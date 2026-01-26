@@ -32,6 +32,7 @@ pub fn run() {
             delete_files,
             // 工具函数
             format_size,
+            open_disk_cleanup,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

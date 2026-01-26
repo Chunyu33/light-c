@@ -188,3 +188,27 @@ pub struct CategoryInfo {
 pub fn format_size(bytes: u64) -> String {
     crate::scanner::format_size(bytes)
 }
+
+/// 打开Windows磁盘清理工具
+#[tauri::command]
+pub fn open_disk_cleanup() -> Result<(), String> {
+    info!("打开Windows磁盘清理工具");
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        
+        Command::new("cleanmgr")
+            .arg("/d")
+            .arg("C")
+            .spawn()
+            .map_err(|e| format!("无法启动磁盘清理工具: {}", e))?;
+        
+        Ok(())
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("此功能仅支持Windows系统".to_string())
+    }
+}

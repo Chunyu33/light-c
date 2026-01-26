@@ -4,8 +4,9 @@
 // ============================================================================
 
 import { memo } from 'react';
-import { Trash2, Loader2, RefreshCw, CheckSquare, Square, Sparkles } from 'lucide-react';
+import { Trash2, Loader2, RefreshCw, CheckSquare, Square, Sparkles, HardDrive } from 'lucide-react';
 import type { AppStatus } from '../types';
+import { openDiskCleanup } from '../api/commands';
 
 // ============================================================================
 // 类型定义
@@ -232,6 +233,17 @@ export const ActionButtons = memo(function ActionButtons({
           />
         </div>
       )}
+
+      {/* ========== 分隔线 ========== */}
+      <div className="w-px h-7 bg-[var(--border-default)] mx-1" />
+
+      {/* ========== 系统磁盘清理 ========== */}
+      <SecondaryButton
+        onClick={() => openDiskCleanup()}
+        disabled={isBusy}
+        icon={<HardDrive className="w-3.5 h-3.5" />}
+        label="系统清理"
+      />
     </div>
   );
 });

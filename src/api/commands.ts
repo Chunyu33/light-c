@@ -60,3 +60,10 @@ export async function getCategories(): Promise<CategoryInfo[]> {
 export async function formatSizeFromRust(bytes: number): Promise<string> {
   return invoke<string>('format_size', { bytes });
 }
+
+/**
+ * 打开Windows磁盘清理工具
+ */
+export async function openDiskCleanup(): Promise<void> {
+  return invoke<void>('open_disk_cleanup');
+}
