@@ -1,0 +1,132 @@
+/* ============================================================================
+   C盘清理工具 - 全局样式
+   支持浅色/深色主题
+   ============================================================================ */
+
+@import "tailwindcss";
+
+/* ============================================================================
+   CSS变量 - 浅色主题（浅绿色渐变风格）
+   ============================================================================ */
+:root, .light {
+  /* 背景色 - 浅绿色色调 */
+  --bg-base: #f0fdf4;
+  --bg-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #ecfdf5;
+  --bg-active: #d1fae5;
+  
+  /* 前景色 */
+  --fg-primary: #064e3b;
+  --fg-secondary: #065f46;
+  --fg-muted: #6b7280;
+  --fg-faint: #9ca3af;
+  
+  /* 边框 */
+  --border-default: #d1fae5;
+  --border-muted: #ecfdf5;
+  
+  /* 强调色 - 绿色系 */
+  --accent-primary: #10b981;
+  --accent-primary-hover: #059669;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  
+  /* 滚动条 */
+  --scrollbar-track: #ecfdf5;
+  --scrollbar-thumb: #a7f3d0;
+  --scrollbar-thumb-hover: #6ee7b7;
+
+  font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
+   CSS变量 - 深色主题（深绿色色调）
+   ============================================================================ */
+.dark {
+  --bg-base: #0a1f1a;
+  --bg-elevated: #0f2922;
+  --bg-card: #14332b;
+  --bg-hover: #1a3d34;
+  --bg-active: #20473d;
+  
+  --fg-primary: #ecfdf5;
+  --fg-secondary: #a7f3d0;
+  --fg-muted: #6ee7b7;
+  --fg-faint: #34d399;
+  
+  --border-default: #1a3d34;
+  --border-muted: #14332b;
+  
+  --accent-primary: #10b981;
+  --accent-primary-hover: #34d399;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  
+  --scrollbar-track: #14332b;
+  --scrollbar-thumb: #1a3d34;
+  --scrollbar-thumb-hover: #20473d;
+}
+
+/* ============================================================================
+   滚动条样式 - 现代简约风格
+   ============================================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* 滚动条角落 */
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+
+/* Firefox滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* ============================================================================
+   基础样式
+   ============================================================================ */
+body {
+  background-color: var(--bg-base);
+  color: var(--fg-primary);
+}
+
+/* 禁用文本选择（桌面应用风格） */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 平滑过渡 */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
