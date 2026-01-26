@@ -36,4 +36,6 @@ thiserror = "1"
 # 日志
 log = "0.4"
 env_logger = "0.11"
+tauri-plugin-updater = "2.9.0"
+tauri-plugin-process = "2.3.1"
 

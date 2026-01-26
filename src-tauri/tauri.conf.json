@@ -34,6 +34,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVEMDMzQzcwQkM2QjRCRUIKUldUclMydThjRHdEWFhnelhONmpBSHFDVVlQVWs4QjBUM3Iza3dMR2szdkkvOVBydVc1SWVrK0oK",
+      "endpoints": [
+        "https://github.com/Chunyu33/light-c/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

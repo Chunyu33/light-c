@@ -3,8 +3,10 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 type SettingsTab = 'general' | 'feedback' | 'about';
 
@@ -206,10 +208,162 @@ function FeedbackSettings() {
   );
 }
 
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'latest' | 'error';
+
 // 关于
 function AboutSettings() {
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string } | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const checkForUpdates = async () => {
+    setUpdateStatus('checking');
+    setErrorMessage('');
+    
+    try {
+      const update = await check();
+      
+      if (update) {
+        setUpdateInfo({
+          version: update.version,
+          notes: update.body || '无更新说明',
+        });
+        setUpdateStatus('available');
+      } else {
+        setUpdateStatus('latest');
+      }
+    } catch (error) {
+      console.error('检查更新失败:', error);
+      setErrorMessage(error instanceof Error ? error.message : '检查更新失败');
+      setUpdateStatus('error');
+    }
+  };
+
+  const downloadAndInstall = async () => {
+    setUpdateStatus('downloading');
+    setDownloadProgress(0);
+    
+    try {
+      const update = await check();
+      
+      if (update) {
+        let downloaded = 0;
+        let contentLength = 0;
+        await update.downloadAndInstall((event) => {
+          if (event.event === 'Started') {
+            contentLength = event.data.contentLength || 0;
+          } else if (event.event === 'Progress') {
+            downloaded += event.data.chunkLength;
+            if (contentLength > 0) {
+              setDownloadProgress((downloaded / contentLength) * 100);
+            }
+          }
+        });
+        
+        setUpdateStatus('ready');
+      }
+    } catch (error) {
+      console.error('下载更新失败:', error);
+      setErrorMessage(error instanceof Error ? error.message : '下载更新失败');
+      setUpdateStatus('error');
+    }
+  };
+
+  const handleRelaunch = async () => {
+    await relaunch();
+  };
+
   return (
     <div className="space-y-6">
+      {/* 检查更新 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider">检查更新</h4>
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {updateStatus === 'checking' && (
+                <RefreshCw className="w-5 h-5 text-emerald-500 animate-spin" />
+              )}
+              {updateStatus === 'idle' && (
+                <Download className="w-5 h-5 text-[var(--fg-muted)]" />
+              )}
+              {updateStatus === 'latest' && (
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              )}
+              {updateStatus === 'available' && (
+                <Download className="w-5 h-5 text-amber-500" />
+              )}
+              {updateStatus === 'downloading' && (
+                <RefreshCw className="w-5 h-5 text-emerald-500 animate-spin" />
+              )}
+              {updateStatus === 'ready' && (
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              )}
+              {updateStatus === 'error' && (
+                <AlertCircle className="w-5 h-5 text-red-500" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-[var(--fg-primary)]">
+                  {updateStatus === 'idle' && '检查更新'}
+                  {updateStatus === 'checking' && '正在检查...'}
+                  {updateStatus === 'latest' && '已是最新版本'}
+                  {updateStatus === 'available' && `发现新版本: v${updateInfo?.version}`}
+                  {updateStatus === 'downloading' && `正在下载... ${downloadProgress.toFixed(0)}%`}
+                  {updateStatus === 'ready' && '更新已就绪'}
+                  {updateStatus === 'error' && '检查失败'}
+                </p>
+                <p className="text-xs text-[var(--fg-muted)]">
+                  {updateStatus === 'idle' && '点击检查是否有新版本可用'}
+                  {updateStatus === 'checking' && '正在连接更新服务器...'}
+                  {updateStatus === 'latest' && '您的应用已是最新版本'}
+                  {updateStatus === 'available' && '点击下载并安装更新'}
+                  {updateStatus === 'downloading' && '请勿关闭应用...'}
+                  {updateStatus === 'ready' && '点击重启应用以完成更新'}
+                  {updateStatus === 'error' && errorMessage}
+                </p>
+              </div>
+            </div>
+            <div>
+              {(updateStatus === 'idle' || updateStatus === 'latest' || updateStatus === 'error') && (
+                <button
+                  onClick={checkForUpdates}
+                  className="px-3 py-1.5 text-xs font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                >
+                  检查更新
+                </button>
+              )}
+              {updateStatus === 'available' && (
+                <button
+                  onClick={downloadAndInstall}
+                  className="px-3 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                >
+                  下载更新
+                </button>
+              )}
+              {updateStatus === 'ready' && (
+                <button
+                  onClick={handleRelaunch}
+                  className="px-3 py-1.5 text-xs font-medium bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+                >
+                  重启应用
+                </button>
+              )}
+            </div>
+          </div>
+          {updateStatus === 'downloading' && (
+            <div className="mt-3">
+              <div className="h-1.5 bg-[var(--bg-base)] rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-300"
+                  style={{ width: `${downloadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider">应用信息</h4>
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
