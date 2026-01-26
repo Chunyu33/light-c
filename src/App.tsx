@@ -128,7 +128,7 @@ function App() {
 
       {/* 底部状态栏 */}
       <footer className="h-7 bg-[var(--bg-elevated)] border-t border-[var(--border-default)] flex items-center justify-center px-4 shrink-0">
-        <p className="text-[10px] text-[var(--fg-faint)]">Copyright © 2025 Chunyu. All rights reserved.</p>
+        <p className="text-[10px] text-[var(--fg-faint)]">Copyright © {new Date().getFullYear()} LightC. All rights reserved.</p>
       </footer>
     </div>
   );
