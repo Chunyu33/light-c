@@ -2,7 +2,7 @@
 // 设置弹窗组件 - 仿微信设置布局
 // ============================================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 
@@ -28,11 +28,30 @@ const themeOptions: { mode: ThemeMode; label: string; icon: typeof Sun }[] = [
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const { mode, setMode } = useTheme();
+  const [isVisible, setIsVisible] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setIsAnimating(true);
+      // 延迟一帧以触发动画
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    } else {
+      setIsVisible(false);
+      // 等待动画结束后再隐藏
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  if (!isOpen && !isAnimating) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩 */}
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -40,7 +59,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       />
       
       {/* 弹窗内容 */}
-      <div className="relative w-[600px] h-[450px] bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] flex overflow-hidden">
+      <div className={`relative w-[600px] h-[450px] bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] flex overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
         {/* 左侧导航 */}
         <div className="w-[160px] bg-[var(--bg-base)] border-r border-[var(--border-default)] py-4">
           <div className="px-4 mb-4">
@@ -204,6 +223,17 @@ function AboutSettings() {
               <p className="text-xs text-[var(--fg-faint)] mt-1">版本 0.1.0</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider">为什么叫LightC</h4>
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
+          <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
+            <span className="font-medium text-emerald-500">Light</span> 代表轻量、轻快，寓意让您的C盘变得轻盈；
+            <span className="font-medium text-emerald-500">C</span> 即C盘，Windows系统的核心磁盘。
+            LightC 致力于帮助您安全、高效地清理C盘垃圾文件，释放宝贵的磁盘空间，让系统运行更加流畅。
+          </p>
         </div>
       </div>
 
