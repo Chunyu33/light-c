@@ -3,25 +3,24 @@
 // 支持浅色/深色/跟随系统主题
 // ============================================================================
 
-import { useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  DiskUsage,
   ScanSummary,
   CategoryCard,
   ActionButtons,
   ErrorAlert,
   EmptyState,
-  ThemeToggle,
+  SettingsModal,
+  TitleBar,
 } from './components';
 import { useCleanup } from './hooks/useCleanup';
-import { HardDrive } from 'lucide-react';
+import './App.css';
 
 function App() {
   const {
     status,
     scanResult,
     deleteResult,
-    diskInfo,
     selectedPaths,
     error,
     startScan,
@@ -29,13 +28,9 @@ function App() {
     toggleFileSelection,
     toggleCategorySelection,
     toggleAllSelection,
-    refreshDiskInfo,
     clearError,
   } = useCleanup();
 
-  useEffect(() => {
-    refreshDiskInfo();
-  }, [refreshDiskInfo]);
 
   // 使用useMemo优化计算
   const selectedSize = useMemo(() => {
@@ -51,23 +46,15 @@ function App() {
     return total;
   }, [scanResult, selectedPaths]);
 
-  return (
-    <div className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden no-select">
-      {/* 标题栏 */}
-      <header 
-        className="h-12 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center px-4 shrink-0"
-        data-tauri-drag-region
-      >
-        <div className="flex items-center gap-3 flex-1" data-tauri-drag-region>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <HardDrive className="w-4 h-4 text-white" />
-          </div>
-          <div data-tauri-drag-region>
-            <h1 className="text-sm font-semibold text-[var(--fg-primary)]">C盘清理工具</h1>
-            <p className="text-[10px] text-[var(--fg-muted)]">Windows 智能瘦身助手</p>
-          </div>
-        </div>
+  const [showSettings, setShowSettings] = useState(false);
 
+  return (
+    <div className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden">
+      {/* 自定义标题栏 */}
+      <TitleBar onSettingsClick={() => setShowSettings(true)} />
+
+      {/* 工具栏 */}
+      <header className="h-11 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center px-4 shrink-0">
         {/* 操作按钮 */}
         <ActionButtons
           status={status}
@@ -79,12 +66,10 @@ function App() {
           onSelectAll={() => toggleAllSelection(true)}
           onDeselectAll={() => toggleAllSelection(false)}
         />
-
-        {/* 主题切换 */}
-        <div className="ml-3 pl-3 border-l border-[var(--border-default)]">
-          <ThemeToggle />
-        </div>
       </header>
+
+      {/* 设置弹窗 */}
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* 主内容区 */}
       <main className="flex-1 overflow-auto p-4 space-y-3 bg-[var(--bg-base)]">
@@ -102,9 +87,6 @@ function App() {
         )}
         {/* 错误提示 */}
         {error && <ErrorAlert message={error} onClose={clearError} />}
-
-        {/* 磁盘使用情况 */}
-        <DiskUsage diskInfo={diskInfo} loading={status === 'scanning' && !diskInfo} />
 
         {/* 扫描结果摘要 */}
         {scanResult && (

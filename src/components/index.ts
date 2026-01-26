@@ -9,3 +9,5 @@ export { ActionButtons } from './ActionButtons';
 export { ErrorAlert } from './ErrorAlert';
 export { EmptyState } from './EmptyState';
 export { ThemeToggle } from './ThemeToggle';
+export { SettingsModal } from './SettingsModal';
+export { TitleBar } from './TitleBar';
