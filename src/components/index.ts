@@ -11,3 +11,4 @@ export { EmptyState } from './EmptyState';
 export { ThemeToggle } from './ThemeToggle';
 export { SettingsModal } from './SettingsModal';
 export { TitleBar } from './TitleBar';
+export { ScanProgress } from './ScanProgress';

@@ -156,12 +156,12 @@ function FeedbackSettings() {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider">联系我们</h4>
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider">联系我</h4>
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4 space-y-4">
           <div>
             <p className="text-sm font-medium text-[var(--fg-primary)]">问题反馈</p>
             <p className="text-xs text-[var(--fg-muted)] mt-1">
-              如果您在使用过程中遇到任何问题或有改进建议，欢迎通过以下方式联系我们：
+              如果您在使用过程中遇到任何问题或有改进建议，欢迎通过以下方式联系我：
             </p>
           </div>
           

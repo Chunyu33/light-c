@@ -12,6 +12,8 @@ import {
   EmptyState,
   SettingsModal,
   TitleBar,
+  ScanProgress,
+  DiskUsage,
 } from './components';
 import { useCleanup } from './hooks/useCleanup';
 import './App.css';
@@ -21,6 +23,7 @@ function App() {
     status,
     scanResult,
     deleteResult,
+    diskInfo,
     selectedPaths,
     error,
     startScan,
@@ -31,8 +34,10 @@ function App() {
     clearError,
   } = useCleanup();
 
+  // 设置弹窗状态
+  const [showSettings, setShowSettings] = useState(false);
 
-  // 使用useMemo优化计算
+  // 使用useMemo优化计算已选文件大小
   const selectedSize = useMemo(() => {
     if (!scanResult) return 0;
     let total = 0;
@@ -46,15 +51,16 @@ function App() {
     return total;
   }, [scanResult, selectedPaths]);
 
-  const [showSettings, setShowSettings] = useState(false);
+  // 判断是否正在扫描
+  const isScanning = status === 'scanning';
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden">
+    <div className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden select-none">
       {/* 自定义标题栏 */}
       <TitleBar onSettingsClick={() => setShowSettings(true)} />
 
       {/* 工具栏 */}
-      <header className="h-11 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center px-4 shrink-0">
+      <header className="h-14 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center px-4 shrink-0">
         {/* 操作按钮 */}
         <ActionButtons
           status={status}
@@ -68,25 +74,26 @@ function App() {
         />
       </header>
 
+      {/* 扫描进度条 - 位于工具栏下方 */}
+      <ScanProgress
+        isScanning={isScanning}
+        currentCategory="正在扫描垃圾文件..."
+        completedCategories={isScanning ? 0 : (scanResult?.categories.length || 0)}
+        totalCategories={10}
+        scannedFileCount={scanResult?.total_file_count || 0}
+        scannedSize={scanResult?.total_size || 0}
+      />
+
       {/* 设置弹窗 */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
       {/* 主内容区 */}
       <main className="flex-1 overflow-auto p-4 space-y-3 bg-[var(--bg-base)]">
-        {/* 扫描中Loading */}
-        {status === 'scanning' && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-[var(--bg-card)] rounded-xl p-6 shadow-2xl border border-[var(--border-default)] flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-              <div className="text-center">
-                <p className="text-[var(--fg-primary)] font-medium">正在扫描中...</p>
-                <p className="text-[var(--fg-muted)] text-sm mt-1">请稍候，正在分析C盘文件</p>
-              </div>
-            </div>
-          </div>
-        )}
         {/* 错误提示 */}
         {error && <ErrorAlert message={error} onClose={clearError} />}
+
+        {/* C盘使用情况 - 始终显示 */}
+        <DiskUsage diskInfo={diskInfo} />
 
         {/* 扫描结果摘要 */}
         {scanResult && (
@@ -122,14 +129,10 @@ function App() {
             )}
           </div>
         ) : (
+          /* 未扫描时显示软件特色介绍 */
           <EmptyState />
         )}
       </main>
-
-      {/* 底部状态栏 */}
-      <footer className="h-7 bg-[var(--bg-elevated)] border-t border-[var(--border-default)] flex items-center justify-center px-4 shrink-0">
-        <p className="text-[10px] text-[var(--fg-faint)]">Copyright © {new Date().getFullYear()} LightC. All rights reserved.</p>
-      </footer>
     </div>
   );
 }

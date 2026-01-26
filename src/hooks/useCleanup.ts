@@ -3,7 +3,7 @@
 // 管理扫描和删除的状态逻辑
 // ============================================================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ScanResult, DeleteResult, AppStatus, FileInfo } from '../types';
 import { scanJunkFiles, deleteFiles, getDiskInfo } from '../api/commands';
 import type { DiskInfo } from '../types';
@@ -63,6 +63,11 @@ export function useCleanup(): UseCleanupReturn {
       setError(`获取磁盘信息失败: ${err}`);
     }
   }, []);
+
+  // 应用启动时自动获取磁盘信息
+  useEffect(() => {
+    refreshDiskInfo();
+  }, [refreshDiskInfo]);
 
   // 执行扫描
   const startScan = useCallback(async () => {

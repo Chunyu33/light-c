@@ -12,26 +12,17 @@ interface DiskUsageProps {
 }
 
 export function DiskUsage({ diskInfo, loading }: DiskUsageProps) {
-  if (loading) {
+  // 加载中或数据为空时显示骨架屏
+  if (loading || !diskInfo) {
     return (
       <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
         <div className="animate-pulse flex items-center gap-4">
           <div className="w-12 h-12 bg-[var(--bg-hover)] rounded-lg"></div>
           <div className="flex-1">
             <div className="h-4 bg-[var(--bg-hover)] rounded w-1/3 mb-2"></div>
-            <div className="h-3 bg-[var(--bg-hover)] rounded w-full"></div>
+            <div className="h-2 bg-[var(--bg-hover)] rounded w-full mb-2"></div>
+            <div className="h-3 bg-[var(--bg-hover)] rounded w-2/3"></div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!diskInfo) {
-    return (
-      <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
-        <div className="flex items-center gap-3 text-[var(--fg-muted)]">
-          <HardDrive className="w-5 h-5" />
-          <span className="text-sm">点击"开始扫描"获取磁盘信息</span>
         </div>
       </div>
     );
