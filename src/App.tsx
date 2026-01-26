@@ -14,8 +14,10 @@ import {
   TitleBar,
   ScanProgress,
   DiskUsage,
+  ConfirmDialog,
 } from './components';
 import { useCleanup } from './hooks/useCleanup';
+import { formatSize } from './utils/format';
 import './App.css';
 
 function App() {
@@ -36,6 +38,8 @@ function App() {
 
   // 设置弹窗状态
   const [showSettings, setShowSettings] = useState(false);
+  // 清理确认弹窗状态
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // 使用useMemo优化计算已选文件大小
   const selectedSize = useMemo(() => {
@@ -68,7 +72,7 @@ function App() {
           selectedCount={selectedPaths.size}
           totalCount={scanResult?.total_file_count || 0}
           onScan={startScan}
-          onDelete={startDelete}
+          onDelete={() => setShowDeleteConfirm(true)}
           onSelectAll={() => toggleAllSelection(true)}
           onDeselectAll={() => toggleAllSelection(false)}
         />
@@ -86,6 +90,22 @@ function App() {
 
       {/* 设置弹窗 */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
+      {/* 清理确认弹窗 */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="确认清理"
+        description={`您即将删除 ${selectedPaths.size.toLocaleString()} 个文件，预计释放 ${formatSize(selectedSize)} 空间。此操作不可撤销。`}
+        warning="免责声明：本软件仅清理常见的系统垃圾文件，但不对任何数据丢失承担责任。请确保您已了解所选文件的内容，重要数据请提前备份。"
+        confirmText="确认清理"
+        cancelText="取消"
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          startDelete();
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isDanger
+      />
 
       {/* 主内容区 */}
       <main className="flex-1 overflow-auto p-4 space-y-3 bg-[var(--bg-base)]">

@@ -28,6 +28,14 @@ pub enum JunkCategory {
     OldWindowsInstallation,
     /// 应用程序缓存
     AppCache,
+    /// 字体缓存
+    FontCache,
+    /// Windows错误报告
+    WindowsErrorReports,
+    /// 安装程序临时文件
+    InstallerTemp,
+    /// 剪贴板缓存
+    ClipboardCache,
 }
 
 impl JunkCategory {
@@ -44,6 +52,10 @@ impl JunkCategory {
             JunkCategory::MemoryDump => "内存转储文件",
             JunkCategory::OldWindowsInstallation => "旧版Windows安装",
             JunkCategory::AppCache => "应用程序缓存",
+            JunkCategory::FontCache => "字体缓存",
+            JunkCategory::WindowsErrorReports => "Windows错误报告",
+            JunkCategory::InstallerTemp => "安装程序临时文件",
+            JunkCategory::ClipboardCache => "剪贴板缓存",
         }
     }
 
@@ -60,6 +72,10 @@ impl JunkCategory {
             JunkCategory::MemoryDump => "系统崩溃时产生的内存转储文件",
             JunkCategory::OldWindowsInstallation => "系统升级后保留的旧版Windows文件",
             JunkCategory::AppCache => "各类应用程序产生的缓存文件",
+            JunkCategory::FontCache => "Windows字体渲染缓存，删除后会自动重建",
+            JunkCategory::WindowsErrorReports => "系统和应用崩溃时生成的错误报告文件",
+            JunkCategory::InstallerTemp => "软件安装过程中产生的临时文件",
+            JunkCategory::ClipboardCache => "剪贴板历史记录缓存文件",
         }
     }
 
@@ -68,9 +84,13 @@ impl JunkCategory {
         match self {
             JunkCategory::WindowsTemp => 1,
             JunkCategory::ThumbnailCache => 1,
+            JunkCategory::FontCache => 1,
+            JunkCategory::ClipboardCache => 1,
             JunkCategory::BrowserCache => 2,
             JunkCategory::RecycleBin => 2,
             JunkCategory::LogFiles => 2,
+            JunkCategory::WindowsErrorReports => 2,
+            JunkCategory::InstallerTemp => 2,
             JunkCategory::SystemCache => 3,
             JunkCategory::WindowsUpdate => 3,
             JunkCategory::AppCache => 3,
@@ -126,6 +146,20 @@ impl JunkCategory {
                 ScanPath::env_path("LOCALAPPDATA", Some("Temp")),
                 ScanPath::env_path("APPDATA", Some("Local\\Temp")),
             ],
+            JunkCategory::FontCache => vec![
+                ScanPath::fixed_path("C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache"),
+            ],
+            JunkCategory::WindowsErrorReports => vec![
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\WER")),
+                ScanPath::fixed_path("C:\\ProgramData\\Microsoft\\Windows\\WER"),
+            ],
+            JunkCategory::InstallerTemp => vec![
+                ScanPath::fixed_path("C:\\Windows\\Installer\\$PatchCache$"),
+                ScanPath::env_path("LOCALAPPDATA", Some("Downloaded Installations")),
+            ],
+            JunkCategory::ClipboardCache => vec![
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Clipboard")),
+            ],
         }
     }
 
@@ -142,6 +176,10 @@ impl JunkCategory {
             JunkCategory::MemoryDump => vec!["*.dmp", "MEMORY.DMP"],
             JunkCategory::OldWindowsInstallation => vec!["*"],
             JunkCategory::AppCache => vec!["*"],
+            JunkCategory::FontCache => vec!["*"],
+            JunkCategory::WindowsErrorReports => vec!["*"],
+            JunkCategory::InstallerTemp => vec!["*"],
+            JunkCategory::ClipboardCache => vec!["*"],
         }
     }
 
@@ -158,6 +196,10 @@ impl JunkCategory {
             JunkCategory::MemoryDump,
             JunkCategory::OldWindowsInstallation,
             JunkCategory::AppCache,
+            JunkCategory::FontCache,
+            JunkCategory::WindowsErrorReports,
+            JunkCategory::InstallerTemp,
+            JunkCategory::ClipboardCache,
         ]
     }
 }

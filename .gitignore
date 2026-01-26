@@ -25,3 +25,4 @@ dist-ssr
 
 # Tauri signing keys (KEEP PRIVATE!)
 .tauri/update.key
+.tauri/*

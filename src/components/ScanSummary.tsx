@@ -73,25 +73,54 @@ export function ScanSummary({
 
       {/* 删除结果提示 */}
       {deleteResult && (
-        <div className={`rounded-lg border p-3 flex items-center gap-3 ${
+        <div className={`rounded-lg border p-3 ${
           deleteResult.failed_count === 0
             ? 'bg-emerald-500/10 border-emerald-500/30'
             : 'bg-amber-500/10 border-amber-500/30'
         }`}>
-          <CheckCircle2 className={`w-5 h-5 ${
-            deleteResult.failed_count === 0 ? 'text-emerald-500' : 'text-amber-500'
-          }`} />
-          <div className="flex-1">
-            <span className={`text-sm font-medium ${
-              deleteResult.failed_count === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-            }`}>
-              {deleteResult.failed_count === 0 ? '清理完成！' : '清理完成（部分失败）'}
-            </span>
-            <span className="text-xs text-[var(--fg-muted)] ml-3">
-              删除 {deleteResult.success_count} 个文件，释放 {formatSize(deleteResult.freed_size)}
-              {deleteResult.failed_count > 0 && `，${deleteResult.failed_count} 个失败`}
-            </span>
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className={`w-5 h-5 ${
+              deleteResult.failed_count === 0 ? 'text-emerald-500' : 'text-amber-500'
+            }`} />
+            <div className="flex-1">
+              <span className={`text-sm font-medium ${
+                deleteResult.failed_count === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+              }`}>
+                {deleteResult.failed_count === 0 ? '清理完成！' : '清理完成（部分失败）'}
+              </span>
+              <span className="text-xs text-[var(--fg-muted)] ml-3">
+                删除 {deleteResult.success_count} 个文件，释放 {formatSize(deleteResult.freed_size)}
+                {deleteResult.failed_count > 0 && `，${deleteResult.failed_count} 个失败`}
+              </span>
+            </div>
           </div>
+          
+          {/* 失败原因详情 */}
+          {deleteResult.failed_files && deleteResult.failed_files.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-amber-500/20">
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
+                失败原因：
+              </p>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {deleteResult.failed_files.slice(0, 10).map((item, index) => (
+                  <div key={index} className="text-xs text-[var(--fg-muted)] flex gap-2">
+                    <span className="text-amber-500 shrink-0">•</span>
+                    <span className="truncate flex-1" title={item.path}>
+                      {item.path.split('\\').pop()}
+                    </span>
+                    <span className="text-amber-500 shrink-0">
+                      {item.reason}
+                    </span>
+                  </div>
+                ))}
+                {deleteResult.failed_files.length > 10 && (
+                  <p className="text-xs text-[var(--fg-muted)] italic">
+                    ...还有 {deleteResult.failed_files.length - 10} 个失败项
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
