@@ -125,20 +125,21 @@ export function useCleanup(): UseCleanupReturn {
           paths.filter((p) => !result.failed_files.some((f) => f.path === p))
         );
         
-        const updatedCategories = scanResult.categories.map((category) => ({
-          ...category,
-          files: category.files.filter((f) => !deletedPaths.has(f.path)),
-          file_count: category.files.filter((f) => !deletedPaths.has(f.path)).length,
-          total_size: category.files
-            .filter((f) => !deletedPaths.has(f.path))
-            .reduce((sum, f) => sum + f.size, 0),
-        }));
+        const updatedCategories = scanResult.categories.map((category) => {
+          const remainingFiles = category.files.filter((f) => !deletedPaths.has(f.path));
+          return {
+            ...category,
+            files: remainingFiles,
+            file_count: remainingFiles.length,
+            total_size: remainingFiles.reduce((sum, f) => sum + f.size, 0),
+          };
+        });
 
         setScanResult({
           ...scanResult,
           categories: updatedCategories,
-          total_file_count: updatedCategories.reduce((sum, c) => sum + c.file_count, 0),
-          total_size: updatedCategories.reduce((sum, c) => sum + c.total_size, 0),
+          total_file_count: updatedCategories.reduce((acc, c) => acc + c.file_count, 0),
+          total_size: updatedCategories.reduce((acc, c) => acc + c.total_size, 0),
         });
 
         // 清除已删除文件的选中状态
@@ -149,7 +150,7 @@ export function useCleanup(): UseCleanupReturn {
         });
       }
 
-      // 刷新磁盘信息
+      // 刷新磁盘信息（放在finally之前确保执行）
       await refreshDiskInfo();
     } catch (err) {
       console.error('删除失败:', err);
