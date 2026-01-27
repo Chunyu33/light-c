@@ -25,4 +25,6 @@ dist-ssr
 
 # Tauri signing keys (KEEP PRIVATE!)
 .tauri/update.key
-.tauri/*
+.tauri/*.key
+build.sh
+build.ps1
