@@ -7,6 +7,7 @@ import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, Ref
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { getVersion } from '@tauri-apps/api/app';
 
 type SettingsTab = 'general' | 'feedback' | 'about';
 
@@ -216,6 +217,12 @@ function AboutSettings() {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string } | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [appVersion, setAppVersion] = useState('');
+
+  // 获取应用版本号
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion('未知'));
+  }, []);
 
   const checkForUpdates = async () => {
     setUpdateStatus('checking');
@@ -374,7 +381,7 @@ function AboutSettings() {
             <div>
               <h3 className="text-lg font-semibold text-[var(--fg-primary)]">LightC</h3>
               <p className="text-sm text-[var(--fg-muted)]">Windows C盘智能清理工具</p>
-              <p className="text-xs text-[var(--fg-faint)] mt-1">版本 0.1.0</p>
+              <p className="text-xs text-[var(--fg-faint)] mt-1">版本 {appVersion || '...'}</p>
             </div>
           </div>
         </div>

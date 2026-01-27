@@ -2,8 +2,10 @@
 // 扫描结果摘要组件 - 支持主题切换
 // ============================================================================
 
-import { FileSearch, Clock, Trash2, CheckCircle2 } from 'lucide-react';
-import type { ScanResult, DeleteResult } from '../types';
+import { useState, useRef } from 'react';
+import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import type { ScanResult, DeleteResult, DeleteError } from '../types';
 import { formatSize, formatDuration } from '../utils/format';
 
 interface ScanSummaryProps {
@@ -13,12 +15,130 @@ interface ScanSummaryProps {
   selectedSize: number;
 }
 
+// 失败明细弹窗组件
+function FailedFilesModal({ 
+  isOpen, 
+  onClose, 
+  failedFiles 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  failedFiles: DeleteError[];
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  const virtualizer = useVirtualizer({
+    count: failedFiles.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 44,
+    overscan: 10,
+  });
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* 遮罩层 */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* 弹窗 */}
+      <div className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden">
+        {/* 头部 */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-[var(--fg-primary)]">
+                清理失败明细
+              </h3>
+              <p className="text-xs text-[var(--fg-muted)]">
+                共 {failedFiles.length.toLocaleString()} 个文件清理失败
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* 列表头部 */}
+        <div className="flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
+          <span className="flex-1">文件路径</span>
+          <span className="w-32 text-right">失败原因</span>
+        </div>
+
+        {/* 虚拟滚动列表 */}
+        <div 
+          ref={parentRef}
+          className="overflow-auto"
+          style={{ height: '400px', maxHeight: 'calc(80vh - 180px)' }}
+        >
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const item = failedFiles[virtualItem.index];
+              return (
+                <div
+                  key={virtualItem.key}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualItem.size}px`,
+                    transform: `translateY(${virtualItem.start}px)`,
+                  }}
+                  className="flex items-center px-5 py-2 border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)]"
+                >
+                  <span 
+                    className="flex-1 text-xs text-[var(--fg-secondary)] truncate pr-4" 
+                    title={item.path}
+                  >
+                    {item.path}
+                  </span>
+                  <span className="w-32 text-xs text-amber-500 text-right shrink-0">
+                    {item.reason}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 底部 */}
+        <div className="flex items-center justify-end px-5 py-3 border-t border-[var(--border-default)] bg-[var(--bg-card)] shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--bg-hover)] text-[var(--fg-primary)] hover:bg-[var(--bg-base)] transition-colors"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ScanSummary({
   scanResult,
   deleteResult,
   selectedCount,
   selectedSize,
 }: ScanSummaryProps) {
+  const [showFailedModal, setShowFailedModal] = useState(false);
   if (!scanResult) return null;
 
   return (
@@ -114,14 +234,26 @@ export function ScanSummary({
                   </div>
                 ))}
                 {deleteResult.failed_files.length > 10 && (
-                  <p className="text-xs text-[var(--fg-muted)] italic">
-                    ...还有 {deleteResult.failed_files.length - 10} 个失败项
-                  </p>
+                  <button
+                    onClick={() => setShowFailedModal(true)}
+                    className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 cursor-pointer transition-colors"
+                  >
+                    ...还有 {deleteResult.failed_files.length - 10} 个失败项，点击查看全部
+                  </button>
                 )}
               </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* 失败明细弹窗 */}
+      {deleteResult?.failed_files && (
+        <FailedFilesModal
+          isOpen={showFailedModal}
+          onClose={() => setShowFailedModal(false)}
+          failedFiles={deleteResult.failed_files}
+        />
       )}
     </div>
   );

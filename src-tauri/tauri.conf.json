@@ -5,7 +5,7 @@
   "identifier": "com.chunyu.LightC",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:1666",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
