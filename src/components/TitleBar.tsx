@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Minus, Square, X, Maximize2, Settings } from 'lucide-react';
+import { Minus, Square, X, Settings } from 'lucide-react';
 
 interface TitleBarProps {
   onSettingsClick: () => void;
@@ -87,7 +87,6 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
           className="h-full px-3 flex items-center justify-center text-white/80 hover:bg-white/10 transition-colors"
           title={isMaximized ? "还原" : "最大化"}
         >
-          {/* {isMaximized ? <Square className="w-3 h-3" /> : <Maximize2 className="w-3.5 h-3.5" />} */}
           <Square className="w-3.5 h-3.5" />
         </button>
 
