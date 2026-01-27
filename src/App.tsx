@@ -34,6 +34,7 @@ function App() {
     toggleCategorySelection,
     toggleAllSelection,
     clearError,
+    clearDeleteResult,
   } = useCleanup();
 
   // 设置弹窗状态
@@ -122,6 +123,7 @@ function App() {
             deleteResult={deleteResult}
             selectedCount={selectedPaths.size}
             selectedSize={selectedSize}
+            onClearDeleteResult={clearDeleteResult}
           />
         )}
 

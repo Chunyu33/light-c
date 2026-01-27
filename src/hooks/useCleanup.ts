@@ -36,6 +36,8 @@ interface UseCleanupReturn {
   refreshDiskInfo: () => Promise<void>;
   /** 清除错误 */
   clearError: () => void;
+  /** 清除删除结果 */
+  clearDeleteResult: () => void;
   /** 重置状态 */
   reset: () => void;
 }
@@ -215,6 +217,11 @@ export function useCleanup(): UseCleanupReturn {
     setError(null);
   }, []);
 
+  // 清除删除结果
+  const clearDeleteResult = useCallback(() => {
+    setDeleteResult(null);
+  }, []);
+
   // 重置状态
   const reset = useCallback(() => {
     setStatus('idle');
@@ -238,6 +245,7 @@ export function useCleanup(): UseCleanupReturn {
     toggleAllSelection,
     refreshDiskInfo,
     clearError,
+    clearDeleteResult,
     reset,
   };
 }

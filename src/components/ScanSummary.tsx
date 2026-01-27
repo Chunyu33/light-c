@@ -13,6 +13,7 @@ interface ScanSummaryProps {
   deleteResult: DeleteResult | null;
   selectedCount: number;
   selectedSize: number;
+  onClearDeleteResult?: () => void;
 }
 
 // 失败明细弹窗组件
@@ -137,6 +138,7 @@ export function ScanSummary({
   deleteResult,
   selectedCount,
   selectedSize,
+  onClearDeleteResult,
 }: ScanSummaryProps) {
   const [showFailedModal, setShowFailedModal] = useState(false);
   if (!scanResult) return null;
@@ -199,7 +201,7 @@ export function ScanSummary({
             : 'bg-amber-500/10 border-amber-500/30'
         }`}>
           <div className="flex items-center gap-3">
-            <CheckCircle2 className={`w-5 h-5 ${
+            <CheckCircle2 className={`w-5 h-5 shrink-0 ${
               deleteResult.failed_count === 0 ? 'text-emerald-500' : 'text-amber-500'
             }`} />
             <div className="flex-1">
@@ -209,10 +211,22 @@ export function ScanSummary({
                 {deleteResult.failed_count === 0 ? '清理完成！' : '清理完成（部分失败）'}
               </span>
               <span className="text-xs text-[var(--fg-muted)] ml-3">
-                删除 {deleteResult.success_count} 个文件，释放 {formatSize(deleteResult.freed_size)}
-                {deleteResult.failed_count > 0 && `，${deleteResult.failed_count} 个失败`}
+                删除 {deleteResult.success_count} 个文件，释放 <span className="text-emerald-500 font-medium">{formatSize(deleteResult.freed_size)}</span>
+                {deleteResult.failed_count > 0 && (
+                  <>，<span className="text-red-500 font-medium">{deleteResult.failed_count}</span> 个失败</>
+                )}
               </span>
             </div>
+            {/* 关闭按钮 */}
+            {onClearDeleteResult && (
+              <button
+                onClick={onClearDeleteResult}
+                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
+                title="关闭"
+              >
+                <X className="w-4 h-4 text-[var(--fg-muted)]" />
+              </button>
+            )}
           </div>
           
           {/* 失败原因详情 */}
