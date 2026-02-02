@@ -45,7 +45,7 @@ const categoryColors: Record<string, { bg: string; text: string; border: string 
 export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
   const [status, setStatus] = useState<'idle' | 'scanning' | 'done'>('idle');
   const [scanResult, setScanResult] = useState<SocialScanResult | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -59,7 +59,7 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
   const handleScan = async () => {
     setStatus('scanning');
     setScanResult(null);
-    setSelectedCategories(new Set());
+    setSelectedPaths(new Set());
     setExpandedCategory(null);
 
     try {
@@ -67,11 +67,9 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
       console.log('社交软件扫描结果:', result);
       setScanResult(result);
       setStatus('done');
-      // 默认全选有文件的分类
-      const nonEmptyCategories = result.categories
-        .filter(c => c.file_count > 0)
-        .map(c => c.id);
-      setSelectedCategories(new Set(nonEmptyCategories));
+      // 默认全选所有文件
+      const allPaths = result.categories.flatMap(c => c.files.map(f => f.path));
+      setSelectedPaths(new Set(allPaths));
     } catch (err) {
       console.error('扫描社交软件缓存失败:', err);
       showToast({ type: 'error', title: '扫描失败', description: String(err) });
@@ -79,14 +77,30 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
     }
   };
 
-  // 切换分类选中
-  const toggleCategory = (categoryId: string) => {
-    setSelectedCategories(prev => {
+  // 切换单个文件选中
+  const toggleFile = (path: string) => {
+    setSelectedPaths(prev => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
+      if (next.has(path)) {
+        next.delete(path);
       } else {
-        next.add(categoryId);
+        next.add(path);
+      }
+      return next;
+    });
+  };
+
+  // 切换分类选中（选中/取消该分类下所有文件）
+  const toggleCategory = (category: { files: SocialFile[] }) => {
+    const categoryPaths = category.files.map(f => f.path);
+    const allSelected = categoryPaths.every(p => selectedPaths.has(p));
+    
+    setSelectedPaths(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        categoryPaths.forEach(p => next.delete(p));
+      } else {
+        categoryPaths.forEach(p => next.add(p));
       }
       return next;
     });
@@ -95,11 +109,11 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
   // 全选/取消全选
   const toggleSelectAll = () => {
     if (!scanResult) return;
-    const nonEmptyCategories = scanResult.categories.filter(c => c.file_count > 0);
-    if (selectedCategories.size === nonEmptyCategories.length) {
-      setSelectedCategories(new Set());
+    const allPaths = scanResult.categories.flatMap(c => c.files.map(f => f.path));
+    if (selectedPaths.size === allPaths.length) {
+      setSelectedPaths(new Set());
     } else {
-      setSelectedCategories(new Set(nonEmptyCategories.map(c => c.id)));
+      setSelectedPaths(new Set(allPaths));
     }
   };
 
@@ -107,13 +121,8 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
   const handleDelete = async () => {
     if (!scanResult) return;
     
-    // 收集所有选中分类的文件路径
-    const paths: string[] = [];
-    for (const category of scanResult.categories) {
-      if (selectedCategories.has(category.id)) {
-        paths.push(...category.files.map(f => f.path));
-      }
-    }
+    // 收集所有选中的文件路径
+    const paths = Array.from(selectedPaths);
 
     if (paths.length === 0) return;
 
@@ -155,10 +164,11 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
 
   // 计算选中的文件数和大小
   const selectedStats = scanResult?.categories
-    .filter(c => selectedCategories.has(c.id))
-    .reduce((acc, c) => ({
-      files: acc.files + c.file_count,
-      size: acc.size + c.total_size,
+    .flatMap(c => c.files)
+    .filter(f => selectedPaths.has(f.path))
+    .reduce((acc, f) => ({
+      files: acc.files + 1,
+      size: acc.size + f.size,
     }), { files: 0, size: 0 }) || { files: 0, size: 0 };
 
   return (
@@ -276,14 +286,14 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
               >
                 <input
                   type="checkbox"
-                  checked={selectedCategories.size === scanResult.categories.filter(c => c.file_count > 0).length}
+                  checked={selectedPaths.size === scanResult.categories.flatMap(c => c.files).length && selectedPaths.size > 0}
                   onChange={toggleSelectAll}
                   className="h-4 w-4 rounded border-[var(--border-default)] text-emerald-500 focus:ring-emerald-500"
                 />
                 全选
               </button>
               <button
-                onClick={() => setSelectedCategories(new Set())}
+                onClick={() => setSelectedPaths(new Set())}
                 className="text-sm text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] transition"
               >
                 取消全选
@@ -291,10 +301,10 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
             </div>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              disabled={selectedCategories.size === 0 || isDeleting}
+              disabled={selectedPaths.size === 0 || isDeleting}
               className={`
                 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all
-                ${selectedCategories.size === 0 || isDeleting
+                ${selectedPaths.size === 0 || isDeleting
                   ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
                   : 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm hover:shadow'
                 }
@@ -350,9 +360,13 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
             {status === 'done' && scanResult && scanResult.categories.map((category) => {
               const Icon = categoryIcons[category.id] || FolderOpen;
               const colors = categoryColors[category.id] || categoryColors.images_videos;
-              const isSelected = selectedCategories.has(category.id);
               const isExpanded = expandedCategory === category.id;
               const hasFiles = category.file_count > 0;
+              // 计算该分类的选中状态
+              const categoryPaths = category.files.map(f => f.path);
+              const selectedInCategory = categoryPaths.filter(p => selectedPaths.has(p)).length;
+              const isAllSelected = selectedInCategory === categoryPaths.length && categoryPaths.length > 0;
+              const isPartialSelected = selectedInCategory > 0 && selectedInCategory < categoryPaths.length;
 
               return (
                 <div key={category.id}>
@@ -361,18 +375,30 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
                     className={`
                       px-5 py-4 flex items-center gap-4 transition-all
                       ${hasFiles ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : 'opacity-50'}
-                      ${isSelected ? 'bg-emerald-500/5' : ''}
+                      ${isAllSelected || isPartialSelected ? 'bg-emerald-500/5' : ''}
                     `}
-                    onClick={() => hasFiles && toggleCategory(category.id)}
+                    onClick={() => hasFiles && setExpandedCategory(isExpanded ? null : category.id)}
                   >
+                    {/* 展开图标 */}
+                    <div className={`text-[var(--fg-muted)] transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
+
                     {/* 复选框 */}
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      disabled={!hasFiles}
-                      onChange={() => {}}
-                      className="h-5 w-5 rounded border-[var(--border-default)] text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                    />
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasFiles) toggleCategory(category);
+                      }}
+                      className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors
+                        ${isAllSelected ? 'bg-emerald-500 border-emerald-500' : isPartialSelected ? 'bg-emerald-500/50 border-emerald-500' : 'border-[var(--fg-faint)] hover:border-[var(--fg-muted)]'}`}
+                    >
+                      {(isAllSelected || isPartialSelected) && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
 
                     {/* 图标 */}
                     <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${colors.bg}`}>
@@ -399,19 +425,6 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
                         {category.file_count.toLocaleString()} 个文件
                       </p>
                     </div>
-
-                    {/* 展开按钮 */}
-                    {hasFiles && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExpandedCategory(isExpanded ? null : category.id);
-                        }}
-                        className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition"
-                      >
-                        <ChevronRight className={`w-4 h-4 text-[var(--fg-muted)] transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                      </button>
-                    )}
                   </div>
 
                   {/* 展开的文件列表 */}
@@ -419,44 +432,59 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
                     <div className="bg-[var(--bg-base)] border-t border-[var(--border-default)]">
                       {/* 预览前 20 个文件 */}
                       <div className="max-h-64 overflow-auto">
-                        {category.files.slice(0, 20).map((file, index) => (
-                          <div
-                            key={file.path}
-                            className="px-5 py-2.5 flex items-center gap-3 text-xs border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--bg-hover)]"
-                          >
-                            <span className="w-6 text-center text-[var(--fg-faint)]">{index + 1}</span>
-                            <span className="px-2 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] shrink-0">
-                              {file.app_name}
-                            </span>
-                            <span className="flex-1 truncate text-[var(--fg-secondary)]" title={file.path}>
-                              {file.path}
-                            </span>
-                            <span className="text-emerald-600 font-medium shrink-0">{formatSize(file.size)}</span>
-                            {/* 操作按钮 */}
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openInFolder(file.path);
-                                }}
-                                className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
-                                title="打开所在文件夹"
+                        {category.files.slice(0, 20).map((file, index) => {
+                          const isFileSelected = selectedPaths.has(file.path);
+                          return (
+                            <div
+                              key={file.path}
+                              className={`px-5 py-2.5 flex items-center gap-3 text-xs border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--bg-hover)] cursor-pointer ${isFileSelected ? 'bg-emerald-500/5' : ''}`}
+                              onClick={() => toggleFile(file.path)}
+                            >
+                              {/* 文件复选框 */}
+                              <div
+                                className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors
+                                  ${isFileSelected ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--fg-faint)]'}`}
                               >
-                                <FolderOpen className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openFile(file.path);
-                                }}
-                                className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
-                                title="打开文件"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </button>
+                                {isFileSelected && (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className="w-6 text-center text-[var(--fg-faint)]">{index + 1}</span>
+                              <span className="px-2 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] shrink-0">
+                                {file.app_name}
+                              </span>
+                              <span className="flex-1 truncate text-[var(--fg-secondary)]" title={file.path}>
+                                {file.path}
+                              </span>
+                              <span className="text-emerald-600 font-medium shrink-0">{formatSize(file.size)}</span>
+                              {/* 操作按钮 */}
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openInFolder(file.path);
+                                  }}
+                                  className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
+                                  title="打开所在文件夹"
+                                >
+                                  <FolderOpen className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openFile(file.path);
+                                  }}
+                                  className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
+                                  title="打开文件"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       {/* 查看全部按钮 */}
                       {category.files.length > 20 && (
