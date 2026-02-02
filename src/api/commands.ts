@@ -12,6 +12,7 @@ import type {
   CategoryInfo,
   ScanRequest,
   DeleteRequest,
+  LargeFileEntry,
 } from '../types';
 
 /**
@@ -66,4 +67,11 @@ export async function formatSizeFromRust(bytes: number): Promise<string> {
  */
 export async function openDiskCleanup(): Promise<void> {
   return invoke<void>('open_disk_cleanup');
+}
+
+/**
+ * 扫描C盘大文件（前 50 项）
+ */
+export async function scanLargeFiles(): Promise<LargeFileEntry[]> {
+  return invoke<LargeFileEntry[]>('scan_large_files');
 }

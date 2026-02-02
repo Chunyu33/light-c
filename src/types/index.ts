@@ -119,5 +119,15 @@ export interface DeleteRequest {
   paths: string[];
 }
 
+/** 大文件扫描结果条目 */
+export interface LargeFileEntry {
+  /** 文件路径 */
+  path: string;
+  /** 文件大小（字节） */
+  size: number;
+  /** 最后修改时间（Unix时间戳，秒） */
+  modified: number;
+}
+
 /** 应用状态 */
 export type AppStatus = 'idle' | 'scanning' | 'deleting';

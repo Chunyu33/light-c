@@ -61,22 +61,31 @@ interface CircularProgressProps {
   size?: number;
   strokeWidth?: number;
   isCompleted?: boolean;
+  isIndeterminate?: boolean;
 }
 
 const CircularProgress = memo(function CircularProgress({ 
   progress, 
   size = 80, 
   strokeWidth = 6,
-  isCompleted = false 
+  isCompleted = false,
+  isIndeterminate = false,
 }: CircularProgressProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (progress / 100) * circumference;
+  const offset = isIndeterminate 
+    ? circumference * 0.75  // 不确定进度时显示 25% 的弧
+    : circumference - (progress / 100) * circumference;
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
       {/* 背景圆环 */}
-      <svg className="transform -rotate-90" width={size} height={size}>
+      <svg 
+        className={`transform -rotate-90 ${isIndeterminate ? 'animate-spin' : ''}`}
+        style={isIndeterminate ? { animationDuration: '1.5s' } : undefined}
+        width={size} 
+        height={size}
+      >
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -96,7 +105,7 @@ const CircularProgress = memo(function CircularProgress({
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className="transition-all duration-500 ease-out"
+          className={isIndeterminate ? '' : 'transition-all duration-500 ease-out'}
         />
         <defs>
           <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -109,6 +118,8 @@ const CircularProgress = memo(function CircularProgress({
       <div className="absolute inset-0 flex items-center justify-center">
         {isCompleted ? (
           <CheckCircle className="w-8 h-8 text-emerald-500" />
+        ) : isIndeterminate ? (
+          <FolderSearch className="w-6 h-6 text-emerald-500 animate-pulse" />
         ) : (
           <span className="text-lg font-bold text-emerald-500">{Math.round(progress)}%</span>
         )}
@@ -186,7 +197,9 @@ export function ScanProgress({
   const displayFileCount = isCompleted ? completedDataRef.current.scannedFileCount : scannedFileCount;
   const displaySize = isCompleted ? completedDataRef.current.scannedSize : scannedSize;
   const displayTotal = isCompleted ? completedDataRef.current.totalCategories : totalCategories;
-  const progress = isCompleted ? 100 : (totalCategories > 0 ? (completedCategories / totalCategories) * 100 : 0);
+  // -1 表示不确定进度（扫描中），使用模拟动画进度
+  const isIndeterminate = completedCategories < 0 && !isCompleted;
+  const progress = isCompleted ? 100 : (isIndeterminate ? 0 : (totalCategories > 0 ? (completedCategories / totalCategories) * 100 : 0));
 
   return (
     <div 
@@ -211,7 +224,7 @@ export function ScanProgress({
       >
         {/* 顶部：进度环 */}
         <div className="flex flex-col items-center mb-5">
-          <CircularProgress progress={progress} isCompleted={isCompleted} />
+          <CircularProgress progress={progress} isCompleted={isCompleted} isIndeterminate={isIndeterminate} />
           
           {/* 状态文字 */}
           <h3 className="mt-4 text-base font-semibold text-[var(--fg-primary)]">

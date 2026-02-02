@@ -9,9 +9,10 @@ import { formatSize } from '../utils/format';
 interface DiskUsageProps {
   diskInfo: DiskInfo | null;
   loading?: boolean;
+  compact?: boolean;
 }
 
-export function DiskUsage({ diskInfo, loading }: DiskUsageProps) {
+export function DiskUsage({ diskInfo, loading, compact }: DiskUsageProps) {
   // 加载中或数据为空时显示骨架屏
   if (loading || !diskInfo) {
     return (
@@ -39,29 +40,41 @@ export function DiskUsage({ diskInfo, loading }: DiskUsageProps) {
   const colors = getUsageColor(diskInfo.usage_percent);
 
   return (
-    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
-      <div className="flex items-center gap-4">
+    <div
+      className={`bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] ${
+        compact ? 'p-3' : 'p-4'
+      }`}
+    >
+      <div className={`flex items-center ${compact ? 'gap-3' : 'gap-4'}`}>
         {/* 磁盘图标 */}
-        <div className="w-12 h-12 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-          <HardDrive className="w-6 h-6 text-emerald-500" />
+        <div
+          className={`rounded-lg bg-emerald-500/15 flex items-center justify-center ${
+            compact ? 'w-10 h-10' : 'w-12 h-12'
+          }`}
+        >
+          <HardDrive className={compact ? 'w-5 h-5 text-emerald-500' : 'w-6 h-6 text-emerald-500'} />
         </div>
 
         {/* 磁盘信息 */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-2">
+          <div className={`flex items-center justify-between ${compact ? 'mb-1.5' : 'mb-2'}`}>
             <div>
-              <span className="text-sm font-medium text-[var(--fg-primary)]">{diskInfo.drive_letter} 盘</span>
-              <span className="text-xs text-[var(--fg-muted)] ml-2">系统盘</span>
+              <span className={compact ? 'text-xs font-medium text-[var(--fg-primary)]' : 'text-sm font-medium text-[var(--fg-primary)]'}>
+                {diskInfo.drive_letter} 盘
+              </span>
+              <span className={compact ? 'text-[11px] text-[var(--fg-muted)] ml-2' : 'text-xs text-[var(--fg-muted)] ml-2'}>
+                系统盘
+              </span>
             </div>
             <div className="text-right">
-              <span className={`text-lg font-bold ${colors.text}`}>
+              <span className={`${compact ? 'text-base' : 'text-lg'} font-bold ${colors.text}`}>
                 {diskInfo.usage_percent.toFixed(1)}%
               </span>
             </div>
           </div>
 
           {/* 进度条 */}
-          <div className="h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden mb-2">
+          <div className={`${compact ? 'h-1.5' : 'h-2'} bg-[var(--bg-hover)] rounded-full overflow-hidden ${compact ? 'mb-1.5' : 'mb-2'}`}>
             <div
               className={`h-full ${colors.bar} rounded-full`}
               style={{ width: `${diskInfo.usage_percent}%` }}
@@ -69,7 +82,7 @@ export function DiskUsage({ diskInfo, loading }: DiskUsageProps) {
           </div>
 
           {/* 统计信息 */}
-          <div className="flex items-center gap-4 text-xs">
+          <div className={`flex items-center ${compact ? 'gap-3 text-[11px]' : 'gap-4 text-xs'}`}>
             <span className="text-[var(--fg-muted)]">
               总容量 <span className="text-[var(--fg-secondary)] font-medium">{formatSize(diskInfo.total_space)}</span>
             </span>

@@ -27,6 +27,7 @@ pub fn run() {
             // 扫描相关
             scan_junk_files,
             scan_category,
+            scan_large_files,
             get_categories,
             // 删除相关
             delete_files,
