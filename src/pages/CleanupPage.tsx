@@ -3,11 +3,10 @@
 // 展示扫描结果和清理操作
 // ============================================================================
 
+import { Loader2, FolderSearch, FileText, HardDrive, Search, Trash2 } from 'lucide-react';
 import {
-  ActionButtons,
   ScanSummary,
   CategoryCard,
-  ScanProgress,
   EmptyState,
   ConfirmDialog,
   BackButton,
@@ -68,38 +67,124 @@ export function CleanupToolbar({
   | 'onDeselectAll'
 >) {
   const isScanning = status === 'scanning';
+  const hasResult = !!scanResult && scanResult.total_file_count > 0;
 
   return (
     <>
-      {/* 工具栏 */}
-      <header className="h-14 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center px-4 shrink-0">
-        <ActionButtons
-          status={status}
-          hasScanResult={!!scanResult}
-          selectedCount={selectedPaths.size}
-          totalCount={scanResult?.total_file_count || 0}
-          onScan={onScan}
-          onDelete={() => setShowDeleteConfirm(true)}
-          onSelectAll={onSelectAll}
-          onDeselectAll={onDeselectAll}
-        />
+      {/* 顶部操作栏 */}
+      <header className="bg-[var(--bg-elevated)] border-b border-[var(--border-default)] px-4 py-3 shrink-0">
+        <div className="flex items-center justify-between">
+          {/* 左侧：扫描按钮 */}
+          <button
+            onClick={onScan}
+            disabled={isScanning}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+              ${isScanning
+                ? 'bg-emerald-500/20 text-emerald-600 cursor-not-allowed'
+                : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm'
+              }
+            `}
+          >
+            {isScanning ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                扫描中...
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4" />
+                {hasResult ? '重新扫描' : '开始扫描'}
+              </>
+            )}
+          </button>
+
+          {/* 右侧：选择和删除操作 */}
+          {hasResult && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onSelectAll}
+                className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
+              >
+                全选
+              </button>
+              <button
+                onClick={onDeselectAll}
+                className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] transition"
+              >
+                取消全选
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={selectedPaths.size === 0}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
+                  ${selectedPaths.size === 0
+                    ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
+                    : 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm'
+                  }
+                `}
+              >
+                <Trash2 className="w-4 h-4" />
+                清理选中 ({selectedPaths.size.toLocaleString()})
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 扫描中状态 - 内联显示 */}
+        {isScanning && (
+          <div className="mt-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                <FolderSearch className="w-5 h-5 text-emerald-600 animate-pulse" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-[var(--fg-primary)]">正在扫描垃圾文件...</p>
+                <p className="text-xs text-[var(--fg-muted)] mt-0.5">正在检索系统缓存、临时文件等</p>
+              </div>
+            </div>
+            {/* 进度条动画 */}
+            <div className="h-1.5 bg-emerald-500/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full rounded-full"
+                style={{ 
+                  width: '100%',
+                  background: 'linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.6), transparent)',
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 1.5s ease-in-out infinite'
+                }} 
+              />
+            </div>
+            {/* 统计信息 */}
+            <div className="mt-3 flex items-center gap-4 text-xs text-[var(--fg-muted)]">
+              <span className="flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5" />
+                扫描中...
+              </span>
+              <span className="flex items-center gap-1">
+                <HardDrive className="w-3.5 h-3.5" />
+                计算大小...
+              </span>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* 扫描进度条 - 扫描中使用模拟进度，完成后显示实际结果 */}
-      <ScanProgress
-        isScanning={isScanning}
-        currentCategory="正在扫描垃圾文件..."
-        completedCategories={isScanning ? -1 : scanResult?.categories.length || 0}
-        totalCategories={scanResult?.categories.length || 10}
-        scannedFileCount={scanResult?.total_file_count || 0}
-        scannedSize={scanResult?.total_size || 0}
-      />
+      {/* shimmer 动画样式 */}
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
     </>
   );
 }
 
 /** 清理页面内容组件 */
 export function CleanupPage({
+  status,
   scanResult,
   deleteResult,
   selectedPaths,
@@ -111,7 +196,8 @@ export function CleanupPage({
   onToggleFile,
   onToggleCategory,
   onClearDeleteResult,
-}: Omit<CleanupPageProps, 'status' | 'onScan' | 'onSelectAll' | 'onDeselectAll'>) {
+}: Omit<CleanupPageProps, 'onScan' | 'onSelectAll' | 'onDeselectAll'>) {
+  const isScanning = status === 'scanning';
   return (
     <>
       {/* 删除确认弹窗 */}
@@ -168,6 +254,20 @@ export function CleanupPage({
                 <p className="text-[var(--fg-muted)] text-sm">🎉 太棒了！没有发现可清理的垃圾文件</p>
               </div>
             )}
+          </div>
+        ) : isScanning ? (
+          /* 扫描中占位元素 */
+          <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] overflow-hidden">
+            <div className="px-5 py-3 bg-[var(--bg-elevated)] border-b border-[var(--border-default)]">
+              <h3 className="text-sm font-semibold text-[var(--fg-primary)]">垃圾文件分类</h3>
+            </div>
+            <div className="py-16 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
+                <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+              </div>
+              <p className="text-sm font-medium text-[var(--fg-secondary)]">正在扫描中...</p>
+              <p className="text-xs text-[var(--fg-muted)] mt-1">正在检索系统垃圾文件，请稍候</p>
+            </div>
           </div>
         ) : (
           <div className="max-w-5xl mx-auto">

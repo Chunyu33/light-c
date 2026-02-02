@@ -10,7 +10,10 @@ import {
   Folder,
   File,
   AlertTriangle,
+  FolderOpen,
+  ExternalLink,
 } from 'lucide-react';
+import { openInFolder, openFile } from '../api/commands';
 import type { CategoryScanResult, FileInfo } from '../types';
 import { formatSize } from '../utils/format';
 
@@ -240,6 +243,30 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
       {/* 文件大小 */}
       <div className="text-xs text-[var(--fg-muted)] tabular-nums">
         {formatSize(file.size)}
+      </div>
+
+      {/* 操作按钮 */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openInFolder(file.path);
+          }}
+          className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
+          title="打开所在文件夹"
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            openFile(file.path);
+          }}
+          className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
+          title="打开文件"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

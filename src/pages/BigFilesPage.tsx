@@ -4,9 +4,9 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react';
-import { HardDrive, Search, Trash2, FileWarning, Loader2, FolderSearch, CheckCircle2 } from 'lucide-react';
+import { HardDrive, Search, Trash2, FileWarning, Loader2, FolderSearch, CheckCircle2, FolderOpen, ExternalLink } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import { deleteFiles, scanLargeFiles } from '../api/commands';
+import { deleteFiles, scanLargeFiles, openInFolder, openFile } from '../api/commands';
 import { ConfirmDialog, BackButton, useToast } from '../components';
 import {
   formatDate,
@@ -424,6 +424,30 @@ export function BigFilesPage({ onBack }: BigFilesPageProps) {
                             {getRiskLevelText(riskLevel)}
                           </span>
                         </div>
+                      </div>
+
+                      {/* 操作按钮 */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openInFolder(file.path);
+                          }}
+                          className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition text-[var(--fg-muted)] hover:text-emerald-600"
+                          title="打开所在文件夹"
+                        >
+                          <FolderOpen className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openFile(file.path);
+                          }}
+                          className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition text-[var(--fg-muted)] hover:text-emerald-600"
+                          title="打开文件"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );

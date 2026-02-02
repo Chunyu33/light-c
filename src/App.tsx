@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from 'react';
 import { ErrorAlert, SettingsModal, TitleBar, ToastProvider } from './components';
-import { HomePage, CleanupPage, CleanupToolbar, BigFilesPage, PlaceholderPage } from './pages';
+import { HomePage, CleanupPage, CleanupToolbar, BigFilesPage, SocialCleanPage, SystemSlimPage } from './pages';
 import { useCleanup } from './hooks/useCleanup';
 import './App.css';
 
@@ -105,6 +105,7 @@ function App() {
         {/* 清理页面内容 */}
         {activePage === 'cleanup' && (
           <CleanupPage
+            status={status}
             scanResult={scanResult}
             deleteResult={deleteResult}
             selectedPaths={selectedPaths}
@@ -123,22 +124,10 @@ function App() {
         {activePage === 'big-files' && <BigFilesPage onBack={goHome} />}
 
         {/* 社交软件专清页 */}
-        {activePage === 'social-clean' && (
-          <PlaceholderPage
-            title="社交软件专清"
-            description="页面已就位，后续将在此展示社交软件缓存清理功能。"
-            onBack={goHome}
-          />
-        )}
+        {activePage === 'social-clean' && <SocialCleanPage onBack={goHome} />}
 
         {/* 系统瘦身页 */}
-        {activePage === 'system-slim' && (
-          <PlaceholderPage
-            title="系统瘦身"
-            description="页面已就位，后续将在此展示系统组件与备份清理功能。"
-            onBack={goHome}
-          />
-        )}
+        {activePage === 'system-slim' && <SystemSlimPage onBack={goHome} />}
       </main>
     </div>
     </ToastProvider>

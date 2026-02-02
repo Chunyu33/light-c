@@ -75,3 +75,111 @@ export async function openDiskCleanup(): Promise<void> {
 export async function scanLargeFiles(): Promise<LargeFileEntry[]> {
   return invoke<LargeFileEntry[]>('scan_large_files');
 }
+
+/**
+ * 扫描社交软件缓存
+ */
+export async function scanSocialCache(): Promise<SocialScanResult> {
+  return invoke<SocialScanResult>('scan_social_cache');
+}
+
+/**
+ * 在文件资源管理器中打开文件所在目录
+ */
+export async function openInFolder(path: string): Promise<void> {
+  return invoke<void>('open_in_folder', { path });
+}
+
+/**
+ * 直接打开文件（使用系统默认程序）
+ */
+export async function openFile(path: string): Promise<void> {
+  return invoke<void>('open_file', { path });
+}
+
+// ============================================================================
+// 系统瘦身相关
+// ============================================================================
+
+/** 系统瘦身项状态 */
+export interface SlimItemStatus {
+  id: string;
+  name: string;
+  description: string;
+  warning: string;
+  enabled: boolean;
+  size: number;
+  actionable: boolean;
+  action_text: string;
+}
+
+/** 系统瘦身状态汇总 */
+export interface SystemSlimStatus {
+  is_admin: boolean;
+  items: SlimItemStatus[];
+  total_reclaimable: number;
+}
+
+/**
+ * 检查是否以管理员权限运行
+ */
+export async function checkAdminPrivilege(): Promise<boolean> {
+  return invoke<boolean>('check_admin_privilege');
+}
+
+/**
+ * 获取系统瘦身状态
+ */
+export async function getSystemSlimStatus(): Promise<SystemSlimStatus> {
+  return invoke<SystemSlimStatus>('get_system_slim_status');
+}
+
+/**
+ * 关闭休眠功能
+ */
+export async function disableHibernation(): Promise<string> {
+  return invoke<string>('disable_hibernation');
+}
+
+/**
+ * 开启休眠功能
+ */
+export async function enableHibernation(): Promise<string> {
+  return invoke<string>('enable_hibernation');
+}
+
+/**
+ * 清理 WinSxS 组件存储
+ */
+export async function cleanupWinsxs(): Promise<string> {
+  return invoke<string>('cleanup_winsxs');
+}
+
+/**
+ * 打开系统虚拟内存设置
+ */
+export async function openVirtualMemorySettings(): Promise<void> {
+  return invoke<void>('open_virtual_memory_settings');
+}
+
+// 社交软件扫描结果类型
+export interface SocialScanResult {
+  categories: SocialCategory[];
+  total_files: number;
+  total_size: number;
+}
+
+export interface SocialCategory {
+  id: string;
+  name: string;
+  description: string;
+  file_count: number;
+  total_size: number;
+  files: SocialFile[];
+}
+
+export interface SocialFile {
+  path: string;
+  size: number;
+  app_name: string;
+}

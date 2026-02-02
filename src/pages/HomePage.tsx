@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useMemo } from 'react';
-import { HardDrive, Sparkles, Users, Rocket } from 'lucide-react';
+import { HardDrive, Sparkles, Users, Rocket, ChevronRight } from 'lucide-react';
 import { DiskUsage } from '../components';
 import type { DiskInfo } from '../types';
 
@@ -94,17 +94,18 @@ export function HomePage({ diskInfo, isScanning, onScanClick, onNavigate }: Home
               <button
                 key={item.title}
                 onClick={() => onNavigate(item.target)}
-                className="text-left bg-[var(--bg-card)] rounded-xl border border-[var(--border-default)] p-4 flex items-start gap-3 hover:shadow-md hover:shadow-emerald-500/10 transition-shadow"
+                className="group text-left bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-elevated)] rounded-xl border border-[var(--border-default)] p-4 flex items-center gap-3 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-0.5 transition-all duration-200"
               >
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 flex items-center justify-center group-hover:scale-105 transition-transform">
                   {item.icon}
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-[var(--fg-primary)]">{item.title}</div>
-                  <p className="text-xs text-[var(--fg-muted)] mt-1 leading-relaxed">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-[var(--fg-primary)] group-hover:text-emerald-600 transition-colors">{item.title}</div>
+                  <p className="text-xs text-[var(--fg-muted)] mt-0.5 leading-relaxed truncate">
                     {item.description}
                   </p>
                 </div>
+                <ChevronRight className="w-5 h-5 text-[var(--fg-faint)] group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
               </button>
             ))}
           </div>
