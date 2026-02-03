@@ -16,3 +16,4 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { BackButton } from './BackButton';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastType, ToastItem } from './Toast';
+export { PageTransition } from './PageTransition';

@@ -28,6 +28,7 @@ pub fn run() {
             scan_junk_files,
             scan_category,
             scan_large_files,
+            cancel_large_file_scan,
             scan_social_cache,
             get_categories,
             // 删除相关
@@ -44,6 +45,8 @@ pub fn run() {
             enable_hibernation,
             cleanup_winsxs,
             open_virtual_memory_settings,
+            // 健康评分
+            get_health_score,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

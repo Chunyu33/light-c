@@ -10,8 +10,12 @@ use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use tauri::{Emitter, Window};
 use walkdir::WalkDir;
+
+// 全局取消标志，用于停止大文件扫描
+static LARGE_FILE_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 
 /// 扫描请求参数
 #[derive(Debug, Deserialize)]
@@ -125,10 +129,19 @@ pub fn get_disk_info() -> Result<DiskInfo, String> {
 /// 扫描C盘大文件（前 50 项），并实时推送当前路径
 #[tauri::command]
 pub async fn scan_large_files(window: Window) -> Result<Vec<LargeFileEntry>, String> {
+    // 重置取消标志
+    LARGE_FILE_SCAN_CANCELLED.store(false, AtomicOrdering::SeqCst);
     let window = window.clone();
     tokio::task::spawn_blocking(move || scan_large_files_impl(&window))
         .await
         .map_err(|e| format!("扫描任务异常: {}", e))?
+}
+
+/// 取消大文件扫描
+#[tauri::command]
+pub fn cancel_large_file_scan() {
+    info!("收到取消大文件扫描请求");
+    LARGE_FILE_SCAN_CANCELLED.store(true, AtomicOrdering::SeqCst);
 }
 
 fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String> {
@@ -147,6 +160,16 @@ fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String>
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().is_file())
         {
+            // 检查是否被取消
+            if LARGE_FILE_SCAN_CANCELLED.load(AtomicOrdering::SeqCst) {
+                info!("大文件扫描被用户取消，已扫描 {} 个文件", file_count);
+                let _ = window.emit("large-file-scan:cancelled", ());
+                // 返回当前已扫描到的结果
+                let mut results: Vec<LargeFileEntry> = heap.into_iter().map(|item| item.0).collect();
+                results.sort_by(|a, b| b.size.cmp(&a.size));
+                return Ok(results);
+            }
+
             let path = entry.path().to_path_buf();
             let path_str = path.to_string_lossy().to_string();
 
@@ -990,4 +1013,220 @@ pub fn open_virtual_memory_settings() -> Result<(), String> {
     {
         Err("此功能仅支持 Windows 系统".to_string())
     }
+}
+
+// ============================================================================
+// 系统健康评分
+// ============================================================================
+
+/// 系统健康评分结果
+#[derive(Debug, Clone, Serialize)]
+pub struct HealthScoreResult {
+    /// 总分 (0-100)
+    pub score: u32,
+    /// C盘剩余空间评分 (0-40)
+    pub disk_score: u32,
+    /// 休眠文件评分 (0-30)
+    pub hibernation_score: u32,
+    /// 垃圾文件评分 (0-30)
+    pub junk_score: u32,
+    /// C盘剩余百分比
+    pub disk_free_percent: f64,
+    /// 是否存在休眠文件
+    pub has_hibernation: bool,
+    /// 休眠文件大小
+    pub hibernation_size: u64,
+    /// 预估垃圾文件大小
+    pub junk_size: u64,
+}
+
+/// 计算系统健康评分
+/// 评分算法：
+/// - C盘剩余百分比 (40%权重)：剩余空间越多分数越高
+/// - 休眠文件 (30%权重)：无休眠文件得满分，有则根据大小扣分
+/// - 垃圾文件 (30%权重)：垃圾越少分数越高
+#[tauri::command]
+pub fn get_health_score() -> HealthScoreResult {
+    info!("计算系统健康评分...");
+    
+    // 1. 获取C盘剩余空间百分比
+    let (disk_free_percent, disk_score) = calculate_disk_score();
+    
+    // 2. 检查休眠文件
+    let (has_hibernation, hibernation_size, hibernation_score) = calculate_hibernation_score();
+    
+    // 3. 快速估算垃圾文件大小
+    let (junk_size, junk_score) = calculate_junk_score();
+    
+    // 计算总分
+    let score = disk_score + hibernation_score + junk_score;
+    
+    info!("健康评分: {} (磁盘:{}, 休眠:{}, 垃圾:{})", score, disk_score, hibernation_score, junk_score);
+    
+    HealthScoreResult {
+        score,
+        disk_score,
+        hibernation_score,
+        junk_score,
+        disk_free_percent,
+        has_hibernation,
+        hibernation_size,
+        junk_size,
+    }
+}
+
+/// 计算磁盘空间评分 (满分40)
+fn calculate_disk_score() -> (f64, u32) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetDiskFreeSpaceExW(
+                lpDirectoryName: *const u16,
+                lpFreeBytesAvailableToCaller: *mut u64,
+                lpTotalNumberOfBytes: *mut u64,
+                lpTotalNumberOfFreeBytes: *mut u64,
+            ) -> i32;
+        }
+        
+        let path: Vec<u16> = OsStr::new("C:\\")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        
+        let mut free_bytes: u64 = 0;
+        let mut total_bytes: u64 = 0;
+        let mut _total_free: u64 = 0;
+        
+        let success = unsafe {
+            GetDiskFreeSpaceExW(
+                path.as_ptr(),
+                &mut free_bytes,
+                &mut total_bytes,
+                &mut _total_free,
+            )
+        };
+        
+        if success != 0 && total_bytes > 0 {
+            let free_percent = (free_bytes as f64 / total_bytes as f64) * 100.0;
+            // 剩余空间评分：
+            // >= 30% 得满分40
+            // 20-30% 得30分
+            // 10-20% 得20分
+            // 5-10% 得10分
+            // < 5% 得0分
+            let score = if free_percent >= 30.0 {
+                40
+            } else if free_percent >= 20.0 {
+                30 + ((free_percent - 20.0) / 10.0 * 10.0) as u32
+            } else if free_percent >= 10.0 {
+                20 + ((free_percent - 10.0) / 10.0 * 10.0) as u32
+            } else if free_percent >= 5.0 {
+                10 + ((free_percent - 5.0) / 5.0 * 10.0) as u32
+            } else {
+                (free_percent / 5.0 * 10.0) as u32
+            };
+            return (free_percent, score.min(40));
+        }
+    }
+    
+    (50.0, 20) // 默认值
+}
+
+/// 计算休眠文件评分 (满分30)
+fn calculate_hibernation_score() -> (bool, u64, u32) {
+    let hiberfil_path = std::path::Path::new("C:\\hiberfil.sys");
+    
+    if hiberfil_path.exists() {
+        // 获取休眠文件大小
+        let size = std::fs::metadata(hiberfil_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        
+        // 休眠文件存在，根据大小扣分
+        // < 4GB: 20分
+        // 4-8GB: 15分
+        // 8-16GB: 10分
+        // > 16GB: 5分
+        let score = if size < 4 * 1024 * 1024 * 1024 {
+            20
+        } else if size < 8 * 1024 * 1024 * 1024 {
+            15
+        } else if size < 16 * 1024 * 1024 * 1024 {
+            10
+        } else {
+            5
+        };
+        
+        (true, size, score)
+    } else {
+        // 无休眠文件，得满分
+        (false, 0, 30)
+    }
+}
+
+/// 计算垃圾文件评分 (满分30)
+fn calculate_junk_score() -> (u64, u32) {
+    let mut total_junk_size: u64 = 0;
+    
+    // 快速检查常见垃圾目录
+    let junk_paths = [
+        std::env::var("TEMP").unwrap_or_default(),
+        std::env::var("TMP").unwrap_or_default(),
+        format!("{}\\AppData\\Local\\Temp", std::env::var("USERPROFILE").unwrap_or_default()),
+        "C:\\Windows\\Temp".to_string(),
+        "C:\\Windows\\Prefetch".to_string(),
+    ];
+    
+    for path_str in &junk_paths {
+        if path_str.is_empty() {
+            continue;
+        }
+        let path = std::path::Path::new(path_str);
+        if path.exists() && path.is_dir() {
+            // 快速统计目录大小（只遍历一层）
+            if let Ok(entries) = std::fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() {
+                            total_junk_size += metadata.len();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // 检查回收站大小（简化估算）
+    let recycle_bin = format!("C:\\$Recycle.Bin");
+    if std::path::Path::new(&recycle_bin).exists() {
+        // 回收站通常有权限问题，简单估算
+        total_junk_size += 100 * 1024 * 1024; // 假设100MB
+    }
+    
+    // 垃圾文件评分：
+    // < 500MB: 满分30
+    // 500MB-1GB: 25分
+    // 1-2GB: 20分
+    // 2-5GB: 15分
+    // 5-10GB: 10分
+    // > 10GB: 5分
+    let score = if total_junk_size < 500 * 1024 * 1024 {
+        30
+    } else if total_junk_size < 1024 * 1024 * 1024 {
+        25
+    } else if total_junk_size < 2 * 1024 * 1024 * 1024 {
+        20
+    } else if total_junk_size < 5 * 1024 * 1024 * 1024 {
+        15
+    } else if total_junk_size < 10 * 1024 * 1024 * 1024 {
+        10
+    } else {
+        5
+    };
+    
+    (total_junk_size, score)
 }

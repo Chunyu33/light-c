@@ -4,9 +4,9 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react';
-import { HardDrive, Search, Trash2, FileWarning, Loader2, FolderSearch, CheckCircle2, FolderOpen, ExternalLink } from 'lucide-react';
+import { HardDrive, Search, Trash2, FileWarning, Loader2, FolderSearch, CheckCircle2, FolderOpen, ExternalLink, StopCircle } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import { deleteFiles, scanLargeFiles, openInFolder, openFile } from '../api/commands';
+import { deleteFiles, scanLargeFiles, cancelLargeFileScan, openInFolder, openFile } from '../api/commands';
 import { ConfirmDialog, BackButton, useToast } from '../components';
 import {
   formatDate,
@@ -20,6 +20,8 @@ import type { LargeFileEntry } from '../types';
 interface BigFilesPageProps {
   /** 返回首页回调 */
   onBack: () => void;
+  /** 清理完成回调 */
+  onCleanupComplete?: () => void;
 }
 
 /**
@@ -36,7 +38,7 @@ function getLargeFileRiskLevel(size: number): number {
   return 1;
 }
 
-export function BigFilesPage({ onBack }: BigFilesPageProps) {
+export function BigFilesPage({ onBack, onCleanupComplete }: BigFilesPageProps) {
   // 扫描状态
   const [status, setStatus] = useState<'idle' | 'scanning' | 'done'>('idle');
   // 当前扫描路径（实时显示）
@@ -85,6 +87,16 @@ export function BigFilesPage({ onBack }: BigFilesPageProps) {
     } catch (err) {
       console.error('扫描大文件失败:', err);
       setStatus('idle');
+    }
+  };
+
+  // 停止扫描
+  const handleStopScan = async () => {
+    try {
+      await cancelLargeFileScan();
+      showToast({ type: 'info', title: '扫描已停止', description: '将显示已扫描到的大文件' });
+    } catch (err) {
+      console.error('停止扫描失败:', err);
     }
   };
 
@@ -155,6 +167,8 @@ export function BigFilesPage({ onBack }: BigFilesPageProps) {
           }
           return next;
         });
+        // 触发健康评分刷新
+        onCleanupComplete?.();
       }
     } catch (err) {
       console.error('删除大文件失败:', err);
@@ -238,9 +252,18 @@ export function BigFilesPage({ onBack }: BigFilesPageProps) {
           {/* 扫描进度区 */}
           {status === 'scanning' && (
             <div className="mt-5 pt-5 border-t border-white/20">
-              <div className="flex items-center gap-3 mb-3">
-                <FolderSearch className="w-4 h-4 animate-pulse" />
-                <span className="text-sm font-medium">正在扫描文件系统...</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <FolderSearch className="w-4 h-4 animate-pulse" />
+                  <span className="text-sm font-medium">正在扫描文件系统...</span>
+                </div>
+                <button
+                  onClick={handleStopScan}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
+                >
+                  <StopCircle className="w-3.5 h-3.5" />
+                  停止扫描
+                </button>
               </div>
               <p className="text-xs text-white/70 truncate mb-3">
                 {currentPath || '准备中...'}

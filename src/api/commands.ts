@@ -77,6 +77,13 @@ export async function scanLargeFiles(): Promise<LargeFileEntry[]> {
 }
 
 /**
+ * 取消大文件扫描
+ */
+export async function cancelLargeFileScan(): Promise<void> {
+  return invoke<void>('cancel_large_file_scan');
+}
+
+/**
  * 扫描社交软件缓存
  */
 export async function scanSocialCache(): Promise<SocialScanResult> {
@@ -160,6 +167,29 @@ export async function cleanupWinsxs(): Promise<string> {
  */
 export async function openVirtualMemorySettings(): Promise<void> {
   return invoke<void>('open_virtual_memory_settings');
+}
+
+// ============================================================================
+// 健康评分相关
+// ============================================================================
+
+/** 系统健康评分结果 */
+export interface HealthScoreResult {
+  score: number;
+  disk_score: number;
+  hibernation_score: number;
+  junk_score: number;
+  disk_free_percent: number;
+  has_hibernation: boolean;
+  hibernation_size: number;
+  junk_size: number;
+}
+
+/**
+ * 获取系统健康评分
+ */
+export async function getHealthScore(): Promise<HealthScoreResult> {
+  return invoke<HealthScoreResult>('get_health_score');
 }
 
 // 社交软件扫描结果类型

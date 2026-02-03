@@ -31,6 +31,7 @@ import { formatSize } from '../utils/format';
 
 interface SystemSlimPageProps {
   onBack: () => void;
+  onCleanupComplete?: () => void;
 }
 
 // 图标映射
@@ -47,7 +48,7 @@ const itemColors: Record<string, { bg: string; text: string; border: string }> =
   pagefile: { bg: 'bg-cyan-500/10', text: 'text-cyan-500', border: 'border-cyan-500/20' },
 };
 
-export function SystemSlimPage({ onBack }: SystemSlimPageProps) {
+export function SystemSlimPage({ onBack, onCleanupComplete }: SystemSlimPageProps) {
   const [status, setStatus] = useState<SystemSlimStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -108,6 +109,10 @@ export function SystemSlimPage({ onBack }: SystemSlimPageProps) {
       }
       // 刷新状态
       await loadStatus();
+      // 触发健康评分刷新（休眠和WinSxS操作会影响评分）
+      if (item.id === 'hibernation' || item.id === 'winsxs') {
+        onCleanupComplete?.();
+      }
     } catch (error) {
       showToast({ title: '操作失败', description: `${error}`, type: 'error' });
     } finally {

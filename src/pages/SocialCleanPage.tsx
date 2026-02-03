@@ -26,6 +26,7 @@ import { formatSize } from '../utils/format';
 
 interface SocialCleanPageProps {
   onBack: () => void;
+  onCleanupComplete?: () => void;
 }
 
 // 分类图标映射
@@ -42,7 +43,7 @@ const categoryColors: Record<string, { bg: string; text: string; border: string 
   moments_cache: { bg: 'bg-cyan-500/10', text: 'text-cyan-600', border: 'border-cyan-500/20' },
 };
 
-export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
+export function SocialCleanPage({ onBack, onCleanupComplete }: SocialCleanPageProps) {
   const [status, setStatus] = useState<'idle' | 'scanning' | 'done'>('idle');
   const [scanResult, setScanResult] = useState<SocialScanResult | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -153,6 +154,8 @@ export function SocialCleanPage({ onBack }: SocialCleanPageProps) {
       // 重新扫描以更新列表
       if (result.success_count > 0) {
         handleScan();
+        // 触发健康评分刷新
+        onCleanupComplete?.();
       }
     } catch (err) {
       console.error('删除失败:', err);
