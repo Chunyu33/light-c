@@ -3,7 +3,7 @@
 // 扫描微信、QQ、钉钉、飞书等社交软件的缓存文件
 // ============================================================================
 
-import { useState, useRef, memo } from 'react';
+import { useState, useRef, memo, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { 
   MessageCircle, 
@@ -532,13 +532,12 @@ export function SocialCleanPage({ onBack, onCleanupComplete }: SocialCleanPagePr
       </div>
 
       {/* 文件详情弹窗 */}
-      {fileModalData && (
-        <FileListModal
-          title={fileModalData.name}
-          files={fileModalData.files}
-          onClose={() => setFileModalData(null)}
-        />
-      )}
+      <FileListModal
+        isOpen={fileModalData !== null}
+        title={fileModalData?.name || ''}
+        files={fileModalData?.files || []}
+        onClose={() => setFileModalData(null)}
+      />
     </>
   );
 }
@@ -550,11 +549,14 @@ export function SocialCleanPage({ onBack, onCleanupComplete }: SocialCleanPagePr
 interface FileListModalProps {
   title: string;
   files: SocialFile[];
+  isOpen: boolean;
   onClose: () => void;
 }
 
-function FileListModal({ title, files, onClose }: FileListModalProps) {
+function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -563,8 +565,25 @@ function FileListModal({ title, files, onClose }: FileListModalProps) {
     overscan: 20,
   });
 
+  useEffect(() => {
+    if (isOpen) {
+      setIsAnimating(true);
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  if (!isOpen && !isAnimating) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩 */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -572,7 +591,7 @@ function FileListModal({ title, files, onClose }: FileListModalProps) {
       />
       
       {/* 弹窗内容 */}
-      <div className="relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden">
+      <div className={`relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
         {/* 头部 */}
         <div className="px-6 py-4 border-b border-[var(--border-default)] flex items-center justify-between shrink-0">
           <div>

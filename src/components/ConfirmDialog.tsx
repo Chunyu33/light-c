@@ -2,7 +2,7 @@
 // 确认对话框组件 - 用于清理前的二次确认
 // ============================================================================
 
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -37,10 +37,28 @@ export const ConfirmDialog = memo(function ConfirmDialog({
   onCancel,
   isDanger = false,
 }: ConfirmDialogProps) {
-  if (!isOpen) return null;
+  const [isVisible, setIsVisible] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsAnimating(true);
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  if (!isOpen && !isAnimating) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩层 */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -48,7 +66,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
       />
       
       {/* 对话框 */}
-      <div className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden">
+      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div className="flex items-center gap-3">

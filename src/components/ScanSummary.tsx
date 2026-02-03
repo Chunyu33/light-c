@@ -2,7 +2,7 @@
 // 扫描结果摘要组件 - 支持主题切换
 // ============================================================================
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ScanResult, DeleteResult, DeleteError } from '../types';
@@ -27,6 +27,8 @@ function FailedFilesModal({
   failedFiles: DeleteError[];
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   
   const virtualizer = useVirtualizer({
     count: failedFiles.length,
@@ -35,10 +37,25 @@ function FailedFilesModal({
     overscan: 10,
   });
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setIsAnimating(true);
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  if (!isOpen && !isAnimating) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩层 */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -46,7 +63,7 @@ function FailedFilesModal({
       />
       
       {/* 弹窗 */}
-      <div className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden">
+      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] shrink-0">
           <div className="flex items-center gap-3">
