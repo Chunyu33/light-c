@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useMemo, useState, useRef } from 'react';
-import { ErrorAlert, SettingsModal, TitleBar, ToastProvider, PageTransition } from './components';
+import { ErrorAlert, SettingsModal, TitleBar, ToastProvider, PageTransition, WelcomeModal, shouldShowWelcome } from './components';
 import { HomePage, CleanupPage, CleanupToolbar, BigFilesPage, SocialCleanPage, SystemSlimPage } from './pages';
 import { useCleanup } from './hooks/useCleanup';
 import './App.css';
@@ -40,6 +40,8 @@ function App() {
 
   // 设置弹窗状态
   const [showSettings, setShowSettings] = useState(false);
+  // 欢迎弹窗状态
+  const [showWelcome, setShowWelcome] = useState(() => shouldShowWelcome());
   // 清理确认弹窗状态
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // 当前页面
@@ -113,6 +115,9 @@ function App() {
       {/* 设置弹窗 */}
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
 
+      {/* 欢迎弹窗 */}
+      <WelcomeModal isOpen={showWelcome} onClose={() => setShowWelcome(false)} />
+
       {/* 主内容区 */}
       <main className="flex-1 overflow-hidden bg-[var(--bg-base)]">
         {/* 错误提示 */}
@@ -129,6 +134,7 @@ function App() {
                 onScanClick={handleScanClick}
                 onNavigate={navigateTo}
                 refreshTrigger={healthRefreshTrigger}
+                onShowWelcome={() => setShowWelcome(true)}
               />
             )}
 

@@ -22,6 +22,8 @@ interface HomePageProps {
   onNavigate: (page: PageType) => void;
   /** 刷新健康评分的触发器 */
   refreshTrigger?: number;
+  /** 显示欢迎弹窗回调（彩蛋） */
+  onShowWelcome?: () => void;
 }
 
 // 数字跳动动画 Hook
@@ -98,7 +100,7 @@ function getScoreColor(score: number) {
   }
 }
 
-export function HomePage({ diskInfo, isScanning, onScanClick, onNavigate, refreshTrigger }: HomePageProps) {
+export function HomePage({ diskInfo, isScanning, onScanClick, onNavigate, refreshTrigger, onShowWelcome }: HomePageProps) {
   const [healthData, setHealthData] = useState<HealthScoreResult | null>(null);
   const [isLoadingScore, setIsLoadingScore] = useState(true);
 
@@ -149,7 +151,7 @@ export function HomePage({ diskInfo, isScanning, onScanClick, onNavigate, refres
   return (
     <div className="max-w-5xl mx-auto flex flex-col h-full">
       {/* 顶部信息栏 - 紧凑的磁盘使用情况 */}
-      <DiskUsage diskInfo={diskInfo} compact />
+      <DiskUsage diskInfo={diskInfo} compact onTripleClick={onShowWelcome} />
 
       {/* 主内容区域 - 两列布局 */}
       <section className="flex-1 mt-4 grid grid-cols-2 gap-4">

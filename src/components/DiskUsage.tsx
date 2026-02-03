@@ -2,6 +2,7 @@
 // 磁盘使用情况组件 - 支持主题切换
 // ============================================================================
 
+import { useRef } from 'react';
 import { HardDrive } from 'lucide-react';
 import type { DiskInfo } from '../types';
 import { formatSize } from '../utils/format';
@@ -10,9 +11,36 @@ interface DiskUsageProps {
   diskInfo: DiskInfo | null;
   loading?: boolean;
   compact?: boolean;
+  /** 三击时的回调（彩蛋功能） */
+  onTripleClick?: () => void;
 }
 
-export function DiskUsage({ diskInfo, loading, compact }: DiskUsageProps) {
+export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsageProps) {
+  // 三击检测
+  const clickCountRef = useRef(0);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClick = () => {
+    clickCountRef.current += 1;
+    
+    // 清除之前的定时器
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+    }
+    
+    // 检测三击
+    if (clickCountRef.current >= 3) {
+      clickCountRef.current = 0;
+      onTripleClick?.();
+      return;
+    }
+    
+    // 500ms 内没有继续点击则重置计数
+    clickTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 500);
+  };
+
   // 加载中或数据为空时显示骨架屏
   if (loading || !diskInfo) {
     return (
@@ -41,9 +69,10 @@ export function DiskUsage({ diskInfo, loading, compact }: DiskUsageProps) {
 
   return (
     <div
+      onClick={handleClick}
       className={`bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] ${
         compact ? 'p-3' : 'p-4'
-      }`}
+      } cursor-default`}
     >
       <div className={`flex items-center ${compact ? 'gap-3' : 'gap-4'}`}>
         {/* 磁盘图标 */}

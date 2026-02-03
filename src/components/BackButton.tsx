@@ -48,13 +48,25 @@ function savePosition(pos: Position) {
  */
 export function BackButton({ onClick, label = '返回' }: BackButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
+  // 初始化时直接使用保存的位置，避免动画
   const [position, setPosition] = useState<Position>(() => {
     const saved = getSavedPosition();
     // 默认位置：右侧中间偏上
     return saved || { x: window.innerWidth - 80, y: 320 };
   });
   const [isDragging, setIsDragging] = useState(false);
+  // 标记是否已完成首次渲染，用于控制过渡动画
+  const [isInitialized, setIsInitialized] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
+
+  // 首次渲染后启用过渡动画
+  useEffect(() => {
+    // 使用 requestAnimationFrame 确保首帧渲染完成后再启用动画
+    const raf = requestAnimationFrame(() => {
+      setIsInitialized(true);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // 限制位置在窗口范围内
   const clampPosition = useCallback((x: number, y: number): Position => {
@@ -125,11 +137,13 @@ export function BackButton({ onClick, label = '返回' }: BackButtonProps) {
         fixed z-40 inline-flex items-center rounded-full shadow-md border
         bg-slate-100 border-slate-300 
         ${isDragging ? 'cursor-grabbing shadow-lg scale-105' : ''}
-        transition-shadow
+        ${isInitialized ? 'transition-shadow' : ''}
       `}
       style={{
         left: position.x,
         top: position.y,
+        // 首次渲染时不使用过渡动画，避免从默认位置滑动到保存位置
+        transition: isInitialized ? 'box-shadow 0.15s, transform 0.15s' : 'none',
       }}
     >
       {/* 拖拽手柄 */}

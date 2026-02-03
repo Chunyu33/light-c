@@ -3,13 +3,13 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
 
-type SettingsTab = 'general' | 'feedback' | 'about';
+type SettingsTab = 'general' | 'guide' | 'feedback' | 'about';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -18,6 +18,7 @@ interface SettingsModalProps {
 
 const tabs: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: '通用', icon: Settings },
+  { id: 'guide', label: '使用说明', icon: BookOpen },
   { id: 'feedback', label: '意见反馈', icon: MessageSquare },
   { id: 'about', label: '关于', icon: Info },
 ];
@@ -106,6 +107,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             {activeTab === 'general' && (
               <GeneralSettings mode={mode} setMode={setMode} />
             )}
+            {activeTab === 'guide' && <GuideSettings />}
             {activeTab === 'feedback' && <FeedbackSettings />}
             {activeTab === 'about' && <AboutSettings />}
           </div>
@@ -146,6 +148,112 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 使用说明
+function GuideSettings() {
+  return (
+    <div className="space-y-6">
+      {/* 功能说明 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider flex items-center gap-2">
+          <BookOpen className="w-3.5 h-3.5" />
+          功能说明
+        </h4>
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-[var(--fg-primary)] mb-2">一键扫描</p>
+            <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+              扫描系统临时文件、浏览器缓存、Windows更新缓存等常见垃圾文件。扫描过程不会删除任何文件，您可以在扫描结果中选择需要清理的项目。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--fg-primary)] mb-2">大文件清理</p>
+            <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+              扫描C盘中体积最大的50个文件。请仔细查看文件路径和类型，避免删除系统文件或重要数据。建议只删除您确认不再需要的文件。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--fg-primary)] mb-2">社交软件专清</p>
+            <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+              清理微信、QQ等社交软件的缓存文件，包括聊天图片、视频缓存等。清理后可能需要重新下载聊天记录中的图片和文件。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--fg-primary)] mb-2">系统瘦身</p>
+            <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+              管理休眠文件、Windows组件存储等系统级功能。<span className="text-amber-500 font-medium">此功能需要管理员权限</span>，操作前请确保了解各项功能的作用。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 风险等级说明 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Shield className="w-3.5 h-3.5" />
+          文件风险等级
+        </h4>
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-500 text-white shrink-0">安全</span>
+            <p className="text-xs text-[var(--fg-muted)]">临时文件、缓存文件、日志文件等，删除后不影响系统和软件运行</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-lime-500 text-white shrink-0">低风险</span>
+            <p className="text-xs text-[var(--fg-muted)]">媒体文件、下载内容等用户数据，删除前请确认不再需要</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-500 text-white shrink-0">中等</span>
+            <p className="text-xs text-[var(--fg-muted)]">数据库文件、文档、压缩包等，可能包含重要数据，请谨慎删除</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-orange-500 text-white shrink-0">较高</span>
+            <p className="text-xs text-[var(--fg-muted)]">程序文件、配置文件等，删除可能导致软件无法正常运行</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500 text-white shrink-0">高风险</span>
+            <p className="text-xs text-[var(--fg-muted)]">系统核心文件，<span className="text-red-500 font-medium">删除可能导致系统无法启动</span>，强烈建议不要删除</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 注意事项 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5" />
+          注意事项
+        </h4>
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 space-y-2">
+          <p className="text-xs text-[var(--fg-secondary)] leading-relaxed">
+            • 删除操作不可撤销，请在清理前仔细确认文件内容
+          </p>
+          <p className="text-xs text-[var(--fg-secondary)] leading-relaxed">
+            • 建议定期备份重要数据，避免误删造成损失
+          </p>
+          <p className="text-xs text-[var(--fg-secondary)] leading-relaxed">
+            • 系统瘦身功能涉及系统级操作，操作前请确保了解其影响
+          </p>
+          <p className="text-xs text-[var(--fg-secondary)] leading-relaxed">
+            • 关闭休眠功能后将无法使用快速启动和休眠模式
+          </p>
+          <p className="text-xs text-[var(--fg-secondary)] leading-relaxed">
+            • 清理Windows组件存储后可能无法卸载某些系统更新
+          </p>
+        </div>
+      </div>
+
+      {/* 免责声明 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--fg-muted)] uppercase tracking-wider">免责声明</h4>
+        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
+          <p className="text-xs text-[var(--fg-muted)] leading-relaxed">
+            本软件仅提供文件扫描和删除功能，所有删除操作均由用户主动确认执行。开发者不对因使用本软件造成的任何数据丢失、系统故障或其他损失承担责任。使用本软件即表示您已了解并接受上述风险，请在操作前做好数据备份。
+          </p>
         </div>
       </div>
     </div>
