@@ -403,7 +403,7 @@ function AboutSettings() {
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--fg-secondary)]">作者</span>
-            <span className="text-sm font-medium text-[var(--fg-primary)]">Evan Lau</span>
+            <span className="text-sm font-medium text-[var(--fg-primary)]">Evan Lau(刘彦祖)</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--fg-secondary)]">网站</span>
@@ -434,7 +434,7 @@ function AboutSettings() {
 
       <div className="text-center pt-4">
         <p className="text-xs text-[var(--fg-faint)]">
-          Copyright © 2025 Chunyu. All rights reserved.
+          Copyright © 2025 LightC. All rights reserved.
         </p>
       </div>
     </div>

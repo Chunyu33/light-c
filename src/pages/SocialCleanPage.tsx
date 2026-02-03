@@ -176,6 +176,27 @@ export function SocialCleanPage({ onBack, onCleanupComplete }: SocialCleanPagePr
 
   return (
     <>
+      {/* 删除进度遮罩 */}
+      {isDeleting && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-[var(--fg-primary)]">正在清理缓存</h3>
+              <p className="text-sm text-[var(--fg-muted)] mt-1">
+                正在清理 {selectedStats.files} 个文件，请稍候...
+              </p>
+            </div>
+            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
+              <div className="h-full bg-rose-500 rounded-full animate-pulse" style={{ width: '100%' }} />
+            </div>
+            <p className="text-xs text-[var(--fg-faint)]">请勿关闭窗口</p>
+          </div>
+        </div>
+      )}
+
       {/* 删除确认弹窗 */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}

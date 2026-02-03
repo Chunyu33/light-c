@@ -167,7 +167,7 @@ export function HomePage({ diskInfo, isScanning, onScanClick, onNavigate, refres
 
           {/* 评分圆环 - 居中显示，flex-1撑满剩余空间 */}
           <div className="flex-1 flex items-center justify-center">
-            <div className={`relative w-28 h-28 rounded-full ${scoreColor.bgLight} flex items-center justify-center`}>
+            <div className={`relative w-38 h-38 rounded-full ${scoreColor.bgLight} flex items-center justify-center`}>
               <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="6" className="text-[var(--bg-hover)]" />
                 <circle
@@ -188,7 +188,7 @@ export function HomePage({ diskInfo, isScanning, onScanClick, onNavigate, refres
 
           {/* 评分细项 */}
           {healthData && (
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-4">
               <div className="flex items-center gap-2" title="C盘剩余空间占比，空间越充足分数越高（满分40分）">
                 <HardDrive className={`w-4 h-4 shrink-0 ${healthData.disk_score >= 30 ? 'text-emerald-500' : healthData.disk_score >= 20 ? 'text-amber-500' : 'text-rose-500'}`} />
                 <span className="text-xs text-[var(--fg-secondary)] w-16 cursor-help">磁盘空间</span>

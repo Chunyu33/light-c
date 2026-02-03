@@ -25,17 +25,108 @@ interface BigFilesPageProps {
 }
 
 /**
- * 大文件风险等级划分（按体积）
- * @param size 文件大小（字节）
- * @returns 风险等级 1-5
+ * 大文件风险等级划分（基于文件路径和类型判断）
+ * @param path 文件路径
+ * @returns 风险等级 1-5 (1=安全可删, 5=高风险勿删)
  */
-function getLargeFileRiskLevel(size: number): number {
-  const GB = 1024 * 1024 * 1024;
-  if (size >= 10 * GB) return 5;
-  if (size >= 5 * GB) return 4;
-  if (size >= 2 * GB) return 3;
-  if (size >= 1 * GB) return 2;
-  return 1;
+function getLargeFileRiskLevel(path: string): number {
+  const lowerPath = path.toLowerCase();
+  const fileName = lowerPath.split('\\').pop() || '';
+  const ext = fileName.includes('.') ? fileName.split('.').pop() || '' : '';
+
+  // ========== 高风险 (5) - 系统关键文件，删除可能导致系统无法启动 ==========
+  // Windows 系统核心目录
+  if (lowerPath.includes('\\windows\\system32\\') || 
+      lowerPath.includes('\\windows\\syswow64\\') ||
+      lowerPath.includes('\\windows\\winsxs\\')) {
+    return 5;
+  }
+  // 系统关键文件
+  if (['pagefile.sys', 'hiberfil.sys', 'swapfile.sys', 'ntoskrnl.exe', 'bootmgr'].includes(fileName)) {
+    return 5;
+  }
+  // 驱动程序
+  if (ext === 'sys' && lowerPath.includes('\\windows\\')) {
+    return 5;
+  }
+  // 注册表文件
+  if (['ntuser.dat', 'system', 'software', 'sam', 'security'].includes(fileName) && 
+      (lowerPath.includes('\\config\\') || lowerPath.includes('\\users\\'))) {
+    return 5;
+  }
+
+  // ========== 较高风险 (4) - 程序文件，删除可能导致软件无法运行 ==========
+  // Program Files 目录下的可执行文件和库
+  if ((lowerPath.includes('\\program files\\') || lowerPath.includes('\\program files (x86)\\')) &&
+      ['exe', 'dll', 'ocx', 'msi'].includes(ext)) {
+    return 4;
+  }
+  // Windows 目录下的其他文件
+  if (lowerPath.includes('\\windows\\') && !lowerPath.includes('\\temp\\')) {
+    return 4;
+  }
+  // 用户配置文件目录
+  if (lowerPath.includes('\\appdata\\roaming\\') && ['exe', 'dll', 'dat'].includes(ext)) {
+    return 4;
+  }
+
+  // ========== 中等风险 (3) - 可能有用的数据文件 ==========
+  // 数据库文件
+  if (['db', 'sqlite', 'mdf', 'ldf', 'accdb', 'mdb'].includes(ext)) {
+    return 3;
+  }
+  // 虚拟机文件（用户可能需要）
+  if (['vmdk', 'vdi', 'vhd', 'vhdx'].includes(ext)) {
+    return 3;
+  }
+  // 文档文件
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'].includes(ext)) {
+    return 3;
+  }
+  // 压缩包（可能包含重要备份）
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) && !lowerPath.includes('\\temp\\')) {
+    return 3;
+  }
+
+  // ========== 低风险 (2) - 通常可以安全删除 ==========
+  // 视频文件（通常是下载的媒体）
+  if (['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'].includes(ext)) {
+    return 2;
+  }
+  // 音频文件
+  if (['mp3', 'wav', 'flac', 'aac', 'm4a', 'wma', 'ogg'].includes(ext)) {
+    return 2;
+  }
+  // 图片文件
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'raw'].includes(ext)) {
+    return 2;
+  }
+  // 游戏和软件安装包
+  if (lowerPath.includes('\\downloads\\') || lowerPath.includes('\\desktop\\')) {
+    return 2;
+  }
+
+  // ========== 安全 (1) - 临时文件和缓存，可放心删除 ==========
+  // 临时目录
+  if (lowerPath.includes('\\temp\\') || lowerPath.includes('\\tmp\\') || 
+      lowerPath.includes('\\cache\\') || lowerPath.includes('\\caches\\')) {
+    return 1;
+  }
+  // 日志文件
+  if (['log', 'tmp', 'bak', 'old', 'dmp'].includes(ext)) {
+    return 1;
+  }
+  // 回收站
+  if (lowerPath.includes('\\$recycle.bin\\')) {
+    return 1;
+  }
+  // 浏览器缓存
+  if (lowerPath.includes('\\cache\\') || lowerPath.includes('\\code cache\\')) {
+    return 1;
+  }
+
+  // 默认中等风险（未知文件类型需谨慎）
+  return 3;
 }
 
 export function BigFilesPage({ onBack, onCleanupComplete }: BigFilesPageProps) {
@@ -192,6 +283,27 @@ export function BigFilesPage({ onBack, onCleanupComplete }: BigFilesPageProps) {
 
   return (
     <>
+      {/* 删除进度遮罩 */}
+      {isDeleting && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-[var(--fg-primary)]">正在删除文件</h3>
+              <p className="text-sm text-[var(--fg-muted)] mt-1">
+                正在删除 {selectedFiles.size} 个文件，请稍候...
+              </p>
+            </div>
+            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
+              <div className="h-full bg-rose-500 rounded-full animate-pulse" style={{ width: '100%' }} />
+            </div>
+            <p className="text-xs text-[var(--fg-faint)]">请勿关闭窗口</p>
+          </div>
+        </div>
+      )}
+
       {/* 删除确认弹窗 */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
@@ -386,7 +498,7 @@ export function BigFilesPage({ onBack, onCleanupComplete }: BigFilesPageProps) {
             {files.length > 0 && (
               <div className="divide-y divide-[var(--border-default)]">
                 {files.map((file, index) => {
-                  const riskLevel = getLargeFileRiskLevel(file.size);
+                  const riskLevel = getLargeFileRiskLevel(file.path);
                   const isSelected = selectedFiles.has(file.path);
                   return (
                     <div
