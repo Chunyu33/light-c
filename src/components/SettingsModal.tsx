@@ -542,7 +542,7 @@ function AboutSettings() {
 
       <div className="text-center pt-4">
         <p className="text-xs text-[var(--fg-faint)]">
-          Copyright © 2025 LightC. All rights reserved.
+          Copyright © {new Date().getFullYear()} LightC. All rights reserved.
         </p>
       </div>
     </div>
