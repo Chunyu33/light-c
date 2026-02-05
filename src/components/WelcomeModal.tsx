@@ -18,7 +18,7 @@ interface WelcomeModalProps {
 // ============================================================================
 const WELCOME_CONFIG = {
   // 用户名称（留空则显示通用欢迎语）
-  userName: '王枝',
+  userName: '',
   // 欢迎标题
   title: '欢迎使用 LightC',
   // 欢迎语（支持多行）
