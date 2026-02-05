@@ -18,6 +18,12 @@
 
 ---
 
+## 📸 运行截图
+
+<p align="center">
+  <img src="public/assets/show1.png" alt="LightC Screenshot" width="900">
+</p>
+
 ## ✨ 功能特性
 
 ### 🔍 一键扫描清理
