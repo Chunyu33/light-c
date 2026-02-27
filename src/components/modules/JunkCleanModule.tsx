@@ -12,9 +12,9 @@ import { ScanSummary } from '../ScanSummary';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanJunkFiles, deleteFiles } from '../../api/commands';
+import { scanJunkFiles, enhancedDeleteFiles, type EnhancedDeleteResult } from '../../api/commands';
 import { formatSize } from '../../utils/format';
-import type { ScanResult, DeleteResult, FileInfo } from '../../types';
+import type { ScanResult, FileInfo } from '../../types';
 
 // ============================================================================
 // 组件实现
@@ -29,7 +29,7 @@ export function JunkCleanModule() {
 
   // 本地状态
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [deleteResult, setDeleteResult] = useState<DeleteResult | null>(null);
+  const [deleteResult, setDeleteResult] = useState<EnhancedDeleteResult | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -99,13 +99,16 @@ export function JunkCleanModule() {
     setIsDeleting(true);
     try {
       const paths = Array.from(selectedPaths);
-      const result = await deleteFiles(paths);
+      const result = await enhancedDeleteFiles(paths);
       setDeleteResult(result);
 
       // 从扫描结果中移除已删除的文件
       if (scanResult && result.success_count > 0) {
+        // 获取成功删除的路径（不包括失败和标记重启的）
         const deletedPaths = new Set(
-          paths.filter((p) => !result.failed_files.some((f) => f.path === p))
+          result.file_results
+            .filter((f) => f.success)
+            .map((f) => f.path)
         );
 
         const updatedCategories = scanResult.categories.map((category) => {

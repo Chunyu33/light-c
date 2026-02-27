@@ -12,7 +12,8 @@ import {
   BackButton,
 } from '../components';
 import { formatSize } from '../utils/format';
-import type { ScanResult, DeleteResult, AppStatus, FileInfo } from '../types';
+import type { ScanResult, AppStatus, FileInfo } from '../types';
+import type { EnhancedDeleteResult } from '../api/commands';
 
 interface CleanupPageProps {
   /** 应用状态 */
@@ -20,7 +21,7 @@ interface CleanupPageProps {
   /** 扫描结果 */
   scanResult: ScanResult | null;
   /** 删除结果 */
-  deleteResult: DeleteResult | null;
+  deleteResult: EnhancedDeleteResult | null;
   /** 选中的文件路径 */
   selectedPaths: Set<string>;
   /** 选中文件的总大小 */

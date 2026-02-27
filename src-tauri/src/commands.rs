@@ -4,7 +4,7 @@
 // ============================================================================
 
 use crate::scanner::{ScanEngine, ScanResult, JunkCategory, DeleteResult, CategoryScanResult};
-use crate::cleaner::DeleteEngine;
+use crate::cleaner::{DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, Reverse};
@@ -1739,4 +1739,64 @@ pub async fn open_registry_backup_dir() -> Result<(), String> {
     }
     
     Ok(())
+}
+
+// ============================================================================
+// 增强删除命令 - 支持锁定文件处理和物理大小计算
+// ============================================================================
+
+/// 增强删除文件
+/// 
+/// 使用增强删除引擎删除文件，支持：
+/// - 物理大小计算（实际释放的磁盘空间）
+/// - 锁定文件处理（标记为重启删除）
+/// - 详细的失败原因反馈
+#[tauri::command]
+pub async fn enhanced_delete_files(paths: Vec<String>) -> Result<EnhancedDeleteResult, String> {
+    info!("增强删除: 开始删除 {} 个文件", paths.len());
+    
+    let result = tokio::task::spawn_blocking(move || {
+        let engine = EnhancedDeleteEngine::new();
+        engine.delete_files(&paths)
+    })
+    .await
+    .map_err(|e| format!("删除任务失败: {}", e))?;
+    
+    info!(
+        "增强删除完成: 成功 {}, 失败 {}, 待重启 {}, 释放 {} 字节",
+        result.success_count,
+        result.failed_count,
+        result.reboot_pending_count,
+        result.freed_physical_size
+    );
+    
+    Ok(result)
+}
+
+/// 获取文件的物理大小（按簇对齐）
+#[tauri::command]
+pub async fn get_physical_size(logical_size: u64) -> Result<u64, String> {
+    let engine = EnhancedDeleteEngine::new();
+    Ok(engine.calculate_physical_size(logical_size))
+}
+
+/// 检查是否需要管理员权限
+#[tauri::command]
+pub async fn check_admin_for_path(path: String) -> Result<bool, String> {
+    let path_lower = path.to_lowercase();
+    
+    // 需要管理员权限的路径
+    let admin_required_paths = [
+        "c:\\windows\\",
+        "c:\\program files",
+        "c:\\programdata\\microsoft\\windows",
+    ];
+    
+    for admin_path in &admin_required_paths {
+        if path_lower.starts_with(admin_path) {
+            return Ok(true);
+        }
+    }
+    
+    Ok(false)
 }

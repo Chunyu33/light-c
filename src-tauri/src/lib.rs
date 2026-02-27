@@ -53,6 +53,10 @@ pub fn run() {
             scan_registry_redundancy,
             delete_registry_entries,
             open_registry_backup_dir,
+            // 增强删除
+            enhanced_delete_files,
+            get_physical_size,
+            check_admin_for_path,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

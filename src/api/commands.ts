@@ -336,3 +336,110 @@ export async function deleteRegistryEntries(entries: RegistryEntry[]): Promise<R
 export async function openRegistryBackupDir(): Promise<void> {
   return invoke<void>('open_registry_backup_dir');
 }
+
+// ============================================================================
+// 增强删除 API - 支持锁定文件处理和物理大小计算
+// ============================================================================
+
+/** 删除失败原因 */
+export type DeleteFailureReason = 
+  | 'NotFound'           // 文件不存在
+  | 'PermissionDenied'   // 权限不足
+  | 'FileLocked'         // 文件被锁定
+  | 'SystemProtected'    // 系统保护文件
+  | 'OutOfScope'         // 不在清理范围
+  | 'MarkedForReboot'    // 已标记重启删除
+  | { Other: string };   // 其他错误
+
+/** 单个文件删除结果 */
+export interface FileDeleteResult {
+  /** 文件路径 */
+  path: string;
+  /** 是否成功删除 */
+  success: boolean;
+  /** 逻辑大小（文件内容大小） */
+  logical_size: number;
+  /** 物理大小（实际磁盘占用） */
+  physical_size: number;
+  /** 失败原因 */
+  failure_reason: DeleteFailureReason | null;
+  /** 是否标记为重启删除 */
+  marked_for_reboot: boolean;
+}
+
+/** 增强删除结果 */
+export interface EnhancedDeleteResult {
+  /** 成功删除的文件数 */
+  success_count: number;
+  /** 失败的文件数 */
+  failed_count: number;
+  /** 标记为重启删除的文件数 */
+  reboot_pending_count: number;
+  /** 实际释放的物理空间（字节） */
+  freed_physical_size: number;
+  /** 逻辑大小总计 */
+  freed_logical_size: number;
+  /** 跳过的文件大小 */
+  skipped_size: number;
+  /** 详细的文件删除结果 */
+  file_results: FileDeleteResult[];
+  /** 是否需要重启完成清理 */
+  needs_reboot: boolean;
+  /** 汇总消息（WeChat 风格） */
+  summary_message: string;
+}
+
+/**
+ * 增强删除文件
+ * 支持物理大小计算、锁定文件处理、详细失败原因反馈
+ * @param paths 要删除的文件路径列表
+ */
+export async function enhancedDeleteFiles(paths: string[]): Promise<EnhancedDeleteResult> {
+  return invoke<EnhancedDeleteResult>('enhanced_delete_files', { paths });
+}
+
+/**
+ * 获取文件的物理大小（按簇对齐）
+ * @param logicalSize 逻辑大小（字节）
+ */
+export async function getPhysicalSize(logicalSize: number): Promise<number> {
+  return invoke<number>('get_physical_size', { logicalSize });
+}
+
+/**
+ * 检查路径是否需要管理员权限
+ * @param path 文件路径
+ */
+export async function checkAdminForPath(path: string): Promise<boolean> {
+  return invoke<boolean>('check_admin_for_path', { path });
+}
+
+/**
+ * 获取失败原因的用户友好描述
+ */
+export function getFailureReasonMessage(reason: DeleteFailureReason | null): string {
+  if (!reason) return '';
+  if (reason === 'NotFound') return '文件不存在';
+  if (reason === 'PermissionDenied') return '权限不足';
+  if (reason === 'FileLocked') return '文件被系统占用';
+  if (reason === 'SystemProtected') return '系统保护文件';
+  if (reason === 'OutOfScope') return '不在清理范围内';
+  if (reason === 'MarkedForReboot') return '已标记重启后删除';
+  if (typeof reason === 'object' && 'Other' in reason) return reason.Other;
+  return '删除失败';
+}
+
+/**
+ * 获取失败原因的详细提示（用于 tooltip）
+ */
+export function getFailureReasonTooltip(reason: DeleteFailureReason | null): string {
+  if (!reason) return '';
+  if (reason === 'NotFound') return '该文件可能已被其他程序删除';
+  if (reason === 'PermissionDenied') return '需要管理员权限才能删除此文件';
+  if (reason === 'FileLocked') return '该文件正被系统或其他程序使用，将在重启后删除';
+  if (reason === 'SystemProtected') return '这是系统关键文件，删除可能导致系统不稳定';
+  if (reason === 'OutOfScope') return '该文件不在安全清理范围内';
+  if (reason === 'MarkedForReboot') return '文件已标记，将在下次重启时自动删除';
+  if (typeof reason === 'object' && 'Other' in reason) return reason.Other;
+  return '未知错误';
+}

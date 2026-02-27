@@ -1,16 +1,19 @@
 // ============================================================================
 // 扫描结果摘要组件 - 支持主题切换
+// 支持增强删除结果显示（物理大小、跳过原因、重启待删除）
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle } from 'lucide-react';
+import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { ScanResult, DeleteResult, DeleteError } from '../types';
+import type { ScanResult } from '../types';
+import type { EnhancedDeleteResult, FileDeleteResult } from '../api/commands';
+import { getFailureReasonMessage, getFailureReasonTooltip } from '../api/commands';
 import { formatSize, formatDuration } from '../utils/format';
 
 interface ScanSummaryProps {
   scanResult: ScanResult | null;
-  deleteResult: DeleteResult | null;
+  deleteResult: EnhancedDeleteResult | null;
   selectedCount: number;
   selectedSize: number;
   onClearDeleteResult?: () => void;
@@ -24,7 +27,7 @@ function FailedFilesModal({
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
-  failedFiles: DeleteError[];
+  failedFiles: FileDeleteResult[];
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -127,8 +130,11 @@ function FailedFilesModal({
                   >
                     {item.path}
                   </span>
-                  <span className="w-32 text-xs text-amber-500 text-right shrink-0">
-                    {item.reason}
+                  <span 
+                    className="w-40 text-xs text-amber-500 text-right shrink-0"
+                    title={getFailureReasonTooltip(item.failure_reason)}
+                  >
+                    {getFailureReasonMessage(item.failure_reason)}
                   </span>
                 </div>
               );
@@ -158,6 +164,10 @@ export function ScanSummary({
   onClearDeleteResult,
 }: ScanSummaryProps) {
   const [showFailedModal, setShowFailedModal] = useState(false);
+  
+  // 从删除结果中提取失败的文件列表
+  const failedFiles = deleteResult?.file_results.filter(f => !f.success && !f.marked_for_reboot) || [];
+  
   if (!scanResult) return null;
 
   return (
@@ -210,10 +220,10 @@ export function ScanSummary({
         </div>
       </div>
 
-      {/* 删除结果提示 */}
+      {/* 删除结果提示 - WeChat 风格真实释放量显示 */}
       {deleteResult && (
         <div className={`rounded-lg border p-3 ${
-          deleteResult.failed_count === 0
+          deleteResult.failed_count === 0 && deleteResult.reboot_pending_count === 0
             ? 'bg-emerald-500/10 border-emerald-500/30'
             : 'bg-amber-500/10 border-amber-500/30'
         }`}>
@@ -225,14 +235,19 @@ export function ScanSummary({
               <span className={`text-sm font-medium ${
                 deleteResult.failed_count === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
               }`}>
-                {deleteResult.failed_count === 0 ? '清理完成！' : '清理完成（部分失败）'}
+                {deleteResult.summary_message || '清理完成'}
               </span>
-              <span className="text-xs text-[var(--fg-muted)] ml-3">
-                删除 {deleteResult.success_count} 个文件，释放 <span className="text-emerald-500 font-medium">{formatSize(deleteResult.freed_size)}</span>
-                {deleteResult.failed_count > 0 && (
-                  <>，<span className="text-red-500 font-medium">{deleteResult.failed_count}</span> 个失败</>
+              {/* 详细统计 */}
+              <div className="text-xs text-[var(--fg-muted)] mt-1">
+                成功 {deleteResult.success_count} 个，
+                实际释放 <span className="text-emerald-500 font-medium">{formatSize(deleteResult.freed_physical_size)}</span>
+                {deleteResult.skipped_size > 0 && (
+                  <>，<span className="text-amber-500">{formatSize(deleteResult.skipped_size)}</span> 跳过</>
                 )}
-              </span>
+                {deleteResult.reboot_pending_count > 0 && (
+                  <>，<span className="text-blue-500">{deleteResult.reboot_pending_count}</span> 个待重启删除</>
+                )}
+              </div>
             </div>
             {/* 关闭按钮 */}
             {onClearDeleteResult && (
@@ -246,30 +261,43 @@ export function ScanSummary({
             )}
           </div>
           
+          {/* 需要重启提示 */}
+          {deleteResult.needs_reboot && (
+            <div className="mt-3 pt-3 border-t border-blue-500/20 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-blue-500" />
+              <span className="text-xs text-blue-500">
+                部分文件被系统占用，将在下次重启后自动删除
+              </span>
+            </div>
+          )}
+          
           {/* 失败原因详情 */}
-          {deleteResult.failed_files && deleteResult.failed_files.length > 0 && (
+          {failedFiles.length > 0 && (
             <div className="mt-3 pt-3 border-t border-amber-500/20">
               <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-                失败原因：
+                跳过原因：
               </p>
               <div className="max-h-32 overflow-y-auto space-y-1">
-                {deleteResult.failed_files.slice(0, 10).map((item, index) => (
-                  <div key={index} className="text-xs text-[var(--fg-muted)] flex gap-2">
+                {failedFiles.slice(0, 10).map((item, index) => (
+                  <div key={index} className="text-xs text-[var(--fg-muted)] flex gap-2 items-center">
                     <span className="text-amber-500 shrink-0">•</span>
                     <span className="truncate flex-1" title={item.path}>
                       {item.path.split('\\').pop()}
                     </span>
-                    <span className="text-amber-500 shrink-0">
-                      {item.reason}
+                    <span 
+                      className="text-amber-500 shrink-0 cursor-help"
+                      title={getFailureReasonTooltip(item.failure_reason)}
+                    >
+                      {getFailureReasonMessage(item.failure_reason)}
                     </span>
                   </div>
                 ))}
-                {deleteResult.failed_files.length > 10 && (
+                {failedFiles.length > 10 && (
                   <button
                     onClick={() => setShowFailedModal(true)}
                     className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 cursor-pointer transition-colors"
                   >
-                    ...还有 {deleteResult.failed_files.length - 10} 个失败项，点击查看全部
+                    ...还有 {failedFiles.length - 10} 个跳过项，点击查看全部
                   </button>
                 )}
               </div>
@@ -279,11 +307,11 @@ export function ScanSummary({
       )}
 
       {/* 失败明细弹窗 */}
-      {deleteResult?.failed_files && (
+      {failedFiles.length > 0 && (
         <FailedFilesModal
           isOpen={showFailedModal}
           onClose={() => setShowFailedModal(false)}
-          failedFiles={deleteResult.failed_files}
+          failedFiles={failedFiles}
         />
       )}
     </div>
