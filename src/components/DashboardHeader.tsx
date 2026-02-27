@@ -127,7 +127,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
   };
 
   return (
-    <div className="bg-[var(--bg-card)] border-b border-[var(--border-muted)] px-6 py-4 sticky top-0 z-10">
+    <div className="bg-[var(--bg-card)] border-b border-[var(--border-color)] px-6 py-4 sticky top-0 z-10">
       <div className="max-w-5xl mx-auto flex items-center gap-8">
         {/* 健康评分 - 微信风格圆环进度 */}
         <div 
@@ -136,7 +136,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
         >
           <div className={`relative w-16 h-16 rounded-full ${scoreColor.bgLight} flex items-center justify-center`}>
             <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" className="text-[var(--border-default)]" />
+              <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" className="text-[var(--border-color)]" />
               <circle
                 cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round"
                 className={scoreColor.text}
@@ -150,7 +150,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[15px] font-bold text-[var(--fg-primary)]">健康评分</span>
+              <span className="text-[15px] font-bold text-[var(--text-primary)]">健康评分</span>
               {healthData && (
                 <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${scoreColor.bg} text-white`}>
                   {scoreColor.label}
@@ -158,7 +158,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
               )}
             </div>
             {healthData && (
-              <div className="flex items-center gap-4 mt-1.5 text-[12px] text-[var(--fg-muted)] tabular-nums">
+              <div className="flex items-center gap-4 mt-1.5 text-[12px] text-[var(--text-muted)] tabular-nums">
                 <span className="flex items-center gap-1">
                   <HardDrive className="w-3.5 h-3.5" />
                   {healthData.disk_score}/40
@@ -177,24 +177,25 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
         </div>
 
         {/* 分隔线 */}
-        <div className="w-px h-12 bg-[var(--border-default)]" />
+        <div className="w-px h-12 bg-[var(--border-color)]" />
 
         {/* 磁盘使用情况 */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[15px] font-bold text-[var(--fg-primary)]">C 盘空间</span>
+            <span className="text-[15px] font-bold text-[var(--text-primary)]">C 盘空间</span>
             {diskInfo && (
-              <span className="text-[13px] text-[var(--fg-muted)] tabular-nums">
+              <span className="text-[13px] text-[var(--text-muted)] tabular-nums">
                 {formatSize(diskInfo.free_space)} 可用 / {formatSize(diskInfo.total_space)}
               </span>
             )}
           </div>
+          {/* 进度条 - 使用柔和灰色轨道 */}
           <div className="h-2.5 bg-[var(--bg-hover)] rounded-full overflow-hidden">
             {diskInfo && (
               <div 
                 className={`h-full rounded-full transition-all duration-500 ${
-                  diskInfo.usage_percent > 90 ? 'bg-[#FA5151]' :
-                  diskInfo.usage_percent > 75 ? 'bg-[#FA9D3B]' : 'bg-[#07C160]'
+                  diskInfo.usage_percent > 90 ? 'bg-[var(--color-danger)]' :
+                  diskInfo.usage_percent > 75 ? 'bg-[var(--color-warning)]' : 'bg-[var(--brand-green)]'
                 }`}
                 style={{ width: `${diskInfo.usage_percent}%` }}
               />
@@ -203,17 +204,17 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
         </div>
 
         {/* 分隔线 */}
-        <div className="w-px h-12 bg-[var(--border-default)]" />
+        <div className="w-px h-12 bg-[var(--border-color)]" />
 
-        {/* 一键扫描按钮 - 实心微信绿 */}
+        {/* 一键扫描按钮 - 唯一的大绿色元素 */}
         <button
           onClick={onOneClickScan}
           disabled={isAnyScanning}
           className={`
             flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200
             ${isAnyScanning
-              ? 'bg-[#07C160]/20 text-[#07C160] cursor-not-allowed'
-              : 'bg-[#07C160] text-white hover:bg-[#06AD56] active:scale-[0.98]'
+              ? 'bg-[var(--brand-green-20)] text-[var(--brand-green)] cursor-not-allowed'
+              : 'bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] active:scale-[0.98]'
             }
           `}
         >

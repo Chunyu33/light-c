@@ -21,15 +21,15 @@ import { formatSize } from '../utils/format';
 const getRiskBadgeStyle = (level: number) => {
   switch (level) {
     case 1:
-      return 'bg-[#07C160]/10 text-[#07C160] border-[#07C160]/20';  // 微信绿 - 安全
+      return 'bg-[var(--brand-green-10)] text-[var(--brand-green)] border-[var(--brand-green-20)]';  // 微信绿 - 安全
     case 2:
-      return 'bg-[#07C160]/10 text-[#07C160] border-[#07C160]/20';  // 微信绿 - 低风险
+      return 'bg-[var(--brand-green-10)] text-[var(--brand-green)] border-[var(--brand-green-20)]';  // 微信绿 - 低风险
     case 3:
-      return 'bg-[#FA9D3B]/10 text-[#FA9D3B] border-[#FA9D3B]/20';  // 柔和橙 - 中等
+      return 'bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/20';  // 柔和橙 - 中等
     case 4:
-      return 'bg-[#FA9D3B]/10 text-[#FA9D3B] border-[#FA9D3B]/20';  // 柔和橙 - 较高
+      return 'bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/20';  // 柔和橙 - 较高
     default:
-      return 'bg-[#FA5151]/10 text-[#FA5151] border-[#FA5151]/20';  // 柔和红 - 高风险
+      return 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] border-[var(--color-danger)]/20';  // 柔和红 - 高风险
   }
 };
 
@@ -107,14 +107,14 @@ export function CategoryCard({
       >
         <div className="flex items-center gap-4">
           {/* 展开图标 */}
-          <div className="text-[var(--fg-faint)] transition-transform duration-200" style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
+          <div className="text-[var(--text-faint)] transition-transform duration-200" style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
             <ChevronDown className="w-5 h-5" />
           </div>
 
           {/* 复选框 - 微信绿 */}
           <div onClick={(e) => { e.stopPropagation(); handleCategoryToggle(); }}>
             <div className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors
-              ${isAllSelected ? 'bg-[#07C160] border-[#07C160]' : isPartialSelected ? 'bg-[#07C160]/50 border-[#07C160]' : 'border-[var(--fg-faint)] hover:border-[var(--fg-muted)]'}`}>
+              ${isAllSelected ? 'bg-[var(--brand-green)] border-[var(--brand-green)]' : isPartialSelected ? 'bg-[var(--brand-green)]/50 border-[var(--brand-green)]' : 'border-[var(--text-faint)] hover:border-[var(--text-muted)]'}`}>
               {(isAllSelected || isPartialSelected) && (
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   {isAllSelected ? <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /> : <path strokeLinecap="round" d="M5 12h14" />}
@@ -124,32 +124,32 @@ export function CategoryCard({
           </div>
 
           {/* 分类图标 - 微信绿 10% 透明度圆角容器 */}
-          <div className="w-10 h-10 rounded-xl bg-[#07C160]/10 flex items-center justify-center text-[#07C160]">
+          <div className="w-10 h-10 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center text-[var(--brand-green)]">
             <Folder className="w-5 h-5" />
           </div>
 
           {/* 分类信息 */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[14px] font-bold text-[var(--fg-primary)] truncate">
+              <span className="text-[14px] font-bold text-[var(--text-primary)] truncate">
                 {category.display_name}
               </span>
               <span className={`px-2 py-0.5 text-[11px] font-medium rounded border ${getRiskBadgeStyle(category.risk_level)}`}>
                 {getRiskText(category.risk_level)}
               </span>
             </div>
-            <p className="text-[13px] text-[var(--fg-muted)] truncate mt-1">{category.description}</p>
+            <p className="text-[13px] text-[var(--text-muted)] truncate mt-1">{category.description}</p>
           </div>
 
           {/* 统计信息 - tabular-nums 确保数字稳定 */}
           <div className="text-right">
-            <p className="text-[15px] font-bold text-[var(--fg-primary)] tabular-nums">
+            <p className="text-[15px] font-bold text-[var(--text-primary)] tabular-nums">
               {formatSize(category.total_size)}
             </p>
-            <p className="text-[13px] text-[var(--fg-muted)] tabular-nums">
+            <p className="text-[13px] text-[var(--text-muted)] tabular-nums">
               {category.file_count.toLocaleString()} 个文件
               {selectedCount > 0 && (
-                <span className="text-[#07C160] ml-1">
+                <span className="text-[var(--brand-green)] ml-1">
                   (已选 {selectedCount.toLocaleString()} 个, {formatSize(selectedSize)})
                 </span>
               )}
@@ -160,17 +160,17 @@ export function CategoryCard({
 
       {/* 文件列表 - 虚拟滚动 */}
       {expanded && (
-        <div className="border-t border-[var(--border-muted)]">
+        <div className="border-t border-[var(--border-color)]">
           {/* 风险提示 - 微信风格柔和橙 */}
           {category.risk_level >= 3 && (
-            <div className="px-5 py-2.5 bg-[#FA9D3B]/10 border-b border-[#FA9D3B]/20 flex items-center gap-2 text-[13px] text-[#FA9D3B]">
+            <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[13px] text-[var(--color-warning)]">
               <AlertTriangle className="w-4 h-4" />
               <span>此分类风险等级较高，请谨慎选择删除</span>
             </div>
           )}
 
           {/* 虚拟列表容器 */}
-          <div ref={parentRef} className="h-64 overflow-auto bg-[var(--bg-base)]">
+          <div ref={parentRef} className="h-64 overflow-auto bg-[var(--bg-main)]">
             <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
               {virtualizer.getVirtualItems().map((virtualRow) => {
                 const file = category.files[virtualRow.index];
@@ -215,12 +215,12 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
     <div
       style={style}
       className={`px-5 flex items-center gap-4 cursor-pointer transition-colors
-        ${selected ? 'bg-[#07C160]/10' : 'hover:bg-[var(--bg-hover)]'}`}
+        ${selected ? 'bg-[var(--brand-green-10)]' : 'hover:bg-[var(--bg-hover)]'}`}
       onClick={onToggle}
     >
       {/* 复选框 - 微信绿 */}
       <div className={`w-4 h-4 rounded border flex items-center justify-center
-        ${selected ? 'bg-[#07C160] border-[#07C160]' : 'border-[var(--fg-faint)]'}`}>
+        ${selected ? 'bg-[var(--brand-green)] border-[var(--brand-green)]' : 'border-[var(--text-faint)]'}`}>
         {selected && (
           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -229,19 +229,19 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
       </div>
 
       {/* 文件图标 */}
-      <div className="text-[var(--fg-faint)]">
+      <div className="text-[var(--text-faint)]">
         {file.is_dir ? <Folder className="w-4 h-4" /> : <File className="w-4 h-4" />}
       </div>
 
       {/* 文件路径 */}
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] text-[var(--fg-secondary)] truncate" title={file.path}>
+        <p className="text-[13px] text-[var(--text-secondary)] truncate" title={file.path}>
           {file.path}
         </p>
       </div>
 
       {/* 文件大小 */}
-      <div className="text-[13px] text-[var(--fg-muted)] tabular-nums">
+      <div className="text-[13px] text-[var(--text-muted)] tabular-nums">
         {formatSize(file.size)}
       </div>
 
@@ -252,7 +252,7 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
             e.stopPropagation();
             openInFolder(file.path);
           }}
-          className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--fg-muted)] hover:text-[#07C160]"
+          className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
           title="打开所在文件夹"
         >
           <FolderOpen className="w-4 h-4" />
@@ -262,7 +262,7 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
             e.stopPropagation();
             openFile(file.path);
           }}
-          className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--fg-muted)] hover:text-[#07C160]"
+          className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
           title="打开文件"
         >
           <ExternalLink className="w-4 h-4" />

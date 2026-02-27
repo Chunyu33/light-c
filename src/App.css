@@ -6,43 +6,63 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   CSS变量 - 浅色主题（微信风格 - 简洁、专业、可信赖）
+   CSS变量 - 浅色主题（微信设计语言）
    设计理念：
-   - 主强调色使用微信绿 #07C160，传递专业可信的感觉
-   - 背景采用柔和灰白 #F5F5F5，卡片使用纯白悬浮
-   - 文字层次分明：标题深灰 #1A1A1A，描述中灰 #71717A
+   - 品牌绿色 #07C160 仅用于主要操作按钮和强调元素
+   - 主背景 #F5F5F5 柔和灰白，卡片背景纯白 #FFFFFF
+   - 文字层次：主文字 #1A1A1A，辅助文字 #757575
+   - 边框极淡 #EDEDED，几乎不可见
    ============================================================================ */
 :root, .light {
-  /* 背景色 - 微信风格柔和灰白 */
-  --bg-base: #F5F5F5;           /* 主背景：柔和灰白，不刺眼 */
-  --bg-elevated: #FFFFFF;       /* 悬浮元素：纯白 */
-  --bg-card: #FFFFFF;           /* 卡片背景：纯白，与灰白背景形成层次 */
-  --bg-hover: #FAFAFA;          /* 悬停状态：极淡灰 */
-  --bg-active: #F0F0F0;         /* 激活状态：浅灰 */
+  /* ===== 品牌色 ===== */
+  --brand-green: #07C160;           /* 微信绿：仅用于主按钮和强调 */
+  --brand-green-hover: #06AD56;     /* 微信绿悬停态 */
+  --brand-green-10: rgba(7, 193, 96, 0.1);   /* 10% 透明度 */
+  --brand-green-20: rgba(7, 193, 96, 0.2);   /* 20% 透明度 */
   
-  /* 前景色 - 清晰的文字层次 */
-  --fg-primary: #1A1A1A;        /* 主标题：深灰，几乎黑色 */
-  --fg-secondary: #3D3D3D;      /* 次要文字：中深灰 */
-  --fg-muted: #71717A;          /* 辅助文字：中灰 (Zinc 500) */
-  --fg-faint: #A1A1AA;          /* 最淡文字：浅灰 (Zinc 400) */
+  /* ===== 背景色 ===== */
+  --bg-main: #F5F5F5;               /* 主背景：柔和灰白 */
+  --bg-card: #FFFFFF;               /* 卡片背景：纯白 */
+  --bg-elevated: #FFFFFF;           /* 悬浮元素：纯白 */
+  --bg-hover: #FAFAFA;              /* 悬停状态 */
+  --bg-active: #F0F0F0;             /* 激活状态 */
+  --bg-input: #FFFFFF;              /* 输入框背景 */
   
-  /* 边框 - 极淡，几乎不可见 */
-  --border-default: #E5E5E5;    /* 默认边框：淡灰 */
-  --border-muted: #F0F0F0;      /* 更淡边框 */
+  /* 兼容旧变量名 */
+  --bg-base: var(--bg-main);
   
-  /* 强调色 - 微信绿色系 */
-  --accent-primary: #07C160;    /* 微信绿：主强调色 */
-  --accent-primary-hover: #06AD56; /* 微信绿悬停：稍深 */
-  --accent-success: #07C160;    /* 成功状态：微信绿 */
-  --accent-warning: #FA9D3B;    /* 警告状态：柔和橙 */
-  --accent-danger: #FA5151;     /* 危险状态：柔和红 */
+  /* ===== 文字色 ===== */
+  --text-primary: #1A1A1A;          /* 主文字：深灰 */
+  --text-secondary: #3D3D3D;        /* 次要文字 */
+  --text-muted: #757575;            /* 辅助文字：中灰 */
+  --text-faint: #A1A1AA;            /* 最淡文字 */
   
-  /* 微信绿透明度变体 */
-  --wechat-green: #07C160;
-  --wechat-green-10: rgba(7, 193, 96, 0.1);   /* 10% 透明度，用于图标背景 */
-  --wechat-green-20: rgba(7, 193, 96, 0.2);   /* 20% 透明度 */
+  /* 兼容旧变量名 */
+  --fg-primary: var(--text-primary);
+  --fg-secondary: var(--text-secondary);
+  --fg-muted: var(--text-muted);
+  --fg-faint: var(--text-faint);
   
-  /* 滚动条 - 极简风格 */
+  /* ===== 边框色 ===== */
+  --border-color: #EDEDED;          /* 主边框：极淡 */
+  --border-muted: #F5F5F5;          /* 更淡边框 */
+  
+  /* 兼容旧变量名 */
+  --border-default: var(--border-color);
+  
+  /* ===== 状态色 ===== */
+  --color-success: #07C160;         /* 成功：微信绿 */
+  --color-warning: #FA9D3B;         /* 警告：柔和橙 */
+  --color-danger: #FA5151;          /* 危险：柔和红 */
+  
+  /* 兼容旧变量名 */
+  --accent-primary: var(--brand-green);
+  --accent-primary-hover: var(--brand-green-hover);
+  --accent-success: var(--color-success);
+  --accent-warning: var(--color-warning);
+  --accent-danger: var(--color-danger);
+  
+  /* ===== 滚动条 ===== */
   --scrollbar-track: #F5F5F5;
   --scrollbar-thumb: #D4D4D8;
   --scrollbar-thumb-hover: #A1A1AA;
@@ -57,46 +77,66 @@
 }
 
 /* ============================================================================
-   CSS变量 - 深色主题（微信风格深色版 - 沉稳、专业）
+   CSS变量 - 深色主题（微信设计语言）
    设计理念：
-   - 保持微信绿 #07C160 作为强调色
-   - 背景使用深灰色系，避免纯黑
-   - 文字层次清晰，确保可读性
+   - 品牌绿色 #06AD56 稍暗以适应深色背景
+   - 主背景 #111111 深灰，卡片背景 #191919
+   - 文字使用偏白色 #D1D1D1，避免纯白减少眼睛疲劳
+   - 边框 #2C2C2C 微妙分隔
    ============================================================================ */
 .dark {
-  /* 背景色 - 深灰色系，不是纯黑 */
-  --bg-base: #1A1A1A;           /* 主背景：深灰 */
-  --bg-elevated: #242424;       /* 悬浮元素：稍浅深灰 */
-  --bg-card: #2A2A2A;           /* 卡片背景：中深灰 */
-  --bg-hover: #333333;          /* 悬停状态 */
-  --bg-active: #3D3D3D;         /* 激活状态 */
+  /* ===== 品牌色 ===== */
+  --brand-green: #06AD56;           /* 微信绿深色版：稍暗 */
+  --brand-green-hover: #07C160;     /* 悬停时稍亮 */
+  --brand-green-10: rgba(6, 173, 86, 0.15);   /* 深色模式下稍高透明度 */
+  --brand-green-20: rgba(6, 173, 86, 0.25);
   
-  /* 前景色 - 清晰的文字层次 */
-  --fg-primary: #F5F5F5;        /* 主标题：几乎白色 */
-  --fg-secondary: #E5E5E5;      /* 次要文字：浅灰 */
-  --fg-muted: #A1A1AA;          /* 辅助文字：中灰 */
-  --fg-faint: #71717A;          /* 最淡文字：深灰 */
+  /* ===== 背景色 ===== */
+  --bg-main: #111111;               /* 主背景：深灰 */
+  --bg-card: #191919;               /* 卡片背景：稍浅深灰 */
+  --bg-elevated: #1F1F1F;           /* 悬浮元素 */
+  --bg-hover: #252525;              /* 悬停状态 */
+  --bg-active: #2F2F2F;             /* 激活状态 */
+  --bg-input: #1F1F1F;              /* 输入框背景 */
   
-  /* 边框 - 微妙的分隔 */
-  --border-default: #3D3D3D;    /* 默认边框 */
-  --border-muted: #333333;      /* 更淡边框 */
+  /* 兼容旧变量名 */
+  --bg-base: var(--bg-main);
   
-  /* 强调色 - 微信绿色系 */
-  --accent-primary: #07C160;    /* 微信绿 */
-  --accent-primary-hover: #1ED760; /* 微信绿悬停：稍亮 */
-  --accent-success: #07C160;
-  --accent-warning: #FA9D3B;
-  --accent-danger: #FA5151;
+  /* ===== 文字色 - 避免纯白，减少眼睛疲劳 ===== */
+  --text-primary: #D1D1D1;          /* 主文字：偏白色 */
+  --text-secondary: #B0B0B0;        /* 次要文字 */
+  --text-muted: #888888;            /* 辅助文字 */
+  --text-faint: #666666;            /* 最淡文字 */
   
-  /* 微信绿透明度变体 */
-  --wechat-green: #07C160;
-  --wechat-green-10: rgba(7, 193, 96, 0.15);  /* 深色模式下稍高透明度 */
-  --wechat-green-20: rgba(7, 193, 96, 0.25);
+  /* 兼容旧变量名 */
+  --fg-primary: var(--text-primary);
+  --fg-secondary: var(--text-secondary);
+  --fg-muted: var(--text-muted);
+  --fg-faint: var(--text-faint);
   
-  /* 滚动条 */
-  --scrollbar-track: #242424;
-  --scrollbar-thumb: #3D3D3D;
-  --scrollbar-thumb-hover: #525252;
+  /* ===== 边框色 ===== */
+  --border-color: #2C2C2C;          /* 主边框 */
+  --border-muted: #222222;          /* 更淡边框 */
+  
+  /* 兼容旧变量名 */
+  --border-default: var(--border-color);
+  
+  /* ===== 状态色 ===== */
+  --color-success: #06AD56;         /* 成功：微信绿深色版 */
+  --color-warning: #E08A30;         /* 警告：柔和橙深色版 */
+  --color-danger: #E04545;          /* 危险：柔和红深色版 */
+  
+  /* 兼容旧变量名 */
+  --accent-primary: var(--brand-green);
+  --accent-primary-hover: var(--brand-green-hover);
+  --accent-success: var(--color-success);
+  --accent-warning: var(--color-warning);
+  --accent-danger: var(--color-danger);
+  
+  /* ===== 滚动条 ===== */
+  --scrollbar-track: #191919;
+  --scrollbar-thumb: #333333;
+  --scrollbar-thumb-hover: #444444;
 }
 
 /* ============================================================================
