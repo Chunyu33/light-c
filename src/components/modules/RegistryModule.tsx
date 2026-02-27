@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Database, Loader2, Trash2, CheckCircle2, Shield } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -32,6 +33,8 @@ export function RegistryModule() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteErrors, setDeleteErrors] = useState<string[]>([]); // 详细错误列表
+  const [showErrorDetails, setShowErrorDetails] = useState(false); // 是否显示错误详情
   const [backupPath, setBackupPath] = useState<string | null>(null);
 
   // 计算选中数量
@@ -43,6 +46,8 @@ export function RegistryModule() {
     setScanResult(null);
     setSelectedEntries(new Set());
     setDeleteError(null);
+    setDeleteErrors([]);
+    setShowErrorDetails(false);
     setBackupPath(null);
 
     try {
@@ -84,6 +89,9 @@ export function RegistryModule() {
 
     setIsDeleting(true);
     setDeleteError(null);
+    setDeleteErrors([]);
+    setShowErrorDetails(false);
+    
     try {
       // 获取选中的条目
       const entriesToDelete = scanResult.entries.filter(
@@ -95,6 +103,7 @@ export function RegistryModule() {
 
       if (result.errors.length > 0) {
         setDeleteError(`${result.errors.length} 个条目删除失败`);
+        setDeleteErrors(result.errors); // 保存详细错误列表
       }
 
       // 从结果中移除已删除的项
@@ -126,6 +135,7 @@ export function RegistryModule() {
     } catch (err) {
       console.error('删除失败:', err);
       setDeleteError(String(err));
+      setDeleteErrors([String(err)]);
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -186,6 +196,28 @@ export function RegistryModule() {
 
   return (
     <>
+      {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
+      {isDeleting && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+            <div className="w-16 h-16 rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-[var(--color-warning)] animate-spin" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">正在清理注册表</h3>
+              <p className="text-sm text-[var(--text-muted)] mt-1">
+                正在删除 {selectedCount} 个注册表条目，请稍候...
+              </p>
+            </div>
+            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
+              <div className="h-full bg-[var(--color-warning)] rounded-full animate-pulse" style={{ width: '100%' }} />
+            </div>
+            <p className="text-xs text-[var(--text-faint)]">请勿关闭窗口</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <ModuleCard
         id="registry"
         title="注册表冗余"
@@ -268,8 +300,27 @@ export function RegistryModule() {
 
             {/* 错误提示 */}
             {deleteError && (
-              <div className="p-3 bg-[var(--color-danger)]/10 rounded-xl text-sm text-[var(--color-danger)]">
-                {deleteError}
+              <div className="p-3 bg-[var(--color-danger)]/10 rounded-xl border border-[var(--color-danger)]/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--color-danger)]">{deleteError}</span>
+                  {deleteErrors.length > 0 && (
+                    <button
+                      onClick={() => setShowErrorDetails(!showErrorDetails)}
+                      className="text-xs text-[var(--color-danger)] hover:underline"
+                    >
+                      {showErrorDetails ? '收起详情' : '查看详情'}
+                    </button>
+                  )}
+                </div>
+                {showErrorDetails && deleteErrors.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-[var(--color-danger)]/20 space-y-1 max-h-32 overflow-auto">
+                    {deleteErrors.map((err, idx) => (
+                      <p key={idx} className="text-xs text-[var(--color-danger)]/80 break-all">
+                        • {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
