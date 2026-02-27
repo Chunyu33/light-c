@@ -37,6 +37,7 @@ const PROTECTED_PATH_PREFIXES: &[&str] = &[
 
 /// 绝对禁止删除的文件名
 const PROTECTED_FILES: &[&str] = &[
+    // Windows 核心系统文件
     "ntoskrnl.exe",
     "hal.dll",
     "ntdll.dll",
@@ -57,6 +58,17 @@ const PROTECTED_FILES: &[&str] = &[
     "desktop.ini",  // 保护文件夹配置
     "ntuser.dat",   // 用户配置
     "usrclass.dat",
+    // 社交软件配置文件（防止误删导致数据丢失）
+    "config.data",      // 微信配置
+    "accinfo.dat",      // 微信账号信息
+    "msg.db",           // 消息数据库
+    "micromsg.db",      // 微信消息数据库
+    "contact.db",       // 联系人数据库
+    "emotion.db",       // 表情数据库
+    "favorite.db",      // 收藏数据库
+    "publicmsg.db",     // 公众号消息
+    "nt_db",            // NTQQ 数据库目录标识
+    "nt_config",        // NTQQ 配置目录标识
 ];
 
 /// 在Windows目录下禁止删除的扩展名

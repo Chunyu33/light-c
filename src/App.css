@@ -6,37 +6,46 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   CSS变量 - 浅色主题（浅绿色渐变风格）
+   CSS变量 - 浅色主题（微信风格 - 简洁、专业、可信赖）
+   设计理念：
+   - 主强调色使用微信绿 #07C160，传递专业可信的感觉
+   - 背景采用柔和灰白 #F5F5F5，卡片使用纯白悬浮
+   - 文字层次分明：标题深灰 #1A1A1A，描述中灰 #71717A
    ============================================================================ */
 :root, .light {
-  /* 背景色 - 浅绿色色调 */
-  --bg-base: #f0fdf4;
-  --bg-elevated: #ffffff;
-  --bg-card: #ffffff;
-  --bg-hover: #ecfdf5;
-  --bg-active: #d1fae5;
+  /* 背景色 - 微信风格柔和灰白 */
+  --bg-base: #F5F5F5;           /* 主背景：柔和灰白，不刺眼 */
+  --bg-elevated: #FFFFFF;       /* 悬浮元素：纯白 */
+  --bg-card: #FFFFFF;           /* 卡片背景：纯白，与灰白背景形成层次 */
+  --bg-hover: #FAFAFA;          /* 悬停状态：极淡灰 */
+  --bg-active: #F0F0F0;         /* 激活状态：浅灰 */
   
-  /* 前景色 */
-  --fg-primary: #064e3b;
-  --fg-secondary: #065f46;
-  --fg-muted: #6b7280;
-  --fg-faint: #9ca3af;
+  /* 前景色 - 清晰的文字层次 */
+  --fg-primary: #1A1A1A;        /* 主标题：深灰，几乎黑色 */
+  --fg-secondary: #3D3D3D;      /* 次要文字：中深灰 */
+  --fg-muted: #71717A;          /* 辅助文字：中灰 (Zinc 500) */
+  --fg-faint: #A1A1AA;          /* 最淡文字：浅灰 (Zinc 400) */
   
-  /* 边框 */
-  --border-default: #d1fae5;
-  --border-muted: #ecfdf5;
+  /* 边框 - 极淡，几乎不可见 */
+  --border-default: #E5E5E5;    /* 默认边框：淡灰 */
+  --border-muted: #F0F0F0;      /* 更淡边框 */
   
-  /* 强调色 - 绿色系 */
-  --accent-primary: #10b981;
-  --accent-primary-hover: #059669;
-  --accent-success: #10b981;
-  --accent-warning: #f59e0b;
-  --accent-danger: #ef4444;
+  /* 强调色 - 微信绿色系 */
+  --accent-primary: #07C160;    /* 微信绿：主强调色 */
+  --accent-primary-hover: #06AD56; /* 微信绿悬停：稍深 */
+  --accent-success: #07C160;    /* 成功状态：微信绿 */
+  --accent-warning: #FA9D3B;    /* 警告状态：柔和橙 */
+  --accent-danger: #FA5151;     /* 危险状态：柔和红 */
   
-  /* 滚动条 */
-  --scrollbar-track: #ecfdf5;
-  --scrollbar-thumb: #a7f3d0;
-  --scrollbar-thumb-hover: #6ee7b7;
+  /* 微信绿透明度变体 */
+  --wechat-green: #07C160;
+  --wechat-green-10: rgba(7, 193, 96, 0.1);   /* 10% 透明度，用于图标背景 */
+  --wechat-green-20: rgba(7, 193, 96, 0.2);   /* 20% 透明度 */
+  
+  /* 滚动条 - 极简风格 */
+  --scrollbar-track: #F5F5F5;
+  --scrollbar-thumb: #D4D4D8;
+  --scrollbar-thumb-hover: #A1A1AA;
 
   font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
   font-size: 14px;
@@ -48,32 +57,46 @@
 }
 
 /* ============================================================================
-   CSS变量 - 深色主题（深绿色色调）
+   CSS变量 - 深色主题（微信风格深色版 - 沉稳、专业）
+   设计理念：
+   - 保持微信绿 #07C160 作为强调色
+   - 背景使用深灰色系，避免纯黑
+   - 文字层次清晰，确保可读性
    ============================================================================ */
 .dark {
-  --bg-base: #0a1f1a;
-  --bg-elevated: #0f2922;
-  --bg-card: #14332b;
-  --bg-hover: #1a3d34;
-  --bg-active: #20473d;
+  /* 背景色 - 深灰色系，不是纯黑 */
+  --bg-base: #1A1A1A;           /* 主背景：深灰 */
+  --bg-elevated: #242424;       /* 悬浮元素：稍浅深灰 */
+  --bg-card: #2A2A2A;           /* 卡片背景：中深灰 */
+  --bg-hover: #333333;          /* 悬停状态 */
+  --bg-active: #3D3D3D;         /* 激活状态 */
   
-  --fg-primary: #ecfdf5;
-  --fg-secondary: #a7f3d0;
-  --fg-muted: #6ee7b7;
-  --fg-faint: #34d399;
+  /* 前景色 - 清晰的文字层次 */
+  --fg-primary: #F5F5F5;        /* 主标题：几乎白色 */
+  --fg-secondary: #E5E5E5;      /* 次要文字：浅灰 */
+  --fg-muted: #A1A1AA;          /* 辅助文字：中灰 */
+  --fg-faint: #71717A;          /* 最淡文字：深灰 */
   
-  --border-default: #1a3d34;
-  --border-muted: #14332b;
+  /* 边框 - 微妙的分隔 */
+  --border-default: #3D3D3D;    /* 默认边框 */
+  --border-muted: #333333;      /* 更淡边框 */
   
-  --accent-primary: #10b981;
-  --accent-primary-hover: #34d399;
-  --accent-success: #10b981;
-  --accent-warning: #f59e0b;
-  --accent-danger: #ef4444;
+  /* 强调色 - 微信绿色系 */
+  --accent-primary: #07C160;    /* 微信绿 */
+  --accent-primary-hover: #1ED760; /* 微信绿悬停：稍亮 */
+  --accent-success: #07C160;
+  --accent-warning: #FA9D3B;
+  --accent-danger: #FA5151;
   
-  --scrollbar-track: #14332b;
-  --scrollbar-thumb: #1a3d34;
-  --scrollbar-thumb-hover: #20473d;
+  /* 微信绿透明度变体 */
+  --wechat-green: #07C160;
+  --wechat-green-10: rgba(7, 193, 96, 0.15);  /* 深色模式下稍高透明度 */
+  --wechat-green-20: rgba(7, 193, 96, 0.25);
+  
+  /* 滚动条 */
+  --scrollbar-track: #242424;
+  --scrollbar-thumb: #3D3D3D;
+  --scrollbar-thumb-hover: #525252;
 }
 
 /* ============================================================================

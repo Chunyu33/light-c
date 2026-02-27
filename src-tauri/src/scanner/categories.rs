@@ -108,17 +108,35 @@ impl JunkCategory {
                 ScanPath::fixed_path("C:\\Windows\\Temp"),
             ],
             JunkCategory::SystemCache => vec![
+                // Windows 预读取缓存
                 ScanPath::fixed_path("C:\\Windows\\Prefetch"),
+                // Windows 传递优化缓存
+                ScanPath::fixed_path("C:\\Windows\\SoftwareDistribution\\DeliveryOptimization"),
+                // Windows 网络缓存
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\INetCache")),
+                // Windows 应用程序缓存
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Caches")),
             ],
             JunkCategory::BrowserCache => vec![
-                // Chrome
+                // Chrome - 主缓存
                 ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\Cache")),
                 ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\Code Cache")),
-                // Edge
+                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\GPUCache")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\Service Worker\\CacheStorage")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\ShaderCache")),
+                // Edge - 主缓存
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\Cache")),
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\Code Cache")),
-                // Firefox
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\GPUCache")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\Service Worker\\CacheStorage")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\ShaderCache")),
+                // Firefox - 配置文件夹下的缓存
                 ScanPath::env_path("LOCALAPPDATA", Some("Mozilla\\Firefox\\Profiles")),
+                // Brave 浏览器
+                ScanPath::env_path("LOCALAPPDATA", Some("BraveSoftware\\Brave-Browser\\User Data\\Default\\Cache")),
+                ScanPath::env_path("LOCALAPPDATA", Some("BraveSoftware\\Brave-Browser\\User Data\\Default\\Code Cache")),
+                // Opera 浏览器
+                ScanPath::env_path("APPDATA", Some("Opera Software\\Opera Stable\\Cache")),
             ],
             JunkCategory::RecycleBin => vec![
                 ScanPath::fixed_path("C:\\$Recycle.Bin"),
@@ -154,8 +172,16 @@ impl JunkCategory {
                 ScanPath::fixed_path("C:\\ProgramData\\Microsoft\\Windows\\WER"),
             ],
             JunkCategory::InstallerTemp => vec![
+                // Windows Installer 补丁缓存
                 ScanPath::fixed_path("C:\\Windows\\Installer\\$PatchCache$"),
+                // 下载的安装程序
                 ScanPath::env_path("LOCALAPPDATA", Some("Downloaded Installations")),
+                // NVIDIA 安装缓存
+                ScanPath::fixed_path("C:\\NVIDIA"),
+                // AMD 安装缓存
+                ScanPath::fixed_path("C:\\AMD"),
+                // Intel 安装缓存
+                ScanPath::fixed_path("C:\\Intel"),
             ],
             JunkCategory::ClipboardCache => vec![
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Clipboard")),

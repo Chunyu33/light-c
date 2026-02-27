@@ -53,9 +53,9 @@ function DashboardContent() {
       {/* 欢迎弹窗 */}
       <WelcomeModal isOpen={showWelcome} onClose={() => setShowWelcome(false)} />
 
-      {/* 主内容区 - 模块卡片列表 */}
+      {/* 主内容区 - 微信风格柔和灰白背景，增加间距 */}
       <main className="flex-1 overflow-auto bg-[var(--bg-base)]">
-        <div className="max-w-5xl mx-auto p-4 space-y-4">
+        <div className="max-w-5xl mx-auto p-6 space-y-5">
           {/* 垃圾清理模块 */}
           <JunkCleanModule />
 

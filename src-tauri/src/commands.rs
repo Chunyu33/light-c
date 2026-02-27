@@ -443,6 +443,7 @@ pub struct SocialScanResult {
 }
 
 /// 扫描社交软件缓存（异步执行）
+/// 支持动态路径检测，自动识别微信、QQ、NTQQ、钉钉、飞书等软件的缓存目录
 #[tauri::command]
 pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
     info!("开始扫描社交软件缓存");
@@ -475,118 +476,377 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
             },
         ];
 
-        // 获取用户目录和文档目录
+        // 获取用户目录
         let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Default".to_string());
+        let local_appdata = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| format!("{}\\AppData\\Local", user_profile));
+        let appdata = std::env::var("APPDATA").unwrap_or_else(|_| format!("{}\\AppData\\Roaming", user_profile));
         
         // 获取真实的文档目录（可能在 D 盘等非系统盘）
         let documents_dir = dirs::document_dir()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| format!("{}\\Documents", user_profile));
         
-        info!("用户目录: {}, 文档目录: {}", user_profile, documents_dir);
+        // 默认文档目录
+        let default_documents = format!("{}\\Documents", user_profile);
         
-        // 社交软件路径配置 (app_name, path_pattern, category_id)
-        // 同时支持文档目录和用户目录下的 Documents，因为有些系统配置不同
-        let mut social_paths: Vec<(&str, String, &str)> = vec![
-            // 微信 - 文档目录
-            ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Image", documents_dir), "images_videos"),
-            ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Video", documents_dir), "images_videos"),
-            ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\File", documents_dir), "file_transfer"),
-            ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Sns", documents_dir), "moments_cache"),
-            ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Cache", documents_dir), "moments_cache"),
-            // QQ - 文档目录
-            ("QQ", format!("{}\\Tencent Files\\*\\Image", documents_dir), "images_videos"),
-            ("QQ", format!("{}\\Tencent Files\\*\\Video", documents_dir), "images_videos"),
-            ("QQ", format!("{}\\Tencent Files\\*\\FileRecv", documents_dir), "file_transfer"),
-            ("QQ", format!("{}\\AppData\\Roaming\\Tencent\\QQ\\Temp", user_profile), "moments_cache"),
-            // 钉钉
-            ("钉钉", format!("{}\\AppData\\Roaming\\DingTalk\\*\\Image", user_profile), "images_videos"),
-            ("钉钉", format!("{}\\AppData\\Roaming\\DingTalk\\*\\Video", user_profile), "images_videos"),
-            ("钉钉", format!("{}\\AppData\\Roaming\\DingTalk\\*\\File", user_profile), "file_transfer"),
-            ("钉钉", format!("{}\\DingTalk", documents_dir), "file_transfer"),
-            ("钉钉", format!("{}\\AppData\\Roaming\\DingTalk\\*\\Cache", user_profile), "moments_cache"),
-            // 飞书
-            ("飞书", format!("{}\\AppData\\Roaming\\feishu\\*\\Image", user_profile), "images_videos"),
-            ("飞书", format!("{}\\AppData\\Roaming\\feishu\\*\\File", user_profile), "file_transfer"),
-            ("飞书", format!("{}\\Feishu", documents_dir), "file_transfer"),
-            ("飞书", format!("{}\\AppData\\Roaming\\feishu\\*\\Cache", user_profile), "moments_cache"),
-            // 企业微信
-            ("企业微信", format!("{}\\WXWork\\*\\Cache\\Image", documents_dir), "images_videos"),
-            ("企业微信", format!("{}\\WXWork\\*\\Cache\\Video", documents_dir), "images_videos"),
-            ("企业微信", format!("{}\\WXWork\\*\\Cache\\File", documents_dir), "file_transfer"),
+        info!("用户目录: {}", user_profile);
+        info!("文档目录: {}", documents_dir);
+        info!("LocalAppData: {}", local_appdata);
+        
+        // ========================================================================
+        // 动态检测社交软件路径
+        // ========================================================================
+        
+        let mut social_paths: Vec<(&str, String, &str)> = Vec::new();
+        
+        // ------------------------------------------------------------------------
+        // 微信 (WeChat) - 动态检测
+        // ------------------------------------------------------------------------
+        let wechat_base_paths = vec![
+            format!("{}\\WeChat Files", documents_dir),
+            format!("{}\\WeChat Files", default_documents),
         ];
         
-        // 如果文档目录不是默认的 Documents，也添加默认路径作为备选
-        let default_documents = format!("{}\\Documents", user_profile);
-        if documents_dir != default_documents {
-            social_paths.extend(vec![
-                // 微信 - 默认 Documents 目录
-                ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Image", default_documents), "images_videos"),
-                ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Video", default_documents), "images_videos"),
-                ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\File", default_documents), "file_transfer"),
-                ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Sns", default_documents), "moments_cache"),
-                ("微信", format!("{}\\WeChat Files\\*\\FileStorage\\Cache", default_documents), "moments_cache"),
-                // QQ - 默认 Documents 目录
-                ("QQ", format!("{}\\Tencent Files\\*\\Image", default_documents), "images_videos"),
-                ("QQ", format!("{}\\Tencent Files\\*\\Video", default_documents), "images_videos"),
-                ("QQ", format!("{}\\Tencent Files\\*\\FileRecv", default_documents), "file_transfer"),
-            ]);
-        }
-
-        // 图片视频扩展名
-        let image_video_exts = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "mp4", "avi", "mov", "wmv", "flv", "mkv", "dat"];
-        
-        for (app_name, path_pattern, category_id) in &social_paths {
-            info!("检查路径模式: {} ({})", path_pattern, app_name);
-            
-            if path_pattern.contains("*") {
-                // 处理通配符路径：找到通配符所在的父目录
-                // 例如: C:\Users\xxx\Documents\WeChat Files\*\FileStorage\Image
-                // 需要遍历 WeChat Files 下的所有子目录
-                let parts: Vec<&str> = path_pattern.split('*').collect();
-                if parts.len() >= 2 {
-                    let parent_dir = parts[0].trim_end_matches('\\');
-                    let suffix = parts[1].trim_start_matches('\\');
-                    
-                    info!("  父目录: {}, 后缀: {}", parent_dir, suffix);
-                    
-                    let parent_path = std::path::Path::new(parent_dir);
-                    if parent_path.exists() {
-                        info!("  父目录存在，开始遍历子目录");
-                        if let Ok(entries) = std::fs::read_dir(parent_path) {
-                            for entry in entries.filter_map(|e| e.ok()) {
-                                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                                    let full_path = entry.path().join(suffix);
-                                    info!("    检查完整路径: {:?}, 存在: {}", full_path, full_path.exists());
-                                    if full_path.exists() {
-                                        scan_directory_for_social(
-                                            &full_path,
-                                            app_name,
-                                            category_id,
-                                            &mut categories,
-                                            &image_video_exts,
-                                        );
-                                    }
+        for base_path in &wechat_base_paths {
+            let base = std::path::Path::new(base_path);
+            if base.exists() {
+                info!("发现微信目录: {}", base_path);
+                // 遍历所有用户目录（微信ID）
+                if let Ok(entries) = std::fs::read_dir(base) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                            let user_dir = entry.path();
+                            let user_name = user_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            
+                            // 跳过 All Users 和 Applet 等系统目录
+                            if user_name == "All Users" || user_name == "Applet" || user_name.starts_with(".") {
+                                continue;
+                            }
+                            
+                            info!("  微信用户: {}", user_name);
+                            
+                            // FileStorage 子目录
+                            let file_storage = user_dir.join("FileStorage");
+                            if file_storage.exists() {
+                                // 图片
+                                let image_dir = file_storage.join("Image");
+                                if image_dir.exists() {
+                                    social_paths.push(("微信", image_dir.to_string_lossy().to_string(), "images_videos"));
+                                }
+                                // 视频
+                                let video_dir = file_storage.join("Video");
+                                if video_dir.exists() {
+                                    social_paths.push(("微信", video_dir.to_string_lossy().to_string(), "images_videos"));
+                                }
+                                // 文件
+                                let file_dir = file_storage.join("File");
+                                if file_dir.exists() {
+                                    social_paths.push(("微信", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                                }
+                                // 朋友圈
+                                let sns_dir = file_storage.join("Sns");
+                                if sns_dir.exists() {
+                                    social_paths.push(("微信", sns_dir.to_string_lossy().to_string(), "moments_cache"));
+                                }
+                                // 缓存
+                                let cache_dir = file_storage.join("Cache");
+                                if cache_dir.exists() {
+                                    social_paths.push(("微信", cache_dir.to_string_lossy().to_string(), "moments_cache"));
+                                }
+                                // 消息附件
+                                let msg_attach = file_storage.join("MsgAttach");
+                                if msg_attach.exists() {
+                                    social_paths.push(("微信", msg_attach.to_string_lossy().to_string(), "file_transfer"));
+                                }
+                            }
+                            
+                            // Msg 目录（消息数据库，通常较大）
+                            let msg_dir = user_dir.join("Msg");
+                            if msg_dir.exists() {
+                                // 只扫描 Attach 子目录，避免删除消息数据库
+                                let attach_dir = msg_dir.join("Attach");
+                                if attach_dir.exists() {
+                                    social_paths.push(("微信", attach_dir.to_string_lossy().to_string(), "file_transfer"));
                                 }
                             }
                         }
-                    } else {
-                        info!("  父目录不存在: {}", parent_dir);
                     }
                 }
-            } else {
-                // 非通配符路径，直接扫描
-                let direct_path = PathBuf::from(path_pattern);
-                info!("  直接路径: {:?}, 存在: {}", direct_path, direct_path.exists());
-                if direct_path.exists() {
-                    scan_directory_for_social(
-                        &direct_path,
-                        app_name,
-                        category_id,
-                        &mut categories,
-                        &image_video_exts,
-                    );
+            }
+        }
+        
+        // ------------------------------------------------------------------------
+        // QQ (传统版) - 动态检测
+        // ------------------------------------------------------------------------
+        let qq_base_paths = vec![
+            format!("{}\\Tencent Files", documents_dir),
+            format!("{}\\Tencent Files", default_documents),
+        ];
+        
+        for base_path in &qq_base_paths {
+            let base = std::path::Path::new(base_path);
+            if base.exists() {
+                info!("发现QQ目录: {}", base_path);
+                if let Ok(entries) = std::fs::read_dir(base) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                            let user_dir = entry.path();
+                            let user_name = user_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            
+                            // QQ号通常是纯数字
+                            if !user_name.chars().all(|c| c.is_ascii_digit()) && user_name != "All Users" {
+                                continue;
+                            }
+                            
+                            info!("  QQ用户: {}", user_name);
+                            
+                            // 图片
+                            let image_dir = user_dir.join("Image");
+                            if image_dir.exists() {
+                                social_paths.push(("QQ", image_dir.to_string_lossy().to_string(), "images_videos"));
+                            }
+                            // 视频
+                            let video_dir = user_dir.join("Video");
+                            if video_dir.exists() {
+                                social_paths.push(("QQ", video_dir.to_string_lossy().to_string(), "images_videos"));
+                            }
+                            // 文件接收
+                            let file_recv = user_dir.join("FileRecv");
+                            if file_recv.exists() {
+                                social_paths.push(("QQ", file_recv.to_string_lossy().to_string(), "file_transfer"));
+                            }
+                            // 音频
+                            let audio_dir = user_dir.join("Audio");
+                            if audio_dir.exists() {
+                                social_paths.push(("QQ", audio_dir.to_string_lossy().to_string(), "images_videos"));
+                            }
+                        }
+                    }
                 }
+            }
+        }
+        
+        // QQ 临时文件
+        let qq_temp = format!("{}\\Tencent\\QQ\\Temp", appdata);
+        if std::path::Path::new(&qq_temp).exists() {
+            social_paths.push(("QQ", qq_temp, "moments_cache"));
+        }
+        
+        // ------------------------------------------------------------------------
+        // NTQQ (新版QQ) - 动态检测
+        // ------------------------------------------------------------------------
+        let ntqq_base = format!("{}\\Tencent\\QQ\\nt_qq", local_appdata);
+        let ntqq_path = std::path::Path::new(&ntqq_base);
+        if ntqq_path.exists() {
+            info!("发现NTQQ目录: {}", ntqq_base);
+            // NTQQ 的缓存结构
+            if let Ok(entries) = std::fs::read_dir(ntqq_path) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                        let sub_dir = entry.path();
+                        let dir_name = sub_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+                        
+                        // 跳过非用户目录
+                        if dir_name == "global" || dir_name.starts_with(".") {
+                            continue;
+                        }
+                        
+                        info!("  NTQQ用户目录: {}", dir_name);
+                        
+                        // nt_data 目录
+                        let nt_data = sub_dir.join("nt_data");
+                        if nt_data.exists() {
+                            // 图片缓存
+                            let pic_dir = nt_data.join("Pic");
+                            if pic_dir.exists() {
+                                social_paths.push(("NTQQ", pic_dir.to_string_lossy().to_string(), "images_videos"));
+                            }
+                            // 视频缓存
+                            let video_dir = nt_data.join("Video");
+                            if video_dir.exists() {
+                                social_paths.push(("NTQQ", video_dir.to_string_lossy().to_string(), "images_videos"));
+                            }
+                            // 文件缓存
+                            let file_dir = nt_data.join("File");
+                            if file_dir.exists() {
+                                social_paths.push(("NTQQ", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                            }
+                        }
+                        
+                        // nt_msg 目录（消息缓存）
+                        let nt_msg = sub_dir.join("nt_msg");
+                        if nt_msg.exists() {
+                            social_paths.push(("NTQQ", nt_msg.to_string_lossy().to_string(), "moments_cache"));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // NTQQ 全局缓存
+        let ntqq_cache = format!("{}\\Tencent\\QQ\\Cache", local_appdata);
+        if std::path::Path::new(&ntqq_cache).exists() {
+            social_paths.push(("NTQQ", ntqq_cache, "moments_cache"));
+        }
+        
+        // ------------------------------------------------------------------------
+        // 钉钉 (DingTalk) - 动态检测
+        // ------------------------------------------------------------------------
+        let dingtalk_base = format!("{}\\DingTalk", appdata);
+        let dingtalk_path = std::path::Path::new(&dingtalk_base);
+        if dingtalk_path.exists() {
+            info!("发现钉钉目录: {}", dingtalk_base);
+            if let Ok(entries) = std::fs::read_dir(dingtalk_path) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                        let sub_dir = entry.path();
+                        // 图片
+                        let image_dir = sub_dir.join("Image");
+                        if image_dir.exists() {
+                            social_paths.push(("钉钉", image_dir.to_string_lossy().to_string(), "images_videos"));
+                        }
+                        // 视频
+                        let video_dir = sub_dir.join("Video");
+                        if video_dir.exists() {
+                            social_paths.push(("钉钉", video_dir.to_string_lossy().to_string(), "images_videos"));
+                        }
+                        // 文件
+                        let file_dir = sub_dir.join("File");
+                        if file_dir.exists() {
+                            social_paths.push(("钉钉", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                        }
+                        // 缓存
+                        let cache_dir = sub_dir.join("Cache");
+                        if cache_dir.exists() {
+                            social_paths.push(("钉钉", cache_dir.to_string_lossy().to_string(), "moments_cache"));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 钉钉文档目录
+        let dingtalk_docs = format!("{}\\DingTalk", documents_dir);
+        if std::path::Path::new(&dingtalk_docs).exists() {
+            social_paths.push(("钉钉", dingtalk_docs, "file_transfer"));
+        }
+        
+        // ------------------------------------------------------------------------
+        // 飞书 (Feishu/Lark) - 动态检测
+        // ------------------------------------------------------------------------
+        let feishu_base = format!("{}\\feishu", appdata);
+        let feishu_path = std::path::Path::new(&feishu_base);
+        if feishu_path.exists() {
+            info!("发现飞书目录: {}", feishu_base);
+            if let Ok(entries) = std::fs::read_dir(feishu_path) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                        let sub_dir = entry.path();
+                        // 图片
+                        let image_dir = sub_dir.join("Image");
+                        if image_dir.exists() {
+                            social_paths.push(("飞书", image_dir.to_string_lossy().to_string(), "images_videos"));
+                        }
+                        // 文件
+                        let file_dir = sub_dir.join("File");
+                        if file_dir.exists() {
+                            social_paths.push(("飞书", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                        }
+                        // 缓存
+                        let cache_dir = sub_dir.join("Cache");
+                        if cache_dir.exists() {
+                            social_paths.push(("飞书", cache_dir.to_string_lossy().to_string(), "moments_cache"));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 飞书文档目录
+        let feishu_docs = format!("{}\\Feishu", documents_dir);
+        if std::path::Path::new(&feishu_docs).exists() {
+            social_paths.push(("飞书", feishu_docs, "file_transfer"));
+        }
+        
+        // Lark (国际版飞书)
+        let lark_base = format!("{}\\Lark", appdata);
+        if std::path::Path::new(&lark_base).exists() {
+            social_paths.push(("Lark", lark_base, "moments_cache"));
+        }
+        
+        // ------------------------------------------------------------------------
+        // 企业微信 (WXWork) - 动态检测
+        // ------------------------------------------------------------------------
+        let wxwork_base_paths = vec![
+            format!("{}\\WXWork", documents_dir),
+            format!("{}\\WXWork", default_documents),
+        ];
+        
+        for base_path in &wxwork_base_paths {
+            let base = std::path::Path::new(base_path);
+            if base.exists() {
+                info!("发现企业微信目录: {}", base_path);
+                if let Ok(entries) = std::fs::read_dir(base) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                            let user_dir = entry.path();
+                            let cache_dir = user_dir.join("Cache");
+                            if cache_dir.exists() {
+                                // 图片
+                                let image_dir = cache_dir.join("Image");
+                                if image_dir.exists() {
+                                    social_paths.push(("企业微信", image_dir.to_string_lossy().to_string(), "images_videos"));
+                                }
+                                // 视频
+                                let video_dir = cache_dir.join("Video");
+                                if video_dir.exists() {
+                                    social_paths.push(("企业微信", video_dir.to_string_lossy().to_string(), "images_videos"));
+                                }
+                                // 文件
+                                let file_dir = cache_dir.join("File");
+                                if file_dir.exists() {
+                                    social_paths.push(("企业微信", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ------------------------------------------------------------------------
+        // Telegram - 动态检测
+        // ------------------------------------------------------------------------
+        let telegram_base = format!("{}\\Telegram Desktop", appdata);
+        if std::path::Path::new(&telegram_base).exists() {
+            info!("发现Telegram目录: {}", telegram_base);
+            social_paths.push(("Telegram", telegram_base, "moments_cache"));
+        }
+        
+        // ========================================================================
+        // 执行扫描
+        // ========================================================================
+        
+        // 图片视频扩展名
+        let image_video_exts = [
+            "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "heif", "tiff",
+            "mp4", "avi", "mov", "wmv", "flv", "mkv", "webm", "m4v", "3gp",
+            "mp3", "wav", "aac", "flac", "ogg", "wma", "m4a",
+            "dat", "silk", "amr"  // 微信语音格式
+        ];
+        
+        info!("共发现 {} 个社交软件缓存路径", social_paths.len());
+        
+        for (app_name, path_str, category_id) in &social_paths {
+            let path = PathBuf::from(path_str);
+            if path.exists() {
+                scan_directory_for_social(
+                    &path,
+                    app_name,
+                    category_id,
+                    &mut categories,
+                    &image_video_exts,
+                );
             }
         }
 

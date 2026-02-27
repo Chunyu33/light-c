@@ -57,26 +57,27 @@ function useAnimatedNumber(targetValue: number, duration: number = 800) {
 // 根据分数获取颜色配置
 // ============================================================================
 
+// 微信风格评分颜色配置
 function getScoreColor(score: number) {
   if (score >= 80) {
     return {
-      text: 'text-emerald-500',
-      bg: 'bg-emerald-500',
-      bgLight: 'bg-emerald-500/10',
+      text: 'text-[#07C160]',      // 微信绿
+      bg: 'bg-[#07C160]',
+      bgLight: 'bg-[#07C160]/10',
       label: '优秀',
     };
   } else if (score >= 60) {
     return {
-      text: 'text-amber-500',
-      bg: 'bg-amber-500',
-      bgLight: 'bg-amber-500/10',
+      text: 'text-[#FA9D3B]',      // 柔和橙
+      bg: 'bg-[#FA9D3B]',
+      bgLight: 'bg-[#FA9D3B]/10',
       label: '良好',
     };
   } else {
     return {
-      text: 'text-rose-500',
-      bg: 'bg-rose-500',
-      bgLight: 'bg-rose-500/10',
+      text: 'text-[#FA5151]',      // 柔和红
+      bg: 'bg-[#FA5151]',
+      bgLight: 'bg-[#FA5151]/10',
       label: '需优化',
     };
   }
@@ -126,48 +127,48 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
   };
 
   return (
-    <div className="bg-[var(--bg-card)] border-b border-[var(--border-default)] px-4 py-3 sticky top-0 z-10">
-      <div className="max-w-5xl mx-auto flex items-center gap-6">
-        {/* 健康评分 */}
+    <div className="bg-[var(--bg-card)] border-b border-[var(--border-muted)] px-6 py-4 sticky top-0 z-10">
+      <div className="max-w-5xl mx-auto flex items-center gap-8">
+        {/* 健康评分 - 微信风格圆环进度 */}
         <div 
-          className="flex items-center gap-3 cursor-pointer"
+          className="flex items-center gap-4 cursor-pointer"
           onClick={handleTripleClick}
         >
-          <div className={`relative w-14 h-14 rounded-full ${scoreColor.bgLight} flex items-center justify-center`}>
+          <div className={`relative w-16 h-16 rounded-full ${scoreColor.bgLight} flex items-center justify-center`}>
             <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="6" className="text-[var(--bg-hover)]" />
+              <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" className="text-[var(--border-default)]" />
               <circle
-                cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round"
+                cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round"
                 className={scoreColor.text}
                 strokeDasharray={`${(healthData?.score ?? 0) * 2.64} 264`}
                 style={{ transition: 'stroke-dasharray 0.8s ease-out' }}
               />
             </svg>
-            <span className={`text-lg font-bold ${scoreColor.text} tabular-nums`}>
+            <span className={`text-xl font-bold ${scoreColor.text} tabular-nums`}>
               {isLoadingHealth ? '--' : animatedScore}
             </span>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--fg-primary)]">健康评分</span>
+              <span className="text-[15px] font-bold text-[var(--fg-primary)]">健康评分</span>
               {healthData && (
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${scoreColor.bg} text-white`}>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${scoreColor.bg} text-white`}>
                   {scoreColor.label}
                 </span>
               )}
             </div>
             {healthData && (
-              <div className="flex items-center gap-3 mt-1 text-[10px] text-[var(--fg-muted)]">
+              <div className="flex items-center gap-4 mt-1.5 text-[12px] text-[var(--fg-muted)] tabular-nums">
                 <span className="flex items-center gap-1">
-                  <HardDrive className="w-3 h-3" />
+                  <HardDrive className="w-3.5 h-3.5" />
                   {healthData.disk_score}/40
                 </span>
                 <span className="flex items-center gap-1">
-                  <Moon className="w-3 h-3" />
+                  <Moon className="w-3.5 h-3.5" />
                   {healthData.hibernation_score}/30
                 </span>
                 <span className="flex items-center gap-1">
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   {healthData.junk_score}/30
                 </span>
               </div>
@@ -176,24 +177,24 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
         </div>
 
         {/* 分隔线 */}
-        <div className="w-px h-10 bg-[var(--border-default)]" />
+        <div className="w-px h-12 bg-[var(--border-default)]" />
 
         {/* 磁盘使用情况 */}
         <div className="flex-1">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-medium text-[var(--fg-primary)]">C 盘空间</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[15px] font-bold text-[var(--fg-primary)]">C 盘空间</span>
             {diskInfo && (
-              <span className="text-xs text-[var(--fg-muted)]">
+              <span className="text-[13px] text-[var(--fg-muted)] tabular-nums">
                 {formatSize(diskInfo.free_space)} 可用 / {formatSize(diskInfo.total_space)}
               </span>
             )}
           </div>
-          <div className="h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
+          <div className="h-2.5 bg-[var(--bg-hover)] rounded-full overflow-hidden">
             {diskInfo && (
               <div 
                 className={`h-full rounded-full transition-all duration-500 ${
-                  diskInfo.usage_percent > 90 ? 'bg-rose-500' :
-                  diskInfo.usage_percent > 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                  diskInfo.usage_percent > 90 ? 'bg-[#FA5151]' :
+                  diskInfo.usage_percent > 75 ? 'bg-[#FA9D3B]' : 'bg-[#07C160]'
                 }`}
                 style={{ width: `${diskInfo.usage_percent}%` }}
               />
@@ -202,17 +203,17 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
         </div>
 
         {/* 分隔线 */}
-        <div className="w-px h-10 bg-[var(--border-default)]" />
+        <div className="w-px h-12 bg-[var(--border-default)]" />
 
-        {/* 一键扫描按钮 */}
+        {/* 一键扫描按钮 - 实心微信绿 */}
         <button
           onClick={onOneClickScan}
           disabled={isAnyScanning}
           className={`
-            flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all
+            flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200
             ${isAnyScanning
-              ? 'bg-emerald-500/20 text-emerald-600 cursor-not-allowed'
-              : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/25 active:scale-95'
+              ? 'bg-[#07C160]/20 text-[#07C160] cursor-not-allowed'
+              : 'bg-[#07C160] text-white hover:bg-[#06AD56] active:scale-[0.98]'
             }
           `}
         >
