@@ -18,3 +18,6 @@ export { ToastProvider, useToast } from './Toast';
 export type { ToastType, ToastItem } from './Toast';
 export { PageTransition } from './PageTransition';
 export { WelcomeModal, shouldShowWelcome, resetWelcomeState } from './WelcomeModal';
+export { ModuleCard } from './ModuleCard';
+export { DashboardHeader } from './DashboardHeader';
+export * from './modules';
