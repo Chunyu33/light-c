@@ -3,7 +3,7 @@
 // 通用的可展开清理模块卡片，用于仪表盘布局
 // ============================================================================
 
-import { ReactNode } from 'react';
+import { ReactNode, useRef, useState, useEffect } from 'react';
 import { ChevronDown, Loader2, Search, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatSize } from '../utils/format';
 import type { ModuleStatus } from '../contexts/DashboardContext';
@@ -222,12 +222,95 @@ export function ModuleCard({
         )}
       </div>
 
-      {/* 展开内容 */}
-      {expanded && (
+      {/* 展开内容 - 手风琴动画 */}
+      <AccordionContent expanded={expanded}>
         <div className="border-t border-[var(--border-color)]">
           {children}
         </div>
-      )}
+      </AccordionContent>
+    </div>
+  );
+}
+
+// ============================================================================
+// 手风琴动画组件
+// ============================================================================
+
+interface AccordionContentProps {
+  expanded: boolean;
+  children: ReactNode;
+}
+
+function AccordionContent({ expanded, children }: AccordionContentProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | 'auto'>(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+
+    if (expanded) {
+      // 展开：先设置实际高度，动画结束后设为 auto
+      const scrollHeight = content.scrollHeight;
+      setHeight(scrollHeight);
+      setIsAnimating(true);
+      
+      const timer = setTimeout(() => {
+        setHeight('auto');
+        setIsAnimating(false);
+      }, 300); // 与 CSS transition 时长一致
+      
+      return () => clearTimeout(timer);
+    } else {
+      // 折叠：先从 auto 设为实际高度，再设为 0
+      if (height === 'auto') {
+        const scrollHeight = content.scrollHeight;
+        setHeight(scrollHeight);
+        // 强制重绘
+        content.offsetHeight;
+        requestAnimationFrame(() => {
+          setHeight(0);
+          setIsAnimating(true);
+        });
+      } else {
+        setHeight(0);
+        setIsAnimating(true);
+      }
+      
+      const timer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [expanded]);
+
+  // 初始状态：如果展开则显示内容
+  useEffect(() => {
+    if (expanded && height === 0 && !isAnimating) {
+      const content = contentRef.current;
+      if (content) {
+        setHeight(content.scrollHeight);
+        setTimeout(() => setHeight('auto'), 300);
+      }
+    }
+  }, []);
+
+  const shouldRender = expanded || height !== 0 || isAnimating;
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      ref={contentRef}
+      style={{
+        height: typeof height === 'number' ? `${height}px` : height,
+        overflow: 'hidden',
+        transition: 'height 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
+    >
+      {children}
     </div>
   );
 }

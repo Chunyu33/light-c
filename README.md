@@ -283,6 +283,34 @@ npm run tauri build
 
 ---
 
+## 📋 更新日志
+
+### v1.2.0 (2025-02-27)
+
+#### 🆕 新增功能
+
+- **卸载残留扫描**：扫描 AppData 和 ProgramData 中无对应已安装程序的孤立文件夹
+- **注册表冗余扫描**：安全扫描 Windows 注册表中的孤立键值和无效引用，支持备份导出
+- **增强删除引擎**：
+  - 支持 **Take Ownership** 获取文件所有权（仅限安全目录）
+  - 支持 **Delete on Reboot** 处理锁定文件（使用 `MoveFileExW` + `MOVEFILE_DELAY_UNTIL_REBOOT`）
+  - 显示**物理释放量**而非逻辑大小（按磁盘簇对齐计算）
+  - 详细的失败原因反馈（权限不足、文件被占用、系统保护等）
+
+#### 🎨 UI 优化
+
+- **手风琴动画**：模块卡片折叠/展开添加平滑过渡动画效果
+- **WeChat 风格汇总**：清理完成后显示真实释放量、跳过原因、待重启删除数
+- **失败原因提示**：鼠标悬停显示详细的跳过原因（如"文件被系统占用，将在重启后删除"）
+
+#### 🔧 技术改进
+
+- 新增 `EnhancedDeleteEngine` 模块（`src-tauri/src/cleaner/enhanced_delete.rs`）
+- 前端新增 `EnhancedDeleteResult` 类型和相关 API
+- `ScanSummary` 组件支持增强删除结果显示
+
+---
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
