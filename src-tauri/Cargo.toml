@@ -31,6 +31,8 @@ tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
 # Windows系统API
 winapi = { version = "0.3", features = ["fileapi", "winbase", "handleapi", "errhandlingapi"] }
+# Windows注册表操作
+winreg = "0.55"
 # 错误处理
 thiserror = "1"
 # 日志

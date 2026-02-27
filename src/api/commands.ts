@@ -213,3 +213,126 @@ export interface SocialFile {
   size: number;
   app_name: string;
 }
+
+// ============================================================================
+// 卸载残留扫描相关
+// ============================================================================
+
+/** 卸载残留扫描结果 */
+export interface LeftoverScanResult {
+  /** 发现的残留文件夹列表 */
+  leftovers: LeftoverEntry[];
+  /** 总大小（字节） */
+  total_size: number;
+  /** 扫描耗时（毫秒） */
+  scan_duration_ms: number;
+}
+
+/** 单个残留条目 */
+export interface LeftoverEntry {
+  /** 文件夹路径 */
+  path: string;
+  /** 文件夹大小（字节） */
+  size: number;
+  /** 可能的软件名称 */
+  app_name: string;
+  /** 来源类型 */
+  source: 'LocalAppData' | 'RoamingAppData' | 'ProgramData';
+  /** 最后修改时间（Unix时间戳） */
+  last_modified: number;
+  /** 包含的文件数量 */
+  file_count: number;
+}
+
+/** 卸载残留删除结果 */
+export interface LeftoverDeleteResult {
+  /** 成功删除的文件夹数 */
+  deleted_count: number;
+  /** 释放的空间大小（字节） */
+  deleted_size: number;
+  /** 删除失败的路径 */
+  failed_paths: string[];
+  /** 错误信息列表 */
+  errors: string[];
+}
+
+/**
+ * 扫描卸载残留
+ * 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
+ */
+export async function scanUninstallLeftovers(): Promise<LeftoverScanResult> {
+  return invoke<LeftoverScanResult>('scan_uninstall_leftovers');
+}
+
+/**
+ * 删除卸载残留文件夹
+ * @param paths 要删除的文件夹路径列表
+ */
+export async function deleteLeftoverFolders(paths: string[]): Promise<LeftoverDeleteResult> {
+  return invoke<LeftoverDeleteResult>('delete_leftover_folders', { paths });
+}
+
+// ============================================================================
+// 注册表冗余扫描相关
+// ============================================================================
+
+/** 注册表扫描结果 */
+export interface RegistryScanResult {
+  /** 发现的冗余注册表项 */
+  entries: RegistryEntry[];
+  /** 总条目数 */
+  total_count: number;
+  /** 扫描耗时（毫秒） */
+  scan_duration_ms: number;
+}
+
+/** 单个注册表条目 */
+export interface RegistryEntry {
+  /** 注册表完整路径 */
+  path: string;
+  /** 键名或值名 */
+  name: string;
+  /** 条目类型 */
+  entry_type: 'MuiCache' | 'SoftwareKey' | 'ApplicationAssociation' | 'FileTypeAssociation';
+  /** 关联的文件路径（如果有） */
+  associated_path: string | null;
+  /** 问题描述 */
+  issue: string;
+  /** 风险等级 (1-5) */
+  risk_level: number;
+}
+
+/** 注册表删除结果 */
+export interface RegistryDeleteResult {
+  /** 备份文件路径 */
+  backup_path: string;
+  /** 成功删除的条目数 */
+  deleted_count: number;
+  /** 删除失败的条目路径 */
+  failed_entries: string[];
+  /** 错误信息列表 */
+  errors: string[];
+}
+
+/**
+ * 扫描注册表冗余
+ * 安全扫描 Windows 注册表中的孤立键值和无效引用
+ */
+export async function scanRegistryRedundancy(): Promise<RegistryScanResult> {
+  return invoke<RegistryScanResult>('scan_registry_redundancy');
+}
+
+/**
+ * 备份并删除注册表条目
+ * @param entries 要删除的注册表条目列表
+ */
+export async function deleteRegistryEntries(entries: RegistryEntry[]): Promise<RegistryDeleteResult> {
+  return invoke<RegistryDeleteResult>('delete_registry_entries', { entries });
+}
+
+/**
+ * 打开注册表备份目录
+ */
+export async function openRegistryBackupDir(): Promise<void> {
+  return invoke<void>('open_registry_backup_dir');
+}

@@ -15,6 +15,8 @@ import {
   BigFilesModule,
   SocialCleanModule,
   SystemSlimModule,
+  LeftoversModule,
+  RegistryModule,
 } from './components';
 import { DashboardProvider, useDashboard } from './contexts';
 import './App.css';
@@ -67,6 +69,12 @@ function DashboardContent() {
 
           {/* 系统瘦身模块 */}
           <SystemSlimModule />
+
+          {/* 卸载残留模块 [深度] */}
+          <LeftoversModule />
+
+          {/* 注册表冗余模块 [中风险] */}
+          <RegistryModule />
 
           {/* 底部留白 */}
           <div className="h-4" />

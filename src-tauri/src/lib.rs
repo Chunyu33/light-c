@@ -47,6 +47,12 @@ pub fn run() {
             open_virtual_memory_settings,
             // 健康评分
             get_health_score,
+            // 卸载残留和注册表清理
+            scan_uninstall_leftovers,
+            delete_leftover_folders,
+            scan_registry_redundancy,
+            delete_registry_entries,
+            open_registry_backup_dir,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

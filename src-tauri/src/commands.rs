@@ -1490,3 +1490,253 @@ fn calculate_junk_score() -> (u64, u32) {
     
     (total_junk_size, score)
 }
+
+// ============================================================================
+// 卸载残留扫描命令
+// ============================================================================
+
+use crate::scanner::{LeftoverScanner, LeftoverScanResult};
+use crate::scanner::{RegistryScanner, RegistryScanResult, RegistryEntry, RegistryBackup};
+
+/// 扫描卸载残留
+/// 
+/// 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
+#[tauri::command]
+pub async fn scan_uninstall_leftovers() -> Result<LeftoverScanResult, String> {
+    info!("开始扫描卸载残留...");
+    
+    let result = tokio::task::spawn_blocking(|| {
+        let scanner = LeftoverScanner::new();
+        scanner.scan()
+    })
+    .await
+    .map_err(|e| format!("扫描任务失败: {}", e))?;
+    
+    info!(
+        "卸载残留扫描完成: 发现 {} 个残留, 总大小 {} 字节",
+        result.leftovers.len(),
+        result.total_size
+    );
+    
+    Ok(result)
+}
+
+/// 删除卸载残留文件夹
+/// 
+/// # 参数
+/// - `paths`: 要删除的文件夹路径列表
+#[tauri::command]
+pub async fn delete_leftover_folders(paths: Vec<String>) -> Result<LeftoverDeleteResult, String> {
+    info!("开始删除 {} 个卸载残留文件夹...", paths.len());
+    
+    let result = tokio::task::spawn_blocking(move || {
+        let mut deleted_count = 0u32;
+        let mut deleted_size = 0u64;
+        let mut failed_paths = Vec::new();
+        let mut errors = Vec::new();
+        
+        for path in paths {
+            let path_buf = std::path::PathBuf::from(&path);
+            
+            // 安全检查：确保路径在允许的目录内
+            if !is_safe_leftover_path(&path_buf) {
+                failed_paths.push(path.clone());
+                errors.push(format!("路径不在允许的目录内: {}", path));
+                continue;
+            }
+            
+            // 计算文件夹大小（删除前）
+            let folder_size = calculate_dir_size(&path_buf);
+            
+            // 递归删除目录
+            match std::fs::remove_dir_all(&path_buf) {
+                Ok(_) => {
+                    deleted_count += 1;
+                    deleted_size += folder_size;
+                }
+                Err(e) => {
+                    failed_paths.push(path.clone());
+                    errors.push(format!("删除失败 {}: {}", path, e));
+                }
+            }
+        }
+        
+        LeftoverDeleteResult {
+            deleted_count,
+            deleted_size,
+            failed_paths,
+            errors,
+        }
+    })
+    .await
+    .map_err(|e| format!("删除任务失败: {}", e))?;
+    
+    info!(
+        "卸载残留删除完成: 成功 {}, 失败 {}",
+        result.deleted_count,
+        result.failed_paths.len()
+    );
+    
+    Ok(result)
+}
+
+/// 卸载残留删除结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeftoverDeleteResult {
+    /// 成功删除的文件夹数
+    pub deleted_count: u32,
+    /// 释放的空间大小（字节）
+    pub deleted_size: u64,
+    /// 删除失败的路径
+    pub failed_paths: Vec<String>,
+    /// 错误信息列表
+    pub errors: Vec<String>,
+}
+
+/// 计算目录大小
+fn calculate_dir_size(path: &std::path::Path) -> u64 {
+    let mut size = 0u64;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_file() {
+                if let Ok(metadata) = entry.metadata() {
+                    size += metadata.len();
+                }
+            } else if entry_path.is_dir() {
+                size += calculate_dir_size(&entry_path);
+            }
+        }
+    }
+    size
+}
+
+/// 检查路径是否在允许删除的目录内
+fn is_safe_leftover_path(path: &std::path::Path) -> bool {
+    let path_str = path.to_string_lossy().to_lowercase();
+    
+    // 允许的目录前缀
+    let allowed_prefixes = [
+        "appdata\\local",
+        "appdata\\roaming",
+        "programdata",
+    ];
+    
+    // 检查路径是否包含允许的前缀
+    allowed_prefixes.iter().any(|prefix| path_str.contains(prefix))
+}
+
+// ============================================================================
+// 注册表冗余扫描命令
+// ============================================================================
+
+/// 扫描注册表冗余
+/// 
+/// 安全扫描 Windows 注册表中的孤立键值和无效引用
+#[tauri::command]
+pub async fn scan_registry_redundancy() -> Result<RegistryScanResult, String> {
+    info!("开始扫描注册表冗余...");
+    
+    let result = tokio::task::spawn_blocking(|| {
+        let scanner = RegistryScanner::new();
+        scanner.scan()
+    })
+    .await
+    .map_err(|e| format!("扫描任务失败: {}", e))?;
+    
+    info!(
+        "注册表扫描完成: 发现 {} 个冗余条目",
+        result.total_count
+    );
+    
+    Ok(result)
+}
+
+/// 备份并删除注册表条目
+/// 
+/// # 参数
+/// - `entries`: 要删除的注册表条目列表
+/// 
+/// # 返回
+/// - 备份文件路径和删除结果
+#[tauri::command]
+pub async fn delete_registry_entries(entries: Vec<RegistryEntry>) -> Result<RegistryDeleteResult, String> {
+    info!("开始删除 {} 个注册表条目...", entries.len());
+    
+    // 首先创建备份
+    let backup_dir = RegistryBackup::get_backup_dir();
+    let backup_path = RegistryBackup::export_backup(&entries, &backup_dir)
+        .map_err(|e| format!("创建备份失败: {}", e))?;
+    
+    info!("注册表备份已保存到: {:?}", backup_path);
+    
+    // 执行删除
+    let result = tokio::task::spawn_blocking(move || {
+        let mut deleted_count = 0u32;
+        let mut failed_entries = Vec::new();
+        let mut errors = Vec::new();
+        
+        for entry in entries {
+            match crate::scanner::delete_registry_entry(&entry) {
+                Ok(_) => {
+                    deleted_count += 1;
+                }
+                Err(e) => {
+                    failed_entries.push(entry.path.clone());
+                    errors.push(e);
+                }
+            }
+        }
+        
+        RegistryDeleteResult {
+            backup_path: backup_path.to_string_lossy().to_string(),
+            deleted_count,
+            failed_entries,
+            errors,
+        }
+    })
+    .await
+    .map_err(|e| format!("删除任务失败: {}", e))?;
+    
+    info!(
+        "注册表删除完成: 成功 {}, 失败 {}",
+        result.deleted_count,
+        result.failed_entries.len()
+    );
+    
+    Ok(result)
+}
+
+/// 注册表删除结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryDeleteResult {
+    /// 备份文件路径
+    pub backup_path: String,
+    /// 成功删除的条目数
+    pub deleted_count: u32,
+    /// 删除失败的条目路径
+    pub failed_entries: Vec<String>,
+    /// 错误信息列表
+    pub errors: Vec<String>,
+}
+
+/// 打开注册表备份目录
+#[tauri::command]
+pub async fn open_registry_backup_dir() -> Result<(), String> {
+    let backup_dir = RegistryBackup::get_backup_dir();
+    
+    // 确保目录存在
+    std::fs::create_dir_all(&backup_dir)
+        .map_err(|e| format!("创建备份目录失败: {}", e))?;
+    
+    // 打开目录
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&backup_dir)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+    
+    Ok(())
+}

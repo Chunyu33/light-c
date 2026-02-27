@@ -40,6 +40,10 @@ export interface ModulesState {
   social: ModuleState;
   /** 系统瘦身模块 */
   system: ModuleState;
+  /** 卸载残留模块 */
+  leftovers: ModuleState;
+  /** 注册表冗余模块 */
+  registry: ModuleState;
 }
 
 /** 仪表盘 Context 值类型 */
@@ -94,6 +98,8 @@ const initialModulesState: ModulesState = {
   bigFiles: { ...initialModuleState },
   social: { ...initialModuleState },
   system: { ...initialModuleState },
+  leftovers: { ...initialModuleState },
+  registry: { ...initialModuleState },
 };
 
 // ============================================================================

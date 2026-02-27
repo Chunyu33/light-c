@@ -21,6 +21,7 @@ dependencies = [
  "tokio",
  "walkdir",
  "winapi",
+ "winreg",
 ]
 
 [[package]]
