@@ -11,7 +11,7 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
-use tauri::{Emitter, Window};
+use tauri::{Emitter, Manager, Window};
 use walkdir::WalkDir;
 
 // 全局取消标志，用于停止大文件扫描
@@ -2023,4 +2023,182 @@ fn get_cpu_info() -> String {
     
     // 回退到环境变量
     std::env::var("PROCESSOR_IDENTIFIER").unwrap_or_else(|_| "未知处理器".to_string())
+}
+
+// ============================================================================
+// 清理日志相关命令
+// ============================================================================
+
+/// 清理日志条目（用于前端传入）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanupLogEntryInput {
+    /// 清理模块分类
+    pub category: String,
+    /// 文件路径
+    pub path: String,
+    /// 文件大小（字节）
+    pub size: u64,
+    /// 是否成功
+    pub success: bool,
+    /// 错误信息（可选）
+    pub error_message: Option<String>,
+}
+
+/// 记录清理操作到日志文件
+/// 
+/// 接收一批清理结果，序列化为 JSON 并保存到日志文件
+/// 即使写入失败也不会影响清理逻辑
+#[tauri::command]
+pub async fn record_cleanup_action(
+    handle: tauri::AppHandle,
+    entries: Vec<CleanupLogEntryInput>,
+) -> Result<String, String> {
+    use crate::logger::{CleanupLogEntry, CleanupLogger};
+    use chrono::Local;
+    
+    info!("记录清理操作，共 {} 条记录", entries.len());
+    
+    if entries.is_empty() {
+        return Ok("没有需要记录的清理操作".to_string());
+    }
+    
+    // 获取应用数据目录
+    let app_data_dir = handle.path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    
+    // 创建日志管理器
+    let logger = CleanupLogger::new(&app_data_dir);
+    
+    // 转换为内部日志格式
+    let log_entries: Vec<CleanupLogEntry> = entries
+        .into_iter()
+        .map(|e| CleanupLogEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+            category: e.category,
+            path: e.path,
+            size: e.size,
+            result: if e.success { "Success".to_string() } else { "Failed".to_string() },
+            error_message: e.error_message,
+        })
+        .collect();
+    
+    // 保存日志
+    match logger.save_cleanup_results(log_entries).await {
+        Ok(path) => {
+            info!("清理日志已保存: {:?}", path);
+            Ok(format!("日志已保存: {}", path.display()))
+        }
+        Err(e) => {
+            // 记录错误但不影响清理流程
+            log::warn!("保存清理日志失败: {}", e);
+            Err(e)
+        }
+    }
+}
+
+/// 打开日志文件夹
+/// 
+/// 使用 explorer.exe 打开日志目录
+#[tauri::command]
+pub async fn open_logs_folder(handle: tauri::AppHandle) -> Result<(), String> {
+    info!("打开日志文件夹");
+    
+    // 获取应用数据目录
+    let app_data_dir = handle.path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    
+    let log_path = app_data_dir.join("logs");
+    
+    // 确保目录存在
+    if !log_path.exists() {
+        std::fs::create_dir_all(&log_path)
+            .map_err(|e| format!("创建日志目录失败: {}", e))?;
+    }
+    
+    // 使用 explorer.exe 打开目录
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&log_path)
+            .spawn()
+            .map_err(|e| format!("打开文件夹失败: {}", e))?;
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("此功能仅支持 Windows 系统".to_string());
+    }
+    
+    Ok(())
+}
+
+/// 获取清理历史记录列表
+/// 
+/// 返回日志目录中所有日志文件的摘要信息
+#[tauri::command]
+pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<CleanupHistorySummary>, String> {
+    info!("获取清理历史记录");
+    
+    let app_data_dir = handle.path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    
+    let log_path = app_data_dir.join("logs");
+    
+    if !log_path.exists() {
+        return Ok(Vec::new());
+    }
+    
+    let mut history: Vec<CleanupHistorySummary> = Vec::new();
+    
+    // 遍历日志目录
+    if let Ok(entries) = std::fs::read_dir(&log_path) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().map(|ext| ext == "json").unwrap_or(false) {
+                // 读取并解析日志文件
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(session) = serde_json::from_str::<crate::logger::CleanupSession>(&content) {
+                        history.push(CleanupHistorySummary {
+                            filename: path.file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default(),
+                            session_start: session.session_start,
+                            session_end: session.session_end,
+                            total_files: session.total_files,
+                            success_count: session.success_count,
+                            failed_count: session.failed_count,
+                            total_freed_bytes: session.total_freed_bytes,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    // 按时间倒序排列
+    history.sort_by(|a, b| b.session_start.cmp(&a.session_start));
+    
+    Ok(history)
+}
+
+/// 清理历史摘要
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanupHistorySummary {
+    /// 日志文件名
+    pub filename: String,
+    /// 会话开始时间
+    pub session_start: String,
+    /// 会话结束时间
+    pub session_end: String,
+    /// 总文件数
+    pub total_files: usize,
+    /// 成功数
+    pub success_count: usize,
+    /// 失败数
+    pub failed_count: usize,
+    /// 总释放空间
+    pub total_freed_bytes: u64,
 }

@@ -583,3 +583,65 @@ export interface SystemInfo {
 export async function getSystemInfo(): Promise<SystemInfo> {
   return invoke<SystemInfo>('get_system_info');
 }
+
+// ============================================================================
+// 清理日志相关 API
+// ============================================================================
+
+/**
+ * 清理日志条目输入
+ */
+export interface CleanupLogEntryInput {
+  /** 清理模块分类 */
+  category: string;
+  /** 文件路径 */
+  path: string;
+  /** 文件大小（字节） */
+  size: number;
+  /** 是否成功 */
+  success: boolean;
+  /** 错误信息（可选） */
+  error_message?: string;
+}
+
+/**
+ * 清理历史摘要
+ */
+export interface CleanupHistorySummary {
+  /** 日志文件名 */
+  filename: string;
+  /** 会话开始时间 */
+  session_start: string;
+  /** 会话结束时间 */
+  session_end: string;
+  /** 总文件数 */
+  total_files: number;
+  /** 成功数 */
+  success_count: number;
+  /** 失败数 */
+  failed_count: number;
+  /** 总释放空间（字节） */
+  total_freed_bytes: number;
+}
+
+/**
+ * 记录清理操作到日志文件
+ * @param entries 清理记录数组
+ */
+export async function recordCleanupAction(entries: CleanupLogEntryInput[]): Promise<string> {
+  return invoke<string>('record_cleanup_action', { entries });
+}
+
+/**
+ * 打开日志文件夹
+ */
+export async function openLogsFolder(): Promise<void> {
+  return invoke<void>('open_logs_folder');
+}
+
+/**
+ * 获取清理历史记录列表
+ */
+export async function getCleanupHistory(): Promise<CleanupHistorySummary[]> {
+  return invoke<CleanupHistorySummary[]>('get_cleanup_history');
+}

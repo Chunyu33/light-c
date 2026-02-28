@@ -13,8 +13,10 @@ import {
   scanRegistryRedundancy, 
   deleteRegistryEntries,
   openRegistryBackupDir,
+  recordCleanupAction,
   type RegistryScanResult,
   type RegistryEntry,
+  type CleanupLogEntryInput,
 } from '../../api/commands';
 
 // ============================================================================
@@ -101,13 +103,28 @@ export function RegistryModule() {
       const result = await deleteRegistryEntries(entriesToDelete);
       setBackupPath(result.backup_path);
 
+      // 记录清理日志（所有操作都记录）
+      const failedSet = new Set(result.failed_entries);
+      const logEntries: CleanupLogEntryInput[] = entriesToDelete.map((entry, index) => {
+        const errorMsg = index < result.errors.length ? result.errors[index] : undefined;
+        return {
+          category: '注册表冗余',
+          path: `${entry.path}\\${entry.name}`,
+          size: 0, // 注册表条目没有大小
+          success: !failedSet.has(entry.path),
+          error_message: failedSet.has(entry.path) ? errorMsg : undefined,
+        };
+      });
+      recordCleanupAction(logEntries).catch((err) => {
+        console.warn('记录清理日志失败:', err);
+      });
+
       if (result.errors.length > 0) {
         setDeleteError(`${result.errors.length} 个条目删除失败`);
         setDeleteErrors(result.errors); // 保存详细错误列表
       }
 
       // 从结果中移除已删除的项
-      const failedSet = new Set(result.failed_entries);
       const remainingEntries = scanResult.entries.filter(
         e => !selectedEntries.has(e.path + '|' + e.name) || failedSet.has(e.path)
       );

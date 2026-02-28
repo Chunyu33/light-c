@@ -24,7 +24,7 @@ import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanSocialCache, deleteFiles, openInFolder, openFile, SocialScanResult, SocialFile } from '../../api/commands';
+import { scanSocialCache, deleteFiles, openInFolder, openFile, recordCleanupAction, SocialScanResult, SocialFile, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 
 // ============================================================================
@@ -148,6 +148,24 @@ export function SocialCleanModule() {
     setIsDeleting(true);
     try {
       const result = await deleteFiles(paths);
+
+      // 记录清理日志（所有操作都记录）
+      const failedPathSet = new Set(result.failed_files?.map((f) => f.path) || []);
+      const allFiles = scanResult?.categories.flatMap(c => c.files) || [];
+      const logEntries: CleanupLogEntryInput[] = paths.map((path) => {
+        const file = allFiles.find((f) => f.path === path);
+        const failedFile = result.failed_files?.find((f) => f.path === path);
+        return {
+          category: '社交软件专清',
+          path,
+          size: file?.size || 0,
+          success: !failedPathSet.has(path),
+          error_message: failedFile?.reason,
+        };
+      });
+      recordCleanupAction(logEntries).catch((err) => {
+        console.warn('记录清理日志失败:', err);
+      });
       
       if (result.failed_count === 0) {
         showToast({
@@ -179,7 +197,7 @@ export function SocialCleanModule() {
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedPaths, handleScan, triggerHealthRefresh, showToast]);
+  }, [selectedPaths, scanResult, handleScan, triggerHealthRefresh, showToast]);
 
   // 计算选中的文件数和大小
   const selectedStats = scanResult?.categories

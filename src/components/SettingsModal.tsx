@@ -4,12 +4,12 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
-import { getSystemInfo, type SystemInfo } from '../api/commands';
+import { getSystemInfo, type SystemInfo, openLogsFolder } from '../api/commands';
 import { formatSize } from '../utils/format';
 
 type SettingsTab = 'general' | 'guide' | 'feedback' | 'about';
@@ -123,11 +123,22 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
 // 通用设置 - 微信风格主题切换器
 function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
+  const handleOpenLogsFolder = async () => {
+    try {
+      await openLogsFolder();
+    } catch (error) {
+      console.error('打开日志文件夹失败:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 外观设置 */}
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">外观</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Palette className="w-3.5 h-3.5" />
+          外观
+        </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div>
@@ -153,6 +164,32 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 数据管理 - 使用 border-t 分隔 */}
+      <div className="space-y-3 pt-2 border-t border-[var(--border-color)]">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <History className="w-3.5 h-3.5" />
+          数据管理
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl">
+          {/* 清理历史记录 */}
+          <button
+            onClick={handleOpenLogsFolder}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] rounded-2xl transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center">
+                <FolderOpen className="w-4.5 h-4.5 text-[var(--brand-green)]" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-[var(--text-primary)]">清理历史记录</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">记录最近10次清理的详细文件清单与结果</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
+          </button>
         </div>
       </div>
     </div>

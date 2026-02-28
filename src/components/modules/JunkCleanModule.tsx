@@ -12,7 +12,7 @@ import { ScanSummary } from '../ScanSummary';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanJunkFiles, enhancedDeleteFiles, type EnhancedDeleteResult } from '../../api/commands';
+import { scanJunkFiles, enhancedDeleteFiles, recordCleanupAction, type EnhancedDeleteResult, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import type { ScanResult, FileInfo } from '../../types';
 
@@ -101,6 +101,21 @@ export function JunkCleanModule() {
       const paths = Array.from(selectedPaths);
       const result = await enhancedDeleteFiles(paths);
       setDeleteResult(result);
+
+      // 记录清理日志（所有操作都记录，包括成功和失败）
+      if (result.file_results.length > 0) {
+        const logEntries: CleanupLogEntryInput[] = result.file_results.map((f) => ({
+          category: '垃圾清理',
+          path: f.path,
+          size: f.physical_size,
+          success: f.success,
+          error_message: f.failure_reason ? JSON.stringify(f.failure_reason) : undefined,
+        }));
+        // 异步记录日志，不阻塞 UI
+        recordCleanupAction(logEntries).catch((err) => {
+          console.warn('记录清理日志失败:', err);
+        });
+      }
 
       // 从扫描结果中移除已删除的文件
       if (scanResult && result.success_count > 0) {

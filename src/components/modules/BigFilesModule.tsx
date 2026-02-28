@@ -11,7 +11,7 @@ import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile } from '../../api/commands';
+import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelText } from '../../utils/format';
 import type { LargeFileEntry } from '../../types';
 
@@ -186,6 +186,23 @@ export function BigFilesModule() {
 
     try {
       const result = await deleteFiles(paths);
+
+      // 记录清理日志（所有操作都记录）
+      const failedPathSet = new Set(result.failed_files?.map((f) => f.path) || []);
+      const logEntries: CleanupLogEntryInput[] = paths.map((path) => {
+        const file = files.find((f) => f.path === path);
+        const failedFile = result.failed_files?.find((f) => f.path === path);
+        return {
+          category: '大文件清理',
+          path,
+          size: file?.size || 0,
+          success: !failedPathSet.has(path),
+          error_message: failedFile?.reason,
+        };
+      });
+      recordCleanupAction(logEntries).catch((err) => {
+        console.warn('记录清理日志失败:', err);
+      });
 
       if (result.failed_count === 0) {
         showToast({

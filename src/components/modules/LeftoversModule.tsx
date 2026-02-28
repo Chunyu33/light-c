@@ -14,9 +14,11 @@ import {
   deleteLeftoverFolders,
   deleteLeftoversPermanent,
   openInFolder,
+  recordCleanupAction,
   type LeftoverScanResult,
   type LeftoverEntry,
   type PermanentDeleteResult,
+  type CleanupLogEntryInput,
   getSafetyCheckMessage,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -104,6 +106,23 @@ export function LeftoversModule() {
     try {
       const paths = Array.from(selectedPaths);
       const result = await deleteLeftoverFolders(paths);
+
+      // 记录清理日志（所有操作都记录）
+      const failedPathSet = new Set(result.failed_paths || []);
+      const logEntries: CleanupLogEntryInput[] = paths.map((path) => {
+        const entry = scanResult?.leftovers.find((l) => l.path === path);
+        const errorIndex = result.failed_paths?.indexOf(path);
+        return {
+          category: '卸载残留',
+          path,
+          size: entry?.size || 0,
+          success: !failedPathSet.has(path),
+          error_message: errorIndex !== undefined && errorIndex >= 0 ? result.errors[errorIndex] : undefined,
+        };
+      });
+      recordCleanupAction(logEntries).catch((err) => {
+        console.warn('记录清理日志失败:', err);
+      });
 
       if (result.errors.length > 0) {
         setDeleteError(`${result.errors.length} 个文件夹删除失败`);

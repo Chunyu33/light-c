@@ -7,6 +7,7 @@
 mod scanner;
 mod cleaner;
 mod commands;
+mod logger;
 
 // 导出命令模块
 use commands::*;
@@ -62,6 +63,10 @@ pub fn run() {
             check_leftover_safety,
             // 系统信息
             get_system_info,
+            // 清理日志
+            record_cleanup_action,
+            open_logs_folder,
+            get_cleanup_history,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");
