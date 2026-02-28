@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useRef, memo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { 
   MessageCircle, 
@@ -193,9 +194,9 @@ export function SocialCleanModule() {
 
   return (
     <>
-      {/* 删除进度遮罩 */}
-      {isDeleting && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+      {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
+      {isDeleting && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -207,7 +208,8 @@ export function SocialCleanModule() {
               </p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 删除确认弹窗 */}
@@ -468,8 +470,8 @@ function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
 
   if (!isOpen && !isAnimating) return null;
 
-  return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+  return createPortal(
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100' : 'scale-95'}`}>
         <div className="px-6 py-4 border-b border-[var(--border-default)] flex items-center justify-between shrink-0">
@@ -510,7 +512,8 @@ function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

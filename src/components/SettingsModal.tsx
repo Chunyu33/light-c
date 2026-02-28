@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
@@ -54,8 +55,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   if (!isOpen && !isAnimating) return null;
 
-  return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+  return createPortal(
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩 */}
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -113,7 +114,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

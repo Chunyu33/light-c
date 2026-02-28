@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ScanResult } from '../types';
@@ -57,8 +58,8 @@ function FailedFilesModal({
 
   if (!isOpen && !isAnimating) return null;
 
-  return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+  return createPortal(
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩层 */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -152,7 +153,8 @@ function FailedFilesModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

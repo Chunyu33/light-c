@@ -16,6 +16,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
@@ -361,8 +363,8 @@ impl EnhancedDeleteEngine {
         
         Self {
             cluster_size,
-            enable_reboot_delete: true,
-            enable_take_ownership: true,
+            enable_reboot_delete: false,  // 默认禁用，避免性能问题
+            enable_take_ownership: false, // 默认禁用，icacls 调用很慢
         }
     }
 
@@ -585,7 +587,7 @@ impl EnhancedDeleteEngine {
     /// 
     /// # 中文说明
     /// 使用 icacls 命令获取文件所有权，然后删除。
-    /// 这相当于在资源管理器中右键 -> 属性 -> 安全 -> 高级 -> 更改所有者。
+    /// 注意：为了性能，不使用 /T 递归标志，只处理单个文件。
     /// 
     /// 安全考虑：
     /// - 只在 SAFE_OWNERSHIP_PATHS 列表中的目录执行
@@ -593,23 +595,22 @@ impl EnhancedDeleteEngine {
     fn delete_with_ownership(&self, path: &Path) -> Result<(), String> {
         let path_str = path.to_string_lossy();
         
-        info!("尝试获取所有权: {}", path_str);
+        debug!("尝试获取所有权: {}", path_str);
 
-        // 使用 icacls 获取所有权
-        // icacls "path" /setowner "%username%" /T /C /Q
+        // 使用 icacls 获取所有权（不使用 /T 递归，提升性能）
         let output = Command::new("icacls")
             .arg(&*path_str)
             .arg("/setowner")
             .arg("Administrators")
-            .arg("/T")  // 递归
             .arg("/C")  // 继续处理错误
             .arg("/Q")  // 静默模式
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW - 不显示命令行窗口
             .output()
             .map_err(|e| format!("执行 icacls 失败: {}", e))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            warn!("icacls 获取所有权失败: {}", stderr);
+            // 静默失败，不阻塞
+            return Err("获取所有权失败".to_string());
         }
 
         // 授予完全控制权限
@@ -617,15 +618,14 @@ impl EnhancedDeleteEngine {
             .arg(&*path_str)
             .arg("/grant")
             .arg("Administrators:F")
-            .arg("/T")
             .arg("/C")
             .arg("/Q")
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("执行 icacls 授权失败: {}", e))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            warn!("icacls 授权失败: {}", stderr);
+            return Err("授权失败".to_string());
         }
 
         // 再次尝试删除
@@ -694,15 +694,19 @@ impl EnhancedDeleteEngine {
         }
     }
 
-    /// 计算目录大小
+    /// 计算目录大小（简化版，只返回估算值以提升性能）
     fn calculate_dir_size(&self, path: &Path) -> u64 {
-        walkdir::WalkDir::new(path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-            .filter_map(|e| e.metadata().ok())
-            .map(|m| m.len())
-            .sum()
+        // 为了性能，只计算直接子项，不递归遍历
+        // 实际释放空间会在删除后由系统报告
+        fs::read_dir(path)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| e.metadata().ok())
+                    .map(|m| m.len())
+                    .sum()
+            })
+            .unwrap_or(0)
     }
 
     /// 获取最后的错误信息

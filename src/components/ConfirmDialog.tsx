@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { memo, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -57,8 +58,8 @@ export const ConfirmDialog = memo(function ConfirmDialog({
 
   if (!isOpen && !isAnimating) return null;
 
-  return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+  return createPortal(
+    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩层 */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -124,6 +125,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 });

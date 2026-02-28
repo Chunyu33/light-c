@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useEffect, useState, useRef, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle, FolderSearch, FileText, HardDrive } from 'lucide-react';
 
 // ============================================================================
@@ -201,10 +202,10 @@ export function ScanProgress({
   const isIndeterminate = completedCategories < 0 && !isCompleted;
   const progress = isCompleted ? 100 : (isIndeterminate ? 0 : (totalCategories > 0 ? (completedCategories / totalCategories) * 100 : 0));
 
-  return (
+  return createPortal(
     <div 
       className={`
-        fixed inset-0 z-50 flex items-center justify-center
+        fixed inset-0 z-[9999] flex items-center justify-center
         transition-all duration-300 ease-out
         ${isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}
       `}
@@ -273,7 +274,8 @@ export function ScanProgress({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

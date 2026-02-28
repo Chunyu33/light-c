@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { HardDrive, Trash2, Loader2, FileWarning, FolderOpen, ExternalLink, StopCircle } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
@@ -252,9 +253,9 @@ export function BigFilesModule() {
 
   return (
     <>
-      {/* 删除进度遮罩 */}
-      {isDeleting && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+      {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
+      {isDeleting && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -266,7 +267,8 @@ export function BigFilesModule() {
               </p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 删除确认弹窗 */}

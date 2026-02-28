@@ -243,14 +243,18 @@ interface AccordionContentProps {
 
 function AccordionContent({ expanded, children }: AccordionContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | 'auto'>(0);
+  const [height, setHeight] = useState<number | 'auto'>(expanded ? 'auto' : 0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const prevExpandedRef = useRef(expanded);
 
   useEffect(() => {
     const content = contentRef.current;
     if (!content) return;
 
-    if (expanded) {
+    const wasExpanded = prevExpandedRef.current;
+    prevExpandedRef.current = expanded;
+
+    if (expanded && !wasExpanded) {
       // 展开：先设置实际高度，动画结束后设为 auto
       const scrollHeight = content.scrollHeight;
       setHeight(scrollHeight);
@@ -259,24 +263,22 @@ function AccordionContent({ expanded, children }: AccordionContentProps) {
       const timer = setTimeout(() => {
         setHeight('auto');
         setIsAnimating(false);
-      }, 300); // 与 CSS transition 时长一致
+      }, 300);
       
       return () => clearTimeout(timer);
-    } else {
-      // 折叠：先从 auto 设为实际高度，再设为 0
-      if (height === 'auto') {
-        const scrollHeight = content.scrollHeight;
-        setHeight(scrollHeight);
-        // 强制重绘
-        content.offsetHeight;
+    } else if (!expanded && wasExpanded) {
+      // 折叠：先获取当前高度，再动画到 0
+      const scrollHeight = content.scrollHeight;
+      // 先设置为具体高度（从 auto 转换）
+      setHeight(scrollHeight);
+      setIsAnimating(true);
+      
+      // 使用 requestAnimationFrame 确保浏览器先渲染具体高度
+      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           setHeight(0);
-          setIsAnimating(true);
         });
-      } else {
-        setHeight(0);
-        setIsAnimating(true);
-      }
+      });
       
       const timer = setTimeout(() => {
         setIsAnimating(false);
@@ -285,17 +287,6 @@ function AccordionContent({ expanded, children }: AccordionContentProps) {
       return () => clearTimeout(timer);
     }
   }, [expanded]);
-
-  // 初始状态：如果展开则显示内容
-  useEffect(() => {
-    if (expanded && height === 0 && !isAnimating) {
-      const content = contentRef.current;
-      if (content) {
-        setHeight(content.scrollHeight);
-        setTimeout(() => setHeight('auto'), 300);
-      }
-    }
-  }, []);
 
   const shouldRender = expanded || height !== 0 || isAnimating;
 

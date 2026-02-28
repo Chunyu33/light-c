@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Shield, Zap, Heart } from 'lucide-react';
 
 interface WelcomeModalProps {
@@ -59,9 +60,9 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
   const { userName, title, messages, features } = WELCOME_CONFIG;
 
-  return (
+  return createPortal(
     <div 
-      className={`fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${
         isAnimating ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
       }`}
       onClick={handleClose}
@@ -172,7 +173,8 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
           animation: float 3s ease-in-out infinite;
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 

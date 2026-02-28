@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { HardDrive, Search, Trash2, FileWarning, Loader2, FolderSearch, CheckCircle2, FolderOpen, ExternalLink, StopCircle } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { deleteFiles, scanLargeFiles, cancelLargeFileScan, openInFolder, openFile } from '../api/commands';
@@ -283,9 +284,9 @@ export function BigFilesPage({ onBack, onCleanupComplete }: BigFilesPageProps) {
 
   return (
     <>
-      {/* 删除进度遮罩 */}
-      {isDeleting && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+      {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
+      {isDeleting && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -301,7 +302,8 @@ export function BigFilesPage({ onBack, onCleanupComplete }: BigFilesPageProps) {
             </div>
             <p className="text-xs text-[var(--fg-faint)]">请勿关闭窗口</p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 删除确认弹窗 */}
