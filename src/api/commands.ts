@@ -548,3 +548,38 @@ export function getSafetyCheckMessage(result: SafetyCheckResult): string {
 export function isSafetyCheckPassed(result: SafetyCheckResult): boolean {
   return result === 'Safe';
 }
+
+// ============================================================================
+// 系统信息 API
+// ============================================================================
+
+/** 系统信息 */
+export interface SystemInfo {
+  /** 操作系统名称 */
+  os_name: string;
+  /** 操作系统版本 */
+  os_version: string;
+  /** 系统架构 */
+  os_arch: string;
+  /** 计算机名称 */
+  computer_name: string;
+  /** 用户名 */
+  user_name: string;
+  /** CPU 信息 */
+  cpu_info: string;
+  /** CPU 核心数 */
+  cpu_cores: number;
+  /** 总内存（字节） */
+  total_memory: number;
+  /** 可用内存（字节） */
+  available_memory: number;
+  /** 系统启动时间（秒） */
+  uptime_seconds: number;
+}
+
+/**
+ * 获取系统信息
+ */
+export async function getSystemInfo(): Promise<SystemInfo> {
+  return invoke<SystemInfo>('get_system_info');
+}

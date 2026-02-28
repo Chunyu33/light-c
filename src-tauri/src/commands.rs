@@ -1864,3 +1864,158 @@ pub async fn check_leftover_safety(path: String) -> Result<SafetyCheckResult, St
     
     Ok(result)
 }
+
+// ============================================================================
+// 系统信息获取
+// ============================================================================
+
+/// 系统信息结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemInfo {
+    /// 操作系统名称
+    pub os_name: String,
+    /// 操作系统版本
+    pub os_version: String,
+    /// 系统架构
+    pub os_arch: String,
+    /// 计算机名称
+    pub computer_name: String,
+    /// 用户名
+    pub user_name: String,
+    /// CPU 信息
+    pub cpu_info: String,
+    /// CPU 核心数
+    pub cpu_cores: u32,
+    /// 总内存（字节）
+    pub total_memory: u64,
+    /// 可用内存（字节）
+    pub available_memory: u64,
+    /// 系统启动时间（秒）
+    pub uptime_seconds: u64,
+}
+
+/// 获取系统信息
+#[tauri::command]
+pub async fn get_system_info() -> Result<SystemInfo, String> {
+    info!("获取系统信息");
+    
+    #[cfg(target_os = "windows")]
+    {
+        use winapi::um::sysinfoapi::{GetSystemInfo, GlobalMemoryStatusEx, SYSTEM_INFO, MEMORYSTATUSEX};
+        
+        // 获取操作系统版本
+        let os_version = get_windows_version();
+        
+        // 获取系统架构
+        let os_arch = if cfg!(target_arch = "x86_64") {
+            "x64 (64位)".to_string()
+        } else if cfg!(target_arch = "x86") {
+            "x86 (32位)".to_string()
+        } else if cfg!(target_arch = "aarch64") {
+            "ARM64".to_string()
+        } else {
+            std::env::consts::ARCH.to_string()
+        };
+        
+        // 获取计算机名称
+        let computer_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "未知".to_string());
+        
+        // 获取用户名
+        let user_name = std::env::var("USERNAME").unwrap_or_else(|_| "未知".to_string());
+        
+        // 获取 CPU 信息
+        let cpu_info = get_cpu_info();
+        
+        // 获取 CPU 核心数
+        let cpu_cores = unsafe {
+            let mut sys_info: SYSTEM_INFO = std::mem::zeroed();
+            GetSystemInfo(&mut sys_info);
+            sys_info.dwNumberOfProcessors
+        };
+        
+        // 获取内存信息
+        let (total_memory, available_memory) = unsafe {
+            let mut mem_status: MEMORYSTATUSEX = std::mem::zeroed();
+            mem_status.dwLength = std::mem::size_of::<MEMORYSTATUSEX>() as u32;
+            if GlobalMemoryStatusEx(&mut mem_status) != 0 {
+                (mem_status.ullTotalPhys, mem_status.ullAvailPhys)
+            } else {
+                (0, 0)
+            }
+        };
+        
+        // 获取系统启动时间
+        let uptime_seconds = unsafe {
+            winapi::um::sysinfoapi::GetTickCount64() / 1000
+        };
+        
+        Ok(SystemInfo {
+            os_name: "Microsoft Windows".to_string(),
+            os_version,
+            os_arch,
+            computer_name,
+            user_name,
+            cpu_info,
+            cpu_cores,
+            total_memory,
+            available_memory,
+            uptime_seconds,
+        })
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("此功能仅支持Windows系统".to_string())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn get_windows_version() -> String {
+    use std::process::Command;
+    
+    // 尝试使用 wmic 获取详细版本
+    if let Ok(output) = Command::new("wmic")
+        .args(["os", "get", "Caption,Version", "/value"])
+        .output()
+    {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let mut caption = String::new();
+        let mut version = String::new();
+        
+        for line in output_str.lines() {
+            if line.starts_with("Caption=") {
+                caption = line.trim_start_matches("Caption=").trim().to_string();
+            } else if line.starts_with("Version=") {
+                version = line.trim_start_matches("Version=").trim().to_string();
+            }
+        }
+        
+        if !caption.is_empty() {
+            return format!("{} ({})", caption, version);
+        }
+    }
+    
+    // 回退到基本版本信息
+    "Windows".to_string()
+}
+
+#[cfg(target_os = "windows")]
+fn get_cpu_info() -> String {
+    use std::process::Command;
+    
+    // 尝试使用 wmic 获取 CPU 信息
+    if let Ok(output) = Command::new("wmic")
+        .args(["cpu", "get", "Name", "/value"])
+        .output()
+    {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        for line in output_str.lines() {
+            if line.starts_with("Name=") {
+                return line.trim_start_matches("Name=").trim().to_string();
+            }
+        }
+    }
+    
+    // 回退到环境变量
+    std::env::var("PROCESSOR_IDENTIFIER").unwrap_or_else(|_| "未知处理器".to_string())
+}

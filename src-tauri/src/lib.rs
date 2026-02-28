@@ -60,6 +60,8 @@ pub fn run() {
             // 永久删除（深度清理）
             delete_leftovers_permanent,
             check_leftover_safety,
+            // 系统信息
+            get_system_info,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

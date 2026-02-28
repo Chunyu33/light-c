@@ -30,7 +30,7 @@ tokio = { version = "1", features = ["full"] }
 # 日期时间处理
 chrono = { version = "0.4", features = ["serde"] }
 # Windows系统API
-winapi = { version = "0.3", features = ["fileapi", "winbase", "handleapi", "errhandlingapi"] }
+winapi = { version = "0.3", features = ["fileapi", "winbase", "handleapi", "errhandlingapi", "sysinfoapi", "processenv"] }
 # Windows注册表操作
 winreg = "0.55"
 # 错误处理

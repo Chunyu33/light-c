@@ -4,11 +4,13 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
+import { getSystemInfo, type SystemInfo } from '../api/commands';
+import { formatSize } from '../utils/format';
 
 type SettingsTab = 'general' | 'guide' | 'feedback' | 'about';
 
@@ -192,6 +194,20 @@ function GuideSettings() {
               管理休眠文件、Windows组件存储等系统级功能。<span className="text-[var(--color-warning)] font-medium">此功能需要管理员权限</span>，操作前请确保了解各项功能的作用。
             </p>
           </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">卸载残留</p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              扫描 AppData 和 ProgramData 目录中已卸载软件遗留的孤立文件夹。系统会自动排除仍在注册表中的已安装程序。
+              <span className="text-[var(--color-warning)] font-medium">深度清理</span>功能将直接从磁盘永久删除文件，不经过回收站。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">注册表冗余</p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              扫描 Windows 注册表中的孤立键值和无效引用，包括 MUI 缓存、软件残留键等。
+              <span className="text-[var(--color-warning)] font-medium">删除前会自动备份</span>，备份文件保存在用户文档目录下的 LightC_Backups 文件夹中。
+            </p>
+          </div>
         </div>
       </div>
 
@@ -246,6 +262,15 @@ function GuideSettings() {
           </p>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
             • 清理Windows组件存储后可能无法卸载某些系统更新
+          </p>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            • <span className="text-[var(--color-danger)] font-medium">深度清理</span>会直接从磁盘永久删除文件，不经过回收站，无法恢复
+          </p>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            • 卸载残留扫描会自动跳过包含可执行文件（.exe/.dll/.sys）的文件夹
+          </p>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            • 注册表清理前会自动创建 .reg 备份文件，可通过双击恢复
           </p>
         </div>
       </div>
@@ -329,10 +354,18 @@ function AboutSettings() {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [appVersion, setAppVersion] = useState('');
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [loadingSystemInfo, setLoadingSystemInfo] = useState(true);
 
-  // 获取应用版本号
+  // 获取应用版本号和系统信息
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => setAppVersion('未知'));
+    
+    // 获取系统信息
+    getSystemInfo()
+      .then(setSystemInfo)
+      .catch(err => console.error('获取系统信息失败:', err))
+      .finally(() => setLoadingSystemInfo(false));
   }, []);
 
   const checkForUpdates = async () => {
@@ -496,6 +529,91 @@ function AboutSettings() {
               <p className="text-xs text-[var(--text-faint)] mt-1">版本 {appVersion || '...'}</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 系统信息 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <MonitorIcon className="w-3.5 h-3.5" />
+          系统信息
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
+          {loadingSystemInfo ? (
+            <div className="flex items-center justify-center py-4">
+              <RefreshCw className="w-5 h-5 text-[var(--brand-green)] animate-spin" />
+              <span className="ml-2 text-sm text-[var(--text-muted)]">正在获取系统信息...</span>
+            </div>
+          ) : systemInfo ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MonitorIcon className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">操作系统</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[280px] truncate" title={systemInfo.os_version}>
+                  {systemInfo.os_version}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">系统架构</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.os_arch}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">处理器</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[280px] truncate" title={systemInfo.cpu_info}>
+                  {systemInfo.cpu_info}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">CPU 核心数</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.cpu_cores} 核</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">内存</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)]">
+                  {formatSize(systemInfo.available_memory)} 可用 / {formatSize(systemInfo.total_memory)} 总计
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">计算机名</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.computer_name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">当前用户</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.user_name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span className="text-sm text-[var(--text-secondary)]">系统运行时间</span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text-primary)]">
+                  {Math.floor(systemInfo.uptime_seconds / 86400)} 天 {Math.floor((systemInfo.uptime_seconds % 86400) / 3600)} 小时 {Math.floor((systemInfo.uptime_seconds % 3600) / 60)} 分钟
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-[var(--text-muted)] text-center py-4">无法获取系统信息</p>
+          )}
         </div>
       </div>
 
