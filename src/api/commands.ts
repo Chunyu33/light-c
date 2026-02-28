@@ -443,3 +443,108 @@ export function getFailureReasonTooltip(reason: DeleteFailureReason | null): str
   if (typeof reason === 'object' && 'Other' in reason) return reason.Other;
   return '未知错误';
 }
+
+// ============================================================================
+// 永久删除 API - 卸载残留深度清理
+// ============================================================================
+
+/** 安全检查结果类型 */
+export type SafetyCheckResult = 
+  | 'Safe'  // 通过所有检查，可以安全删除
+  | { FoundInRegistry: { matched_field: string; matched_value: string } }  // 在注册表中找到匹配
+  | { ContainsExecutables: { files: string[] } }  // 发现可执行文件
+  | { InProtectedPath: { reason: string } };  // 路径在系统保护目录内
+
+/** 单个残留的永久删除结果 */
+export interface LeftoverPermanentDeleteDetail {
+  /** 文件夹路径 */
+  path: string;
+  /** 是否成功删除 */
+  success: boolean;
+  /** 删除的文件数量 */
+  deleted_files: number;
+  /** 释放的空间（字节） */
+  freed_size: number;
+  /** 失败原因 */
+  failure_reason: string | null;
+  /** 是否标记为重启删除 */
+  marked_for_reboot: boolean;
+  /** 是否需要人工审核 */
+  needs_manual_review: boolean;
+  /** 安全检查结果 */
+  safety_check: SafetyCheckResult;
+}
+
+/** 永久删除的总体结果 */
+export interface PermanentDeleteResult {
+  /** 成功删除的文件夹数 */
+  success_count: number;
+  /** 失败的文件夹数 */
+  failed_count: number;
+  /** 需要人工审核的数量 */
+  manual_review_count: number;
+  /** 标记为重启删除的数量 */
+  reboot_pending_count: number;
+  /** 实际释放的空间（字节） */
+  freed_size: number;
+  /** 各文件夹的详细结果 */
+  details: LeftoverPermanentDeleteDetail[];
+  /** 删除耗时（毫秒） */
+  duration_ms: number;
+}
+
+/**
+ * 永久删除卸载残留（深度清理）
+ * 
+ * ⚠️ 警告：此操作将直接从磁盘永久删除文件，不可恢复！
+ * 
+ * 执行删除前会进行三重安全检查：
+ * 1. 注册表检查 - 确认目录不在任何已安装程序中
+ * 2. 可执行文件检查 - 扫描 .exe/.dll/.sys 文件，发现则跳过
+ * 3. 核心白名单检查 - 确保路径不在系统关键目录内
+ * 
+ * @param paths 要永久删除的文件夹路径列表
+ */
+export async function deleteLeftoversPermanent(paths: string[]): Promise<PermanentDeleteResult> {
+  return invoke<PermanentDeleteResult>('delete_leftovers_permanent', { paths });
+}
+
+/**
+ * 执行单个路径的安全检查
+ * 在用户确认删除前，可以先调用此接口检查路径是否安全
+ * @param path 要检查的文件夹路径
+ */
+export async function checkLeftoverSafety(path: string): Promise<SafetyCheckResult> {
+  return invoke<SafetyCheckResult>('check_leftover_safety', { path });
+}
+
+/**
+ * 获取安全检查结果的用户友好描述
+ */
+export function getSafetyCheckMessage(result: SafetyCheckResult): string {
+  if (result === 'Safe') return '安全';
+  if (typeof result === 'object') {
+    if ('FoundInRegistry' in result) {
+      return `注册表中存在匹配: ${result.FoundInRegistry.matched_field} = ${result.FoundInRegistry.matched_value}`;
+    }
+    if ('ContainsExecutables' in result) {
+      const files = result.ContainsExecutables.files;
+      const count = files.length;
+      const preview = files.slice(0, 3).join(', ');
+      return count > 3 
+        ? `包含 ${count} 个可执行文件: ${preview} 等`
+        : `包含可执行文件: ${preview}`;
+    }
+    if ('InProtectedPath' in result) {
+      return `系统保护路径: ${result.InProtectedPath.reason}`;
+    }
+  }
+  return '未知状态';
+}
+
+/**
+ * 检查安全检查结果是否安全
+ */
+export function isSafetyCheckPassed(result: SafetyCheckResult): boolean {
+  return result === 'Safe';
+}

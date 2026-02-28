@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 // ============================================================================
 
 #[cfg(windows)]
-mod windows_api {
+pub(crate) mod windows_api {
     use std::ptr;
 
     // Windows API 常量

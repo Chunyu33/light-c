@@ -4,6 +4,8 @@
 
 mod delete_engine;
 mod enhanced_delete;
+mod permanent_delete;
 
 pub use delete_engine::*;
 pub use enhanced_delete::*;
+pub use permanent_delete::*;

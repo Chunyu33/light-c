@@ -57,6 +57,9 @@ pub fn run() {
             enhanced_delete_files,
             get_physical_size,
             check_admin_for_path,
+            // 永久删除（深度清理）
+            delete_leftovers_permanent,
+            check_leftover_safety,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

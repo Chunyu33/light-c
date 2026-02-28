@@ -12,9 +12,12 @@ import { useDashboard } from '../../contexts/DashboardContext';
 import { 
   scanUninstallLeftovers, 
   deleteLeftoverFolders,
+  deleteLeftoversPermanent,
   openInFolder,
   type LeftoverScanResult,
   type LeftoverEntry,
+  type PermanentDeleteResult,
+  getSafetyCheckMessage,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 
@@ -36,6 +39,12 @@ export function LeftoversModule() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<string[]>([]); // 详细错误列表
   const [showErrorDetails, setShowErrorDetails] = useState(false); // 是否显示错误详情
+  
+  // 深度清理（永久删除）相关状态
+  const [showDeepCleanWarning, setShowDeepCleanWarning] = useState(false); // 首次深度清理警告
+  const [showDeepCleanConfirm, setShowDeepCleanConfirm] = useState(false); // 深度清理确认
+  const [deepCleanResult, setDeepCleanResult] = useState<PermanentDeleteResult | null>(null); // 深度清理结果
+  const [showDeepCleanResult, setShowDeepCleanResult] = useState(false); // 显示深度清理结果
 
   // 计算选中大小
   const selectedSize = useMemo(() => {
@@ -134,6 +143,93 @@ export function LeftoversModule() {
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
+    }
+  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh]);
+
+  // 深度清理（永久删除）- 首次点击显示警告
+  const handleDeepCleanClick = useCallback(() => {
+    if (selectedPaths.size === 0) return;
+    // 首次深度清理显示警告弹窗
+    setShowDeepCleanWarning(true);
+  }, [selectedPaths]);
+
+  // 确认深度清理警告后显示最终确认
+  const handleDeepCleanWarningConfirm = useCallback(() => {
+    setShowDeepCleanWarning(false);
+    setShowDeepCleanConfirm(true);
+  }, []);
+
+  // 执行深度清理（永久删除）
+  const handleDeepClean = useCallback(async () => {
+    if (selectedPaths.size === 0) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+    setDeleteErrors([]);
+    setShowErrorDetails(false);
+    setShowDeepCleanConfirm(false);
+    
+    try {
+      const paths = Array.from(selectedPaths);
+      const result = await deleteLeftoversPermanent(paths);
+      
+      setDeepCleanResult(result);
+      setShowDeepCleanResult(true);
+
+      // 从结果中移除已删除的项
+      if (scanResult) {
+        const deletedPaths = new Set(
+          result.details
+            .filter(d => d.success)
+            .map(d => d.path)
+        );
+        
+        const remainingLeftovers = scanResult.leftovers.filter(
+          l => !deletedPaths.has(l.path)
+        );
+        const newTotalSize = remainingLeftovers.reduce((sum, l) => sum + l.size, 0);
+        
+        setScanResult({
+          ...scanResult,
+          leftovers: remainingLeftovers,
+          total_size: newTotalSize,
+        });
+
+        // 更新选中状态 - 只保留未成功删除的
+        const newSelected = new Set(
+          Array.from(selectedPaths).filter(p => !deletedPaths.has(p))
+        );
+        setSelectedPaths(newSelected);
+
+        updateModuleState('leftovers', {
+          fileCount: remainingLeftovers.length,
+          totalSize: newTotalSize,
+        });
+      }
+
+      // 显示错误信息
+      if (result.failed_count > 0 || result.manual_review_count > 0) {
+        const errorMessages: string[] = [];
+        result.details.forEach(d => {
+          if (!d.success && d.failure_reason) {
+            errorMessages.push(`${d.path}: ${d.failure_reason}`);
+          }
+          if (d.needs_manual_review) {
+            errorMessages.push(`${d.path}: ${getSafetyCheckMessage(d.safety_check)}`);
+          }
+        });
+        if (errorMessages.length > 0) {
+          setDeleteErrors(errorMessages);
+        }
+      }
+
+      triggerHealthRefresh();
+    } catch (err) {
+      console.error('深度清理失败:', err);
+      setDeleteError(String(err));
+      setDeleteErrors([String(err)]);
+    } finally {
+      setIsDeleting(false);
     }
   }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh]);
 
@@ -241,24 +337,47 @@ export function LeftoversModule() {
                   已选 {selectedPaths.size} 项，共 {formatSize(selectedSize)}
                 </span>
               </div>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={selectedPaths.size === 0 || isDeleting}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
-                  ${selectedPaths.size === 0 || isDeleting
-                    ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
-                    : 'bg-[var(--color-danger)] text-white hover:opacity-90'
-                  }
-                `}
-              >
-                {isDeleting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                删除选中
-              </button>
+              <div className="flex items-center gap-2">
+                {/* 普通删除按钮 */}
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={selectedPaths.size === 0 || isDeleting}
+                  className={`
+                    flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
+                    ${selectedPaths.size === 0 || isDeleting
+                      ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
+                      : 'bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)]'
+                    }
+                  `}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  删除选中
+                </button>
+                {/* 深度清理按钮 */}
+                <button
+                  onClick={handleDeepCleanClick}
+                  disabled={selectedPaths.size === 0 || isDeleting}
+                  className={`
+                    flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
+                    ${selectedPaths.size === 0 || isDeleting
+                      ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
+                      : 'bg-[var(--color-danger)] text-white hover:opacity-90'
+                    }
+                  `}
+                  title="直接从磁盘永久删除，不可恢复"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  深度清理
+                </button>
+              </div>
             </div>
 
             {/* 错误提示 */}
@@ -379,6 +498,149 @@ export function LeftoversModule() {
         cancelText="取消"
         isDanger={true}
       />
+
+      {/* 深度清理警告弹窗 - 微信风格 */}
+      {showDeepCleanWarning && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* 警告图标 */}
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
+              </div>
+            </div>
+            
+            {/* 标题 */}
+            <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-3">
+              深度清理警告
+            </h3>
+            
+            {/* 内容 */}
+            <div className="space-y-3 mb-6">
+              <p className="text-sm text-[var(--text-secondary)] text-center">
+                深度清理将<span className="text-[var(--color-danger)] font-semibold">直接从磁盘永久删除</span>文件，
+                <span className="text-[var(--color-danger)] font-semibold">不可恢复</span>。
+              </p>
+              <div className="bg-[var(--color-warning)]/10 rounded-xl p-4 border border-[var(--color-warning)]/20">
+                <p className="text-xs text-[var(--text-muted)]">
+                  <span className="font-semibold text-[var(--color-warning)]">安全机制：</span>
+                  系统会自动检查文件夹是否包含可执行文件（.exe/.dll/.sys），
+                  如发现将跳过并标记为"需人工审核"，确保不会误删正在使用的软件。
+                </p>
+              </div>
+            </div>
+            
+            {/* 按钮 */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeepCleanWarning(false)}
+                className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDeepCleanWarningConfirm}
+                className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-[var(--color-danger)] text-white hover:opacity-90 transition-colors"
+              >
+                我已了解，继续
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 深度清理最终确认弹窗 */}
+      <ConfirmDialog
+        isOpen={showDeepCleanConfirm}
+        onCancel={() => setShowDeepCleanConfirm(false)}
+        onConfirm={handleDeepClean}
+        title="确认深度清理"
+        description={`即将永久删除 ${selectedPaths.size} 个文件夹，释放约 ${formatSize(selectedSize)} 空间。`}
+        warning="⚠️ 此操作将直接从磁盘删除数据，不经过回收站，无法恢复！"
+        confirmText="永久删除"
+        cancelText="取消"
+        isDanger={true}
+      />
+
+      {/* 深度清理结果弹窗 */}
+      {showDeepCleanResult && deepCleanResult && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* 结果图标 */}
+            <div className="flex justify-center mb-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                deepCleanResult.success_count > 0 
+                  ? 'bg-[var(--brand-green)]/10' 
+                  : 'bg-[var(--color-danger)]/10'
+              }`}>
+                {deepCleanResult.success_count > 0 ? (
+                  <CheckCircle2 className="w-8 h-8 text-[var(--brand-green)]" />
+                ) : (
+                  <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
+                )}
+              </div>
+            </div>
+            
+            {/* 标题 */}
+            <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">
+              深度清理完成
+            </h3>
+            
+            {/* 统计信息 */}
+            <div className="space-y-3 mb-6">
+              {/* 成功删除 */}
+              {deepCleanResult.success_count > 0 && (
+                <div className="flex items-center justify-between p-3 bg-[var(--brand-green)]/10 rounded-xl">
+                  <span className="text-sm text-[var(--text-secondary)]">成功删除</span>
+                  <span className="text-sm font-bold text-[var(--brand-green)]">
+                    {deepCleanResult.success_count} 个文件夹，释放 {formatSize(deepCleanResult.freed_size)}
+                  </span>
+                </div>
+              )}
+              
+              {/* 需要人工审核 */}
+              {deepCleanResult.manual_review_count > 0 && (
+                <div className="flex items-center justify-between p-3 bg-[var(--color-warning)]/10 rounded-xl">
+                  <span className="text-sm text-[var(--text-secondary)]">需人工审核</span>
+                  <span className="text-sm font-bold text-[var(--color-warning)]">
+                    {deepCleanResult.manual_review_count} 个（包含可执行文件）
+                  </span>
+                </div>
+              )}
+              
+              {/* 待重启删除 */}
+              {deepCleanResult.reboot_pending_count > 0 && (
+                <div className="flex items-center justify-between p-3 bg-[var(--color-info)]/10 rounded-xl">
+                  <span className="text-sm text-[var(--text-secondary)]">待重启删除</span>
+                  <span className="text-sm font-bold text-[var(--color-info)]">
+                    {deepCleanResult.reboot_pending_count} 个（文件被占用）
+                  </span>
+                </div>
+              )}
+              
+              {/* 删除失败 */}
+              {deepCleanResult.failed_count > 0 && (
+                <div className="flex items-center justify-between p-3 bg-[var(--color-danger)]/10 rounded-xl">
+                  <span className="text-sm text-[var(--text-secondary)]">删除失败</span>
+                  <span className="text-sm font-bold text-[var(--color-danger)]">
+                    {deepCleanResult.failed_count} 个
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {/* 关闭按钮 */}
+            <button
+              onClick={() => setShowDeepCleanResult(false)}
+              className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors"
+            >
+              确定
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }

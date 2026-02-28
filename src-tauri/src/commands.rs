@@ -4,7 +4,7 @@
 // ============================================================================
 
 use crate::scanner::{ScanEngine, ScanResult, JunkCategory, DeleteResult, CategoryScanResult};
-use crate::cleaner::{DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult};
+use crate::cleaner::{DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult, PermanentDeleteEngine, PermanentDeleteResult, SafetyCheckResult};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, Reverse};
@@ -1799,4 +1799,68 @@ pub async fn check_admin_for_path(path: String) -> Result<bool, String> {
     }
     
     Ok(false)
+}
+
+// ============================================================================
+// 永久删除命令 - 卸载残留深度清理
+// ============================================================================
+
+/// 永久删除卸载残留（深度清理）
+/// 
+/// ⚠️ 警告：此操作将直接从磁盘永久删除文件，不可恢复！
+/// 
+/// 【安全机制】
+/// 执行删除前会进行三重安全检查：
+/// 1. 注册表检查 - 确认目录不在任何已安装程序中
+/// 2. 可执行文件检查 - 扫描 .exe/.dll/.sys 文件，发现则跳过
+/// 3. 核心白名单检查 - 确保路径不在系统关键目录内
+/// 
+/// # 参数
+/// - `paths`: 要永久删除的文件夹路径列表
+/// 
+/// # 返回
+/// - `PermanentDeleteResult`: 包含成功/失败数量、释放空间、详细结果等
+#[tauri::command]
+pub async fn delete_leftovers_permanent(paths: Vec<String>) -> Result<PermanentDeleteResult, String> {
+    info!("⚠️ 永久删除: 开始深度清理 {} 个卸载残留文件夹", paths.len());
+    
+    let result = tokio::task::spawn_blocking(move || {
+        let engine = PermanentDeleteEngine::new();
+        engine.delete_leftovers(paths)
+    })
+    .await
+    .map_err(|e| format!("永久删除任务失败: {}", e))?;
+    
+    info!(
+        "永久删除完成: 成功 {}, 失败 {}, 待审核 {}, 待重启 {}, 释放 {} 字节",
+        result.success_count,
+        result.failed_count,
+        result.manual_review_count,
+        result.reboot_pending_count,
+        result.freed_size
+    );
+    
+    Ok(result)
+}
+
+/// 执行单个路径的安全检查
+/// 
+/// 在用户确认删除前，可以先调用此接口检查路径是否安全
+/// 
+/// # 参数
+/// - `path`: 要检查的文件夹路径
+/// 
+/// # 返回
+/// - `SafetyCheckResult`: 安全检查结果
+#[tauri::command]
+pub async fn check_leftover_safety(path: String) -> Result<SafetyCheckResult, String> {
+    let result = tokio::task::spawn_blocking(move || {
+        let engine = PermanentDeleteEngine::new();
+        let path = std::path::Path::new(&path);
+        engine.perform_safety_checks(path)
+    })
+    .await
+    .map_err(|e| format!("安全检查失败: {}", e))?;
+    
+    Ok(result)
 }
