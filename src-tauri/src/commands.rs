@@ -1971,27 +1971,24 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 
 #[cfg(target_os = "windows")]
 fn get_windows_version() -> String {
-    use std::process::Command;
+    use winreg::enums::*;
+    use winreg::RegKey;
     
-    // 尝试使用 wmic 获取详细版本
-    if let Ok(output) = Command::new("wmic")
-        .args(["os", "get", "Caption,Version", "/value"])
-        .output()
-    {
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        let mut caption = String::new();
-        let mut version = String::new();
+    // 从注册表读取系统版本信息（避免 wmic 编码问题）
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    if let Ok(key) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion") {
+        let product_name: String = key.get_value("ProductName").unwrap_or_default();
+        let display_version: String = key.get_value("DisplayVersion").unwrap_or_default();
+        let current_build: String = key.get_value("CurrentBuild").unwrap_or_default();
+        let ubr: u32 = key.get_value("UBR").unwrap_or(0);
         
-        for line in output_str.lines() {
-            if line.starts_with("Caption=") {
-                caption = line.trim_start_matches("Caption=").trim().to_string();
-            } else if line.starts_with("Version=") {
-                version = line.trim_start_matches("Version=").trim().to_string();
-            }
-        }
-        
-        if !caption.is_empty() {
-            return format!("{} ({})", caption, version);
+        if !product_name.is_empty() {
+            let version_str = if !display_version.is_empty() {
+                format!("{} {} (Build {}.{})", product_name, display_version, current_build, ubr)
+            } else {
+                format!("{} (Build {}.{})", product_name, current_build, ubr)
+            };
+            return version_str;
         }
     }
     
@@ -2001,18 +1998,15 @@ fn get_windows_version() -> String {
 
 #[cfg(target_os = "windows")]
 fn get_cpu_info() -> String {
-    use std::process::Command;
+    use winreg::enums::*;
+    use winreg::RegKey;
     
-    // 尝试使用 wmic 获取 CPU 信息
-    if let Ok(output) = Command::new("wmic")
-        .args(["cpu", "get", "Name", "/value"])
-        .output()
-    {
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        for line in output_str.lines() {
-            if line.starts_with("Name=") {
-                return line.trim_start_matches("Name=").trim().to_string();
-            }
+    // 从注册表读取 CPU 信息（避免 wmic 编码问题）
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    if let Ok(key) = hklm.open_subkey("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0") {
+        let processor_name: String = key.get_value("ProcessorNameString").unwrap_or_default();
+        if !processor_name.is_empty() {
+            return processor_name.trim().to_string();
         }
     }
     

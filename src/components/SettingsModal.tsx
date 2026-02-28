@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -171,39 +171,57 @@ function GuideSettings() {
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">一键扫描</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-[var(--brand-green)]" />
+              一键扫描
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               扫描系统临时文件、浏览器缓存、Windows更新缓存等常见垃圾文件。扫描过程不会删除任何文件，您可以在扫描结果中选择需要清理的项目。
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">大文件清理</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <FileBox className="w-4 h-4 text-[var(--brand-green)]" />
+              大文件清理
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               扫描C盘中体积最大的50个文件。请仔细查看文件路径和类型，避免删除系统文件或重要数据。建议只删除您确认不再需要的文件。
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">社交软件专清</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-[var(--brand-green)]" />
+              社交软件专清
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               清理微信、QQ等社交软件的缓存文件，包括聊天图片、视频缓存等。清理后可能需要重新下载聊天记录中的图片和文件。
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">系统瘦身</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[var(--brand-green)]" />
+              系统瘦身
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               管理休眠文件、Windows组件存储等系统级功能。<span className="text-[var(--color-warning)] font-medium">此功能需要管理员权限</span>，操作前请确保了解各项功能的作用。
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">卸载残留</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <Package className="w-4 h-4 text-[var(--brand-green)]" />
+              卸载残留
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               扫描 AppData 和 ProgramData 目录中已卸载软件遗留的孤立文件夹。系统会自动排除仍在注册表中的已安装程序。
               <span className="text-[var(--color-warning)] font-medium">深度清理</span>功能将直接从磁盘永久删除文件，不经过回收站。
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">注册表冗余</p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <Database className="w-4 h-4 text-[var(--brand-green)]" />
+              注册表冗余
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               扫描 Windows 注册表中的孤立键值和无效引用，包括 MUI 缓存、软件残留键等。
               <span className="text-[var(--color-warning)] font-medium">删除前会自动备份</span>，备份文件保存在用户文档目录下的 LightC_Backups 文件夹中。
             </p>

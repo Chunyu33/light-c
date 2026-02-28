@@ -153,8 +153,7 @@ export function SystemSlimModule() {
       id="system"
       title="系统瘦身"
       description="通过调整系统配置，释放数 GB 的磁盘空间"
-      icon={<Rocket className="w-6 h-6 text-emerald-600" />}
-      iconBgClass="bg-emerald-600/15"
+      icon={<Rocket className="w-6 h-6 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}

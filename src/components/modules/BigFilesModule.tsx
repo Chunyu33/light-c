@@ -291,8 +291,7 @@ export function BigFilesModule() {
         id="bigFiles"
         title="大文件清理"
         description="扫描 C 盘体积最大的文件，快速释放存储空间"
-        icon={<HardDrive className="w-6 h-6 text-emerald-500" />}
-        iconBgClass="bg-emerald-500/15"
+        icon={<HardDrive className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}

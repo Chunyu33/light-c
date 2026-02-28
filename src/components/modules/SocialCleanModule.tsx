@@ -232,8 +232,7 @@ export function SocialCleanModule() {
         id="social"
         title="社交软件专清"
         description="清理微信、QQ、钉钉、飞书等软件的缓存文件"
-        icon={<MessageCircle className="w-6 h-6 text-teal-500" />}
-        iconBgClass="bg-teal-500/15"
+        icon={<MessageCircle className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}

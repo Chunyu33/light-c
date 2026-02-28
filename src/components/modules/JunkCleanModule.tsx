@@ -241,8 +241,7 @@ export function JunkCleanModule() {
         id="junk"
         title="垃圾清理"
         description="清理系统缓存、临时文件、日志等垃圾文件"
-        icon={<Trash2 className="w-6 h-6 text-emerald-500" />}
-        iconBgClass="bg-emerald-500/15"
+        icon={<Trash2 className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}
