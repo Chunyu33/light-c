@@ -240,14 +240,22 @@ export function RegistryModule() {
         {scanResult && scanResult.entries.length > 0 && (
           <div className="p-5 space-y-4">
             {/* 安全提示 */}
-            <div className="flex items-start gap-3 p-4 bg-[var(--brand-green-10)] rounded-xl border border-[var(--brand-green-20)]">
-              <Shield className="w-5 h-5 text-[var(--brand-green)] shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">安全机制已启用</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">
-                  删除前会自动创建 .reg 备份文件，您可以随时通过双击备份文件恢复。
-                </p>
+            <div className="flex items-start justify-between gap-3 p-4 bg-[var(--brand-green-10)] rounded-xl border border-[var(--brand-green-20)]">
+              <div className="flex items-start gap-3">
+                <Shield className="w-5 h-5 text-[var(--brand-green)] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">安全机制已启用</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    删除前会自动创建 .reg 备份文件，您可以随时通过双击备份文件恢复。
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => openRegistryBackupDir()}
+                className="shrink-0 px-3 py-1.5 text-xs font-medium text-[var(--brand-green)] bg-white/50 hover:bg-white/80 rounded-lg border border-[var(--brand-green-20)] transition-colors"
+              >
+                打开备份目录
+              </button>
             </div>
 
             {/* 备份路径提示 */}
