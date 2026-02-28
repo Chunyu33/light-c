@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -447,7 +447,10 @@ function AboutSettings() {
     <div className="space-y-6">
       {/* 检查更新 */}
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">检查更新</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Download className="w-3.5 h-3.5" />
+          检查更新
+        </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -535,7 +538,10 @@ function AboutSettings() {
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">应用信息</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Info className="w-3.5 h-3.5" />
+          应用信息
+        </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-[var(--brand-green)] flex items-center justify-center">
@@ -636,7 +642,10 @@ function AboutSettings() {
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">为什么叫LightC</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <HelpCircle className="w-3.5 h-3.5" />
+          为什么叫LightC
+        </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
             <span className="font-medium text-[var(--brand-green)]">Light</span> 代表轻量、轻快，寓意让您的C盘变得轻盈；
@@ -647,7 +656,10 @@ function AboutSettings() {
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">开发者</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Code2 className="w-3.5 h-3.5" />
+          开发者
+        </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">作者</span>

@@ -1981,12 +1981,23 @@ fn get_windows_version() -> String {
         let display_version: String = key.get_value("DisplayVersion").unwrap_or_default();
         let current_build: String = key.get_value("CurrentBuild").unwrap_or_default();
         let ubr: u32 = key.get_value("UBR").unwrap_or(0);
+        let _edition_id: String = key.get_value("EditionID").unwrap_or_default();
         
         if !product_name.is_empty() {
-            let version_str = if !display_version.is_empty() {
-                format!("{} {} (Build {}.{})", product_name, display_version, current_build, ubr)
+            // 根据 Build 号判断是否为 Windows 11（Build 22000+）
+            // 注册表中的 ProductName 可能仍然显示 "Windows 10"，需要手动修正
+            let build_num: u32 = current_build.parse().unwrap_or(0);
+            let corrected_name = if build_num >= 22000 && product_name.contains("Windows 10") {
+                // Windows 11 的 Build 号从 22000 开始
+                product_name.replace("Windows 10", "Windows 11")
             } else {
-                format!("{} (Build {}.{})", product_name, current_build, ubr)
+                product_name
+            };
+            
+            let version_str = if !display_version.is_empty() {
+                format!("{} {} (Build {}.{})", corrected_name, display_version, current_build, ubr)
+            } else {
+                format!("{} (Build {}.{})", corrected_name, current_build, ubr)
             };
             return version_str;
         }
