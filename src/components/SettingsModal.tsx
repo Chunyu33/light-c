@@ -137,7 +137,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <Palette className="w-3.5 h-3.5" />
-          外观
+          外观设置
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center justify-between">
@@ -184,7 +184,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 <FolderOpen className="w-4.5 h-4.5 text-[var(--brand-green)]" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-medium text-[var(--text-primary)]">清理历史记录</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">清理日志</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">记录最近10次清理的详细文件清单与结果</p>
               </div>
             </div>
