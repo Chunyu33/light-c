@@ -17,6 +17,7 @@ import {
   SystemSlimModule,
   LeftoversModule,
   RegistryModule,
+  HotspotModule,
 } from './components';
 import { DashboardProvider, useDashboard } from './contexts';
 import './App.css';
@@ -75,6 +76,9 @@ function DashboardContent() {
 
           {/* 注册表冗余模块 [中风险] */}
           <RegistryModule />
+
+          {/* C盘热点扫描模块 */}
+          <HotspotModule />
 
           {/* 底部留白 */}
           <div className="h-4" />

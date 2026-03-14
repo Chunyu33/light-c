@@ -8,3 +8,4 @@ export { SocialCleanModule } from './SocialCleanModule';
 export { SystemSlimModule } from './SystemSlimModule';
 export { LeftoversModule } from './LeftoversModule';
 export { RegistryModule } from './RegistryModule';
+export { HotspotModule } from './HotspotModule';

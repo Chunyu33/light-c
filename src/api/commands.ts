@@ -645,3 +645,47 @@ export async function openLogsFolder(): Promise<void> {
 export async function getCleanupHistory(): Promise<CleanupHistorySummary[]> {
   return invoke<CleanupHistorySummary[]>('get_cleanup_history');
 }
+
+// ============================================================================
+// C盘热点扫描相关 API
+// ============================================================================
+
+/**
+ * 热点文件夹信息
+ */
+export interface HotspotEntry {
+  /** 文件夹完整路径 */
+  path: string;
+  /** 文件夹名称 */
+  name: string;
+  /** 总大小（字节） */
+  total_size: number;
+  /** 文件数量 */
+  file_count: number;
+  /** 最后修改时间（Unix 时间戳，毫秒） */
+  last_modified: number;
+  /** 父目录类型（Local/Roaming/LocalLow） */
+  parent_type: string;
+}
+
+/**
+ * 热点扫描结果
+ */
+export interface HotspotScanResult {
+  /** 热点文件夹列表（已按大小降序排列） */
+  entries: HotspotEntry[];
+  /** 扫描的总文件夹数 */
+  total_folders_scanned: number;
+  /** 扫描耗时（毫秒） */
+  scan_duration_ms: number;
+  /** AppData 总大小 */
+  appdata_total_size: number;
+}
+
+/**
+ * 扫描 AppData 热点文件夹
+ * @param topN 返回 Top N 结果，默认 20
+ */
+export async function scanHotspot(topN?: number): Promise<HotspotScanResult> {
+  return invoke<HotspotScanResult>('scan_hotspot', { topN });
+}

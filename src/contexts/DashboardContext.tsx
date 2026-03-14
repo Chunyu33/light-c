@@ -44,6 +44,8 @@ export interface ModulesState {
   leftovers: ModuleState;
   /** 注册表冗余模块 */
   registry: ModuleState;
+  /** C盘热点扫描模块 */
+  hotspot: ModuleState;
 }
 
 /** 仪表盘 Context 值类型 */
@@ -100,6 +102,7 @@ const initialModulesState: ModulesState = {
   system: { ...initialModuleState },
   leftovers: { ...initialModuleState },
   registry: { ...initialModuleState },
+  hotspot: { ...initialModuleState },
 };
 
 // ============================================================================

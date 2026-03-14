@@ -2202,3 +2202,41 @@ pub struct CleanupHistorySummary {
     /// 总释放空间
     pub total_freed_bytes: u64,
 }
+
+// ============================================================================
+// C盘热点扫描相关命令
+// ============================================================================
+
+/// 扫描 AppData 热点文件夹
+/// 
+/// 返回占用空间最大的 Top N 文件夹
+#[tauri::command]
+pub async fn scan_hotspot(top_n: Option<usize>) -> Result<crate::scanner::HotspotScanResult, String> {
+    use crate::scanner::HotspotScanner;
+    
+    let n = top_n.unwrap_or(20);
+    info!("开始扫描 AppData 热点，Top {}", n);
+    
+    // 在阻塞线程中执行扫描（避免阻塞异步运行时）
+    let result = tokio::task::spawn_blocking(move || {
+        HotspotScanner::scan(n)
+    })
+    .await
+    .map_err(|e| format!("扫描任务执行失败: {}", e))?;
+    
+    match &result {
+        Ok(scan_result) => {
+            info!(
+                "热点扫描完成: {} 个文件夹，耗时 {}ms，AppData 总大小 {} bytes",
+                scan_result.entries.len(),
+                scan_result.scan_duration_ms,
+                scan_result.appdata_total_size
+            );
+        }
+        Err(e) => {
+            log::warn!("热点扫描失败: {}", e);
+        }
+    }
+    
+    result
+}
