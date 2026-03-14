@@ -228,6 +228,9 @@ export interface LeftoverScanResult {
   scan_duration_ms: number;
 }
 
+/** 残留类型 */
+export type LeftoverType = 'Normal' | 'Emulator' | 'VirtualDisk' | 'RegistryOrphan';
+
 /** 单个残留条目 */
 export interface LeftoverEntry {
   /** 文件夹路径 */
@@ -237,11 +240,17 @@ export interface LeftoverEntry {
   /** 可能的软件名称 */
   app_name: string;
   /** 来源类型 */
-  source: 'LocalAppData' | 'RoamingAppData' | 'ProgramData';
+  source: 'LocalAppData' | 'RoamingAppData' | 'LocalLowAppData' | 'ProgramData' | 'VirtualDiskFile';
   /** 最后修改时间（Unix时间戳） */
   last_modified: number;
   /** 包含的文件数量 */
   file_count: number;
+  /** 是否为模拟器残留 */
+  is_emulator: boolean;
+  /** 是否为虚拟磁盘文件 */
+  is_virtual_disk: boolean;
+  /** 残留类型 */
+  leftover_type: LeftoverType;
 }
 
 /** 卸载残留删除结果 */
@@ -259,9 +268,10 @@ export interface LeftoverDeleteResult {
 /**
  * 扫描卸载残留
  * 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
+ * @param deepScan 是否启用深度扫描模式（扫描模拟器残留、虚拟磁盘文件等）
  */
-export async function scanUninstallLeftovers(): Promise<LeftoverScanResult> {
-  return invoke<LeftoverScanResult>('scan_uninstall_leftovers');
+export async function scanUninstallLeftovers(deepScan?: boolean): Promise<LeftoverScanResult> {
+  return invoke<LeftoverScanResult>('scan_uninstall_leftovers', { deepScan });
 }
 
 /**

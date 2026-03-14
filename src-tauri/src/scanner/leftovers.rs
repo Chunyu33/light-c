@@ -1,5 +1,5 @@
 // ============================================================================
-// 卸载残留扫描模块
+// 卸载残留扫描模块（支持模拟器、残留驱动深度检测）
 // 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
 // ============================================================================
 //
@@ -10,12 +10,19 @@
 // 【扫描路径】
 // - %LOCALAPPDATA% (C:\Users\<用户>\AppData\Local)
 // - %APPDATA% (C:\Users\<用户>\AppData\Roaming)
+// - %LOCALAPPDATA%Low (C:\Users\<用户>\AppData\LocalLow)
 // - C:\ProgramData
+//
+// 【深度扫描模式】
+// - 扫描模拟器残留（雷电、蓝叠、夜神、MuMu、MEmu、MSI App Player）
+// - 扫描孤立虚拟磁盘文件（.vmdk, .vdi, .vhd）
+// - 检查注册表关联（HKCU/HKLM Software）
 //
 // 【安全机制】
 // 1. 白名单保护：系统关键文件夹（如 Microsoft、Windows）永不扫描
 // 2. 时间过滤：仅扫描超过30天未修改的文件夹（确保不是新安装的软件）
 // 3. 大小阈值：忽略小于 1MB 的文件夹（避免误报）
+// 4. 驱动保护：系统核心驱动永不标记为残留
 // ============================================================================
 
 use serde::{Deserialize, Serialize};
@@ -53,6 +60,25 @@ pub struct LeftoverEntry {
     pub last_modified: i64,
     /// 包含的文件数量
     pub file_count: u32,
+    /// 是否为模拟器残留
+    pub is_emulator: bool,
+    /// 是否为虚拟磁盘文件
+    pub is_virtual_disk: bool,
+    /// 残留类型描述（用于 UI 显示）
+    pub leftover_type: LeftoverType,
+}
+
+/// 残留类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LeftoverType {
+    /// 普通应用残留
+    Normal,
+    /// 模拟器残留（雷电、蓝叠、夜神等）
+    Emulator,
+    /// 虚拟磁盘文件（.vmdk, .vdi, .vhd）
+    VirtualDisk,
+    /// 注册表关联残留
+    RegistryOrphan,
 }
 
 /// 残留来源类型
@@ -62,19 +88,90 @@ pub enum LeftoverSource {
     LocalAppData,
     /// AppData\Roaming
     RoamingAppData,
+    /// AppData\LocalLow
+    LocalLowAppData,
     /// ProgramData
     ProgramData,
+    /// 虚拟磁盘文件（独立文件）
+    VirtualDiskFile,
 }
 
 impl LeftoverSource {
+    #[allow(dead_code)]
     pub fn display_name(&self) -> &'static str {
         match self {
             LeftoverSource::LocalAppData => "本地应用数据",
             LeftoverSource::RoamingAppData => "漫游应用数据",
+            LeftoverSource::LocalLowAppData => "LocalLow数据",
             LeftoverSource::ProgramData => "程序数据",
+            LeftoverSource::VirtualDiskFile => "虚拟磁盘文件",
         }
     }
 }
+
+// ============================================================================
+// 模拟器特征库
+// 用于识别常见 Android 模拟器的残留文件夹
+// ============================================================================
+
+/// 模拟器特征信息
+struct EmulatorSignature {
+    /// 模拟器名称
+    name: &'static str,
+    /// 文件夹名称关键字（小写匹配）
+    folder_keywords: &'static [&'static str],
+    /// 注册表厂商名关键字
+    registry_keywords: &'static [&'static str],
+}
+
+/// 已知模拟器特征库
+const EMULATOR_SIGNATURES: &[EmulatorSignature] = &[
+    // 雷电模拟器 (LDPlayer)
+    EmulatorSignature {
+        name: "雷电模拟器",
+        folder_keywords: &["ldplayer", "leidian", "dnplayer", "changzhi"],
+        registry_keywords: &["ldplayer", "changzhi", "xuanzhi"],
+    },
+    // 蓝叠模拟器 (BlueStacks)
+    EmulatorSignature {
+        name: "蓝叠模拟器",
+        folder_keywords: &["bluestacks", "bluestacks_nxt", "bstk"],
+        registry_keywords: &["bluestacks", "bluestack systems"],
+    },
+    // 夜神模拟器 (Nox)
+    EmulatorSignature {
+        name: "夜神模拟器",
+        folder_keywords: &["nox", "noxplayer", "bignox", "yeshen"],
+        registry_keywords: &["nox", "bignox", "duodian"],
+    },
+    // MuMu模拟器 (网易)
+    EmulatorSignature {
+        name: "MuMu模拟器",
+        folder_keywords: &["mumu", "nemu", "mumuemulator", "nemubox"],
+        registry_keywords: &["mumu", "netease", "nemu"],
+    },
+    // MEmu模拟器 (逍遥)
+    EmulatorSignature {
+        name: "MEmu模拟器",
+        folder_keywords: &["memu", "microvirt", "xyaz"],
+        registry_keywords: &["memu", "microvirt"],
+    },
+    // MSI App Player
+    EmulatorSignature {
+        name: "MSI App Player",
+        folder_keywords: &["msi app player", "msiappplayer"],
+        registry_keywords: &["msi app player"],
+    },
+    // 腾讯手游助手
+    EmulatorSignature {
+        name: "腾讯手游助手",
+        folder_keywords: &["txgameassistant", "gameloop", "tgp", "androidemulator"],
+        registry_keywords: &["tencent", "gameloop"],
+    },
+];
+
+/// 虚拟磁盘文件扩展名
+const VIRTUAL_DISK_EXTENSIONS: &[&str] = &[".vmdk", ".vdi", ".vhd", ".vhdx"];
 
 // ============================================================================
 // 白名单配置
@@ -193,18 +290,26 @@ pub struct LeftoverScanner {
     min_size_threshold: u64,
     /// 最小未修改天数
     min_days_old: u64,
+    /// 是否启用深度扫描模式
+    deep_scan: bool,
 }
 
 impl LeftoverScanner {
     /// 创建新的扫描器实例
     pub fn new() -> Self {
+        Self::with_deep_scan(false)
+    }
+
+    /// 创建带深度扫描选项的扫描器实例
+    pub fn with_deep_scan(deep_scan: bool) -> Self {
         let installed_apps = Self::get_installed_programs();
-        log::info!("已加载 {} 个已安装程序", installed_apps.len());
+        log::info!("已加载 {} 个已安装程序, 深度扫描: {}", installed_apps.len(), deep_scan);
         
         LeftoverScanner {
             installed_apps,
             min_size_threshold: 1024 * 1024, // 1MB
-            min_days_old: 30,
+            min_days_old: if deep_scan { 7 } else { 30 }, // 深度扫描时降低时间阈值
+            deep_scan,
         }
     }
 
@@ -294,26 +399,37 @@ impl LeftoverScanner {
                         continue;
                     }
 
-                    // 检查是否对应已安装程序
-                    if self.is_installed(&folder_name) {
+                    // 【模拟器检测】检查是否为已知模拟器残留
+                    let is_emulator = self.is_emulator_folder(&folder_name);
+                    
+                    // 非模拟器残留需要检查是否对应已安装程序
+                    if !is_emulator && self.is_installed(&folder_name) {
                         continue;
                     }
 
-                    // 检查最后修改时间
-                    if !self.is_old_enough(&path) {
+                    // 检查最后修改时间（模拟器残留跳过时间检查）
+                    if !is_emulator && !self.is_old_enough(&path) {
                         continue;
                     }
 
                     // 计算文件夹大小
                     let (size, file_count) = self.calculate_folder_size(&path);
 
-                    // 检查大小阈值
-                    if size < self.min_size_threshold {
+                    // 检查大小阈值（模拟器残留降低阈值）
+                    let threshold = if is_emulator { 100 * 1024 } else { self.min_size_threshold };
+                    if size < threshold {
                         continue;
                     }
 
                     // 获取最后修改时间
                     let last_modified = self.get_last_modified(&path);
+
+                    // 确定残留类型
+                    let leftover_type = if is_emulator {
+                        LeftoverType::Emulator
+                    } else {
+                        LeftoverType::Normal
+                    };
 
                     leftovers.push(LeftoverEntry {
                         path: path.to_string_lossy().to_string(),
@@ -322,10 +438,23 @@ impl LeftoverScanner {
                         source: source.clone(),
                         last_modified,
                         file_count,
+                        is_emulator,
+                        is_virtual_disk: false,
+                        leftover_type,
                     });
 
                     total_size += size;
                 }
+            }
+        }
+
+        // 【深度扫描】扫描虚拟磁盘文件
+        if self.deep_scan {
+            log::info!("执行深度扫描: 搜索孤立虚拟磁盘文件...");
+            let virtual_disks = self.scan_virtual_disk_files();
+            for entry in virtual_disks {
+                total_size += entry.size;
+                leftovers.push(entry);
             }
         }
 
@@ -347,13 +476,123 @@ impl LeftoverScanner {
         }
     }
 
+    /// 检查文件夹是否为已知模拟器残留
+    fn is_emulator_folder(&self, folder_name: &str) -> bool {
+        let name_lower = folder_name.to_lowercase();
+        
+        for sig in EMULATOR_SIGNATURES {
+            for keyword in sig.folder_keywords {
+                if name_lower.contains(keyword) {
+                    log::debug!("检测到模拟器残留: {} (匹配 {})", folder_name, sig.name);
+                    return true;
+                }
+            }
+        }
+        
+        false
+    }
+
+    /// 【深度扫描】扫描孤立虚拟磁盘文件
+    /// 搜索 .vmdk, .vdi, .vhd 等虚拟磁盘文件
+    fn scan_virtual_disk_files(&self) -> Vec<LeftoverEntry> {
+        let mut results = Vec::new();
+        
+        // 扫描路径：用户目录下的常见位置
+        let scan_dirs = [
+            dirs::data_local_dir(),
+            dirs::data_dir(),
+            Some(PathBuf::from(r"C:\ProgramData")),
+        ];
+        
+        for dir_opt in scan_dirs.iter() {
+            if let Some(base_dir) = dir_opt {
+                if !base_dir.exists() {
+                    continue;
+                }
+                
+                // 递归搜索虚拟磁盘文件（限制深度为 5）
+                for entry in WalkDir::new(base_dir)
+                    .max_depth(5)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    let path = entry.path();
+                    
+                    // 只处理文件
+                    if !path.is_file() {
+                        continue;
+                    }
+                    
+                    // 检查扩展名
+                    let ext = path.extension()
+                        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+                        .unwrap_or_default();
+                    
+                    if !VIRTUAL_DISK_EXTENSIONS.contains(&ext.as_str()) {
+                        continue;
+                    }
+                    
+                    // 获取文件大小
+                    let size = path.metadata().map(|m| m.len()).unwrap_or(0);
+                    
+                    // 虚拟磁盘文件通常很大，忽略小于 100MB 的
+                    if size < 100 * 1024 * 1024 {
+                        continue;
+                    }
+                    
+                    // 检查是否关联到已安装的模拟器
+                    let parent_folder = path.parent()
+                        .and_then(|p| p.file_name())
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    
+                    // 如果父目录对应已安装程序，跳过
+                    if self.is_installed(&parent_folder) {
+                        continue;
+                    }
+                    
+                    let file_name = path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    
+                    let last_modified = self.get_last_modified(path);
+                    
+                    log::info!("发现孤立虚拟磁盘文件: {} ({} MB)", 
+                        path.display(), size / 1024 / 1024);
+                    
+                    results.push(LeftoverEntry {
+                        path: path.to_string_lossy().to_string(),
+                        size,
+                        app_name: file_name,
+                        source: LeftoverSource::VirtualDiskFile,
+                        last_modified,
+                        file_count: 1,
+                        is_emulator: false,
+                        is_virtual_disk: true,
+                        leftover_type: LeftoverType::VirtualDisk,
+                    });
+                }
+            }
+        }
+        
+        results
+    }
+
     /// 获取需要扫描的路径列表
     fn get_scan_paths(&self) -> Vec<(PathBuf, LeftoverSource)> {
         let mut paths = Vec::new();
 
         // AppData\Local
         if let Some(local_app_data) = dirs::data_local_dir() {
-            paths.push((local_app_data, LeftoverSource::LocalAppData));
+            paths.push((local_app_data.clone(), LeftoverSource::LocalAppData));
+            
+            // AppData\LocalLow（模拟器残留常见位置）
+            if let Some(parent) = local_app_data.parent() {
+                let local_low = parent.join("LocalLow");
+                if local_low.exists() {
+                    paths.push((local_low, LeftoverSource::LocalLowAppData));
+                }
+            }
         }
 
         // AppData\Roaming

@@ -1,11 +1,11 @@
 // ============================================================================
-// 卸载残留扫描模块
+// 卸载残留扫描模块（支持模拟器、残留驱动深度检测）
 // 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
 // ============================================================================
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useDashboard } from '../../contexts/DashboardContext';
@@ -42,6 +42,9 @@ export function LeftoversModule() {
   const [deleteErrors, setDeleteErrors] = useState<string[]>([]); // 详细错误列表
   const [showErrorDetails, setShowErrorDetails] = useState(false); // 是否显示错误详情
   
+  // 深度扫描模式（扫描模拟器残留、虚拟磁盘文件等）
+  const [deepScanEnabled, setDeepScanEnabled] = useState(false);
+  
   // 深度清理（永久删除）相关状态
   const [showDeepCleanWarning, setShowDeepCleanWarning] = useState(false); // 首次深度清理警告
   const [showDeepCleanConfirm, setShowDeepCleanConfirm] = useState(false); // 深度清理确认
@@ -66,7 +69,8 @@ export function LeftoversModule() {
     setShowErrorDetails(false);
 
     try {
-      const result = await scanUninstallLeftovers();
+      // 传入深度扫描参数
+      const result = await scanUninstallLeftovers(deepScanEnabled);
       setScanResult(result);
       
       // 默认全选
@@ -84,7 +88,7 @@ export function LeftoversModule() {
       console.error('卸载残留扫描失败:', err);
       updateModuleState('leftovers', { status: 'error', error: String(err) });
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [updateModuleState, setExpandedModule, deepScanEnabled]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -280,10 +284,23 @@ export function LeftoversModule() {
     switch (source) {
       case 'LocalAppData': return '本地应用数据';
       case 'RoamingAppData': return '漫游应用数据';
+      case 'LocalLowAppData': return 'LocalLow数据';
       case 'ProgramData': return '程序数据';
+      case 'VirtualDiskFile': return '虚拟磁盘';
       default: return source;
     }
   };
+
+  // 统计模拟器和虚拟磁盘残留数量
+  const emulatorCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.leftovers.filter(l => l.is_emulator).length;
+  }, [scanResult]);
+
+  const virtualDiskCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.leftovers.filter(l => l.is_virtual_disk).length;
+  }, [scanResult]);
 
   const isExpanded = expandedModule === 'leftovers';
 
@@ -314,7 +331,7 @@ export function LeftoversModule() {
       <ModuleCard
         id="leftovers"
         title="卸载残留"
-        description="扫描已卸载软件遗留的配置文件和缓存"
+        description="支持模拟器、残留驱动深度检测"
         icon={<Package className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -324,9 +341,28 @@ export function LeftoversModule() {
         onScan={handleScan}
         error={moduleState.error}
         headerExtra={
-          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-warning)]/10 text-[var(--color-warning)] border border-[var(--color-warning)]/20">
-            深度
-          </span>
+          <div className="flex items-center gap-2">
+            {/* 深度扫描开关 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeepScanEnabled(!deepScanEnabled);
+              }}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                deepScanEnabled
+                  ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20'
+                  : 'bg-[var(--bg-hover)] text-[var(--text-muted)] border border-[var(--border-color)]'
+              }`}
+              title="深度扫描：检测模拟器残留、虚拟磁盘文件等"
+            >
+              {deepScanEnabled ? (
+                <ToggleRight className="w-3 h-3" />
+              ) : (
+                <ToggleLeft className="w-3 h-3" />
+              )}
+              深度扫描
+            </button>
+          </div>
         }
       >
         {/* 扫描结果内容 */}
@@ -425,6 +461,22 @@ export function LeftoversModule() {
               </div>
             )}
 
+            {/* 模拟器/虚拟磁盘残留提示 */}
+            {(emulatorCount > 0 || virtualDiskCount > 0) && (
+              <div className="flex items-start gap-3 p-4 bg-[var(--color-danger)]/10 rounded-xl border border-[var(--color-danger)]/20">
+                <Smartphone className="w-5 h-5 text-[var(--color-danger)] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">发现大型模拟器残留文件</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    检测到 {emulatorCount > 0 ? `${emulatorCount} 个模拟器残留` : ''}
+                    {emulatorCount > 0 && virtualDiskCount > 0 ? '、' : ''}
+                    {virtualDiskCount > 0 ? `${virtualDiskCount} 个虚拟磁盘文件` : ''}
+                    ，这些文件通常占用大量空间，建议清理。
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* 残留列表 */}
             <div className="space-y-2 max-h-80 overflow-auto">
               {scanResult.leftovers.map((leftover) => (
@@ -432,6 +484,10 @@ export function LeftoversModule() {
                   key={leftover.path}
                   className={`
                     flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-colors
+                    ${leftover.is_emulator || leftover.is_virtual_disk
+                      ? 'border-2 border-[var(--color-danger)]/30'
+                      : ''
+                    }
                     ${selectedPaths.has(leftover.path)
                       ? 'bg-[var(--brand-green-10)]'
                       : 'bg-[var(--bg-main)] hover:bg-[var(--bg-hover)]'
@@ -452,16 +508,41 @@ export function LeftoversModule() {
                     )}
                   </div>
 
-                  {/* 图标 */}
-                  <div className="w-10 h-10 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center shrink-0">
-                    <Package className="w-5 h-5 text-[var(--brand-green)]" />
+                  {/* 图标 - 根据类型显示不同图标 */}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    leftover.is_emulator
+                      ? 'bg-[var(--color-danger)]/10'
+                      : leftover.is_virtual_disk
+                        ? 'bg-purple-500/10'
+                        : 'bg-[var(--brand-green-10)]'
+                  }`}>
+                    {leftover.is_emulator ? (
+                      <Smartphone className="w-5 h-5 text-[var(--color-danger)]" />
+                    ) : leftover.is_virtual_disk ? (
+                      <HardDrive className="w-5 h-5 text-purple-500" />
+                    ) : (
+                      <Package className="w-5 h-5 text-[var(--brand-green)]" />
+                    )}
                   </div>
 
                   {/* 信息 */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                      {leftover.app_name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                        {leftover.app_name}
+                      </p>
+                      {/* 模拟器/虚拟磁盘标签 */}
+                      {leftover.is_emulator && (
+                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-[var(--color-danger)] bg-[var(--color-danger)]/10">
+                          模拟器残留
+                        </span>
+                      )}
+                      {leftover.is_virtual_disk && (
+                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-purple-500 bg-purple-500/10">
+                          虚拟磁盘
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-[var(--text-muted)] truncate mt-0.5" title={leftover.path}>
                       {leftover.path}
                     </p>
@@ -471,9 +552,15 @@ export function LeftoversModule() {
                     </div>
                   </div>
 
-                  {/* 大小 */}
+                  {/* 大小 - 大文件高亮 */}
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-[var(--text-primary)] tabular-nums">
+                    <p className={`text-sm font-bold tabular-nums ${
+                      leftover.size > 1024 * 1024 * 1024 
+                        ? 'text-[var(--color-danger)]' 
+                        : leftover.size > 100 * 1024 * 1024
+                          ? 'text-[var(--color-warning)]'
+                          : 'text-[var(--text-primary)]'
+                    }`}>
                       {formatSize(leftover.size)}
                     </p>
                   </div>

@@ -1501,12 +1501,16 @@ use crate::scanner::{RegistryScanner, RegistryScanResult, RegistryEntry, Registr
 /// 扫描卸载残留
 /// 
 /// 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
+/// 
+/// # 参数
+/// - `deep_scan`: 是否启用深度扫描模式（扫描模拟器残留、虚拟磁盘文件等）
 #[tauri::command]
-pub async fn scan_uninstall_leftovers() -> Result<LeftoverScanResult, String> {
-    info!("开始扫描卸载残留...");
+pub async fn scan_uninstall_leftovers(deep_scan: Option<bool>) -> Result<LeftoverScanResult, String> {
+    let is_deep = deep_scan.unwrap_or(false);
+    info!("开始扫描卸载残留... 深度扫描: {}", is_deep);
     
-    let result = tokio::task::spawn_blocking(|| {
-        let scanner = LeftoverScanner::new();
+    let result = tokio::task::spawn_blocking(move || {
+        let scanner = LeftoverScanner::with_deep_scan(is_deep);
         scanner.scan()
     })
     .await
