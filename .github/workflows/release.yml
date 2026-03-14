@@ -1,0 +1,64 @@
+# ============================================================================
+# LightC 自动发布工作流
+# 当推送 tag (v*) 时自动构建并发布到 GitHub Releases
+# ============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-action@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tauri 签名密钥（需要在 GitHub Secrets 中配置）
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'LightC v__VERSION__'
+          releaseBody: |
+            ## 更新内容
+            请查看 [CHANGELOG](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细更新内容。
+            
+            ## 安装说明
+            - 下载 `.msi` 文件进行安装
+            - 首次安装可能需要管理员权限
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

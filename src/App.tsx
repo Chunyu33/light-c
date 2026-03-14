@@ -10,6 +10,7 @@ import {
   ToastProvider, 
   WelcomeModal, 
   shouldShowWelcome,
+  UpdateModal,
   DashboardHeader,
   JunkCleanModule,
   BigFilesModule,
@@ -55,6 +56,9 @@ function DashboardContent() {
 
       {/* 欢迎弹窗 */}
       <WelcomeModal isOpen={showWelcome} onClose={() => setShowWelcome(false)} />
+
+      {/* 自动更新检查弹窗 */}
+      <UpdateModal autoCheck={true} />
 
       {/* 主内容区 - 微信风格柔和灰白背景，增加间距 */}
       <main className="flex-1 overflow-auto bg-[var(--bg-base)]">
