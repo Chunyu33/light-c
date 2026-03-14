@@ -25,6 +25,10 @@ pub struct HotspotEntry {
     pub last_modified: i64,
     /// 父目录类型（Local/Roaming/LocalLow）
     pub parent_type: String,
+    /// 是否为缓存目录（包含 cache/tmp/temp/log/download/thumb 等关键字）
+    pub is_cache: bool,
+    /// 是否为程序目录（路径包含 Local\Programs）
+    pub is_program: bool,
 }
 
 /// 热点扫描结果
@@ -93,13 +97,23 @@ impl HotspotScanner {
                                 .map(|n| n.to_string_lossy().to_string())
                                 .unwrap_or_default();
                             
+                            let path_str = path.to_string_lossy().to_string();
+                            
+                            // 判断是否为缓存目录（包含特定关键字）
+                            let is_cache = Self::is_cache_directory(&path_str, &folder_name);
+                            
+                            // 判断是否为程序目录（路径包含 Local\Programs）
+                            let is_program = path_str.contains("Local\\Programs");
+                            
                             all_entries.push(HotspotEntry {
-                                path: path.to_string_lossy().to_string(),
+                                path: path_str,
                                 name: folder_name,
                                 total_size: stats.total_size,
                                 file_count: stats.file_count,
                                 last_modified: stats.last_modified,
                                 parent_type: subdir.to_string(),
+                                is_cache,
+                                is_program,
                             });
                         }
                     }
@@ -170,6 +184,44 @@ impl HotspotScanner {
         ];
         
         skip_folders.contains(&folder_name.as_str())
+    }
+    
+    /// 判断是否为缓存目录
+    /// 检查路径或文件夹名是否包含缓存相关关键字
+    fn is_cache_directory(path: &str, folder_name: &str) -> bool {
+        let path_lower = path.to_lowercase();
+        let name_lower = folder_name.to_lowercase();
+        
+        // 缓存相关关键字列表
+        let cache_keywords = [
+            "cache",
+            "caches",
+            "tmp",
+            "temp",
+            "log",
+            "logs",
+            "download",
+            "downloads",
+            "thumb",
+            "thumbnails",
+            "crashdump",
+            "crashreport",
+            "backup",
+        ];
+        
+        // 检查文件夹名是否包含关键字
+        for keyword in &cache_keywords {
+            if name_lower.contains(keyword) {
+                return true;
+            }
+        }
+        
+        // 检查路径中是否包含 Temp 目录
+        if path_lower.contains("\\temp\\") || path_lower.ends_with("\\temp") {
+            return true;
+        }
+        
+        false
     }
     
     /// 计算文件夹的统计信息

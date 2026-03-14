@@ -69,6 +69,7 @@ pub fn run() {
             get_cleanup_history,
             // C盘热点扫描
             scan_hotspot,
+            cleanup_directory_contents,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

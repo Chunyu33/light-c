@@ -666,6 +666,10 @@ export interface HotspotEntry {
   last_modified: number;
   /** 父目录类型（Local/Roaming/LocalLow） */
   parent_type: string;
+  /** 是否为缓存目录 */
+  is_cache: boolean;
+  /** 是否为程序目录 */
+  is_program: boolean;
 }
 
 /**
@@ -688,4 +692,26 @@ export interface HotspotScanResult {
  */
 export async function scanHotspot(topN?: number): Promise<HotspotScanResult> {
   return invoke<HotspotScanResult>('scan_hotspot', { topN });
+}
+
+/**
+ * 目录清理结果
+ */
+export interface CleanupDirectoryResult {
+  /** 成功删除的文件/目录数 */
+  deleted_count: number;
+  /** 删除失败的数量 */
+  failed_count: number;
+  /** 释放的空间大小（字节） */
+  freed_size: number;
+  /** 错误信息列表 */
+  errors: string[];
+}
+
+/**
+ * 清理目录内容（保留根目录）
+ * @param path 目录路径
+ */
+export async function cleanupDirectoryContents(path: string): Promise<CleanupDirectoryResult> {
+  return invoke<CleanupDirectoryResult>('cleanup_directory_contents', { path });
 }

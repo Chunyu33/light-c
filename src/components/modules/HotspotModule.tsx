@@ -1,13 +1,17 @@
 // ============================================================================
-// C盘热点扫描模块
-// 扫描 AppData 目录下占用空间最大的文件夹
+// 大目录分析模块
+// 深度分析 AppData 目录，定位占用空间的元凶
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, Brush, Search, ShieldAlert } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
+import { ConfirmDialog } from '../ConfirmDialog';
+import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanHotspot, openInFolder, type HotspotScanResult, type HotspotEntry } from '../../api/commands';
+import { scanHotspot, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 
 // ============================================================================
@@ -79,9 +83,11 @@ interface HotspotItemProps {
   rank: number;
   maxSize: number;
   onOpenFolder: (path: string) => void;
+  onCleanup: (entry: HotspotEntry) => void;
+  onSearch: (name: string) => void;
 }
 
-function HotspotItem({ entry, rank, maxSize, onOpenFolder }: HotspotItemProps) {
+function HotspotItem({ entry, rank, maxSize, onOpenFolder, onCleanup, onSearch }: HotspotItemProps) {
   // 计算占比条宽度
   const percentage = maxSize > 0 ? (entry.total_size / maxSize) * 100 : 0;
   
@@ -112,6 +118,20 @@ function HotspotItem({ entry, rank, maxSize, onOpenFolder }: HotspotItemProps) {
             <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded ${getParentTypeColor(entry.parent_type)}`}>
               {entry.parent_type}
             </span>
+            {/* 程序目录标签 - 红色警告，禁止删除 */}
+            {entry.is_program && (
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
+                <ShieldAlert className="w-3 h-3" />
+                系统/程序
+              </span>
+            )}
+            {/* 缓存目录标签 - 建议清理 */}
+            {entry.is_cache && !entry.is_program && (
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
+                <Brush className="w-3 h-3" />
+                临时缓存
+              </span>
+            )}
           </div>
           <div 
             className="text-xs text-[var(--text-muted)] mt-0.5 truncate cursor-help"
@@ -140,17 +160,46 @@ function HotspotItem({ entry, rank, maxSize, onOpenFolder }: HotspotItemProps) {
             {formatSize(entry.total_size)}
           </div>
           
-          {/* 打开文件夹按钮 */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenFolder(entry.path);
-            }}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
-            title="在文件资源管理器中打开"
-          >
-            <FolderOpen className="w-4 h-4" />
-          </button>
+          {/* 操作按钮组 */}
+          <div className="flex items-center gap-1">
+            {/* 清理按钮 - 仅缓存目录显示，程序目录不显示 */}
+            {entry.is_cache && !entry.is_program && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCleanup(entry);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
+                title="清理缓存文件"
+              >
+                <Brush className="w-4 h-4" />
+              </button>
+            )}
+            
+            {/* 搜索按钮 - 搜索该文件夹是否可以删除 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSearch(entry.name);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
+              title="搜索该文件夹是否可以删除"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            
+            {/* 打开文件夹按钮 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFolder(entry.path);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
+              title="在文件资源管理器中打开"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -164,6 +213,7 @@ function HotspotItem({ entry, rank, maxSize, onOpenFolder }: HotspotItemProps) {
 export function HotspotModule() {
   const { modules, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.hotspot;
+  const { showToast } = useToast();
 
   const lastScanTriggerRef = useRef(0);
 
@@ -171,6 +221,9 @@ export function HotspotModule() {
   const [scanResult, setScanResult] = useState<HotspotScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // 清理确认对话框状态
+  const [cleanupTarget, setCleanupTarget] = useState<HotspotEntry | null>(null);
+  const [isCleaning, setIsCleaning] = useState(false);
 
   // 是否展开
   const isExpanded = expandedModule === 'hotspot';
@@ -218,6 +271,64 @@ export function HotspotModule() {
     }
   }, []);
 
+  // 触发清理确认对话框
+  const handleCleanupClick = useCallback((entry: HotspotEntry) => {
+    setCleanupTarget(entry);
+  }, []);
+
+  // 执行清理操作
+  const handleCleanupConfirm = useCallback(async () => {
+    if (!cleanupTarget) return;
+    
+    setIsCleaning(true);
+    try {
+      const result = await cleanupDirectoryContents(cleanupTarget.path);
+      
+      if (result.deleted_count > 0) {
+        showToast({
+          type: 'success',
+          title: `清理完成`,
+          description: `已删除 ${result.deleted_count} 项，释放 ${formatSize(result.freed_size)}`,
+        });
+        // 清理完成后重新扫描以更新数据
+        handleScan();
+      } else if (result.failed_count > 0) {
+        showToast({
+          type: 'warning',
+          title: '清理受阻',
+          description: `${result.failed_count} 个文件被占用无法删除`,
+        });
+      } else {
+        showToast({
+          type: 'info',
+          title: '目录已为空',
+          description: '没有需要清理的文件',
+        });
+      }
+    } catch (err) {
+      console.error('清理失败:', err);
+      showToast({
+        type: 'error',
+        title: '清理失败',
+        description: String(err),
+      });
+    } finally {
+      setIsCleaning(false);
+      setCleanupTarget(null);
+    }
+  }, [cleanupTarget, handleScan, showToast]);
+
+  // 搜索文件夹是否可以删除 - 使用 Tauri opener 插件打开浏览器
+  const handleSearch = useCallback(async (name: string) => {
+    try {
+      const query = encodeURIComponent(`Windows 文件夹 ${name} 可以删除吗`);
+      const url = `https://www.bing.com/search?q=${query}`;
+      await openUrl(url);
+    } catch (err) {
+      console.error('打开搜索链接失败:', err);
+    }
+  }, []);
+
   // 显示的条目（默认显示 10 条，展开显示全部）
   const displayedEntries = showAll 
     ? scanResult?.entries || []
@@ -229,8 +340,8 @@ export function HotspotModule() {
   return (
     <ModuleCard
       id="hotspot"
-      title="C盘热点"
-      description="扫描 AppData 中占用空间最大的文件夹"
+      title="大目录分析"
+      description="深度分析 AppData 目录，定位占用空间的元凶"
       icon={<Flame className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -271,6 +382,8 @@ export function HotspotModule() {
                 rank={index + 1}
                 maxSize={maxSize}
                 onOpenFolder={handleOpenFolder}
+                onCleanup={handleCleanupClick}
+                onSearch={handleSearch}
               />
             ))}
           </div>
@@ -301,6 +414,22 @@ export function HotspotModule() {
           <Flame className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm">点击"开始扫描"查看 AppData 空间占用热点</p>
         </div>
+      )}
+
+      {/* 清理确认对话框 */}
+      {cleanupTarget && createPortal(
+        <ConfirmDialog
+          isOpen={!!cleanupTarget}
+          title="确认清理"
+          description={`确定清理 "${cleanupTarget.name}" 的临时文件吗？此操作将删除该目录下的所有文件，但保留目录本身。`}
+          warning="被占用的文件将被跳过，不会影响正在运行的程序。"
+          confirmText={isCleaning ? '清理中...' : '确认清理'}
+          cancelText="取消"
+          onConfirm={handleCleanupConfirm}
+          onCancel={() => setCleanupTarget(null)}
+          isDanger={false}
+        />,
+        document.body
       )}
     </ModuleCard>
   );

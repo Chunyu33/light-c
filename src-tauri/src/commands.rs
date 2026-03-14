@@ -2240,3 +2240,105 @@ pub async fn scan_hotspot(top_n: Option<usize>) -> Result<crate::scanner::Hotspo
     
     result
 }
+
+/// 清理目录内容（保留根目录）
+/// 
+/// 遍历并删除目录内的所有文件和子文件夹，保留根目录本身
+/// 静默跳过被占用或无法访问的文件
+#[tauri::command]
+pub async fn cleanup_directory_contents(path: String) -> Result<CleanupDirectoryResult, String> {
+    use std::fs;
+    use walkdir::WalkDir;
+    
+    info!("开始清理目录内容: {}", path);
+    
+    let target_path = std::path::PathBuf::from(&path);
+    
+    // 验证路径存在且是目录
+    if !target_path.exists() {
+        return Err(format!("目录不存在: {}", path));
+    }
+    if !target_path.is_dir() {
+        return Err(format!("路径不是目录: {}", path));
+    }
+    
+    // 在阻塞线程中执行清理
+    let result = tokio::task::spawn_blocking(move || {
+        let mut deleted_count: usize = 0;
+        let mut failed_count: usize = 0;
+        let mut freed_size: u64 = 0;
+        let mut errors: Vec<String> = Vec::new();
+        
+        // 收集所有需要删除的条目（先文件后目录，深度优先）
+        let mut entries: Vec<_> = WalkDir::new(&target_path)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path() != target_path) // 排除根目录本身
+            .collect();
+        
+        // 按深度降序排列，确保先删除深层文件/目录
+        entries.sort_by(|a, b| b.depth().cmp(&a.depth()));
+        
+        for entry in entries {
+            let entry_path = entry.path();
+            
+            // 获取文件大小（仅文件）
+            let file_size = if entry_path.is_file() {
+                entry_path.metadata().map(|m| m.len()).unwrap_or(0)
+            } else {
+                0
+            };
+            
+            // 尝试删除
+            let delete_result = if entry_path.is_dir() {
+                fs::remove_dir(entry_path)
+            } else {
+                fs::remove_file(entry_path)
+            };
+            
+            match delete_result {
+                Ok(_) => {
+                    deleted_count += 1;
+                    freed_size += file_size;
+                }
+                Err(e) => {
+                    // 静默跳过被占用的文件，但记录错误
+                    failed_count += 1;
+                    if errors.len() < 10 {
+                        errors.push(format!("{}: {}", entry_path.display(), e));
+                    }
+                }
+            }
+        }
+        
+        CleanupDirectoryResult {
+            deleted_count,
+            failed_count,
+            freed_size,
+            errors,
+        }
+    })
+    .await
+    .map_err(|e| format!("清理任务执行失败: {}", e))?;
+    
+    info!(
+        "目录清理完成: 删除 {} 项，失败 {} 项，释放 {} 字节",
+        result.deleted_count, result.failed_count, result.freed_size
+    );
+    
+    Ok(result)
+}
+
+/// 目录清理结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanupDirectoryResult {
+    /// 成功删除的文件/目录数
+    pub deleted_count: usize,
+    /// 删除失败的数量
+    pub failed_count: usize,
+    /// 释放的空间大小（字节）
+    pub freed_size: u64,
+    /// 错误信息列表（最多10条）
+    pub errors: Vec<String>,
+}
