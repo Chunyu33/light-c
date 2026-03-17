@@ -4,10 +4,14 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, Download, CheckCircle, AlertCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users } from 'lucide-react';
+
+// 赞赏码图片
+import wechatQr from '../assets/r_wechat_qr.jpg';
+import alipayQr from '../assets/r_alipay_qr.jpg';
 import { useTheme, type ThemeMode } from '../contexts';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
+// import { check } from '@tauri-apps/plugin-updater'; // 自动更新功能已停用
+// import { relaunch } from '@tauri-apps/plugin-process'; // 自动更新功能已停用
 import { getVersion } from '@tauri-apps/api/app';
 import { getSystemInfo, type SystemInfo, openLogsFolder } from '../api/commands';
 import { formatSize } from '../utils/format';
@@ -263,6 +267,55 @@ function GuideSettings() {
               <span className="text-[var(--color-warning)] font-medium">删除前会自动备份</span>，备份文件保存在用户文档目录下的 LightC_Backups 文件夹中。
             </p>
           </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-[var(--brand-green)]" />
+              大目录分析
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
+              通过<span className="text-[var(--brand-green)] font-medium">语义识别技术</span>深度分析 AppData 目录，智能识别占用空间最大的文件夹。
+              系统会自动标记<span className="text-[var(--color-warning)] font-medium">程序缓存</span>和<span className="text-[var(--color-danger)] font-medium">潜在风险项</span>，
+              帮助您快速定位 C 盘空间的"元凶"，精准释放磁盘空间。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 深度扫描功能说明 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Layers className="w-3.5 h-3.5" />
+          深度扫描功能
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <Package className="w-4 h-4 text-[var(--color-warning)]" />
+              模拟器残留检测
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
+              支持检测主流安卓模拟器（<span className="font-medium">雷电、蓝叠、夜神、MuMu、MEmu、腾讯手游助手</span>等）的卸载残留。
+              系统会扫描 AppData、LocalLow、ProgramData 目录下的模拟器配置文件、虚拟磁盘文件（.vmdk/.vdi/.vhd）等大型残留，
+              这些文件通常占用<span className="text-[var(--color-danger)] font-medium">数十GB</span>空间。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <Database className="w-4 h-4 text-[var(--color-warning)]" />
+              冗余注册表深度扫描
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
+              深度扫描 HKEY_CURRENT_USER\Software 和 HKEY_LOCAL_MACHINE\SOFTWARE 下的孤立注册表项，
+              识别已卸载软件遗留的配置信息和<span className="text-[var(--color-warning)] font-medium">孤立驱动服务项</span>。
+              清理前会自动创建备份，确保操作安全可逆。
+            </p>
+          </div>
+          <div className="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20 rounded-xl p-3">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              <span className="font-medium">💡 使用提示：</span>在卸载残留模块中开启"深度扫描"开关，即可启用模拟器残留和虚拟磁盘文件检测功能。
+              大型残留文件会以<span className="text-[var(--color-danger)] font-medium">红色高亮</span>显示，方便快速识别。
+            </p>
+          </div>
         </div>
       </div>
 
@@ -400,14 +453,8 @@ function FeedbackSettings() {
   );
 }
 
-type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'latest' | 'error';
-
 // 关于 - 微信风格
 function AboutSettings() {
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
-  const [updateInfo, setUpdateInfo] = useState<{ version: string; notes: string } | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [errorMessage, setErrorMessage] = useState('');
   const [appVersion, setAppVersion] = useState('');
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loadingSystemInfo, setLoadingSystemInfo] = useState(true);
@@ -423,157 +470,10 @@ function AboutSettings() {
       .finally(() => setLoadingSystemInfo(false));
   }, []);
 
-  const checkForUpdates = async () => {
-    setUpdateStatus('checking');
-    setErrorMessage('');
-    
-    try {
-      const update = await check();
-      
-      if (update) {
-        setUpdateInfo({
-          version: update.version,
-          notes: update.body || '无更新说明',
-        });
-        setUpdateStatus('available');
-      } else {
-        setUpdateStatus('latest');
-      }
-    } catch (error) {
-      console.error('检查更新失败:', error);
-      setErrorMessage(error instanceof Error ? error.message : '检查更新失败');
-      setUpdateStatus('error');
-    }
-  };
-
-  const downloadAndInstall = async () => {
-    setUpdateStatus('downloading');
-    setDownloadProgress(0);
-    
-    try {
-      const update = await check();
-      
-      if (update) {
-        let downloaded = 0;
-        let contentLength = 0;
-        await update.downloadAndInstall((event) => {
-          if (event.event === 'Started') {
-            contentLength = event.data.contentLength || 0;
-          } else if (event.event === 'Progress') {
-            downloaded += event.data.chunkLength;
-            if (contentLength > 0) {
-              setDownloadProgress((downloaded / contentLength) * 100);
-            }
-          }
-        });
-        
-        setUpdateStatus('ready');
-      }
-    } catch (error) {
-      console.error('下载更新失败:', error);
-      setErrorMessage(error instanceof Error ? error.message : '下载更新失败');
-      setUpdateStatus('error');
-    }
-  };
-
-  const handleRelaunch = async () => {
-    await relaunch();
-  };
+  // 自动更新功能已停用，相关代码已移除
 
   return (
     <div className="space-y-6">
-      {/* 检查更新 */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
-          <Download className="w-3.5 h-3.5" />
-          检查更新
-        </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {updateStatus === 'checking' && (
-                <RefreshCw className="w-5 h-5 text-[var(--brand-green)] animate-spin" />
-              )}
-              {updateStatus === 'idle' && (
-                <Download className="w-5 h-5 text-[var(--text-muted)]" />
-              )}
-              {updateStatus === 'latest' && (
-                <CheckCircle className="w-5 h-5 text-[var(--brand-green)]" />
-              )}
-              {updateStatus === 'available' && (
-                <Download className="w-5 h-5 text-[var(--color-warning)]" />
-              )}
-              {updateStatus === 'downloading' && (
-                <RefreshCw className="w-5 h-5 text-[var(--brand-green)] animate-spin" />
-              )}
-              {updateStatus === 'ready' && (
-                <CheckCircle className="w-5 h-5 text-[var(--brand-green)]" />
-              )}
-              {updateStatus === 'error' && (
-                <AlertCircle className="w-5 h-5 text-[var(--color-danger)]" />
-              )}
-              <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">
-                  {updateStatus === 'idle' && '检查更新'}
-                  {updateStatus === 'checking' && '正在检查...'}
-                  {updateStatus === 'latest' && '已是最新版本'}
-                  {updateStatus === 'available' && `发现新版本: v${updateInfo?.version}`}
-                  {updateStatus === 'downloading' && `正在下载... ${downloadProgress.toFixed(0)}%`}
-                  {updateStatus === 'ready' && '更新已就绪'}
-                  {updateStatus === 'error' && '检查失败'}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {updateStatus === 'idle' && '点击检查是否有新版本可用'}
-                  {updateStatus === 'checking' && '正在连接更新服务器...'}
-                  {updateStatus === 'latest' && '您的应用已是最新版本'}
-                  {updateStatus === 'available' && '点击下载并安装更新'}
-                  {updateStatus === 'downloading' && '请勿关闭应用...'}
-                  {updateStatus === 'ready' && '点击重启应用以完成更新'}
-                  {updateStatus === 'error' && errorMessage}
-                </p>
-              </div>
-            </div>
-            <div>
-              {(updateStatus === 'idle' || updateStatus === 'latest' || updateStatus === 'error') && (
-                <button
-                  onClick={checkForUpdates}
-                  className="px-4 py-2 text-xs font-medium bg-[var(--brand-green)] text-white rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors"
-                >
-                  检查更新
-                </button>
-              )}
-              {updateStatus === 'available' && (
-                <button
-                  onClick={downloadAndInstall}
-                  className="px-4 py-2 text-xs font-medium bg-[var(--color-warning)] text-white rounded-xl hover:opacity-90 transition-colors"
-                >
-                  下载更新
-                </button>
-              )}
-              {updateStatus === 'ready' && (
-                <button
-                  onClick={handleRelaunch}
-                  className="px-4 py-2 text-xs font-medium bg-[var(--brand-green)] text-white rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors"
-                >
-                  重启应用
-                </button>
-              )}
-            </div>
-          </div>
-          {/* 进度条 - 使用 brand-green */}
-          {updateStatus === 'downloading' && (
-            <div className="mt-4">
-              <div className="h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-[var(--brand-green)] transition-all duration-300"
-                  style={{ width: `${downloadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <Info className="w-3.5 h-3.5" />
@@ -729,11 +629,250 @@ function AboutSettings() {
         </div>
       </div>
 
+      {/* 交流群 */}
+      <CommunityGroup />
+
+      {/* 支持作者 - 赞赏功能 */}
+      <SupportAuthor />
+
       <div className="text-center pt-4">
         <p className="text-xs text-[var(--text-faint)]">
           Copyright © {new Date().getFullYear()} LightC. All rights reserved.
         </p>
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// 交流群组件 - 复制群号功能
+// ============================================================================
+
+const QQ_GROUP = '762137328';
+
+function CommunityGroup() {
+  const [copied, setCopied] = useState(false);
+
+  // 复制群号到剪贴板
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(QQ_GROUP);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+        <Users className="w-3.5 h-3.5" />
+        交流群
+      </h4>
+      <div className="bg-[var(--bg-main)] rounded-2xl p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-[var(--text-secondary)]">QQ群：</span>
+            <span className="text-sm font-medium text-[var(--text-primary)]">{QQ_GROUP}</span>
+          </div>
+          <button
+            onClick={handleCopy}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+              copied
+                ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)]'
+                : 'bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+            }`}
+          >
+            {copied ? (
+              <>
+                <CheckCircle className="w-3 h-3" />
+                已复制
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                复制
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 支持作者组件 - 赞赏功能（含点击放大 Modal）
+// ============================================================================
+
+type PaymentType = 'wechat' | 'alipay';
+
+function SupportAuthor() {
+  const [paymentType, setPaymentType] = useState<PaymentType>('wechat');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // 切换支付方式时的淡入淡出动画
+  const handlePaymentChange = (type: PaymentType) => {
+    if (type === paymentType) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setPaymentType(type);
+      setIsTransitioning(false);
+    }, 150);
+  };
+
+  // 打开放大 Modal
+  const openModal = () => {
+    setShowModal(true);
+    requestAnimationFrame(() => setModalVisible(true));
+  };
+
+  // 关闭放大 Modal
+  const closeModal = () => {
+    setModalVisible(false);
+    setTimeout(() => setShowModal(false), 200);
+  };
+
+  // ESC 键关闭 Modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showModal) {
+        closeModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
+  return (
+    <>
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Coffee className="w-3.5 h-3.5" />
+          支持作者
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
+          {/* 文案说明 */}
+          <p className="text-sm text-[var(--text-secondary)] text-center mb-4">
+            维护不易，请我喝杯咖啡~（自愿原则）
+          </p>
+
+          {/* 赞赏码图片 - 可点击放大 */}
+          <div className="flex justify-center mb-2">
+            <div 
+              onClick={openModal}
+              className="relative w-36 h-36 rounded-xl border border-[var(--border-color)] overflow-hidden bg-white p-2 cursor-pointer hover:shadow-lg hover:border-[var(--brand-green)] transition-all duration-200 group"
+            >
+              <img
+                src={paymentType === 'wechat' ? wechatQr : alipayQr}
+                alt={paymentType === 'wechat' ? '微信赞赏码' : '支付宝赞赏码'}
+                className={`w-full h-full object-contain transition-opacity duration-150 ${
+                  isTransitioning ? 'opacity-0' : 'opacity-100'
+                }`}
+              />
+              {/* 悬浮放大提示 */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
+                  点击放大
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 点击提示文字 */}
+          <p className="text-[10px] text-[var(--text-faint)] text-center mb-3">
+            点击图片可放大扫描
+          </p>
+
+          {/* Segmented Control 切换开关 */}
+          <div className="flex justify-center">
+            <div className="inline-flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]">
+              <button
+                onClick={() => handlePaymentChange('wechat')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                  paymentType === 'wechat'
+                    ? 'bg-[#07C160] text-white shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                微信
+              </button>
+              <button
+                onClick={() => handlePaymentChange('alipay')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                  paymentType === 'alipay'
+                    ? 'bg-[#1677FF] text-white shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                支付宝
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 放大 Modal - 半透明磨砂背景 */}
+      {showModal && createPortal(
+        <div 
+          className={`fixed inset-0 z-[10000] flex items-center justify-center transition-all duration-200 ${
+            modalVisible ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
+          }`}
+          onClick={closeModal}
+        >
+          <div 
+            className={`relative bg-white rounded-2xl shadow-2xl p-4 transition-all duration-200 ${
+              modalVisible ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 关闭按钮 */}
+            <button
+              onClick={closeModal}
+              className="absolute -top-2 -right-2 w-8 h-8 bg-[var(--bg-card)] rounded-full shadow-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* 高清大图 */}
+            <img
+              src={paymentType === 'wechat' ? wechatQr : alipayQr}
+              alt={paymentType === 'wechat' ? '微信赞赏码' : '支付宝赞赏码'}
+              className="w-72 h-72 object-contain"
+            />
+
+            {/* 底部切换 */}
+            <div className="flex justify-center mt-4">
+              <div className="inline-flex bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => handlePaymentChange('wechat')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                    paymentType === 'wechat'
+                      ? 'bg-[#07C160] text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  微信
+                </button>
+                <button
+                  onClick={() => handlePaymentChange('alipay')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                    paymentType === 'alipay'
+                      ? 'bg-[#1677FF] text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  支付宝
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }

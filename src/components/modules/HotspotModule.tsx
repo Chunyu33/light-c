@@ -75,7 +75,7 @@ function getParentTypeColor(type: string): string {
 }
 
 // ============================================================================
-// 热点条目组件
+// 大目录分析条目组件
 // ============================================================================
 
 interface HotspotItemProps {
@@ -248,7 +248,7 @@ export function HotspotModule() {
         totalSize: top10Size,
       });
     } catch (err) {
-      console.error('热点扫描失败:', err);
+      console.error('大目录分析扫描失败:', err);
       setError(String(err));
       updateModuleState('hotspot', { status: 'error' });
     }
@@ -373,7 +373,7 @@ export function HotspotModule() {
             <span>耗时 {(scanResult.scan_duration_ms / 1000).toFixed(1)}s</span>
           </div>
 
-          {/* 热点列表 */}
+          {/* 目录列表 */}
           <div className="space-y-2">
             {displayedEntries.map((entry, index) => (
               <HotspotItem
@@ -402,7 +402,7 @@ export function HotspotModule() {
           {/* 空状态 */}
           {scanResult.entries.length === 0 && (
             <div className="text-center py-8 text-[var(--text-muted)]">
-              <p className="text-sm">未发现热点文件夹</p>
+              <p className="text-sm">未发现大型目录</p>
             </div>
           )}
         </div>
@@ -412,7 +412,7 @@ export function HotspotModule() {
       {moduleState.status === 'idle' && !scanResult && (
         <div className="text-center py-8 text-[var(--text-muted)]">
           <Flame className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">点击"开始扫描"查看 AppData 空间占用热点</p>
+          <p className="text-sm">点击"开始扫描"分析 AppData 目录空间占用</p>
         </div>
       )}
 

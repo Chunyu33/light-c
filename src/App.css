@@ -281,3 +281,29 @@ body {
 .animate-slide-in-left {
   animation: fade-in 0.2s ease-out forwards;
 }
+
+/* ============================================================================
+   桌面应用规范化 - 禁用文本选中
+   让应用更像原生桌面软件而非网页
+   ============================================================================ */
+
+/* 全局禁用文本选中 */
+* {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 输入框和文本域允许选中 */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 代码块允许选中（如果有） */
+pre,
+code {
+  user-select: text;
+  -webkit-user-select: text;
+}

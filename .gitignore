@@ -28,3 +28,7 @@ dist-ssr
 .tauri/*.key
 build.sh
 build.ps1
+
+update.md
+release.ps1
+
