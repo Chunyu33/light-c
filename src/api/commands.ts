@@ -215,6 +215,101 @@ export interface SocialFile {
 }
 
 // ============================================================================
+// 社交软件扫描 V2 - 带风险分级
+// ============================================================================
+
+/** 风险等级 */
+export type RiskLevel = 'critical' | 'medium' | 'low' | 'none';
+
+/** 文件分类 */
+export type FileCategory = 'chat_database' | 'image_video' | 'file_transfer' | 'temp_cache' | 'moments_cache';
+
+/** 社交软件文件条目 V2 */
+export interface SocialFileEntryV2 {
+  /** 文件完整路径 */
+  path: string;
+  /** 文件大小（字节） */
+  size: number;
+  /** 所属应用名称 */
+  app_name: string;
+  /** 文件分类 */
+  category: FileCategory;
+  /** 风险等级 */
+  risk_level: RiskLevel;
+  /** 是否可删除（Critical 级别强制为 false） */
+  deletable: boolean;
+}
+
+/** 社交软件分类统计 V2 */
+export interface SocialCategoryStatsV2 {
+  /** 分类ID */
+  id: string;
+  /** 分类名称 */
+  name: string;
+  /** 分类描述 */
+  description: string;
+  /** 文件数量 */
+  file_count: number;
+  /** 总大小（字节） */
+  total_size: number;
+  /** 可删除的文件数量 */
+  deletable_count: number;
+  /** 可删除的文件大小 */
+  deletable_size: number;
+  /** 文件列表 */
+  files: SocialFileEntryV2[];
+}
+
+/** 社交软件扫描结果 V2 */
+export interface SocialScanResultV2 {
+  /** 按分类统计 */
+  categories: SocialCategoryStatsV2[];
+  /** 总文件数 */
+  total_files: number;
+  /** 总大小 */
+  total_size: number;
+  /** 可删除的文件数 */
+  deletable_files: number;
+  /** 可删除的文件大小 */
+  deletable_size: number;
+  /** 检测到的社交软件列表 */
+  detected_apps: string[];
+}
+
+/**
+ * 扫描社交软件缓存 V2（带风险分级）
+ * 
+ * 支持智能路径溯源和文件类型深度分类：
+ * - 微信：通过注册表读取自定义路径，识别聊天记录数据库
+ * - QQ/NTQQ：定位 nt_data 目录，识别消息数据库
+ * - 钉钉：定位 storage 和 cache 目录
+ * - 飞书：扫描 LarkShell，定位 sdk_storage 和 file_storage
+ */
+export async function scanSocialCacheV2(): Promise<SocialScanResultV2> {
+  return invoke<SocialScanResultV2>('scan_social_cache_v2');
+}
+
+/** 获取风险等级的中文描述 */
+export function getRiskLevelDescription(level: RiskLevel): string {
+  switch (level) {
+    case 'critical': return '危险（聊天记录）';
+    case 'medium': return '谨慎清理';
+    case 'low': return '建议清理';
+    case 'none': return '安全清理';
+  }
+}
+
+/** 获取风险等级的提示信息 */
+export function getRiskLevelTooltip(level: RiskLevel): string {
+  switch (level) {
+    case 'critical': return '此文件为聊天记录数据库，删除后将永久丢失聊天记录，强烈建议保留';
+    case 'medium': return '此文件可能包含重要文档或附件，请确认后再删除';
+    case 'low': return '此文件为图片/视频缓存，删除后可通过重新下载恢复';
+    case 'none': return '此文件为临时缓存，可安全删除';
+  }
+}
+
+// ============================================================================
 // 卸载残留扫描相关
 // ============================================================================
 

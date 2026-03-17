@@ -235,7 +235,14 @@ function GuideSettings() {
               社交软件专清
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              清理微信、QQ等社交软件的缓存文件，包括聊天图片、视频缓存等。清理后可能需要重新下载聊天记录中的图片和文件。
+              支持<span className="font-medium">微信、QQ/NTQQ、钉钉、飞书、企业微信、Telegram</span>等主流社交软件。
+              系统会<span className="text-[var(--brand-green)] font-medium">智能读取注册表</span>获取自定义存储路径，即使数据迁移到其他磁盘也能正确识别。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              <span className="text-[var(--brand-green)] font-medium">智能风险分级：</span>
+              <span className="text-[var(--color-danger)]">聊天记录数据库</span>会被自动锁定禁止删除，
+              <span className="text-[var(--color-warning)]">传输文件</span>需谨慎清理，
+              <span className="text-[var(--brand-green)]">图片视频缓存</span>可安全清理。
             </p>
           </div>
           <div>

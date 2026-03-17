@@ -923,6 +923,47 @@ fn scan_directory_for_social(
 }
 
 // ============================================================================
+// 社交软件专清 V2 - 智能路径溯源与风险分级
+// ============================================================================
+
+use crate::scanner::{SocialScanner, SocialScanResultV2};
+
+/// 扫描社交软件缓存 V2（带风险分级）
+/// 
+/// 支持智能路径溯源和文件类型深度分类：
+/// - 微信：通过注册表读取自定义路径，识别聊天记录数据库
+/// - QQ/NTQQ：定位 nt_data 目录，识别消息数据库
+/// - 钉钉：定位 storage 和 cache 目录
+/// - 飞书：扫描 LarkShell，定位 sdk_storage 和 file_storage
+/// 
+/// # 风险等级
+/// - CRITICAL: 聊天记录数据库，禁止删除
+/// - MEDIUM: 接收的文件，谨慎清理
+/// - LOW: 图片视频缓存，建议清理
+/// - NONE: 临时缓存，安全清理
+#[tauri::command]
+pub async fn scan_social_cache_v2() -> Result<SocialScanResultV2, String> {
+    info!("开始扫描社交软件缓存 V2（带风险分级）");
+    
+    let result = tokio::task::spawn_blocking(|| {
+        let scanner = SocialScanner::new();
+        scanner.scan()
+    })
+    .await
+    .map_err(|e| format!("扫描任务异常: {}", e))?;
+    
+    info!(
+        "社交软件扫描 V2 完成: {} 个文件, {} 字节, 可删除 {} 个文件 ({} 字节)",
+        result.total_files,
+        result.total_size,
+        result.deletable_files,
+        result.deletable_size
+    );
+    
+    Ok(result)
+}
+
+// ============================================================================
 // 系统瘦身相关
 // ============================================================================
 

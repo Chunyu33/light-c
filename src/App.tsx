@@ -14,7 +14,7 @@ import {
   DashboardHeader,
   JunkCleanModule,
   BigFilesModule,
-  SocialCleanModule,
+  SocialCleanModuleV2,
   SystemSlimModule,
   LeftoversModule,
   RegistryModule,
@@ -70,7 +70,7 @@ function DashboardContent() {
           <BigFilesModule />
 
           {/* 社交软件专清模块 */}
-          <SocialCleanModule />
+          <SocialCleanModuleV2 />
 
           {/* 系统瘦身模块 */}
           <SystemSlimModule />
