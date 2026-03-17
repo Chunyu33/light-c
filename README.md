@@ -83,35 +83,55 @@
 ## 🏗️ 技术架构
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                         Frontend (React + TypeScript)             │
-│  ┌──────────────────┐  ┌──────────────┐  ┌──────────────────┐    │
-│  │     Pages        │  │  Components  │  │     Hooks        │    │
-│  │  - HomePage      │  │  - TitleBar  │  │  - useCleanup    │    │
-│  │  - CleanupPage   │  │  - Toast     │  │  - useToast      │    │
-│  │  - BigFilesPage  │  │  - Cards     │  │                  │    │
-│  │  - SocialClean   │  │  - Dialogs   │  │                  │    │
-│  │  - SystemSlim    │  │  - BackBtn   │  │                  │    │
-│  └──────────────────┘  └──────────────┘  └──────────────────┘    │
-│                              │                                    │
-│                       Tauri Commands (IPC)                        │
-└──────────────────────────────┼───────────────────────────────────┘
-                               │
-┌──────────────────────────────┼───────────────────────────────────┐
-│                         Backend (Rust)                            │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────┐  │
-│  │  Scanner Module  │  │  Cleaner Module  │  │ System Slimming│  │
-│  │  - ScanEngine    │  │  - DeleteEngine  │  │ - Hibernation  │  │
-│  │  - Categories    │  │  - SafetyCheck   │  │ - WinSxS DISM  │  │
-│  │  - LargeFiles    │  │                  │  │ - PageFile     │  │
-│  │  - SocialCache   │  │                  │  │ - AdminCheck   │  │
-│  └──────────────────┘  └──────────────────┘  └────────────────┘  │
-│                                                                   │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                      Tauri Plugins                           │ │
-│  │  - updater (自动更新)  - process (进程管理)  - opener        │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Frontend (React 19 + TypeScript + TailwindCSS 4)        │
+│  ┌────────────────────┐  ┌─────────────────────┐  ┌───────────────────┐     │
+│  │       Pages        │  │     Components      │  │      Hooks        │     │
+│  │  - HomePage        │  │  - TitleBar         │  │  - useCleanup     │     │
+│  │  - CleanupPage     │  │  - Toast            │  │                   │     │
+│  │  - BigFilesPage    │  │  - CategoryCard     │  │                   │     │
+│  │  - SocialCleanPage │  │  - ConfirmDialog    │  │                   │     │
+│  │  - SystemSlimPage  │  │  - SettingsModal    │  │                   │     │
+│  └────────────────────┘  │  - WelcomeModal     │  └───────────────────┘     │
+│                          │  - ScanProgress     │                            │
+│  ┌────────────────────┐  │  - ScanSummary      │  ┌───────────────────┐     │
+│  │   Module Cards     │  └─────────────────────┘  │     Contexts      │     │
+│  │  - JunkClean       │                           │  - ThemeContext   │     │
+│  │  - BigFiles        │                           │  - DashboardCtx   │     │
+│  │  - SocialClean     │                           └───────────────────┘     │
+│  │  - Hotspot         │                                                     │
+│  │  - Leftovers       │                                                     │
+│  │  - Registry        │                                                     │
+│  │  - SystemSlim      │                                                     │
+│  └────────────────────┘                                                     │
+│                                    │                                        │
+│                             Tauri Commands (IPC)                            │
+└────────────────────────────────────┼────────────────────────────────────────┘
+                                     │
+┌────────────────────────────────────┼────────────────────────────────────────┐
+│                              Backend (Rust)                                  │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
+│  │   Scanner Module    │  │   Cleaner Module    │  │   System Slimming   │  │
+│  │  - scan_engine      │  │  - delete_engine    │  │  - Hibernation      │  │
+│  │  - categories       │  │  - enhanced_delete  │  │  - WinSxS DISM      │  │
+│  │  - file_info        │  │  - permanent_delete │  │  - PageFile         │  │
+│  │  - social_scanner   │  └─────────────────────┘  │  - AdminCheck       │  │
+│  │  - hotspot          │                           └─────────────────────┘  │
+│  │  - leftovers        │  ┌─────────────────────┐                           │
+│  │  - registry         │  │   Logger Module     │                           │
+│  └─────────────────────┘  └─────────────────────┘                           │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                           Tauri Plugins                                 │ │
+│  │   - updater (自动更新)   - process (进程管理)   - opener (文件打开)     │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                         Core Dependencies                               │ │
+│  │   - rayon (并行计算)   - walkdir (目录遍历)   - winreg (注册表操作)     │ │
+│  │   - tokio (异步运行时)   - chrono (时间处理)   - winapi (系统API)       │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -123,19 +143,38 @@ LightC/
 ├── src/                              # React 前端源码
 │   ├── api/
 │   │   └── commands.ts               # Tauri 命令调用封装
+│   ├── assets/                       # 静态资源（二维码等）
 │   ├── components/
+│   │   ├── modules/                  # 功能模块卡片组件
+│   │   │   ├── BigFilesModule.tsx    # 大文件清理模块
+│   │   │   ├── HotspotModule.tsx     # 大目录分析模块
+│   │   │   ├── JunkCleanModule.tsx   # 垃圾清理模块
+│   │   │   ├── LeftoversModule.tsx   # 卸载残留模块
+│   │   │   ├── RegistryModule.tsx    # 注册表清理模块
+│   │   │   ├── SocialCleanModule.tsx # 社交软件专清模块
+│   │   │   ├── SystemSlimModule.tsx  # 系统瘦身模块
+│   │   │   └── index.ts
+│   │   ├── ActionButtons.tsx         # 操作按钮组
 │   │   ├── BackButton.tsx            # 返回按钮组件
 │   │   ├── CategoryCard.tsx          # 垃圾分类卡片（含虚拟列表）
 │   │   ├── ConfirmDialog.tsx         # 确认对话框
+│   │   ├── DashboardHeader.tsx       # 仪表盘头部
 │   │   ├── DiskUsage.tsx             # 磁盘使用情况展示
 │   │   ├── EmptyState.tsx            # 空状态引导页
 │   │   ├── ErrorAlert.tsx            # 错误提示组件
+│   │   ├── ModuleCard.tsx            # 通用模块卡片
+│   │   ├── PageTransition.tsx        # 页面过渡动画
+│   │   ├── ScanProgress.tsx          # 扫描进度组件
 │   │   ├── ScanSummary.tsx           # 扫描结果摘要
 │   │   ├── SettingsModal.tsx         # 设置弹窗（通用/反馈/关于）
+│   │   ├── ThemeToggle.tsx           # 主题切换按钮
 │   │   ├── TitleBar.tsx              # 自定义标题栏
 │   │   ├── Toast.tsx                 # 轻提示通知组件
+│   │   ├── UpdateModal.tsx           # 更新弹窗
+│   │   ├── WelcomeModal.tsx          # 欢迎弹窗
 │   │   └── index.ts                  # 组件统一导出
 │   ├── contexts/
+│   │   ├── DashboardContext.tsx      # 仪表盘状态管理
 │   │   ├── ThemeContext.tsx          # 主题状态管理
 │   │   └── index.ts
 │   ├── hooks/
@@ -146,6 +185,7 @@ LightC/
 │   │   ├── BigFilesPage.tsx          # 大文件清理页
 │   │   ├── SocialCleanPage.tsx       # 社交软件专清页
 │   │   ├── SystemSlimPage.tsx        # 系统瘦身页
+│   │   ├── PlaceholderPage.tsx       # 占位页面
 │   │   └── index.ts                  # 页面统一导出
 │   ├── types/
 │   │   └── index.ts                  # TypeScript 类型定义
@@ -161,12 +201,20 @@ LightC/
 │   │   │   ├── mod.rs                # 模块入口
 │   │   │   ├── categories.rs         # 垃圾分类定义（10种）
 │   │   │   ├── file_info.rs          # 文件/扫描结果结构体
-│   │   │   └── scan_engine.rs        # 扫描引擎核心逻辑
+│   │   │   ├── scan_engine.rs        # 扫描引擎核心逻辑
+│   │   │   ├── social_scanner.rs     # 社交软件缓存扫描器
+│   │   │   ├── hotspot.rs            # 大目录分析（语义识别）
+│   │   │   ├── leftovers.rs          # 卸载残留扫描
+│   │   │   └── registry.rs           # 注册表冗余扫描
 │   │   ├── cleaner/                  # 清理器模块
 │   │   │   ├── mod.rs
-│   │   │   └── delete_engine.rs      # 删除引擎（含安全保护）
+│   │   │   ├── delete_engine.rs      # 删除引擎（含安全保护）
+│   │   │   ├── enhanced_delete.rs    # 增强删除（所有权获取）
+│   │   │   └── permanent_delete.rs   # 永久删除（绕过回收站）
+│   │   ├── logger/                   # 日志模块
 │   │   ├── commands.rs               # Tauri 命令接口（含系统瘦身）
-│   │   └── lib.rs                    # 应用主入口
+│   │   ├── lib.rs                    # 应用库入口
+│   │   └── main.rs                   # 应用主入口
 │   ├── capabilities/
 │   │   └── default.json              # 权限配置
 │   ├── icons/                        # 应用图标
@@ -177,13 +225,20 @@ LightC/
 │   ├── generate-icons.js             # PNG 图标生成
 │   └── generate-ico.js               # ICO 图标生成
 │
+├── public/                           # 公共资源
+│   └── assets/                       # 截图等资源
+│
 ├── .tauri/                           # Tauri 签名密钥（勿提交）
 │   ├── update.key                    # 私钥（.gitignore）
 │   └── update.key.pub                # 公钥
 │
+├── .github/
+│   └── workflows/
+│       └── release.yml               # GitHub Actions 发布流程
+│
 ├── package.json
-├── tailwind.config.js
 ├── vite.config.ts
+├── tsconfig.json
 └── README.md
 ```
 
