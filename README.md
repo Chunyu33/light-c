@@ -22,6 +22,9 @@
 
 <p align="center">
   <img src="public/assets/show1.png" alt="LightC Screenshot" width="900">
+  <img src="public/assets/show2.png" alt="LightC Screenshot" width="900">
+  <img src="public/assets/show3.png" alt="LightC Screenshot" width="900">
+  <img src="public/assets/show4.png" alt="LightC Screenshot" width="900">
 </p>
 
 ## ✨ 功能特性
