@@ -2208,22 +2208,39 @@ pub struct CleanupHistorySummary {
 }
 
 // ============================================================================
-// C盘热点扫描相关命令
+// 大目录分析相关命令
 // ============================================================================
 
-/// 扫描 AppData 热点文件夹
+/// 扫描大目录
 /// 
-/// 返回占用空间最大的 Top N 文件夹
+/// # 参数
+/// - `top_n`: 返回的最大条目数，默认 20
+/// - `full_scan`: 是否启用全盘深度扫描，默认 false（仅扫描 AppData）
+/// 
+/// # 安全措施
+/// 深度扫描模式下，所有结果的 is_safe_to_clean 强制为 false，
+/// 前端应禁用清理按钮，仅允许"打开位置"和"搜索"操作
 #[tauri::command]
-pub async fn scan_hotspot(top_n: Option<usize>) -> Result<crate::scanner::HotspotScanResult, String> {
+pub async fn scan_hotspot(
+    top_n: Option<usize>,
+    full_scan: Option<bool>,
+) -> Result<crate::scanner::HotspotScanResult, String> {
     use crate::scanner::HotspotScanner;
     
     let n = top_n.unwrap_or(20);
-    info!("开始扫描 AppData 热点，Top {}", n);
+    let is_full_scan = full_scan.unwrap_or(false);
+    
+    if is_full_scan {
+        info!("开始全盘深度扫描，Top {}", n);
+    } else {
+        info!("开始扫描 AppData 目录，Top {}", n);
+    }
     
     // 在阻塞线程中执行扫描（避免阻塞异步运行时）
+    // 使用 spawn_blocking 确保不会阻塞 Tokio 的异步运行时
     let result = tokio::task::spawn_blocking(move || {
-        HotspotScanner::scan(n)
+        let scanner = HotspotScanner::new(is_full_scan, n);
+        scanner.scan()
     })
     .await
     .map_err(|e| format!("扫描任务执行失败: {}", e))?;
@@ -2231,14 +2248,15 @@ pub async fn scan_hotspot(top_n: Option<usize>) -> Result<crate::scanner::Hotspo
     match &result {
         Ok(scan_result) => {
             info!(
-                "热点扫描完成: {} 个文件夹，耗时 {}ms，AppData 总大小 {} bytes",
+                "大目录扫描完成: {} 个目录，耗时 {}ms，扫描范围总大小 {} bytes，深度扫描: {}",
                 scan_result.entries.len(),
                 scan_result.scan_duration_ms,
-                scan_result.appdata_total_size
+                scan_result.appdata_total_size,
+                scan_result.is_full_scan
             );
         }
         Err(e) => {
-            log::warn!("热点扫描失败: {}", e);
+            log::warn!("大目录扫描失败: {}", e);
         }
     }
     

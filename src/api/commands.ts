@@ -657,11 +657,11 @@ export async function getCleanupHistory(): Promise<CleanupHistorySummary[]> {
 }
 
 // ============================================================================
-// C盘热点扫描相关 API
+// 大目录分析相关 API
 // ============================================================================
 
 /**
- * 热点文件夹信息
+ * 大目录条目信息
  */
 export interface HotspotEntry {
   /** 文件夹完整路径 */
@@ -674,34 +674,48 @@ export interface HotspotEntry {
   file_count: number;
   /** 最后修改时间（Unix 时间戳，毫秒） */
   last_modified: number;
-  /** 父目录类型（Local/Roaming/LocalLow） */
+  /** 父目录类型（Local/Roaming/LocalLow/System/Program 等） */
   parent_type: string;
   /** 是否为缓存目录 */
   is_cache: boolean;
   /** 是否为程序目录 */
   is_program: boolean;
+  /** 是否可安全清理（深度扫描模式下强制为 false） */
+  is_safe_to_clean: boolean;
+  /** 是否为系统保护目录（黑名单目录） */
+  is_protected: boolean;
+  /** 子目录列表（智能下钻：当目录 >5GB 且 >1000 文件时，展示前 3 个最大子目录） */
+  children: HotspotEntry[];
+  /** 当前目录的下钻深度（0 = 顶级目录） */
+  depth: number;
 }
 
 /**
- * 热点扫描结果
+ * 大目录扫描结果
  */
 export interface HotspotScanResult {
-  /** 热点文件夹列表（已按大小降序排列） */
+  /** 大目录列表（已按大小降序排列） */
   entries: HotspotEntry[];
   /** 扫描的总文件夹数 */
   total_folders_scanned: number;
   /** 扫描耗时（毫秒） */
   scan_duration_ms: number;
-  /** AppData 总大小 */
+  /** 扫描范围总大小（AppData 或 C 盘） */
   appdata_total_size: number;
+  /** 是否为深度扫描模式 */
+  is_full_scan: boolean;
 }
 
 /**
- * 扫描 AppData 热点文件夹
+ * 扫描大目录
  * @param topN 返回 Top N 结果，默认 20
+ * @param fullScan 是否启用全盘深度扫描，默认 false（仅扫描 AppData）
+ * 
+ * 【安全措施】深度扫描模式下，所有结果的 is_safe_to_clean 为 false，
+ * 前端应禁用清理按钮，仅允许"打开位置"和"搜索"操作
  */
-export async function scanHotspot(topN?: number): Promise<HotspotScanResult> {
-  return invoke<HotspotScanResult>('scan_hotspot', { topN });
+export async function scanHotspot(topN?: number, fullScan?: boolean): Promise<HotspotScanResult> {
+  return invoke<HotspotScanResult>('scan_hotspot', { topN, fullScan });
 }
 
 /**

@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, Brush, Search, ShieldAlert } from 'lucide-react';
+import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, Brush, Search, ShieldAlert, Shield, Eye } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -69,6 +69,15 @@ function getParentTypeColor(type: string): string {
       return 'text-purple-500 bg-purple-50 dark:bg-purple-900/20';
     case 'LocalLow':
       return 'text-orange-500 bg-orange-50 dark:bg-orange-900/20';
+    case 'Windows':
+      return 'text-red-500 bg-red-50 dark:bg-red-900/20';
+    case 'Program Files':
+    case 'Program Files (x86)':
+      return 'text-amber-500 bg-amber-50 dark:bg-amber-900/20';
+    case 'Users':
+      return 'text-cyan-500 bg-cyan-50 dark:bg-cyan-900/20';
+    case 'System':
+      return 'text-rose-500 bg-rose-50 dark:bg-rose-900/20';
     default:
       return 'text-gray-500 bg-gray-50 dark:bg-gray-900/20';
   }
@@ -82,54 +91,95 @@ interface HotspotItemProps {
   entry: HotspotEntry;
   rank: number;
   maxSize: number;
+  isFullScan: boolean; // 是否为深度扫描模式
   onOpenFolder: (path: string) => void;
   onCleanup: (entry: HotspotEntry) => void;
   onSearch: (name: string) => void;
+  /** 父目录名称（用于路径简写展示） */
+  parentName?: string;
+  /** 是否为子目录（下钻结果） */
+  isChild?: boolean;
 }
 
-function HotspotItem({ entry, rank, maxSize, onOpenFolder, onCleanup, onSearch }: HotspotItemProps) {
+function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup, onSearch, parentName, isChild }: HotspotItemProps) {
   // 计算占比条宽度
   const percentage = maxSize > 0 ? (entry.total_size / maxSize) * 100 : 0;
   
+  // 【安全措施】深度扫描模式下，或者 is_safe_to_clean 为 false 时，禁用清理按钮
+  const canCleanup = !isFullScan && entry.is_safe_to_clean && entry.is_cache && !entry.is_program && !entry.is_protected;
+  
+  // 生成路径简写：父目录 > 子目录
+  const displayName = parentName ? `${parentName} > ${entry.name}` : entry.name;
+  
+  // 子目录缩进样式
+  const indentClass = isChild ? 'ml-6 border-l-2 border-[var(--border-color)] pl-3' : '';
+  
   return (
-    <div className="group relative bg-[var(--bg-main)] rounded-xl p-3 hover:bg-[var(--bg-hover)] transition-colors">
+    <div className={`${indentClass}`}>
+      <div className={`group relative bg-[var(--bg-main)] rounded-xl p-3 hover:bg-[var(--bg-hover)] transition-colors ${
+        entry.is_protected ? 'border border-red-200 dark:border-red-800/30' : ''
+      } ${isChild ? 'bg-opacity-50' : ''}`}>
       {/* 占比背景条 */}
       <div 
-        className="absolute inset-0 bg-[var(--brand-green-10)] rounded-xl opacity-50 transition-all"
+        className={`absolute inset-0 rounded-xl opacity-50 transition-all ${
+          entry.is_protected ? 'bg-red-100 dark:bg-red-900/10' : 'bg-[var(--brand-green-10)]'
+        }`}
         style={{ width: `${percentage}%` }}
       />
       
       <div className="relative flex items-center gap-3">
         {/* 排名 */}
         <div className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
-          rank <= 3 
-            ? 'bg-[var(--brand-green)] text-white' 
-            : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)]'
+          entry.is_protected
+            ? 'bg-red-500 text-white'
+            : rank <= 3 
+              ? 'bg-[var(--brand-green)] text-white' 
+              : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)]'
         }`}>
           {rank}
         </div>
         
         {/* 文件夹信息 */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm text-[var(--text-primary)] truncate">
-              {entry.name}
+              {isChild ? displayName : entry.name}
             </span>
+            {/* 下钻深度指示器 */}
+            {entry.depth > 0 && !isChild && (
+              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-purple-500 bg-purple-50 dark:bg-purple-900/20">
+                L{entry.depth}
+              </span>
+            )}
             <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded ${getParentTypeColor(entry.parent_type)}`}>
               {entry.parent_type}
             </span>
+            {/* 系统保护目录标签 - 深度扫描时显示 */}
+            {entry.is_protected && (
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
+                <Shield className="w-3 h-3" />
+                系统保护
+              </span>
+            )}
             {/* 程序目录标签 - 红色警告，禁止删除 */}
-            {entry.is_program && (
+            {entry.is_program && !entry.is_protected && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
                 <ShieldAlert className="w-3 h-3" />
                 系统/程序
               </span>
             )}
-            {/* 缓存目录标签 - 建议清理 */}
-            {entry.is_cache && !entry.is_program && (
+            {/* 缓存目录标签 - 建议清理（仅非深度扫描模式显示） */}
+            {entry.is_cache && !entry.is_program && !entry.is_protected && !isFullScan && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
                 <Brush className="w-3 h-3" />
                 临时缓存
+              </span>
+            )}
+            {/* 深度扫描只读提示 */}
+            {isFullScan && !entry.is_protected && (
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-blue-500 bg-blue-50 dark:bg-blue-900/20">
+                <Eye className="w-3 h-3" />
+                仅查看
               </span>
             )}
           </div>
@@ -156,14 +206,16 @@ function HotspotItem({ entry, rank, maxSize, onOpenFolder, onCleanup, onSearch }
           </div>
           
           {/* 大小 */}
-          <div className="font-semibold text-[var(--brand-green)] min-w-[70px] text-right">
+          <div className={`font-semibold min-w-[70px] text-right ${
+            entry.is_protected ? 'text-red-500' : 'text-[var(--brand-green)]'
+          }`}>
             {formatSize(entry.total_size)}
           </div>
           
           {/* 操作按钮组 */}
           <div className="flex items-center gap-1">
-            {/* 清理按钮 - 仅缓存目录显示，程序目录不显示 */}
-            {entry.is_cache && !entry.is_program && (
+            {/* 清理按钮 - 仅在非深度扫描模式且可清理时显示 */}
+            {canCleanup && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -202,6 +254,27 @@ function HotspotItem({ entry, rank, maxSize, onOpenFolder, onCleanup, onSearch }
           </div>
         </div>
       </div>
+      </div>
+      
+      {/* 递归渲染子目录（智能下钻结果） */}
+      {entry.children && entry.children.length > 0 && (
+        <div className="mt-1 space-y-1">
+          {entry.children.map((child, idx) => (
+            <HotspotItem
+              key={child.path}
+              entry={child}
+              rank={idx + 1}
+              maxSize={entry.total_size} // 使用父目录大小作为基准
+              isFullScan={isFullScan}
+              onOpenFolder={onOpenFolder}
+              onCleanup={onCleanup}
+              onSearch={onSearch}
+              parentName={entry.name}
+              isChild={true}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -221,6 +294,8 @@ export function HotspotModule() {
   const [scanResult, setScanResult] = useState<HotspotScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // 深度扫描开关状态
+  const [fullScanEnabled, setFullScanEnabled] = useState(false);
   // 清理确认对话框状态
   const [cleanupTarget, setCleanupTarget] = useState<HotspotEntry | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
@@ -236,7 +311,8 @@ export function HotspotModule() {
     setShowAll(false);
 
     try {
-      const result = await scanHotspot(20);
+      // 根据深度扫描开关决定扫描模式
+      const result = await scanHotspot(30, fullScanEnabled);
       setScanResult(result);
       
       // 计算 Top 10 的总大小作为模块显示
@@ -252,7 +328,7 @@ export function HotspotModule() {
       setError(String(err));
       updateModuleState('hotspot', { status: 'error' });
     }
-  }, [updateModuleState]);
+  }, [updateModuleState, fullScanEnabled]);
 
   // 响应一键扫描
   useEffect(() => {
@@ -341,7 +417,7 @@ export function HotspotModule() {
     <ModuleCard
       id="hotspot"
       title="大目录分析"
-      description="深度分析 AppData 目录，定位占用空间的元凶"
+      description={fullScanEnabled ? "全盘深度扫描 C 盘，定位空间占用元凶" : "深度分析 AppData 目录，定位占用空间的元凶"}
       icon={<Flame className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -351,24 +427,56 @@ export function HotspotModule() {
       onScan={handleScan}
       scanButtonText="开始扫描"
       error={error}
+      headerExtra={
+        // 深度扫描开关 - 参考卸载残留模块样式
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFullScanEnabled(!fullScanEnabled)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              fullScanEnabled
+                ? 'bg-[var(--brand-green)] text-white'
+                : 'bg-[var(--bg-main)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
+            }`}
+            title={fullScanEnabled ? '当前：全盘深度扫描' : '当前：仅扫描 AppData'}
+          >
+            <Eye className="w-3.5 h-3.5" />
+            深度扫描
+          </button>
+        </div>
+      }
     >
       {/* 扫描中状态 */}
       {moduleState.status === 'scanning' && (
         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
-          <p className="text-sm">正在扫描 AppData 目录...</p>
-          <p className="text-xs mt-1">这可能需要几秒钟</p>
+          <p className="text-sm">
+            {fullScanEnabled ? '正在全盘扫描 C 盘...' : '正在扫描 AppData 目录...'}
+          </p>
+          <p className="text-xs mt-1">
+            {fullScanEnabled ? '深度扫描可能需要较长时间，请耐心等待' : '这可能需要几秒钟'}
+          </p>
         </div>
       )}
 
       {/* 扫描结果 */}
       {moduleState.status === 'done' && scanResult && (
         <div className="space-y-3">
+          {/* 深度扫描安全提示 */}
+          {scanResult.is_full_scan && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-600 dark:text-blue-400">
+              <Eye className="w-4 h-4 flex-shrink-0" />
+              <span>深度扫描模式：仅供查看分析，清理功能已禁用以保护系统安全</span>
+            </div>
+          )}
+
           {/* 统计摘要 */}
           <div className="flex items-center justify-between px-1 text-xs text-[var(--text-muted)]">
             <div className="flex items-center gap-4">
               <span>共扫描 <strong className="text-[var(--text-primary)]">{scanResult.total_folders_scanned}</strong> 个文件夹</span>
-              <span>AppData 总占用 <strong className="text-[var(--brand-green)]">{formatSize(scanResult.appdata_total_size)}</strong></span>
+              <span>
+                {scanResult.is_full_scan ? 'C 盘' : 'AppData'} 总占用{' '}
+                <strong className="text-[var(--brand-green)]">{formatSize(scanResult.appdata_total_size)}</strong>
+              </span>
             </div>
             <span>耗时 {(scanResult.scan_duration_ms / 1000).toFixed(1)}s</span>
           </div>
@@ -381,6 +489,7 @@ export function HotspotModule() {
                 entry={entry}
                 rank={index + 1}
                 maxSize={maxSize}
+                isFullScan={scanResult.is_full_scan}
                 onOpenFolder={handleOpenFolder}
                 onCleanup={handleCleanupClick}
                 onSearch={handleSearch}

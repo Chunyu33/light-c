@@ -277,6 +277,10 @@ function GuideSettings() {
               系统会自动标记<span className="text-[var(--color-warning)] font-medium">程序缓存</span>和<span className="text-[var(--color-danger)] font-medium">潜在风险项</span>，
               帮助您快速定位 C 盘空间的"元凶"，精准释放磁盘空间。
             </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-2">
+              <span className="text-[var(--brand-green)] font-medium">智能下钻：</span>开启深度扫描后，当目录超过 <span className="font-medium">5GB</span> 且包含超过 <span className="font-medium">1000</span> 个文件时，
+              系统会自动分析其子目录结构，最多下钻 <span className="font-medium">3 层</span>，展示每层占用空间最大的前 3 个子目录，帮助您精准定位空间占用来源。
+            </p>
           </div>
         </div>
       </div>
