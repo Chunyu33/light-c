@@ -614,14 +614,14 @@ function AboutSettings() {
             <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">网站</span>
+            <span className="text-sm text-[var(--text-secondary)]">官方网站</span>
             <a 
-              href="https://evanspace.icu" 
+              href="https://evanspace.icu/lightc" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-sm font-medium text-[var(--brand-green)] hover:opacity-80 flex items-center gap-1"
             >
-              evanspace.icu
+              LightC
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>

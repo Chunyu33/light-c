@@ -356,7 +356,7 @@ export function SocialCleanModuleV2() {
         <div className="max-h-[500px] overflow-auto">
           {/* 说明提示 */}
           {showTip && (
-            <div className="mx-4 mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
+            <div className="mx-4 mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
               <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-amber-600 text-[10px] font-bold">!</span>
               </div>
