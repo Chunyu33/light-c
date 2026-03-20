@@ -659,7 +659,7 @@ function AboutSettings() {
 // 交流群组件 - 复制群号功能
 // ============================================================================
 
-const QQ_GROUP = '762137328';
+const QQ_GROUP = '834582563';
 
 function CommunityGroup() {
   const [copied, setCopied] = useState(false);
