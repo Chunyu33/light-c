@@ -10,3 +10,4 @@ export { SystemSlimModule } from './SystemSlimModule';
 export { LeftoversModule } from './LeftoversModule';
 export { RegistryModule } from './RegistryModule';
 export { HotspotModule } from './HotspotModule';
+export { ContextMenuModule } from './ContextMenuModule';

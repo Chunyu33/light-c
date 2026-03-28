@@ -834,3 +834,95 @@ export interface CleanupDirectoryResult {
 export async function cleanupDirectoryContents(path: string): Promise<CleanupDirectoryResult> {
   return invoke<CleanupDirectoryResult>('cleanup_directory_contents', { path });
 }
+
+// ============================================================================
+// 右键菜单清理相关 API
+// ============================================================================
+
+/** 单个右键菜单条目 */
+export interface ContextMenuEntry {
+  /** 唯一 ID（reg_root + "||" + reg_subpath） */
+  id: string;
+  /** 菜单显示名称 */
+  display_name: string;
+  /** 注册表子键名 */
+  key_name: string;
+  /** 完整注册表路径（用于 UI 展示） */
+  registry_path: string;
+  /** 注册表根 ("HKCU" | "HKLM") */
+  reg_root: 'HKCU' | 'HKLM';
+  /** 相对于根的子路径 */
+  reg_subpath: string;
+  /** 作用范围（"任意文件", "文件夹", "桌面背景", "磁盘驱动器", "库文件夹"） */
+  scope: string;
+  /** 图标路径（原始值，可能含 index 后缀） */
+  icon_path: string | null;
+  /** 原始命令字符串 */
+  command: string | null;
+  /** 从命令中提取的 exe 路径 */
+  exe_path: string | null;
+  /** exe 文件是否存在于磁盘 */
+  exe_exists: boolean;
+  /** 是否需要管理员权限才能删除 */
+  needs_admin: boolean;
+}
+
+/** 右键菜单扫描结果 */
+export interface ContextMenuScanResult {
+  /** 所有扫描到的条目 */
+  entries: ContextMenuEntry[];
+  /** 其中无效（exe 不存在）的条目数 */
+  invalid_count: number;
+  /** 扫描耗时（毫秒） */
+  scan_duration_ms: number;
+}
+
+/** 右键菜单条目删除请求 */
+export interface ContextMenuDeleteRequest {
+  /** 条目唯一 ID */
+  id: string;
+  /** 注册表根 */
+  reg_root: 'HKCU' | 'HKLM';
+  /** 相对于根的子路径 */
+  reg_subpath: string;
+}
+
+/** 单个条目的删除详情 */
+export interface ContextMenuDeleteDetail {
+  /** 条目 ID */
+  id: string;
+  /** 是否成功 */
+  success: boolean;
+  /** 失败原因 */
+  error: string | null;
+}
+
+/** 右键菜单删除结果 */
+export interface ContextMenuDeleteResult {
+  /** 成功删除的条目数 */
+  deleted_count: number;
+  /** 删除失败的条目数 */
+  failed_count: number;
+  /** 每个条目的详细结果 */
+  details: ContextMenuDeleteDetail[];
+}
+
+/**
+ * 扫描 Windows 注册表中的右键菜单条目
+ *
+ * 覆盖 HKCU 和 HKLM 下的 *\shell, Directory\shell,
+ * Directory\Background\shell, Drive\shell 等核心路径
+ */
+export async function scanContextMenu(): Promise<ContextMenuScanResult> {
+  return invoke<ContextMenuScanResult>('scan_context_menu');
+}
+
+/**
+ * 删除选中的右键菜单注册表条目
+ * @param entries 要删除的条目列表
+ */
+export async function deleteContextMenuEntries(
+  entries: ContextMenuDeleteRequest[]
+): Promise<ContextMenuDeleteResult> {
+  return invoke<ContextMenuDeleteResult>('delete_context_menu_entries', { entries });
+}

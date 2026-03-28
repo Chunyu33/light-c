@@ -71,6 +71,9 @@ pub fn run() {
             // C盘热点扫描
             scan_hotspot,
             cleanup_directory_contents,
+            // 右键菜单清理
+            scan_context_menu,
+            delete_context_menu_entries,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

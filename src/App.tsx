@@ -19,6 +19,7 @@ import {
   LeftoversModule,
   RegistryModule,
   HotspotModule,
+  ContextMenuModule,
 } from './components';
 import { DashboardProvider, useDashboard } from './contexts';
 import './App.css';
@@ -80,6 +81,9 @@ function DashboardContent() {
 
           {/* 注册表冗余模块 [中风险] */}
           <RegistryModule />
+
+          {/* 右键菜单清理模块 [中风险] */}
+          <ContextMenuModule />
 
           {/* 大目录分析模块 */}
           <HotspotModule />

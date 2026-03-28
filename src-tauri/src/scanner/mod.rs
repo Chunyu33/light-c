@@ -3,6 +3,7 @@
 // ============================================================================
 
 mod categories;
+mod context_menu;
 mod file_info;
 mod hotspot;
 mod leftovers;
@@ -11,6 +12,7 @@ mod scan_engine;
 mod social_scanner;
 
 pub use categories::*;
+pub use context_menu::*;
 pub use file_info::*;
 pub use hotspot::*;
 pub use leftovers::*;

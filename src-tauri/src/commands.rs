@@ -2405,3 +2405,70 @@ pub struct CleanupDirectoryResult {
     /// 错误信息列表（最多10条）
     pub errors: Vec<String>,
 }
+
+// ============================================================================
+// 右键菜单清理相关命令
+// ============================================================================
+
+/// 扫描 Windows 注册表中的右键菜单条目
+///
+/// 覆盖范围：
+/// - HKCU\Software\Classes 和 HKLM\SOFTWARE\Classes 下的
+///   *\shell, Directory\shell, Directory\Background\shell,
+///   Drive\shell, LibraryFolder\Background\shell
+///
+/// 对每个条目检查其命令中引用的 exe 是否存在，返回完整列表供用户确认。
+#[tauri::command]
+pub async fn scan_context_menu(
+) -> Result<crate::scanner::ContextMenuScanResult, String> {
+    use crate::scanner::ContextMenuScanner;
+
+    info!("开始扫描右键菜单注册表条目");
+
+    // 在阻塞线程中执行（注册表操作为同步 I/O）
+    let result = tokio::task::spawn_blocking(move || {
+        let scanner = ContextMenuScanner::new();
+        scanner.scan()
+    })
+    .await
+    .map_err(|e| format!("扫描任务执行失败: {}", e))??;
+
+    info!(
+        "右键菜单扫描完成: {} 条目，其中 {} 个无效，耗时 {}ms",
+        result.entries.len(),
+        result.invalid_count,
+        result.scan_duration_ms
+    );
+
+    Ok(result)
+}
+
+/// 删除选中的右键菜单注册表条目
+///
+/// # 参数
+/// - `entries`: 要删除的条目列表，每项包含 reg_root 和 reg_subpath
+///
+/// # 安全说明
+/// - HKCU 条目无需管理员即可删除
+/// - HKLM 条目需要管理员权限，若权限不足会在 details 中记录失败原因
+#[tauri::command]
+pub async fn delete_context_menu_entries(
+    entries: Vec<crate::scanner::ContextMenuDeleteRequest>,
+) -> Result<crate::scanner::ContextMenuDeleteResult, String> {
+    use crate::scanner::delete_context_menu_entries as do_delete;
+
+    info!("开始删除 {} 个右键菜单条目", entries.len());
+
+    let result = tokio::task::spawn_blocking(move || {
+        do_delete(&entries)
+    })
+    .await
+    .map_err(|e| format!("删除任务执行失败: {}", e))?;
+
+    info!(
+        "右键菜单清理完成: 成功 {} 个，失败 {} 个",
+        result.deleted_count, result.failed_count
+    );
+
+    Ok(result)
+}
