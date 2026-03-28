@@ -2,7 +2,7 @@
 // 确认对话框组件 - 用于清理前的二次确认
 // ============================================================================
 
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -40,18 +40,18 @@ export const ConfirmDialog = memo(function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const enteredRef = useRef(false);
+  if (isVisible) enteredRef.current = true;
 
   useEffect(() => {
     if (isOpen) {
       setIsAnimating(true);
-      requestAnimationFrame(() => {
-        setIsVisible(true);
-      });
+      setIsVisible(true);
     } else {
       setIsVisible(false);
       const timer = setTimeout(() => {
         setIsAnimating(false);
-      }, 200);
+      }, 190);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -59,15 +59,15 @@ export const ConfirmDialog = memo(function ConfirmDialog({
   if (!isOpen && !isAnimating) return null;
 
   return createPortal(
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* 遮罩层 */}
       <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onCancel}
       />
       
       {/* 对话框 */}
-      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div className="flex items-center gap-3">

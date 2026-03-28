@@ -198,6 +198,53 @@ body {
    动画效果
    ============================================================================ */
 
+/* ── 模态框弹入动画 ──────────────────────────────────────────────────────────
+   cubic-bezier(0.16, 1, 0.3, 1) 弹簧曲线：快速加速后回弹收敛，
+   与 Windows 11 / 微信桌面版窗口弹出质感一致 */
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── 模态框弹出动画 ──────────────────────────────────────────────────────────
+   cubic-bezier(0.4, 0, 1, 1) 快速收缩曲线：立即加速消失，避免拖拉感 */
+@keyframes modal-content-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+  }
+}
+
+/* ── 遮罩淡入 / 淡出 ─────────────────────────────────────────────────────── */
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── 工具类 ─────────────────────────────────────────────────────────────────
+   animation-fill-mode: both 确保：
+   - 动画开始前元素保持 from 关键帧状态（避免闪现最终态）
+   - 动画结束后元素保持 to  关键帧状态（避免复位闪烁） */
+.modal-overlay-in  { animation: modal-overlay-in  220ms ease both; }
+.modal-overlay-out { animation: modal-overlay-out 185ms ease both; }
+.modal-content-in  { animation: modal-content-in  280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.modal-content-out { animation: modal-content-out 185ms cubic-bezier(0.4, 0, 1, 1) both; }
+
 /* 流光动画 - 用于进度条 */
 @keyframes shimmer {
   0% {

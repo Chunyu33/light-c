@@ -2,9 +2,9 @@
 // 设置弹窗组件 - 仿微信设置布局
 // ============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users, MousePointerClick } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
@@ -41,20 +41,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { mode, setMode } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  // 记录是否曾经进入「可见」状态，用于区分「初次挂载预隐藏」和「正在关闭」
+  const enteredRef = useRef(false);
+  if (isVisible) enteredRef.current = true;
 
   useEffect(() => {
     if (isOpen) {
       setIsAnimating(true);
-      // 延迟一帧以触发动画
-      requestAnimationFrame(() => {
-        setIsVisible(true);
-      });
+      setIsVisible(true);
     } else {
       setIsVisible(false);
-      // 等待动画结束后再隐藏
+      // 等待弹出动画结束（185ms）后卸载 DOM
       const timer = setTimeout(() => {
         setIsAnimating(false);
-      }, 200);
+      }, 190);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -62,15 +62,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen && !isAnimating) return null;
 
   return createPortal(
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* 遮罩 */}
       <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onClose}
       />
       
       {/* 弹窗内容 - 微信风格卡片布局 */}
-      <div className={`relative w-[600px] h-[450px] bg-[var(--bg-card)] rounded-2xl shadow-2xl flex overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+      <div className={`relative w-[600px] h-[450px] bg-[var(--bg-card)] rounded-2xl shadow-2xl flex overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 左侧导航 - 使用主背景色 */}
         <div className="w-[160px] bg-[var(--bg-main)] border-r border-[var(--border-color)] py-4">
           <div className="px-4 mb-4">
@@ -272,6 +272,23 @@ function GuideSettings() {
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               扫描 Windows 注册表中的孤立键值和无效引用，包括 MUI 缓存、软件残留键等。
               <span className="text-[var(--color-warning)] font-medium">删除前会自动备份</span>，备份文件保存在用户文档目录下的 LightC_Backups 文件夹中。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <MousePointerClick className="w-4 h-4 text-[var(--brand-green)]" />
+              右键菜单清理
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
+              扫描 Windows 注册表中注册的右键菜单项（覆盖"任意文件""文件夹""桌面背景""磁盘驱动器"等场景），
+              找出那些指向<span className="text-[var(--color-danger)] font-medium">已不存在可执行文件</span>的失效条目。
+              失效菜单项虽不影响系统稳定性，但会让右键菜单显得杂乱，影响使用体验。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              <span className="text-[var(--color-warning)] font-medium">⚠ 权限提示：</span>
+              注册表条目分为用户级（HKCU）和系统级（HKLM）两类。
+              删除<span className="font-medium"> HKCU </span>条目无需特殊权限；
+              删除<span className="font-medium"> HKLM </span>条目需要以<span className="text-[var(--color-warning)] font-medium">管理员身份运行</span>程序，否则会提示删除失败。
             </p>
           </div>
           <div>
