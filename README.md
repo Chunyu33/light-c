@@ -33,8 +33,25 @@
 | **夸克网盘高速下载** | [https://pan.quark.cn/s/e698f3b9b4f9](https://pan.quark.cn/s/e698f3b9b4f9) | 作者分享，国内高速 |
 | **作者哔哩哔哩主页** | [https://space.bilibili.com/387797235](https://space.bilibili.com/387797235?spm_id_from=333.1007.0.0) | 关注获取最新动态 |
 
-💡 验证文件完整性：
-用户可打开 PowerShell 执行 Get-FileHash 文件名，比对结果是否与 GitHub 页面一致，以防文件被篡改
+### � 验证文件完整性
+
+为确保下载的安装包未被篡改，请在安装前验证文件哈希值：
+
+**PowerShell（推荐）**
+```powershell
+Get-FileHash .\文件名.msi -Algorithm SHA256
+```
+
+**CMD（命令提示符）**
+```cmd
+certutil -hashfile 文件名 SHA256
+```
+
+将计算结果与 [GitHub Releases](https://github.com/Chunyu33/light-c/releases) 页面公布的 SHA256 值对比，**完全一致**即为官方原版文件。
+
+<p align="center">
+  <img src="public/assets/verify.png" alt="文件完整性验证示例" width="700">
+</p>
 
 ---
 
