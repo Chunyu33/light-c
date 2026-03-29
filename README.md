@@ -33,6 +33,8 @@
 | **夸克网盘高速下载** | [https://pan.quark.cn/s/e698f3b9b4f9](https://pan.quark.cn/s/e698f3b9b4f9) | 作者分享，国内高速 |
 | **作者哔哩哔哩主页** | [https://space.bilibili.com/387797235](https://space.bilibili.com/387797235?spm_id_from=333.1007.0.0) | 关注获取最新动态 |
 
+💡 验证文件完整性：
+用户可打开 PowerShell 执行 Get-FileHash 文件名，比对结果是否与 GitHub 页面一致，以防文件被篡改
 
 ---
 
