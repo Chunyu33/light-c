@@ -159,15 +159,24 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
             </div>
             {healthData && (
               <div className="flex items-center gap-4 mt-1.5 text-[12px] text-[var(--text-muted)] tabular-nums">
-                <span className="flex items-center gap-1">
+                <span 
+                  className="flex items-center gap-1 cursor-help"
+                  title="磁盘空间评分（满分40）&#10;• 可用空间 ≥30%：40分&#10;• 可用空间 20-30%：30分&#10;• 可用空间 10-20%：20分&#10;• 可用空间 <10%：10分"
+                >
                   <HardDrive className="w-3.5 h-3.5" />
                   {healthData.disk_score}/40
                 </span>
-                <span className="flex items-center gap-1">
+                <span 
+                  className="flex items-center gap-1 cursor-help"
+                  title="休眠文件评分（满分30）&#10;• 已关闭休眠：30分&#10;• 休眠文件存在：0分&#10;休眠文件通常占用 8-32GB 空间"
+                >
                   <Moon className="w-3.5 h-3.5" />
                   {healthData.hibernation_score}/30
                 </span>
-                <span className="flex items-center gap-1">
+                <span 
+                  className="flex items-center gap-1 cursor-help"
+                  title="垃圾文件评分（满分30）&#10;• 垃圾 <500MB：30分&#10;• 垃圾 500MB-2GB：20分&#10;• 垃圾 2-5GB：10分&#10;• 垃圾 >5GB：0分"
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                   {healthData.junk_score}/30
                 </span>

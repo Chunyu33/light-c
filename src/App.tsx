@@ -3,7 +3,8 @@
 // 单页仪表盘布局，支持浅色/深色/跟随系统主题
 // ============================================================================
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { 
   SettingsModal, 
   TitleBar, 
@@ -20,6 +21,8 @@ import {
   RegistryModule,
   HotspotModule,
   ContextMenuModule,
+  SplashScreen,
+  Footer,
 } from './components';
 import { DashboardProvider, useDashboard } from './contexts';
 import './App.css';
@@ -91,6 +94,9 @@ function DashboardContent() {
           {/* 底部留白 */}
           <div className="h-4" />
         </div>
+
+        {/* 底部版权声明 */}
+        <Footer />
       </main>
     </div>
   );
@@ -101,6 +107,23 @@ function DashboardContent() {
 // ============================================================================
 
 function App() {
+  const [windowLabel, setWindowLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCurrentWindow().label && setWindowLabel(getCurrentWindow().label);
+  }, []);
+
+  // 等待窗口标签检测完成
+  if (windowLabel === null) {
+    return null;
+  }
+
+  // 启动屏幕窗口
+  if (windowLabel === 'splashscreen') {
+    return <SplashScreen />;
+  }
+
+  // 主窗口
   return (
     <ToastProvider>
       <DashboardProvider>

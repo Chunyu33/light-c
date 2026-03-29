@@ -12,13 +12,27 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "LightC",
         "width": 800,
         "height": 600,
         "minWidth": 600,
         "minHeight": 450,
         "center": true,
-        "decorations": false
+        "decorations": false,
+        "visible": false
+      },
+      {
+        "label": "splashscreen",
+        "title": "LightC",
+        "width": 400,
+        "height": 320,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

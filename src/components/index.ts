@@ -21,4 +21,6 @@ export { WelcomeModal, shouldShowWelcome, resetWelcomeState } from './WelcomeMod
 export { UpdateModal } from './UpdateModal';
 export { ModuleCard } from './ModuleCard';
 export { DashboardHeader } from './DashboardHeader';
+export { SplashScreen } from './SplashScreen';
+export { Footer } from './Footer';
 export * from './modules';
