@@ -18,6 +18,24 @@
 
 ---
 
+
+## ⚠️ 安全下载声明
+
+> **请认准唯一官方发布渠道：[GitHub Releases](https://github.com/Chunyu33/light-c/releases)**
+>
+> 近期发现有第三方下载站分发非官方打包版本，**为了您的系统安全，请勿从非授权渠道下载**。
+
+### 📥 官方下载渠道
+
+| 渠道 | 链接 | 说明 |
+|:-----|:-----|:-----|
+| **GitHub Releases** | [https://github.com/Chunyu33/light-c/releases](https://github.com/Chunyu33/light-c/releases) | 唯一官方发布渠道 |
+| **夸克网盘高速下载** | [https://pan.quark.cn/s/e698f3b9b4f9](https://pan.quark.cn/s/e698f3b9b4f9) | 作者分享，国内高速 |
+| **作者哔哩哔哩主页** | [https://space.bilibili.com/387797235](https://space.bilibili.com/387797235?spm_id_from=333.1007.0.0) | 关注获取最新动态 |
+
+
+---
+
 ## 📸 运行截图
 
 <p align="center">
