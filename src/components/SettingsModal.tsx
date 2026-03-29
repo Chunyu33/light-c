@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users, MousePointerClick } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users, MousePointerClick, ShieldCheck, Terminal } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
@@ -16,7 +16,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { getSystemInfo, type SystemInfo, openLogsFolder } from '../api/commands';
 import { formatSize } from '../utils/format';
 
-type SettingsTab = 'general' | 'guide' | 'feedback' | 'about';
+type SettingsTab = 'general' | 'security' | 'guide' | 'feedback' | 'about';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,6 +25,7 @@ interface SettingsModalProps {
 
 const tabs: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: '通用', icon: Settings },
+  { id: 'security', label: '安全与校验', icon: ShieldCheck },
   { id: 'guide', label: '使用说明', icon: BookOpen },
   { id: 'feedback', label: '意见反馈', icon: MessageSquare },
   { id: 'about', label: '关于', icon: Info },
@@ -64,15 +65,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* 遮罩 */}
-      <div 
+      <div
         className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onClose}
       />
-      
+
       {/* 弹窗内容 - 微信风格卡片布局 */}
       <div className={`relative w-[600px] h-[450px] bg-[var(--bg-card)] rounded-2xl shadow-2xl flex overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 左侧导航 - 使用主背景色 */}
-        <div className="w-[160px] bg-[var(--bg-main)] border-r border-[var(--border-color)] py-4">
+        {/* === 🐛 核心修复点：添加 shrink-0，禁止菜单缩小以适应右侧的长代码块 === */}
+        <div className="w-[160px] shrink-0 bg-[var(--bg-main)] border-r border-[var(--border-color)] py-4">
           <div className="px-4 mb-4">
             <h2 className="text-sm font-semibold text-[var(--text-primary)]">设置</h2>
           </div>
@@ -81,14 +83,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                  activeTab === id
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${activeTab === id
                     ? 'bg-[var(--brand-green-10)] text-[var(--brand-green)] font-medium'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                }`}
+                  }`}
               >
-                <Icon className="w-4 h-4" />
-                <span>{label}</span>
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">{label}</span>
               </button>
             ))}
           </nav>
@@ -114,6 +115,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             {activeTab === 'general' && (
               <GeneralSettings mode={mode} setMode={setMode} />
             )}
+            {activeTab === 'security' && <SecuritySettings />}
             {activeTab === 'guide' && <GuideSettings />}
             {activeTab === 'feedback' && <FeedbackSettings />}
             {activeTab === 'about' && <AboutSettings />}
@@ -156,11 +158,10 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                   key={m}
                   onClick={() => setMode(m)}
                   title={label}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
-                    mode === m
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${mode === m
                       ? 'bg-[var(--brand-green)] text-white'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{label}</span>
@@ -178,7 +179,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
           数据管理
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl">
-          {/* 清理历史记录 */}
+          {/* 清理日志记录 */}
           <button
             onClick={handleOpenLogsFolder}
             className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] rounded-2xl transition-colors group"
@@ -194,6 +195,129 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
             </div>
             <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 安全与校验设置 - 官方版本安全声明 + 一键校验工具
+// ============================================================================
+
+function SecuritySettings() {
+  const [version, setVersion] = useState<string>('');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion('2.3.0'));
+  }, []);
+
+  const fileName = `LightC_${version}_x64_Installer.msi`;
+  const commands = [
+    {
+      label: 'PowerShell (推荐)',
+      command: `Get-FileHash "${fileName}" -Algorithm SHA256`,
+    },
+    {
+      label: 'CMD',
+      command: `certutil -hashfile "${fileName}" SHA256`,
+    },
+  ];
+
+  const handleCopy = async (command: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (error) {
+      console.error('复制失败:', error);
+    }
+  };
+
+  return (
+    /* w-0 min-w-full 是防止子元素撑破 Flex 容器的黑科技 */
+    <div className="flex flex-col w-0 min-w-full space-y-4 pb-2">
+
+      {/* 1. 风险声明卡片 */}
+      <div className="w-full bg-[var(--bg-main)] rounded-xl border border-[var(--border-color)] overflow-hidden">
+        <div className="p-3 bg-amber-500/5 border-b border-amber-500/10 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <div className="text-[11px] text-amber-600/90 leading-relaxed break-all">
+            非官方渠道版本可能包含<span className="font-bold">捆绑插件或后门程序</span>。请务必核对文件哈希值，确保您的系统安全。
+          </div>
+        </div>
+
+        <div className="p-3 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)]">
+            <CheckCircle className="w-3.5 h-3.5 text-[var(--brand-green)]" />
+            官方正版标识
+          </div>
+          <div className="pl-6 space-y-1.5 text-[11px] text-[var(--text-muted)]">
+            <p className="flex items-center gap-1">
+              源码及发布:
+              <a href="https://github.com/Chunyu33/light-c" target="_blank" className="text-[var(--brand-green)] hover:underline inline-flex items-center">
+                GitHub <ExternalLink className="w-2.5 h-2.5 ml-0.5" />
+              </a>
+            </p>
+            <p>作者动态: <a className="text-[var(--brand-green)]" href='https://space.bilibili.com/387797235' target='_blank'>B站 @Evan的像素空间</a></p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 校验命令区 */}
+      <div className="space-y-2.5">
+        <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest px-1">
+          HASH 完整性校验
+        </h4>
+
+        <div className="bg-[var(--bg-main)] rounded-xl border border-[var(--border-color)] p-3 space-y-4">
+          {commands.map((cmd, index) => (
+            <div key={index} className="space-y-1.5">
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-[10px] font-semibold text-[var(--text-secondary)]">{cmd.label}</span>
+                <button
+                  onClick={() => handleCopy(cmd.command, index)}
+                  className="text-[10px] text-[var(--brand-green)] hover:opacity-70 transition-all flex items-center gap-1"
+                >
+                  {copiedIndex === index ? (
+                    <><CheckCircle className="w-2.5 h-2.5" /> 已复制</>
+                  ) : (
+                    <><Copy className="w-2.5 h-2.5" /> 复制指令</>
+                  )}
+                </button>
+              </div>
+
+              {/* 命令显示区：强制横向滚动，防止撑开宽度 */}
+              <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-2 overflow-x-auto scrollbar-thin">
+                <code className="text-[10px] font-mono text-[var(--brand-green)] whitespace-nowrap block">
+                  {cmd.command}
+                </code>
+              </div>
+            </div>
+          ))}
+
+          {/* 底部小字说明 */}
+          <div className="pt-2 border-t border-[var(--border-color)]">
+            <div className="flex items-start gap-2 text-[10px] text-[var(--text-faint)] leading-normal">
+              <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[var(--brand-green)]" />
+              <div className="space-y-1">
+                <p className="text-[var(--text-secondary)] font-medium">如何进行校验？</p>
+                <p className="break-all">
+                  1. 在安装包所在文件夹，<span className="text-[var(--text-primary)]">按住 Shift 键</span>并右键点击空白处。
+                </p>
+                <p>
+                  2. 选择 <span className="text-[var(--text-primary)]">“在此处打开 PowerShell/终端”</span>。
+                </p>
+                <p>
+                  3. 粘贴上方复制的指令并回车，对比结果是否与<a href='https://github.com/Chunyu33/light-c/releases' 
+                  className="text-[var(--brand-green)] hover:underline inline-flex items-center"
+                  target='_blank' rel='noopener noreferrer'>官方Releases</a>的 <span className="font-mono text-[var(--brand-green)]">SHA256SUMS.txt</span> 一致。
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -323,7 +447,7 @@ function GuideSettings() {
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
               支持检测主流安卓模拟器（<span className="font-medium">雷电、蓝叠、夜神、MuMu、MEmu、腾讯手游助手</span>等）的卸载残留。
-              系统会扫描 AppData、LocalLow、ProgramData 目录下的模拟器配置文件、虚拟磁盘文件（.vmdk/.vdi/.vhd）等大型残留，
+              系统会扫描 AppData、LocalLow、ProgramData 目录下的模拟器配置文件、虚拟磁盘文件（.vmdk/.vmdk/.vhd）等大型残留，
               这些文件通常占用<span className="text-[var(--color-danger)] font-medium">数十GB</span>空间。
             </p>
           </div>
@@ -437,7 +561,7 @@ function FeedbackSettings() {
               如果您在使用过程中遇到任何问题或有改进建议，欢迎通过以下方式联系我：
             </p>
           </div>
-          
+
           <div className="space-y-2">
             <a
               href="https://github.com/Chunyu33/light-c/issues"
@@ -448,7 +572,7 @@ function FeedbackSettings() {
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center">
                   <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                   </svg>
                 </div>
                 <div>
@@ -490,7 +614,7 @@ function AboutSettings() {
   // 获取应用版本号和系统信息
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => setAppVersion('未知'));
-    
+
     // 获取系统信息
     getSystemInfo()
       .then(setSystemInfo)
@@ -632,9 +756,9 @@ function AboutSettings() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">官方网站</span>
-            <a 
-              href="https://evanspace.icu/lightc" 
-              target="_blank" 
+            <a
+              href="https://evanspace.icu/lightc"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-sm font-medium text-[var(--brand-green)] hover:opacity-80 flex items-center gap-1"
             >
@@ -644,9 +768,9 @@ function AboutSettings() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">开源地址</span>
-            <a 
-              href="https://github.com/Chunyu33/light-c" 
-              target="_blank" 
+            <a
+              href="https://github.com/Chunyu33/light-c"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-sm font-medium text-[var(--brand-green)] hover:opacity-80 flex items-center gap-1"
             >
@@ -706,11 +830,10 @@ function CommunityGroup() {
           </div>
           <button
             onClick={handleCopy}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
-              copied
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${copied
                 ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)]'
                 : 'bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-            }`}
+              }`}
           >
             {copied ? (
               <>
@@ -790,16 +913,15 @@ function SupportAuthor() {
 
           {/* 赞赏码图片 - 可点击放大 */}
           <div className="flex justify-center mb-2">
-            <div 
+            <div
               onClick={openModal}
               className="relative w-36 h-36 rounded-xl border border-[var(--border-color)] overflow-hidden bg-white p-2 cursor-pointer hover:shadow-lg hover:border-[var(--brand-green)] transition-all duration-200 group"
             >
               <img
                 src={paymentType === 'wechat' ? wechatQr : alipayQr}
                 alt={paymentType === 'wechat' ? '微信赞赏码' : '支付宝赞赏码'}
-                className={`w-full h-full object-contain transition-opacity duration-150 ${
-                  isTransitioning ? 'opacity-0' : 'opacity-100'
-                }`}
+                className={`w-full h-full object-contain transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'
+                  }`}
               />
               {/* 悬浮放大提示 */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
@@ -820,21 +942,19 @@ function SupportAuthor() {
             <div className="inline-flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]">
               <button
                 onClick={() => handlePaymentChange('wechat')}
-                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                  paymentType === 'wechat'
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'wechat'
                     ? 'bg-[#07C160] text-white shadow-sm'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
+                  }`}
               >
                 微信
               </button>
               <button
                 onClick={() => handlePaymentChange('alipay')}
-                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                  paymentType === 'alipay'
+                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'alipay'
                     ? 'bg-[#1677FF] text-white shadow-sm'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
+                  }`}
               >
                 支付宝
               </button>
@@ -845,16 +965,14 @@ function SupportAuthor() {
 
       {/* 放大 Modal - 半透明磨砂背景 */}
       {showModal && createPortal(
-        <div 
-          className={`fixed inset-0 z-[10000] flex items-center justify-center transition-all duration-200 ${
-            modalVisible ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
-          }`}
+        <div
+          className={`fixed inset-0 z-[10000] flex items-center justify-center transition-all duration-200 ${modalVisible ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
+            }`}
           onClick={closeModal}
         >
-          <div 
-            className={`relative bg-white rounded-2xl shadow-2xl p-4 transition-all duration-200 ${
-              modalVisible ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
-            }`}
+          <div
+            className={`relative bg-white rounded-2xl shadow-2xl p-4 transition-all duration-200 ${modalVisible ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* 关闭按钮 */}
@@ -877,21 +995,19 @@ function SupportAuthor() {
               <div className="inline-flex bg-gray-100 rounded-xl p-1">
                 <button
                   onClick={() => handlePaymentChange('wechat')}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                    paymentType === 'wechat'
+                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'wechat'
                       ? 'bg-[#07C160] text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                    }`}
                 >
                   微信
                 </button>
                 <button
                   onClick={() => handlePaymentChange('alipay')}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                    paymentType === 'alipay'
+                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'alipay'
                       ? 'bg-[#1677FF] text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                    }`}
                 >
                   支付宝
                 </button>
