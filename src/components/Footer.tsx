@@ -13,7 +13,7 @@ export function Footer() {
       <div className="max-w-5xl mx-auto flex flex-col items-center gap-3">
         {/* 版权信息 */}
         <p className="text-[11px] text-[var(--text-muted)]">
-          © {currentYear} LightC · Evan的像素空间 · 保留所有权利
+          © {currentYear} LightC · Evan Lau · 保留所有权利
         </p>
 
         {/* 正版渠道提示 */}
