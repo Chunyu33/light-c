@@ -82,7 +82,8 @@ Write-Host "[3/4] Packaging artifacts..." -ForegroundColor Yellow
 
 # Define paths
 $ReleaseDir = Join-Path $ProjectRoot "src-tauri\target\release"
-$BundleDir = Join-Path $ReleaseDir "bundle\msi"
+$BundleMsiDir = Join-Path $ReleaseDir "bundle\msi"
+$BundleNsisDir = Join-Path $ReleaseDir "bundle\nsis"
 $DistReleaseDir = Join-Path $ProjectRoot "dist_release"
 $PortableFolderName = "LightC_" + $Version + "_Portable"
 $PortableDir = Join-Path $DistReleaseDir $PortableFolderName
@@ -101,7 +102,7 @@ Write-Host "  Created: $DistReleaseDir" -ForegroundColor Gray
 
 Write-Host "  Processing MSI installer..." -ForegroundColor Gray
 
-$MsiFiles = Get-ChildItem -Path $BundleDir -Filter "*.msi" -ErrorAction SilentlyContinue
+$MsiFiles = Get-ChildItem -Path $BundleMsiDir -Filter "*.msi" -ErrorAction SilentlyContinue
 
 if ($null -eq $MsiFiles -or $MsiFiles.Count -eq 0) {
     Write-Host "  Warning: No MSI found, skipping..." -ForegroundColor Yellow
@@ -116,7 +117,27 @@ else {
 }
 
 # --------------------------------------------------------------------------
-# 3.2 Create Portable Version
+# 3.2 Copy NSIS Installer
+# --------------------------------------------------------------------------
+
+Write-Host "  Processing NSIS installer..." -ForegroundColor Gray
+
+$NsisFiles = Get-ChildItem -Path $BundleNsisDir -Filter "*.exe" -ErrorAction SilentlyContinue
+
+if ($null -eq $NsisFiles -or $NsisFiles.Count -eq 0) {
+    Write-Host "  Warning: No NSIS installer found, skipping..." -ForegroundColor Yellow
+}
+else {
+    $SourceNsis = $NsisFiles[0].FullName
+    $TargetNsisName = "LightC_" + $Version + "_x64_Setup.exe"
+    $TargetNsis = Join-Path $DistReleaseDir $TargetNsisName
+    
+    Copy-Item $SourceNsis $TargetNsis -Force
+    Write-Host "    Copied: $TargetNsisName" -ForegroundColor White
+}
+
+# --------------------------------------------------------------------------
+# 3.3 Create Portable Version
 # --------------------------------------------------------------------------
 
 Write-Host "  Processing Portable version..." -ForegroundColor Gray
