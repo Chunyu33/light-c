@@ -161,23 +161,19 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               <p className="text-sm font-medium text-[var(--text-primary)]">主题模式</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">选择应用的外观主题</p>
             </div>
-            {/* 分段控制器 - 仅激活状态使用 brand-green */}
-            {/* 非标准字号时只显示图标，避免布局变形 */}
+            {/* 分段控制器 - 仅显示图标 */}
             <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
               {themeOptions.map(({ mode: m, label, icon: Icon }) => (
                 <button
                   key={m}
                   onClick={() => setMode(m)}
                   title={label}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                    fontSizeLevel === 'standard' ? 'px-3 py-2' : 'p-2'
-                  } ${mode === m
+                  className={`flex items-center justify-center p-2 rounded-lg transition-all duration-200 ${mode === m
                       ? 'bg-[var(--brand-green)] text-white'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                     }`}
                 >
-                  <Icon className="w-3.5 h-3.5 shrink-0" />
-                  {fontSizeLevel === 'standard' && <span>{label}</span>}
+                  <Icon className="w-4 h-4" />
                 </button>
               ))}
             </div>
@@ -632,11 +628,38 @@ function GuideSettings() {
 }
 
 // 意见反馈 - 微信风格
+const QQ_GROUP = '834582563';
+const WECHAT_ID = 'ZENITH3399';
+
 function FeedbackSettings() {
+  const [copiedQQ, setCopiedQQ] = useState(false);
+  const [copiedWechat, setCopiedWechat] = useState(false);
+
+  const handleCopyQQ = async () => {
+    try {
+      await navigator.clipboard.writeText(QQ_GROUP);
+      setCopiedQQ(true);
+      setTimeout(() => setCopiedQQ(false), 2000);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
+  };
+
+  const handleCopyWechat = async () => {
+    try {
+      await navigator.clipboard.writeText(WECHAT_ID);
+      setCopiedWechat(true);
+      setTimeout(() => setCopiedWechat(false), 2000);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* 问题反馈 */}
       <div className="space-y-3">
-        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">联系我</h4>
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">问题反馈</h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">问题反馈</p>
@@ -681,6 +704,56 @@ function FeedbackSettings() {
               </div>
               <ExternalLink className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)]" />
             </a>
+          </div>
+        </div>
+      </div>
+
+      {/* 联系方式 - QQ群和微信 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <MessageCircle className="w-3.5 h-3.5" />
+          交流
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-4 space-y-3">
+          {/* QQ群 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[var(--text-secondary)]">QQ群：</span>
+              <span className="text-sm font-medium text-[var(--text-primary)]">{QQ_GROUP}</span>
+            </div>
+            <button
+              onClick={handleCopyQQ}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${copiedQQ
+                  ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                }`}
+            >
+              {copiedQQ ? (
+                <><CheckCircle className="w-3 h-3" />已复制</>
+              ) : (
+                <><Copy className="w-3 h-3" />复制</>
+              )}
+            </button>
+          </div>
+          {/* 微信号 */}
+          <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[var(--text-secondary)]"> 微 信：</span>
+              <span className="text-sm font-medium text-[var(--text-primary)]">{WECHAT_ID}</span>
+            </div>
+            <button
+              onClick={handleCopyWechat}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${copiedWechat
+                  ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)]'
+                  : 'bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                }`}
+            >
+              {copiedWechat ? (
+                <><CheckCircle className="w-3 h-3" />已复制</>
+              ) : (
+                <><Copy className="w-3 h-3" />复制</>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -952,7 +1025,7 @@ function SupportAuthor() {
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           {/* 文案说明 */}
           <p className="text-sm text-[var(--text-secondary)] text-center mb-4">
-            维护不易，请我喝杯咖啡~（自愿原则）
+            维护不易，如果软件对您有帮助，请我喝杯咖啡~（自愿原则）
           </p>
 
           {/* 赞赏码图片 - 可点击放大 */}
