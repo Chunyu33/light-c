@@ -206,14 +206,15 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
 // ============================================================================
 
 function SecuritySettings() {
-  const [version, setVersion] = useState<string>('');
+  // const [version, setVersion] = useState<string>('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  useEffect(() => {
-    getVersion().then(setVersion).catch(() => setVersion('2.3.0'));
-  }, []);
+  // useEffect(() => {
+  //   getVersion().then(setVersion).catch(() => setVersion('2.3.0'));
+  // }, []);
 
-  const fileName = `LightC_${version}_x64_Installer.msi`;
+  // const fileName = `LightC_${version}_x64_Installer.msi`;
+  const fileName = `替换成安装包名`;
   const commands = [
     {
       label: 'PowerShell (推荐)',
