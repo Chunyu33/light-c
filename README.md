@@ -297,7 +297,7 @@ LightC/
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
-├── update-log.md                     # 版本更新日志
+├── update-logs.md                     # 版本更新日志
 └── README.md
 ```
 
@@ -410,7 +410,7 @@ npm run tauri build
 
 ## 📋 更新日志
 
-查看完整的版本更新历史：[更新日志](update-log.md)
+查看完整的版本更新历史：[更新日志](update-logs.md)
 
 ---
 

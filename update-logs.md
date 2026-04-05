@@ -19,7 +19,7 @@
 
 ### 📝 文档优化
 
-- **更新日志独立**：将更新日志从 README 抽离为独立的 `update-log.md` 文件，保持 README 简洁
+- **更新日志独立**：将更新日志从 README 抽离为独立的 `update-logs.md` 文件，保持 README 简洁
 
 ---
 

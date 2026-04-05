@@ -952,7 +952,7 @@ function AboutSettings() {
           更新日志
         </h4>
         <a
-          href="https://github.com/Chunyu33/light-c/blob/main/update-log.md"
+          href="https://github.com/Chunyu33/light-c/blob/main/update-logs.md"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-between p-4 rounded-2xl bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] transition-colors group"
