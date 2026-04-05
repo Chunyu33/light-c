@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users, MousePointerClick, ShieldCheck, Rocket } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
@@ -684,6 +684,9 @@ function FeedbackSettings() {
           </div>
         </div>
       </div>
+
+      {/* 支持作者 - 赞赏功能 */}
+      <SupportAuthor />
     </div>
   );
 }
@@ -864,73 +867,31 @@ function AboutSettings() {
         </div>
       </div>
 
-      {/* 交流群 */}
-      <CommunityGroup />
-
-      {/* 支持作者 - 赞赏功能 */}
-      <SupportAuthor />
+      {/* 更新日志 */}
+      <div className="space-y-3">
+        <a
+          href="https://github.com/Chunyu33/light-c/blob/main/README.md#-更新日志"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between p-4 rounded-2xl bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-[var(--brand-green)]" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">更新日志</p>
+              <p className="text-xs text-[var(--text-muted)]">查看版本更新历史</p>
+            </div>
+          </div>
+          <ExternalLink className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)]" />
+        </a>
+      </div>
 
       <div className="text-center pt-4">
         <p className="text-xs text-[var(--text-faint)]">
-          Copyright © {new Date().getFullYear()} LightC. All rights reserved.
+          Copyright &copy; {new Date().getFullYear()} LightC. All rights reserved.
         </p>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// 交流群组件 - 复制群号功能
-// ============================================================================
-
-const QQ_GROUP = '834582563';
-
-function CommunityGroup() {
-  const [copied, setCopied] = useState(false);
-
-  // 复制群号到剪贴板
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(QQ_GROUP);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('复制失败:', err);
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
-        <Users className="w-3.5 h-3.5" />
-        交流群
-      </h4>
-      <div className="bg-[var(--bg-main)] rounded-2xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[var(--text-secondary)]">QQ群：</span>
-            <span className="text-sm font-medium text-[var(--text-primary)]">{QQ_GROUP}</span>
-          </div>
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${copied
-                ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)]'
-                : 'bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-              }`}
-          >
-            {copied ? (
-              <>
-                <CheckCircle className="w-3 h-3" />
-                已复制
-              </>
-            ) : (
-              <>
-                <Copy className="w-3 h-3" />
-                复制
-              </>
-            )}
-          </button>
-        </div>
       </div>
     </div>
   );
