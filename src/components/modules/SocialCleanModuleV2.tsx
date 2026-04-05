@@ -277,12 +277,30 @@ export function SocialCleanModuleV2() {
 
   const isExpanded = expandedModule === 'social';
 
+  // 删除遮罩动画状态 - 使用 CSS keyframe 动画类
+  const [isDeletingVisible, setIsDeletingVisible] = useState(false);
+  const [isDeletingAnimating, setIsDeletingAnimating] = useState(false);
+  const deletingEnteredRef = useRef(false);
+  if (isDeletingVisible) deletingEnteredRef.current = true;
+  
+  useEffect(() => {
+    if (isDeleting) {
+      setIsDeletingAnimating(true);
+      setIsDeletingVisible(true);
+    } else {
+      setIsDeletingVisible(false);
+      const timer = setTimeout(() => setIsDeletingAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDeleting]);
+
   return (
     <>
       {/* 删除进度遮罩 */}
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+      {isDeletingAnimating && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4 ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
             </div>

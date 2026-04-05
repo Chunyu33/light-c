@@ -4,7 +4,7 @@
 // 核心价值：轻量、安全、高效清理
 // ============================================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Shield, Zap, Sparkles } from 'lucide-react';
 
@@ -37,12 +37,20 @@ const STORAGE_KEY = 'lightc_welcome_dismissed';
 
 export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isButtonPressed, setIsButtonPressed] = useState(false);
+  const enteredRef = useRef(false);
+  if (isVisible) enteredRef.current = true;
 
   useEffect(() => {
     if (isOpen) {
       setIsAnimating(true);
+      setIsVisible(true);
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => setIsAnimating(false), 280);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -50,8 +58,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     if (dontShowAgain) {
       localStorage.setItem(STORAGE_KEY, 'true');
     }
-    setIsAnimating(false);
-    setTimeout(onClose, 200);
+    onClose();
   };
 
   // 开始使用按钮点击 - 带缩放动画
@@ -63,21 +70,18 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }, 150);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isAnimating) return null;
 
   const { title, subtitle, description, features } = WELCOME_CONFIG;
 
   return createPortal(
-    <div 
-      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-all duration-300 ${
-        isAnimating ? 'bg-black/40 backdrop-blur-sm' : 'bg-transparent'
-      }`}
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div 
-        className={`relative bg-[var(--bg-card)] rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden transition-all duration-300 ${
-          isAnimating ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
-        }`}
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
+        onClick={handleClose}
+      />
+      <div 
+        className={`relative bg-[var(--bg-card)] rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 顶部渐变装饰条 */}

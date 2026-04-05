@@ -57,8 +57,7 @@
         "sidebarImage": "nsis/wizard.bmp",
         "installMode": "currentUser",
         "languages": ["SimpChinese", "English"],
-        "displayLanguageSelector": false,
-        "installerScript": "nsis/installer.nsh"
+        "displayLanguageSelector": false
       }
     }
   }

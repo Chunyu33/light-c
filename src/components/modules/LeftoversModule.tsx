@@ -51,6 +51,54 @@ export function LeftoversModule() {
   const [deepCleanResult, setDeepCleanResult] = useState<PermanentDeleteResult | null>(null); // 深度清理结果
   const [showDeepCleanResult, setShowDeepCleanResult] = useState(false); // 显示深度清理结果
 
+  // 动画状态 - 删除进度遮罩
+  const [isDeletingVisible, setIsDeletingVisible] = useState(false);
+  const [isDeletingAnimating, setIsDeletingAnimating] = useState(false);
+  const deletingEnteredRef = useRef(false);
+  if (isDeletingVisible) deletingEnteredRef.current = true;
+  useEffect(() => {
+    if (isDeleting) {
+      setIsDeletingAnimating(true);
+      setIsDeletingVisible(true);
+    } else {
+      setIsDeletingVisible(false);
+      const timer = setTimeout(() => setIsDeletingAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDeleting]);
+
+  // 动画状态 - 深度清理警告弹窗
+  const [isWarningVisible, setIsWarningVisible] = useState(false);
+  const [isWarningAnimating, setIsWarningAnimating] = useState(false);
+  const warningEnteredRef = useRef(false);
+  if (isWarningVisible) warningEnteredRef.current = true;
+  useEffect(() => {
+    if (showDeepCleanWarning) {
+      setIsWarningAnimating(true);
+      setIsWarningVisible(true);
+    } else {
+      setIsWarningVisible(false);
+      const timer = setTimeout(() => setIsWarningAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [showDeepCleanWarning]);
+
+  // 动画状态 - 深度清理结果弹窗
+  const [isResultVisible, setIsResultVisible] = useState(false);
+  const [isResultAnimating, setIsResultAnimating] = useState(false);
+  const resultEnteredRef = useRef(false);
+  if (isResultVisible) resultEnteredRef.current = true;
+  useEffect(() => {
+    if (showDeepCleanResult && deepCleanResult) {
+      setIsResultAnimating(true);
+      setIsResultVisible(true);
+    } else {
+      setIsResultVisible(false);
+      const timer = setTimeout(() => setIsResultAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [showDeepCleanResult, deepCleanResult]);
+
   // 计算选中大小
   const selectedSize = useMemo(() => {
     if (!scanResult) return 0;
@@ -307,9 +355,10 @@ export function LeftoversModule() {
   return (
     <>
       {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+      {isDeletingAnimating && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4 ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             <div className="w-16 h-16 rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-[var(--color-warning)] animate-spin" />
             </div>
@@ -606,9 +655,10 @@ export function LeftoversModule() {
       />
 
       {/* 深度清理警告弹窗 - 微信风格 */}
-      {showDeepCleanWarning && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+      {isWarningAnimating && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isWarningVisible ? 'modal-overlay-in' : warningEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanWarning(false)} />
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             {/* 警告图标 */}
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
@@ -670,9 +720,10 @@ export function LeftoversModule() {
       />
 
       {/* 深度清理结果弹窗 */}
-      {showDeepCleanResult && deepCleanResult && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+      {isResultAnimating && deepCleanResult && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isResultVisible ? 'modal-overlay-in' : resultEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanResult(false)} />
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 ${isResultVisible ? 'modal-content-in' : resultEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             {/* 结果图标 */}
             <div className="flex justify-center mb-4">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
