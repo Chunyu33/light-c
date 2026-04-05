@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users, MousePointerClick, ShieldCheck } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, HelpCircle, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, Users, MousePointerClick, ShieldCheck, Rocket } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
@@ -13,7 +13,7 @@ import { useTheme, type ThemeMode } from '../contexts';
 // import { check } from '@tauri-apps/plugin-updater'; // 自动更新功能已停用
 // import { relaunch } from '@tauri-apps/plugin-process'; // 自动更新功能已停用
 import { getVersion } from '@tauri-apps/api/app';
-import { getSystemInfo, type SystemInfo, openLogsFolder } from '../api/commands';
+import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings } from '../api/commands';
 import { formatSize } from '../utils/format';
 
 type SettingsTab = 'general' | 'security' | 'guide' | 'feedback' | 'about';
@@ -191,6 +191,48 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               <div className="text-left">
                 <p className="text-sm font-medium text-[var(--text-primary)]">清理日志</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">记录最近10次清理的详细文件清单与结果</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
+          </button>
+        </div>
+      </div>
+
+      {/* 系统快捷工具 */}
+      <div className="space-y-3 pt-2 border-t border-[var(--border-color)]">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Rocket className="w-3.5 h-3.5" />
+          系统快捷工具
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl divide-y divide-[var(--border-color)]">
+          {/* 开机启动管理 */}
+          <button
+            onClick={() => openStartupManager().catch(console.error)}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] first:rounded-t-2xl transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center">
+                <Rocket className="w-4.5 h-4.5 text-[var(--brand-green)]" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-[var(--text-primary)]">开机启动管理</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">打开任务管理器，禁用不必要的自启动软件</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
+          </button>
+          {/* 存储感知 */}
+          <button
+            onClick={() => openStorageSettings().catch(console.error)}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] last:rounded-b-2xl transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center">
+                <HardDrive className="w-4.5 h-4.5 text-[var(--brand-green)]" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-[var(--text-primary)]">存储感知</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">调用 Windows 原生的磁盘清理与空间管理</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />

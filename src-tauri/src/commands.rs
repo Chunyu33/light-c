@@ -2472,3 +2472,47 @@ pub async fn delete_context_menu_entries(
 
     Ok(result)
 }
+
+// ============================================================================
+// 系统快捷工具
+// ============================================================================
+
+/// 打开任务管理器的启动项管理页面
+#[tauri::command]
+pub fn open_startup_manager() -> Result<(), String> {
+    info!("打开启动项管理器");
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        use std::os::windows::process::CommandExt;
+        
+        Command::new("cmd")
+            .args(["/c", "start", "taskmgr", "/0", "/startup"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn()
+            .map_err(|e| format!("无法打开启动项管理器: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+/// 打开 Windows 存储感知设置页面
+#[tauri::command]
+pub fn open_storage_settings() -> Result<(), String> {
+    info!("打开存储感知设置");
+    
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        use std::os::windows::process::CommandExt;
+        
+        Command::new("cmd")
+            .args(["/c", "start", "ms-settings:storagesense"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .spawn()
+            .map_err(|e| format!("无法打开存储感知设置: {}", e))?;
+    }
+    
+    Ok(())
+}

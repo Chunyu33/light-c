@@ -98,6 +98,9 @@ pub fn run() {
             // 右键菜单清理
             scan_context_menu,
             delete_context_menu_entries,
+            // 系统快捷工具
+            open_startup_manager,
+            open_storage_settings,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

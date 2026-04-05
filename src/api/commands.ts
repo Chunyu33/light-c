@@ -926,3 +926,21 @@ export async function deleteContextMenuEntries(
 ): Promise<ContextMenuDeleteResult> {
   return invoke<ContextMenuDeleteResult>('delete_context_menu_entries', { entries });
 }
+
+// ============================================================================
+// 系统快捷工具
+// ============================================================================
+
+/**
+ * 打开任务管理器的启动项管理页面
+ */
+export async function openStartupManager(): Promise<void> {
+  return invoke<void>('open_startup_manager');
+}
+
+/**
+ * 打开 Windows 存储感知设置页面
+ */
+export async function openStorageSettings(): Promise<void> {
+  return invoke<void>('open_storage_settings');
+}
