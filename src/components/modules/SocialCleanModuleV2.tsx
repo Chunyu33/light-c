@@ -120,6 +120,23 @@ export function SocialCleanModuleV2() {
   const [fileModalData, setFileModalData] = useState<{ name: string; files: SocialFileEntryV2[] } | null>(null);
   const [showTip, setShowTip] = useState(true);
 
+  // 删除遮罩动画状态 - 使用 CSS keyframe 动画类
+  const [isDeletingVisible, setIsDeletingVisible] = useState(false);
+  const [isDeletingAnimating, setIsDeletingAnimating] = useState(false);
+  const deletingEnteredRef = useRef(false);
+  if (isDeletingVisible) deletingEnteredRef.current = true;
+  
+  useEffect(() => {
+    if (isDeleting) {
+      setIsDeletingAnimating(true);
+      setIsDeletingVisible(true);
+    } else {
+      setIsDeletingVisible(false);
+      const timer = setTimeout(() => setIsDeletingAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDeleting]);
+
   // 开始扫描
   const handleScan = useCallback(async () => {
     updateModuleState('social', { status: 'scanning', error: null });
@@ -276,23 +293,6 @@ export function SocialCleanModuleV2() {
     }), { files: 0, size: 0 }) || { files: 0, size: 0 };
 
   const isExpanded = expandedModule === 'social';
-
-  // 删除遮罩动画状态 - 使用 CSS keyframe 动画类
-  const [isDeletingVisible, setIsDeletingVisible] = useState(false);
-  const [isDeletingAnimating, setIsDeletingAnimating] = useState(false);
-  const deletingEnteredRef = useRef(false);
-  if (isDeletingVisible) deletingEnteredRef.current = true;
-  
-  useEffect(() => {
-    if (isDeleting) {
-      setIsDeletingAnimating(true);
-      setIsDeletingVisible(true);
-    } else {
-      setIsDeletingVisible(false);
-      const timer = setTimeout(() => setIsDeletingAnimating(false), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isDeleting]);
 
   return (
     <>

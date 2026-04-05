@@ -397,7 +397,7 @@ export function BigFilesModule() {
                     onClick={() => toggleFileSelection(file.path)}
                     className={`
                       px-4 py-3 flex items-center gap-3 cursor-pointer transition-all
-                      ${isSelected ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-[var(--bg-hover)]'}
+                      ${isSelected ? 'bg-[var(--brand-green-10)] hover:bg-[var(--brand-green-10)]' : 'hover:bg-[var(--bg-hover)]'}
                     `}
                   >
                     {/* 序号 + 复选框 */}
@@ -405,12 +405,19 @@ export function BigFilesModule() {
                       <span className="w-5 text-center text-xs font-medium text-[var(--fg-faint)]">
                         {index + 1}
                       </span>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => {}}
-                        className="h-4 w-4 rounded border-[var(--border-default)] text-emerald-500 focus:ring-emerald-500 cursor-pointer"
-                      />
+                      <div className={`
+                        w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer
+                        ${isSelected
+                          ? 'bg-[var(--brand-green)] border-[var(--brand-green)]'
+                          : 'border-[var(--text-faint)]'
+                        }
+                      `}>
+                        {isSelected && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
                     </div>
 
                     {/* 文件图标 */}

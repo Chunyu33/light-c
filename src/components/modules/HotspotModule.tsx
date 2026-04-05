@@ -471,7 +471,7 @@ export function HotspotModule() {
 
           {/* 统计摘要 */}
           <div className="flex items-center justify-between px-1 text-xs text-[var(--text-muted)]">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mt-4">
               <span>共扫描 <strong className="text-[var(--text-primary)]">{scanResult.total_folders_scanned}</strong> 个文件夹</span>
               <span>
                 {scanResult.is_full_scan ? 'C 盘' : 'AppData'} 总占用{' '}
