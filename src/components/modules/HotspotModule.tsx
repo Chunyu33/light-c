@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, Brush, Search, ShieldAlert, Shield, Eye } from 'lucide-react';
+import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, Search, ShieldAlert, Shield, Eye, Trash2 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -171,7 +171,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             {/* 缓存目录标签 - 建议清理（仅非深度扫描模式显示） */}
             {entry.is_cache && !entry.is_program && !entry.is_protected && !isFullScan && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
-                <Brush className="w-3 h-3" />
+                <Trash2 className="w-3 h-3" />
                 临时缓存
               </span>
             )}
@@ -224,7 +224,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
                 title="清理缓存文件"
               >
-                <Brush className="w-4 h-4" />
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
             
