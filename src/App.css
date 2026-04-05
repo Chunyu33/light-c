@@ -67,9 +67,14 @@
   --scrollbar-thumb: #D4D4D8;
   --scrollbar-thumb-hover: #A1A1AA;
 
+  /* ===== 字体大小控制系统 ===== */
+  --font-size-offset: 0px;            /* 字号偏移量：标准=0px, 适中=1px, 较大=2px */
+  --base-font-size: 14px;             /* 基础字号 */
+  --base-line-height: 1.5;            /* 基础行高 */
+
   font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: calc(var(--base-font-size) + var(--font-size-offset));
+  line-height: var(--base-line-height);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -189,7 +194,7 @@ body {
 
 /* 平滑过渡 */
 * {
-  transition-property: background-color, border-color, color, fill, stroke;
+  transition-property: background-color, border-color, color, fill, stroke, font-size;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }

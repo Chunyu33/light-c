@@ -9,7 +9,8 @@ import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, Ref
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
 import alipayQr from '../assets/r_alipay_qr.jpg';
-import { useTheme, type ThemeMode } from '../contexts';
+import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSizeLevel } from '../contexts';
+import { Type } from 'lucide-react';
 // import { check } from '@tauri-apps/plugin-updater'; // 自动更新功能已停用
 // import { relaunch } from '@tauri-apps/plugin-process'; // 自动更新功能已停用
 import { getVersion } from '@tauri-apps/api/app';
@@ -35,6 +36,12 @@ const themeOptions: { mode: ThemeMode; label: string; icon: typeof Sun }[] = [
   { mode: 'light', label: '浅色模式', icon: Sun },
   { mode: 'dark', label: '深色模式', icon: Moon },
   { mode: 'system', label: '跟随系统', icon: Monitor },
+];
+
+const fontSizeOptions: { level: FontSizeLevel; label: string }[] = [
+  { level: 'standard', label: '标准' },
+  { level: 'medium', label: '适中' },
+  { level: 'large', label: '较大' },
 ];
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -71,7 +78,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       />
 
       {/* 弹窗内容 - 微信风格卡片布局 */}
-      <div className={`relative w-[600px] h-[450px] bg-[var(--bg-card)] rounded-2xl shadow-2xl flex overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+      <div className={`relative w-[600px] min-h-[450px] max-h-[80vh] bg-[var(--bg-card)] rounded-2xl shadow-2xl flex overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 左侧导航 - 使用主背景色 */}
         {/* === 🐛 核心修复点：添加 shrink-0，禁止菜单缩小以适应右侧的长代码块 === */}
         <div className="w-[160px] shrink-0 bg-[var(--bg-main)] border-r border-[var(--border-color)] py-4">
@@ -98,7 +105,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         {/* 右侧内容 - 卡片背景 */}
         <div className="flex-1 flex flex-col bg-[var(--bg-card)]">
           {/* 标题栏 */}
-          <div className="h-12 flex items-center justify-between px-5 border-b border-[var(--border-color)]">
+          <div className="min-h-12 flex items-center justify-between px-5 border-b border-[var(--border-color)]">
             <h3 className="text-sm font-medium text-[var(--text-primary)]">
               {tabs.find(t => t.id === activeTab)?.label}
             </h3>
@@ -129,6 +136,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
 // 通用设置 - 微信风格主题切换器
 function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
+  const { level: fontSizeLevel, setLevel: setFontSizeLevel } = useFontSize();
+
   const handleOpenLogsFolder = async () => {
     try {
       await openLogsFolder();
@@ -145,26 +154,57 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
           <Palette className="w-3.5 h-3.5" />
           外观设置
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
+          {/* 主题模式 */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">主题模式</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">选择应用的外观主题</p>
             </div>
             {/* 分段控制器 - 仅激活状态使用 brand-green */}
+            {/* 非标准字号时只显示图标，避免布局变形 */}
             <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
               {themeOptions.map(({ mode: m, label, icon: Icon }) => (
                 <button
                   key={m}
                   onClick={() => setMode(m)}
                   title={label}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${mode === m
+                  className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                    fontSizeLevel === 'standard' ? 'px-3 py-2' : 'p-2'
+                  } ${mode === m
                       ? 'bg-[var(--brand-green)] text-white'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                     }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{label}</span>
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  {fontSizeLevel === 'standard' && <span>{label}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 界面字号 */}
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+                <Type className="w-4 h-4 text-[var(--text-muted)]" />
+                界面字号
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">调整应用内文字大小</p>
+            </div>
+            {/* 字号分段控制器 */}
+            <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+              {fontSizeOptions.map(({ level, label }) => (
+                <button
+                  key={level}
+                  onClick={() => setFontSizeLevel(level)}
+                  title={`${label} (+${FONT_SIZE_CONFIGS[level].offset}px)`}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${fontSizeLevel === level
+                      ? 'bg-[var(--brand-green)] text-white'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                    }`}
+                >
+                  {label}
                 </button>
               ))}
             </div>
@@ -286,7 +326,7 @@ function SecuritySettings() {
       <div className="w-full bg-[var(--bg-main)] rounded-xl border border-[var(--border-color)] overflow-hidden">
         <div className="p-3 bg-amber-500/5 border-b border-amber-500/10 flex items-start gap-2.5">
           <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-[11px] text-amber-600/90 leading-relaxed break-all">
+          <div className="text-xs text-amber-600/90 leading-relaxed">
             非官方渠道版本可能包含<span className="font-bold">捆绑插件或后门程序</span>。请务必核对文件哈希值，确保您的系统安全。
           </div>
         </div>
@@ -296,7 +336,7 @@ function SecuritySettings() {
             <CheckCircle className="w-3.5 h-3.5 text-[var(--brand-green)]" />
             官方正版标识
           </div>
-          <div className="pl-6 space-y-1.5 text-[11px] text-[var(--text-muted)]">
+          <div className="pl-6 space-y-1.5 text-xs text-[var(--text-muted)]">
             <p className="flex items-center gap-1">
               源码及发布:
               <a href="https://github.com/Chunyu33/light-c" target="_blank" className="text-[var(--brand-green)] hover:underline inline-flex items-center">
@@ -310,7 +350,7 @@ function SecuritySettings() {
 
       {/* 2. 校验命令区 */}
       <div className="space-y-2.5">
-        <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest px-1">
+        <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest px-1">
           HASH 完整性校验
         </h4>
 
@@ -318,10 +358,10 @@ function SecuritySettings() {
           {commands.map((cmd, index) => (
             <div key={index} className="space-y-1.5">
               <div className="flex items-center justify-between px-0.5">
-                <span className="text-[10px] font-semibold text-[var(--text-secondary)]">{cmd.label}</span>
+                <span className="text-xs font-semibold text-[var(--text-secondary)]">{cmd.label}</span>
                 <button
                   onClick={() => handleCopy(cmd.command, index)}
-                  className="text-[10px] text-[var(--brand-green)] hover:opacity-70 transition-all flex items-center gap-1"
+                  className="text-xs text-[var(--brand-green)] hover:opacity-70 transition-all flex items-center gap-1 shrink-0"
                 >
                   {copiedIndex === index ? (
                     <><CheckCircle className="w-2.5 h-2.5" /> 已复制</>
@@ -333,7 +373,7 @@ function SecuritySettings() {
 
               {/* 命令显示区：强制横向滚动，防止撑开宽度 */}
               <div className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-2 overflow-x-auto scrollbar-thin">
-                <code className="text-[10px] font-mono text-[var(--brand-green)] whitespace-nowrap block">
+                <code className="text-xs font-mono text-[var(--brand-green)] whitespace-nowrap block">
                   {cmd.command}
                 </code>
               </div>
@@ -342,7 +382,7 @@ function SecuritySettings() {
 
           {/* 底部小字说明 */}
           <div className="pt-2 border-t border-[var(--border-color)]">
-            <div className="flex items-start gap-2 text-[10px] text-[var(--text-faint)] leading-normal">
+            <div className="flex items-start gap-2 text-xs text-[var(--text-faint)] leading-relaxed">
               <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[var(--brand-green)]" />
               <div className="space-y-1">
                 <p className="text-[var(--text-secondary)] font-medium">如何进行校验？</p>

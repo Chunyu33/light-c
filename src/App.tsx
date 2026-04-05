@@ -24,7 +24,7 @@ import {
   SplashScreen,
   Footer,
 } from './components';
-import { DashboardProvider, useDashboard } from './contexts';
+import { DashboardProvider, useDashboard, FontSizeProvider } from './contexts';
 import './App.css';
 
 // ============================================================================
@@ -125,11 +125,13 @@ function App() {
 
   // 主窗口
   return (
-    <ToastProvider>
-      <DashboardProvider>
-        <DashboardContent />
-      </DashboardProvider>
-    </ToastProvider>
+    <FontSizeProvider>
+      <ToastProvider>
+        <DashboardProvider>
+          <DashboardContent />
+        </DashboardProvider>
+      </ToastProvider>
+    </FontSizeProvider>
   );
 }
 
