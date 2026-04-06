@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, Search, ShieldAlert, Shield, Eye, Trash2 } from 'lucide-react';
+import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -13,6 +13,7 @@ import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import { scanHotspot, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import { DrillDownModal } from './DrillDownModal';
 
 // ============================================================================
 // 工具函数
@@ -99,9 +100,13 @@ interface HotspotItemProps {
   parentName?: string;
   /** 是否为子目录（下钻结果） */
   isChild?: boolean;
+  /** 当前在树中的绝对深度（0=顶级） */
+  treeDepth?: number;
+  /** 下钻回调：点击后进入 drilldown 模式 */
+  onDrillDown?: (path: string) => void;
 }
 
-function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup, onSearch, parentName, isChild }: HotspotItemProps) {
+function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup, onSearch, parentName, isChild, treeDepth = 0, onDrillDown }: HotspotItemProps) {
   // 计算占比条宽度
   const percentage = maxSize > 0 ? (entry.total_size / maxSize) * 100 : 0;
   
@@ -214,6 +219,20 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
           
           {/* 操作按钮组 */}
           <div className="flex items-center gap-1">
+            {/* 下钻按钮 - 在最末层子目录（无 children 且有 onDrillDown）时显示 */}
+            {onDrillDown && (!entry.children || entry.children.length === 0) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDrillDown(entry.path);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
+                title="展开下级目录"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
+
             {/* 清理按钮 - 仅在非深度扫描模式且可清理时显示 */}
             {canCleanup && (
               <button
@@ -256,7 +275,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
       </div>
       </div>
       
-      {/* 递归渲染子目录（智能下钻结果） */}
+      {/* 递归渲染子目录（智能下钻结果） - 仅在 tree 模式前三级展示 */}
       {entry.children && entry.children.length > 0 && (
         <div className="mt-1 space-y-1">
           {entry.children.map((child, idx) => (
@@ -264,13 +283,15 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
               key={child.path}
               entry={child}
               rank={idx + 1}
-              maxSize={entry.total_size} // 使用父目录大小作为基准
+              maxSize={entry.total_size}
               isFullScan={isFullScan}
               onOpenFolder={onOpenFolder}
               onCleanup={onCleanup}
               onSearch={onSearch}
               parentName={entry.name}
               isChild={true}
+              treeDepth={treeDepth + 1}
+              onDrillDown={onDrillDown}
             />
           ))}
         </div>
@@ -300,8 +321,28 @@ export function HotspotModule() {
   const [cleanupTarget, setCleanupTarget] = useState<HotspotEntry | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
 
+  // ====== 下钻模态框状态 ======
+  /** 选中的路径：非空时弹出 DrillDownModal */
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+
   // 是否展开
   const isExpanded = expandedModule === 'hotspot';
+
+  /** 点击下钻按钮 → 打开模态框 */
+  const handleDrillDown = useCallback((targetPath: string) => {
+    setSelectedPath(targetPath);
+  }, []);
+
+  /** 模态框内发生清理后的同步回调 → 重新扫描主列表 */
+  const handleModalCleanupDone = useCallback(() => {
+    // 延迟触发重新扫描，避免与模态框关闭动画冲突
+    setTimeout(() => {
+      handleScanRef.current?.();
+    }, 100);
+  }, []);
+
+  // 使用 ref 打破 handleScan ↔ handleModalCleanupDone 的循环依赖
+  const handleScanRef = useRef<(() => void) | null>(null);
 
   // 执行扫描
   const handleScan = useCallback(async () => {
@@ -309,6 +350,7 @@ export function HotspotModule() {
     setError(null);
     setScanResult(null);
     setShowAll(false);
+    setSelectedPath(null);
 
     try {
       // 根据深度扫描开关决定扫描模式
@@ -329,6 +371,9 @@ export function HotspotModule() {
       updateModuleState('hotspot', { status: 'error' });
     }
   }, [updateModuleState, fullScanEnabled]);
+
+  // 同步 handleScanRef 供模态框清理回调使用
+  handleScanRef.current = handleScan;
 
   // 响应一键扫描
   useEffect(() => {
@@ -493,6 +538,8 @@ export function HotspotModule() {
                 onOpenFolder={handleOpenFolder}
                 onCleanup={handleCleanupClick}
                 onSearch={handleSearch}
+                treeDepth={0}
+                onDrillDown={handleDrillDown}
               />
             ))}
           </div>
@@ -539,6 +586,15 @@ export function HotspotModule() {
           isDanger={false}
         />,
         document.body
+      )}
+
+      {/* 下钻模态框 - Portal 渲染到 body */}
+      {selectedPath && (
+        <DrillDownModal
+          initialPath={selectedPath}
+          onClose={() => setSelectedPath(null)}
+          onCleanupDone={handleModalCleanupDone}
+        />
       )}
     </ModuleCard>
   );

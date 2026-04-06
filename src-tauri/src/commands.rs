@@ -2304,6 +2304,41 @@ pub async fn scan_hotspot(
     result
 }
 
+/// 单层路径钻取扫描（动态下钻功能）
+/// 
+/// 扫描指定路径的直接子文件夹，使用 rayon 并行计算大小
+/// 用于前端下钻模式，逐层展开深层目录结构
+/// 
+/// # 参数
+/// - `path`: 要扫描的目标目录绝对路径
+#[tauri::command]
+pub async fn scan_path_direct(path: String) -> Result<crate::scanner::HotspotScanResult, String> {
+    use crate::scanner::HotspotScanner;
+
+    info!("路径钻取扫描: {}", path);
+
+    let result = tokio::task::spawn_blocking(move || {
+        HotspotScanner::scan_path_direct(&path)
+    })
+    .await
+    .map_err(|e| format!("路径钻取扫描任务执行失败: {}", e))?;
+
+    match &result {
+        Ok(scan_result) => {
+            info!(
+                "路径钻取扫描完成: {} 个子目录，耗时 {}ms",
+                scan_result.entries.len(),
+                scan_result.scan_duration_ms,
+            );
+        }
+        Err(e) => {
+            log::warn!("路径钻取扫描失败: {}", e);
+        }
+    }
+
+    result
+}
+
 /// 清理目录内容（保留根目录）
 /// 
 /// 遍历并删除目录内的所有文件和子文件夹，保留根目录本身

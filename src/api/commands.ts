@@ -814,6 +814,15 @@ export async function scanHotspot(topN?: number, fullScan?: boolean): Promise<Ho
 }
 
 /**
+ * 单层路径钻取扫描（动态下钻功能）
+ * 扫描指定路径的直接子文件夹，用于逐层展开深层目录结构
+ * @param path 要扫描的目标目录绝对路径
+ */
+export async function scanPathDirect(path: string): Promise<HotspotScanResult> {
+  return invoke<HotspotScanResult>('scan_path_direct', { path });
+}
+
+/**
  * 目录清理结果
  */
 export interface CleanupDirectoryResult {

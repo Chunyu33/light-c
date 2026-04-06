@@ -747,6 +747,85 @@ impl HotspotScanner {
         let scanner = HotspotScanner::new(false, top_n);
         scanner.scan()
     }
+
+    /// 单层路径钻取扫描（动态下钻功能）
+    /// 仅扫描指定路径的直接子文件夹，使用 rayon 并行计算大小
+    /// 
+    /// # 参数
+    /// - `path`: 要扫描的目标目录绝对路径
+    /// 
+    /// # 返回
+    /// 返回 HotspotScanResult，其中 entries 为该路径下的直接子文件夹列表
+    /// 按 total_size 降序排列
+    pub fn scan_path_direct(path: &str) -> Result<HotspotScanResult, String> {
+        let start_time = std::time::Instant::now();
+        let target = PathBuf::from(path);
+
+        if !target.exists() {
+            return Err(format!("路径不存在: {}", path));
+        }
+        if !target.is_dir() {
+            return Err(format!("路径不是文件夹: {}", path));
+        }
+
+        // 读取直接子目录
+        let sub_dirs: Vec<PathBuf> = std::fs::read_dir(&target)
+            .map_err(|e| format!("无法读取目录 {}: {}", path, e))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .filter(|p| !Self::should_skip_scan(p))
+            .collect();
+
+        let total_folders_scanned = sub_dirs.len();
+
+        // 使用 rayon 并行计算每个子目录的大小
+        let mut entries: Vec<HotspotEntry> = sub_dirs
+            .par_iter()
+            .filter_map(|sub_path| {
+                Self::calculate_folder_stats(sub_path).map(|stats| {
+                    let folder_name = sub_path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let path_str = sub_path.to_string_lossy().to_string();
+                    let is_cache = Self::is_cache_directory(&path_str, &folder_name);
+                    let is_program = Self::is_program_directory(&path_str);
+                    let parent_type = Self::get_parent_type(&path_str);
+                    let is_protected = Self::is_protected_directory(sub_path);
+
+                    HotspotEntry {
+                        path: path_str,
+                        name: folder_name,
+                        total_size: stats.total_size,
+                        file_count: stats.file_count,
+                        last_modified: stats.last_modified,
+                        parent_type,
+                        is_cache,
+                        is_program,
+                        is_safe_to_clean: is_cache && !is_program && !is_protected,
+                        is_protected,
+                        children: Vec::new(),
+                        depth: 0,
+                    }
+                })
+            })
+            .collect();
+
+        // 按大小降序排列
+        entries.sort_by(|a, b| b.total_size.cmp(&a.total_size));
+
+        let appdata_total_size = entries.iter().map(|e| e.total_size).sum();
+        let scan_duration_ms = start_time.elapsed().as_millis() as u64;
+
+        Ok(HotspotScanResult {
+            entries,
+            total_folders_scanned,
+            scan_duration_ms,
+            appdata_total_size,
+            is_full_scan: false,
+        })
+    }
 }
 
 /// 文件夹统计信息（内部使用）
