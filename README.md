@@ -203,6 +203,7 @@ LightC/
 │   │   ├── modules/                  # 功能模块卡片组件
 │   │   │   ├── BigFilesModule.tsx    # 大文件清理模块
 │   │   │   ├── HotspotModule.tsx     # 大目录分析模块
+│   │   │   ├── DrillDownModal.tsx    # 大目录下钻模态框
 │   │   │   ├── JunkCleanModule.tsx   # 垃圾清理模块
 │   │   │   ├── LeftoversModule.tsx   # 卸载残留模块
 │   │   │   ├── RegistryModule.tsx    # 注册表清理模块

@@ -508,6 +508,11 @@ function GuideSettings() {
               <span className="text-[var(--brand-green)] font-medium">智能下钻：</span>开启深度扫描后，当目录超过 <span className="font-medium">5GB</span> 且包含超过 <span className="font-medium">1000</span> 个文件时，
               系统会自动分析其子目录结构，最多下钻 <span className="font-medium">3 层</span>，展示每层占用空间最大的前 3 个子目录，帮助您精准定位空间占用来源。
             </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-2">
+              <span className="text-[var(--brand-green)] font-medium">无限下钻弹窗：</span>点击目录条目右侧的 <span className="font-medium">▶</span> 按钮，
+              将弹出<span className="text-[var(--brand-green)] font-medium">沉浸式下钻模态框</span>，支持无限层级深入探索子目录结构。
+              弹窗顶部显示完整路径面包屑导航，可快速回溯到任意层级；按 <span className="font-medium">ESC</span> 键可快速关闭弹窗。
+            </p>
           </div>
         </div>
       </div>
