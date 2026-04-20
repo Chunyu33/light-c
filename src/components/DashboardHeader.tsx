@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useEffect, useState, useRef } from 'react';
-import { HardDrive, Moon, Trash2, Zap, Pause, Play, Square } from 'lucide-react';
+import { HardDrive, Moon, Trash2, Zap, Square } from 'lucide-react';
 import { useDashboard } from '../contexts/DashboardContext';
 import { formatSize } from '../utils/format';
 
@@ -99,7 +99,7 @@ interface DashboardHeaderProps {
 // ============================================================================
 
 export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHeaderProps) {
-  const { diskInfo, healthData, isLoadingHealth, isAnyScanning, isScanPaused, toggleScanPause, stopAllScans } = useDashboard();
+  const { diskInfo, healthData, isLoadingHealth, isAnyScanning, stopAllScans } = useDashboard();
   
   // 动画数字
   const animatedScore = useAnimatedNumber(healthData?.score ?? 0);
@@ -218,42 +218,14 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
         {/* 一键扫描按钮区域 */}
         <div className="flex items-center gap-2">
           {isAnyScanning ? (
-            <>
-              {/* 暂停/继续按钮 */}
-              <button
-                onClick={toggleScanPause}
-                className={`
-                  flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200
-                  ${isScanPaused
-                    ? 'bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)]'
-                    : 'bg-[var(--color-warning)]/20 text-[var(--color-warning)] hover:bg-[var(--color-warning)]/30'
-                  }
-                `}
-                title={isScanPaused ? '继续扫描' : '暂停扫描'}
-              >
-                {isScanPaused ? (
-                  <>
-                    <Play className="w-4 h-4" />
-                    继续
-                  </>
-                ) : (
-                  <>
-                    <Pause className="w-4 h-4" />
-                    暂停
-                  </>
-                )}
-              </button>
-              
-              {/* 停止按钮 */}
-              <button
-                onClick={stopAllScans}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
-                title="停止扫描"
-              >
-                <Square className="w-4 h-4" />
-                停止
-              </button>
-            </>
+            <button
+              onClick={stopAllScans}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-[14px] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
+              title="停止扫描"
+            >
+              <Square className="w-4 h-4" />
+              停止扫描
+            </button>
           ) : (
             <button
               onClick={onOneClickScan}
