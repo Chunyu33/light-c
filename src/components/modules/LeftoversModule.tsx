@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useDashboard } from '../../contexts/DashboardContext';
@@ -723,81 +723,12 @@ export function LeftoversModule() {
 
       {/* 深度清理结果弹窗 */}
       {isResultAnimating && deepCleanResult && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isResultVisible ? 'modal-overlay-in' : resultEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanResult(false)} />
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 ${isResultVisible ? 'modal-content-in' : resultEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
-            {/* 结果图标 */}
-            <div className="flex justify-center mb-4">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                deepCleanResult.success_count > 0 
-                  ? 'bg-[var(--brand-green)]/10' 
-                  : 'bg-[var(--color-danger)]/10'
-              }`}>
-                {deepCleanResult.success_count > 0 ? (
-                  <CheckCircle2 className="w-8 h-8 text-[var(--brand-green)]" />
-                ) : (
-                  <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
-                )}
-              </div>
-            </div>
-            
-            {/* 标题 */}
-            <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">
-              深度清理完成
-            </h3>
-            
-            {/* 统计信息 */}
-            <div className="space-y-3 mb-6">
-              {/* 成功删除 */}
-              {deepCleanResult.success_count > 0 && (
-                <div className="flex items-center justify-between p-3 bg-[var(--brand-green)]/10 rounded-xl">
-                  <span className="text-sm text-[var(--text-secondary)]">成功删除</span>
-                  <span className="text-sm font-bold text-[var(--brand-green)]">
-                    {deepCleanResult.success_count} 个文件夹，释放 {formatSize(deepCleanResult.freed_size)}
-                  </span>
-                </div>
-              )}
-              
-              {/* 需要人工审核 */}
-              {deepCleanResult.manual_review_count > 0 && (
-                <div className="flex items-center justify-between p-3 bg-[var(--color-warning)]/10 rounded-xl">
-                  <span className="text-sm text-[var(--text-secondary)]">需人工审核</span>
-                  <span className="text-sm font-bold text-[var(--color-warning)]">
-                    {deepCleanResult.manual_review_count} 个（包含可执行文件）
-                  </span>
-                </div>
-              )}
-              
-              {/* 待重启删除 */}
-              {deepCleanResult.reboot_pending_count > 0 && (
-                <div className="flex items-center justify-between p-3 bg-[var(--color-info)]/10 rounded-xl">
-                  <span className="text-sm text-[var(--text-secondary)]">待重启删除</span>
-                  <span className="text-sm font-bold text-[var(--color-info)]">
-                    {deepCleanResult.reboot_pending_count} 个（文件被占用）
-                  </span>
-                </div>
-              )}
-              
-              {/* 删除失败 */}
-              {deepCleanResult.failed_count > 0 && (
-                <div className="flex items-center justify-between p-3 bg-[var(--color-danger)]/10 rounded-xl">
-                  <span className="text-sm text-[var(--text-secondary)]">删除失败</span>
-                  <span className="text-sm font-bold text-[var(--color-danger)]">
-                    {deepCleanResult.failed_count} 个
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            {/* 关闭按钮 */}
-            <button
-              onClick={() => setShowDeepCleanResult(false)}
-              className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors"
-            >
-              确定
-            </button>
-          </div>
-        </div>,
+        <DeepCleanResultModal
+          result={deepCleanResult}
+          isVisible={isResultVisible}
+          hasEntered={resultEnteredRef.current}
+          onClose={() => setShowDeepCleanResult(false)}
+        />,
         document.body
       )}
     </>
@@ -805,3 +736,202 @@ export function LeftoversModule() {
 }
 
 export default LeftoversModule;
+
+// ============================================================================
+// 深度清理结果弹窗组件
+// ============================================================================
+
+interface DeepCleanResultModalProps {
+  result: PermanentDeleteResult;
+  isVisible: boolean;
+  hasEntered: boolean;
+  onClose: () => void;
+}
+
+function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCleanResultModalProps) {
+  const [expandedSection, setExpandedSection] = useState<'review' | 'failed' | null>(null);
+
+  // 获取需要审核的项目
+  const reviewItems = result.details.filter(d => d.needs_manual_review);
+  // 获取失败的项目
+  const failedItems = result.details.filter(d => !d.success && !d.needs_manual_review && !d.marked_for_reboot);
+
+  // 获取失败原因的友好描述
+  const getFailureReason = (detail: typeof result.details[0]): string => {
+    if (detail.failure_reason) {
+      // 简化常见错误信息
+      if (detail.failure_reason.includes('拒绝访问') || detail.failure_reason.includes('Access is denied')) {
+        return '权限不足，请以管理员身份运行';
+      }
+      if (detail.failure_reason.includes('正由另一个进程使用') || detail.failure_reason.includes('being used')) {
+        return '文件被占用，请关闭相关程序后重试';
+      }
+      if (detail.failure_reason.includes('找不到') || detail.failure_reason.includes('not find')) {
+        return '文件已不存在';
+      }
+      return detail.failure_reason;
+    }
+    return getSafetyCheckMessage(detail.safety_check);
+  };
+
+  // 获取文件夹名称
+  const getFolderName = (path: string): string => {
+    const parts = path.replace(/\\/g, '/').split('/');
+    return parts[parts.length - 1] || path;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      <div 
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`} 
+        onClick={onClose} 
+      />
+      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl w-[420px] max-h-[80vh] overflow-hidden flex flex-col mx-4 ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
+        {/* 结果图标 */}
+        <div className="flex justify-center mb-4">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+            result.success_count > 0 
+              ? 'bg-[var(--brand-green)]/10' 
+              : 'bg-[var(--color-danger)]/10'
+          }`}>
+            {result.success_count > 0 ? (
+              <CheckCircle2 className="w-8 h-8 text-[var(--brand-green)]" />
+            ) : (
+              <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
+            )}
+          </div>
+        </div>
+        
+        {/* 标题 */}
+        <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">
+          深度清理完成
+        </h3>
+        
+        {/* 统计信息 - 可滚动区域 */}
+        <div className="flex-1 overflow-auto space-y-3 mb-4">
+          {/* 成功删除 */}
+          {result.success_count > 0 && (
+            <div className="flex items-center justify-between p-3 bg-[var(--brand-green)]/10 rounded-xl">
+              <span className="text-sm text-[var(--text-secondary)]">成功删除</span>
+              <span className="text-sm font-bold text-[var(--brand-green)]">
+                {result.success_count} 个，释放 {formatSize(result.freed_size)}
+              </span>
+            </div>
+          )}
+          
+          {/* 需要人工审核 - 可展开 */}
+          {reviewItems.length > 0 && (
+            <div className="bg-[var(--color-warning)]/10 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpandedSection(expandedSection === 'review' ? null : 'review')}
+                className="w-full flex items-center justify-between p-3 hover:bg-[var(--color-warning)]/5 transition-colors"
+              >
+                <span className="text-sm text-[var(--text-secondary)]">需人工审核</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[var(--color-warning)]">
+                    {reviewItems.length} 个
+                  </span>
+                  {expandedSection === 'review' ? (
+                    <ChevronUp className="w-4 h-4 text-[var(--color-warning)]" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-[var(--color-warning)]" />
+                  )}
+                </div>
+              </button>
+              {expandedSection === 'review' && (
+                <div className="px-3 pb-3 space-y-2">
+                  <p className="text-xs text-[var(--text-muted)] mb-2">
+                    以下文件夹包含可执行文件，可能是正在使用的软件，请手动确认后删除：
+                  </p>
+                  {reviewItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-[var(--bg-card)] rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[var(--text-primary)] truncate" title={item.path}>
+                          {getFolderName(item.path)}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-muted)] truncate" title={item.path}>
+                          {item.path}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => openInFolder(item.path)}
+                        className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                        title="打开所在文件夹"
+                      >
+                        <FolderOpen className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* 待重启删除 */}
+          {result.reboot_pending_count > 0 && (
+            <div className="flex items-center justify-between p-3 bg-[var(--color-info)]/10 rounded-xl">
+              <span className="text-sm text-[var(--text-secondary)]">待重启删除</span>
+              <span className="text-sm font-bold text-[var(--color-info)]">
+                {result.reboot_pending_count} 个
+              </span>
+            </div>
+          )}
+          
+          {/* 删除失败 - 可展开 */}
+          {failedItems.length > 0 && (
+            <div className="bg-[var(--color-danger)]/10 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setExpandedSection(expandedSection === 'failed' ? null : 'failed')}
+                className="w-full flex items-center justify-between p-3 hover:bg-[var(--color-danger)]/5 transition-colors"
+              >
+                <span className="text-sm text-[var(--text-secondary)]">删除失败</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[var(--color-danger)]">
+                    {failedItems.length} 个
+                  </span>
+                  {expandedSection === 'failed' ? (
+                    <ChevronUp className="w-4 h-4 text-[var(--color-danger)]" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-[var(--color-danger)]" />
+                  )}
+                </div>
+              </button>
+              {expandedSection === 'failed' && (
+                <div className="px-3 pb-3 space-y-2">
+                  {failedItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-[var(--bg-card)] rounded-lg">
+                      <XCircle className="w-4 h-4 text-[var(--color-danger)] shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-[var(--text-primary)] truncate" title={item.path}>
+                          {getFolderName(item.path)}
+                        </p>
+                        <p className="text-[10px] text-[var(--color-danger)]">
+                          {getFailureReason(item)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => openInFolder(item.path)}
+                        className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                        title="打开所在文件夹"
+                      >
+                        <FolderOpen className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* 关闭按钮 */}
+        <button
+          onClick={onClose}
+          className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors shrink-0"
+        >
+          确定
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -4,12 +4,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Navigation } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
 import alipayQr from '../assets/r_alipay_qr.jpg';
-import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSizeLevel } from '../contexts';
+import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSizeLevel, useSettings } from '../contexts';
 import { Type } from 'lucide-react';
 // import { check } from '@tauri-apps/plugin-updater'; // 自动更新功能已停用
 // import { relaunch } from '@tauri-apps/plugin-process'; // 自动更新功能已停用
@@ -137,6 +137,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 // 通用设置 - 微信风格主题切换器
 function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
   const { level: fontSizeLevel, setLevel: setFontSizeLevel } = useFontSize();
+  const { settings, updateSettings } = useSettings();
 
   const handleOpenLogsFolder = async () => {
     try {
@@ -204,6 +205,30 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 锚点导航开关 */}
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+                <Navigation className="w-4 h-4 text-[var(--text-muted)]" />
+                锚点导航
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">在页面左侧显示悬浮导航，快速定位功能模块</p>
+            </div>
+            {/* Switch 开关 */}
+            <button
+              onClick={() => updateSettings({ showAnchorNav: !settings.showAnchorNav })}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                settings.showAnchorNav ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-hover)]'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                  settings.showAnchorNav ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </div>
       </div>

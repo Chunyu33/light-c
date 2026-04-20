@@ -80,6 +80,12 @@ export interface DashboardContextValue {
   oneClickScanTrigger: number;
   /** 触发一键扫描 */
   triggerOneClickScan: () => void;
+  /** 扫描是否暂停 */
+  isScanPaused: boolean;
+  /** 切换扫描暂停状态 */
+  toggleScanPause: () => void;
+  /** 停止所有扫描 */
+  stopAllScans: () => void;
 }
 
 // ============================================================================
@@ -136,6 +142,8 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
   const [healthRefreshTrigger, setHealthRefreshTrigger] = useState(0);
   // 一键扫描触发器
   const [oneClickScanTrigger, setOneClickScanTrigger] = useState(0);
+  // 扫描暂停状态
+  const [isScanPaused, setIsScanPaused] = useState(false);
 
   // 刷新磁盘信息
   const refreshDiskInfo = useCallback(async () => {
@@ -167,7 +175,28 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
   // 触发一键扫描
   const triggerOneClickScan = useCallback(() => {
+    setIsScanPaused(false); // 开始扫描时重置暂停状态
     setOneClickScanTrigger(n => n + 1);
+  }, []);
+
+  // 切换扫描暂停状态
+  const toggleScanPause = useCallback(() => {
+    setIsScanPaused(prev => !prev);
+  }, []);
+
+  // 停止所有扫描
+  const stopAllScans = useCallback(() => {
+    setIsScanPaused(false);
+    // 将所有正在扫描的模块状态重置为 idle
+    setModules(prev => {
+      const newModules = { ...prev };
+      (Object.keys(newModules) as Array<keyof ModulesState>).forEach(key => {
+        if (newModules[key].status === 'scanning') {
+          newModules[key] = { ...newModules[key], status: 'idle', progress: 0 };
+        }
+      });
+      return newModules;
+    });
   }, []);
 
   // 更新模块状态
@@ -184,6 +213,13 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
 
   // 计算是否有任何模块正在扫描
   const isAnyScanning = Object.values(modules).some(m => m.status === 'scanning');
+
+  // 当没有模块在扫描时，自动重置暂停状态
+  useEffect(() => {
+    if (!isAnyScanning && isScanPaused) {
+      setIsScanPaused(false);
+    }
+  }, [isAnyScanning, isScanPaused]);
 
   // 初始化加载
   useEffect(() => {
@@ -214,6 +250,9 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     triggerHealthRefresh,
     oneClickScanTrigger,
     triggerOneClickScan,
+    isScanPaused,
+    toggleScanPause,
+    stopAllScans,
   };
 
   return (

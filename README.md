@@ -234,6 +234,7 @@ LightC/
 │   ├── contexts/
 │   │   ├── DashboardContext.tsx      # 仪表盘状态管理
 │   │   ├── FontSizeContext.tsx       # 字号设置状态管理
+│   │   ├── SettingsContext.tsx       # 应用设置状态管理
 │   │   ├── ThemeContext.tsx          # 主题状态管理
 │   │   └── index.ts
 │   ├── hooks/

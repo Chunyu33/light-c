@@ -25,7 +25,7 @@ import {
   Footer,
   AnchorNav,
 } from './components';
-import { DashboardProvider, useDashboard, FontSizeProvider } from './contexts';
+import { DashboardProvider, useDashboard, FontSizeProvider, SettingsProvider, useSettings } from './contexts';
 import './App.css';
 
 // ============================================================================
@@ -34,6 +34,7 @@ import './App.css';
 
 function DashboardContent() {
   const { triggerOneClickScan } = useDashboard();
+  const { settings } = useSettings();
 
   // 设置弹窗状态
   const [showSettings, setShowSettings] = useState(false);
@@ -67,8 +68,8 @@ function DashboardContent() {
       {/* 自动更新检查弹窗 - 功能已停用 */}
       {/* <UpdateModal autoCheck={true} /> */}
 
-      {/* 锚点导航 */}
-      <AnchorNav scrollContainerRef={scrollContainerRef} />
+      {/* 锚点导航（根据设置显示） */}
+      {settings.showAnchorNav && <AnchorNav scrollContainerRef={scrollContainerRef} />}
 
       {/* 主内容区 - 微信风格柔和灰白背景，增加间距 */}
       <main ref={scrollContainerRef} className="flex-1 overflow-auto bg-[var(--bg-base)]">
@@ -148,11 +149,13 @@ function App() {
   // 主窗口
   return (
     <FontSizeProvider>
-      <ToastProvider>
-        <DashboardProvider>
-          <DashboardContent />
-        </DashboardProvider>
-      </ToastProvider>
+      <SettingsProvider>
+        <ToastProvider>
+          <DashboardProvider>
+            <DashboardContent />
+          </DashboardProvider>
+        </ToastProvider>
+      </SettingsProvider>
     </FontSizeProvider>
   );
 }

@@ -221,7 +221,7 @@ const WHITELIST_FOLDERS: &[&str] = &[
     "go",
     "golang",
     
-    // 开发工具
+    // 开发工具和框架
     "vscode",
     "visual studio",
     "jetbrains",
@@ -229,6 +229,21 @@ const WHITELIST_FOLDERS: &[&str] = &[
     "github",
     "docker",
     "wsl",
+    "tauri",
+    "electron",
+    "flutter",
+    "android",
+    "gradle",
+    "maven",
+    "composer",
+    "pip",
+    "conda",
+    "anaconda",
+    "miniconda",
+    "virtualenv",
+    "pnpm",
+    "bun",
+    "deno",
     
     // 系统服务
     "application data",
