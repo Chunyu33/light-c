@@ -3,7 +3,7 @@
 // 单页仪表盘布局，支持浅色/深色/跟随系统主题
 // ============================================================================
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { 
   SettingsModal, 
@@ -23,6 +23,7 @@ import {
   ContextMenuModule,
   SplashScreen,
   Footer,
+  AnchorNav,
 } from './components';
 import { DashboardProvider, useDashboard, FontSizeProvider } from './contexts';
 import './App.css';
@@ -38,6 +39,8 @@ function DashboardContent() {
   const [showSettings, setShowSettings] = useState(false);
   // 欢迎弹窗状态
   const [showWelcome, setShowWelcome] = useState(() => shouldShowWelcome());
+  // 滚动容器 ref（用于锚点导航）
+  const scrollContainerRef = useRef<HTMLElement>(null);
 
   // 一键扫描：通过触发器并发启动所有模块扫描
   const handleOneClickScan = useCallback(() => {
@@ -64,32 +67,51 @@ function DashboardContent() {
       {/* 自动更新检查弹窗 - 功能已停用 */}
       {/* <UpdateModal autoCheck={true} /> */}
 
+      {/* 锚点导航 */}
+      <AnchorNav scrollContainerRef={scrollContainerRef} />
+
       {/* 主内容区 - 微信风格柔和灰白背景，增加间距 */}
-      <main className="flex-1 overflow-auto bg-[var(--bg-base)]">
+      <main ref={scrollContainerRef} className="flex-1 overflow-auto bg-[var(--bg-base)]">
         <div className="max-w-5xl mx-auto p-6 space-y-5">
           {/* 垃圾清理模块 */}
-          <JunkCleanModule />
+          <div data-module-id="junk-clean">
+            <JunkCleanModule />
+          </div>
 
           {/* 大文件清理模块 */}
-          <BigFilesModule />
+          <div data-module-id="big-files">
+            <BigFilesModule />
+          </div>
 
           {/* 社交软件专清模块 */}
-          <SocialCleanModuleV2 />
+          <div data-module-id="social-clean">
+            <SocialCleanModuleV2 />
+          </div>
 
           {/* 系统瘦身模块 */}
-          <SystemSlimModule />
+          <div data-module-id="system-slim">
+            <SystemSlimModule />
+          </div>
 
           {/* 卸载残留模块 [深度] */}
-          <LeftoversModule />
+          <div data-module-id="leftovers">
+            <LeftoversModule />
+          </div>
 
           {/* 注册表冗余模块 [中风险] */}
-          <RegistryModule />
+          <div data-module-id="registry">
+            <RegistryModule />
+          </div>
 
           {/* 右键菜单清理模块 [中风险] */}
-          <ContextMenuModule />
+          <div data-module-id="context-menu">
+            <ContextMenuModule />
+          </div>
 
           {/* 大目录分析模块 */}
-          <HotspotModule />
+          <div data-module-id="hotspot">
+            <HotspotModule />
+          </div>
 
           {/* 底部留白 */}
           <div className="h-4" />

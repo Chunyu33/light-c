@@ -212,6 +212,7 @@ LightC/
 │   │   │   ├── SystemSlimModule.tsx  # 系统瘦身模块
 │   │   │   └── index.ts
 │   │   ├── ActionButtons.tsx         # 操作按钮组
+│   │   ├── AnchorNav.tsx             # 锚点导航组件
 │   │   ├── BackButton.tsx            # 返回按钮组件
 │   │   ├── CategoryCard.tsx          # 垃圾分类卡片（含虚拟列表）
 │   │   ├── ConfirmDialog.tsx         # 确认对话框
