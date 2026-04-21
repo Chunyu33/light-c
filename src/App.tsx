@@ -21,6 +21,7 @@ import {
   RegistryModule,
   HotspotModule,
   ContextMenuModule,
+  ProgramDataModule,
   SplashScreen,
   Footer,
   AnchorNav,
@@ -112,6 +113,11 @@ function DashboardContent() {
           {/* 大目录分析模块 */}
           <div data-module-id="hotspot">
             <HotspotModule />
+          </div>
+
+          {/* ProgramData 分析模块 */}
+          <div data-module-id="programdata">
+            <ProgramDataModule />
           </div>
 
           {/* 底部留白 */}
