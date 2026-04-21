@@ -491,19 +491,19 @@ fn infer_from_path(path: &str, size: u64) -> (String, RiskLevel, ActionType, Str
     if size > 1024 * 1024 * 1024 {
         // > 1GB
         return (
-            "Unknown".to_string(),
+            "第三方软件".to_string(),
             RiskLevel::Warning,
             ActionType::Suggest,
-            format!("大型目录（{:.2} GB），建议检查后决定", size as f64 / 1024.0 / 1024.0 / 1024.0),
+            format!("第三方软件目录（{:.2} GB），需自行判断，建议保留", size as f64 / 1024.0 / 1024.0 / 1024.0),
         );
     }
 
     // 默认
     (
-        "Unknown".to_string(),
+        "第三方软件".to_string(),
         RiskLevel::Warning,
         ActionType::Ignore,
-        "未识别的目录，建议保留".to_string(),
+        "第三方软件目录，需自行判断，建议保留".to_string(),
     )
 }
 
@@ -816,7 +816,7 @@ mod tests {
             1024 * 1024, // 1MB
         );
         
-        assert_eq!(result.category, "Unknown");
+        assert_eq!(result.category, "第三方软件");
     }
 
     #[test]

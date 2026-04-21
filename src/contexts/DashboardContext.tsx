@@ -48,6 +48,8 @@ export interface ModulesState {
   hotspot: ModuleState;
   /** 右键菜单清理模块 */
   contextMenu: ModuleState;
+  /** ProgramData 分析模块 */
+  programdata: ModuleState;
 }
 
 /** 仪表盘 Context 值类型 */
@@ -108,6 +110,7 @@ const initialModulesState: ModulesState = {
   registry: { ...initialModuleState },
   hotspot: { ...initialModuleState },
   contextMenu: { ...initialModuleState },
+  programdata: { ...initialModuleState },
 };
 
 // ============================================================================

@@ -953,3 +953,191 @@ export async function openStartupManager(): Promise<void> {
 export async function openStorageSettings(): Promise<void> {
   return invoke<void>('open_storage_settings');
 }
+
+// ============================================================================
+// ProgramData 分析相关 API
+// ============================================================================
+
+/** ProgramData 扫描条目 */
+export interface ProgramDataEntry {
+  /** 目录完整路径 */
+  path: string;
+  /** 目录名称 */
+  name: string;
+  /** 总大小（字节） */
+  size: number;
+  /** 文件数量 */
+  file_count: number;
+  /** 子目录数量 */
+  dir_count: number;
+  /** 最后修改时间（Unix 时间戳，毫秒） */
+  last_modified: number;
+  /** 子目录列表（仅大目录有） */
+  children?: ProgramDataEntry[];
+  /** 扫描深度 */
+  depth: number;
+  /** 是否有访问权限 */
+  accessible: boolean;
+  /** 是否为符号链接 */
+  is_symlink: boolean;
+}
+
+/** ProgramData 扫描结果 */
+export interface ProgramDataScanResult {
+  /** 一级目录列表（已按大小降序排列） */
+  entries: ProgramDataEntry[];
+  /** 扫描的总目录数 */
+  total_dirs_scanned: number;
+  /** 扫描的总文件数 */
+  total_files_scanned: number;
+  /** ProgramData 目录总大小（字节） */
+  total_size: number;
+  /** 扫描耗时（毫秒） */
+  scan_duration_ms: number;
+  /** 无权限访问的目录数 */
+  inaccessible_count: number;
+  /** 扫描根路径 */
+  root_path: string;
+}
+
+/** ProgramData 风险等级 */
+export type ProgramDataRiskLevel = 'safe' | 'warning' | 'dangerous';
+
+/** ProgramData 操作类型 */
+export type ProgramDataActionType = 'delete' | 'suggest' | 'ignore' | 'protect';
+
+/** ProgramData 分析结果（单条） */
+export interface ProgramDataAnalyzeEntry {
+  /** 目录路径 */
+  path: string;
+  /** 目录大小（字节） */
+  size: number;
+  /** 分类 */
+  category: string;
+  /** 风险等级 */
+  risk: ProgramDataRiskLevel;
+  /** 建议操作 */
+  action: ProgramDataActionType;
+  /** 原因说明 */
+  reason: string;
+  /** 建议 */
+  suggestion: string;
+  /** 匹配的规则 ID */
+  matched_rule_id: string | null;
+  /** 标签 */
+  tags: string[];
+}
+
+/** ProgramData 分析结果 */
+export interface ProgramDataAnalyzeResult {
+  /** 分析条目 */
+  entries: ProgramDataAnalyzeEntry[];
+  /** 可清理总大小（Safe 级别） */
+  cleanable_size: number;
+  /** 需确认总大小（Warning 级别） */
+  warning_size: number;
+}
+
+/** ProgramData 增长条目 */
+export interface ProgramDataGrowthEntry {
+  /** 目录路径 */
+  path: string;
+  /** 旧大小（字节） */
+  old_size: number;
+  /** 新大小（字节） */
+  new_size: number;
+  /** 变化量（字节） */
+  diff: number;
+  /** 增长百分比 */
+  diff_percent: number;
+  /** 增长级别 */
+  level: 'significant' | 'fast' | 'minor' | 'stable' | 'decreased' | 'new';
+  /** 解释 */
+  explanation: string;
+  /** 建议 */
+  suggestion: string;
+}
+
+/** ProgramData 增长报告（对应 Rust GrowthReport） */
+export interface ProgramDataGrowthReport {
+  /** 所有变化的目录（按 diff 降序排列） */
+  entries: ProgramDataGrowthEntry[];
+  /** 总增长量（字节） */
+  total_growth: number;
+  /** 显著增长的目录数 */
+  significant_count: number;
+  /** 快速增长的目录数 */
+  fast_count: number;
+  /** 新增目录数 */
+  new_count: number;
+  /** 减少的目录数 */
+  decreased_count: number;
+  /** 对比的时间跨度描述 */
+  time_span: string;
+  /** 摘要文案 */
+  summary: string;
+}
+
+/** ProgramData 清理单项结果（对应 Rust CleanResult） */
+export interface ProgramDataCleanEntry {
+  /** 目录路径 */
+  path: string;
+  /** 目录大小（字节） */
+  size: number;
+  /** 是否成功 */
+  success: boolean;
+  /** 错误信息（如果失败） */
+  error: string | null;
+  /** 跳过原因（如果跳过） */
+  skip_reason: string | null;
+}
+
+/** ProgramData 清理结果（对应 Rust BatchCleanResult） */
+export interface ProgramDataCleanResult {
+  /** 成功清理的数量 */
+  success_count: number;
+  /** 失败的数量 */
+  failed_count: number;
+  /** 跳过的数量 */
+  skipped_count: number;
+  /** 成功释放的空间（字节） */
+  freed_size: number;
+  /** 清理耗时（毫秒） */
+  duration_ms: number;
+  /** 详细结果列表 */
+  results: ProgramDataCleanEntry[];
+}
+
+/**
+ * 扫描 ProgramData 目录
+ */
+export async function scanProgramData(): Promise<ProgramDataScanResult> {
+  return invoke<ProgramDataScanResult>('scan_programdata');
+}
+
+/**
+ * 分析 ProgramData 扫描结果
+ * @param entries 扫描条目
+ */
+export async function analyzeProgramData(entries: ProgramDataEntry[]): Promise<ProgramDataAnalyzeResult> {
+  return invoke<ProgramDataAnalyzeResult>('analyze_programdata', { entries });
+}
+
+/**
+ * 对比 ProgramData 增长
+ */
+export async function diffProgramData(): Promise<ProgramDataGrowthReport> {
+  return invoke<ProgramDataGrowthReport>('diff_programdata');
+}
+
+/**
+ * 清理 ProgramData 目录
+ * @param entries 要清理的分析条目
+ * @param allowWarning 是否允许清理 Warning 级别
+ */
+export async function cleanProgramData(
+  entries: ProgramDataAnalyzeEntry[],
+  allowWarning: boolean = false,
+): Promise<ProgramDataCleanResult> {
+  return invoke<ProgramDataCleanResult>('clean_programdata', { entries, allow_warning: allowWarning });
+}

@@ -10,7 +10,7 @@ mod leftovers;
 mod programdata;
 mod programdata_cleaner;
 mod programdata_growth;
-mod programdata_rules;
+pub(crate) mod programdata_rules;
 mod programdata_snapshot;
 mod registry;
 mod scan_engine;

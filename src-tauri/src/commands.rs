@@ -2551,3 +2551,290 @@ pub fn open_storage_settings() -> Result<(), String> {
     
     Ok(())
 }
+
+// ============================================================================
+// ProgramData 分析相关命令
+// ============================================================================
+
+/// 扫描 ProgramData 目录
+///
+/// 采用两层扫描策略：
+/// 1. 扫描所有一级子目录
+/// 2. 对超过 100MB 的目录再扫描一层子目录
+///
+/// 扫描完成后自动保存快照，用于后续增长对比
+#[tauri::command]
+pub async fn scan_programdata() -> Result<crate::scanner::ProgramDataScanResult, String> {
+    use crate::scanner::{ProgramDataScanner, SnapshotBuilder};
+
+    info!("开始扫描 ProgramData 目录");
+
+    let result = tokio::task::spawn_blocking(move || {
+        let scanner = ProgramDataScanner::new();
+        scanner.scan()
+    })
+    .await
+    .map_err(|e| format!("扫描任务执行失败: {}", e))?;
+
+    info!(
+        "ProgramData 扫描完成: {} 个目录，总大小 {} 字节，耗时 {}ms",
+        result.entries.len(),
+        result.total_size,
+        result.scan_duration_ms
+    );
+
+    // 异步保存快照（不阻塞返回）
+    let snapshot_entries: Vec<(String, u64)> = result
+        .entries
+        .iter()
+        .map(|e| (e.path.clone(), e.size))
+        .collect();
+    let total_size = result.total_size;
+
+    tokio::task::spawn_blocking(move || {
+        let snapshot = SnapshotBuilder::new()
+            .total_size(total_size)
+            .with_first_level_entries(snapshot_entries)
+            .build();
+
+        if let Err(e) = crate::scanner::save_snapshot(&snapshot) {
+            log::warn!("保存快照失败（不影响扫描结果）: {:?}", e);
+        } else {
+            log::info!("已保存 ProgramData 快照");
+        }
+    });
+
+    Ok(result)
+}
+
+/// 分析 ProgramData 扫描结果
+///
+/// 使用内置规则引擎对扫描结果进行分类和风险评估
+/// 返回每个目录的分类、风险等级、建议操作等信息
+#[tauri::command]
+pub async fn analyze_programdata(
+    entries: Vec<crate::scanner::ProgramDataEntry>,
+) -> Result<ProgramDataAnalyzeResponse, String> {
+    use crate::scanner::RuleEngine;
+
+    info!("开始分析 ProgramData，共 {} 个条目", entries.len());
+
+    let result = tokio::task::spawn_blocking(move || {
+        let engine = RuleEngine::default();
+
+        // 将 ProgramDataEntry 转换为规则引擎需要的格式
+        let analyze_input: Vec<(String, u64)> = entries
+            .iter()
+            .map(|e| (e.path.clone(), e.size))
+            .collect();
+
+        engine.analyze_batch(&analyze_input)
+    })
+    .await
+    .map_err(|e| format!("分析任务执行失败: {}", e))?;
+
+    // 计算可清理大小：只统计 Safe 级别 + Delete/Suggest 操作的条目
+    // 与前端一键清理逻辑保持一致
+    use crate::scanner::programdata_rules::{RiskLevel as PdRiskLevel, ActionType as PdActionType};
+    let cleanable_size: u64 = result.results
+        .iter()
+        .filter(|r| {
+            r.risk == PdRiskLevel::Safe
+                && matches!(r.action, PdActionType::Delete | PdActionType::Suggest)
+        })
+        .map(|r| r.size)
+        .sum();
+    let warning_size: u64 = result.results
+        .iter()
+        .filter(|r| r.risk == PdRiskLevel::Warning)
+        .map(|r| r.size)
+        .sum();
+
+    // 转换为前端期望的格式
+    let response_entries: Vec<ProgramDataAnalyzeEntryResponse> = result
+        .results
+        .into_iter()
+        .map(|r| ProgramDataAnalyzeEntryResponse {
+            path: r.path,
+            size: r.size,
+            category: r.category,
+            risk: r.risk,
+            action: r.action,
+            reason: r.reason,
+            suggestion: r.suggestion,
+            matched_rule_id: r.matched_rule_id,
+            tags: r.tags,
+        })
+        .collect();
+
+    info!(
+        "ProgramData 分析完成: {} 条结果，可清理 {} 字节",
+        response_entries.len(),
+        cleanable_size
+    );
+
+    Ok(ProgramDataAnalyzeResponse {
+        entries: response_entries,
+        cleanable_size,
+        warning_size,
+    })
+}
+
+/// 对比 ProgramData 增长
+///
+/// 将最近一次扫描结果与上一次快照进行对比
+/// 找出增长的目录并给出解释和建议
+#[tauri::command]
+pub async fn diff_programdata() -> Result<crate::scanner::GrowthReport, String> {
+    use crate::scanner::{
+        SnapshotManager,
+        compare_growth_with_timespan,
+    };
+
+    info!("开始对比 ProgramData 增长");
+
+    let result = tokio::task::spawn_blocking(move || -> Result<crate::scanner::GrowthReport, String> {
+        // 加载最新快照作为历史数据
+        let manager = SnapshotManager::new()
+            .map_err(|e| format!("初始化快照管理器失败: {:?}", e))?;
+
+        let snapshots = manager.load_all_snapshots()
+            .map_err(|e| format!("加载快照失败: {:?}", e))?;
+
+        if snapshots.len() < 2 {
+            // 至少需要 2 个快照才能对比（当前 + 历史）
+            // 如果只有一个快照，返回空报告
+            return Ok(crate::scanner::GrowthReport {
+                entries: Vec::new(),
+                total_growth: 0,
+                significant_count: 0,
+                fast_count: 0,
+                new_count: 0,
+                decreased_count: 0,
+                time_span: "暂无历史数据".to_string(),
+                summary: "首次扫描，暂无增长对比数据。下次扫描后将自动生成增长报告。".to_string(),
+            });
+        }
+
+        // 最新快照 = 当前数据，第二新 = 历史数据
+        let current_snapshot = &snapshots[0];
+        let previous_snapshot = &snapshots[1];
+
+        let current: Vec<(String, u64)> = current_snapshot
+            .entries
+            .iter()
+            .map(|e| (e.path.clone(), e.size))
+            .collect();
+
+        let previous: Vec<(String, u64)> = previous_snapshot
+            .entries
+            .iter()
+            .map(|e| (e.path.clone(), e.size))
+            .collect();
+
+        let time_span = format!(
+            "{} → {}",
+            previous_snapshot.date, current_snapshot.date
+        );
+
+        let report = compare_growth_with_timespan(&current, &previous, &time_span);
+
+        Ok(report)
+    })
+    .await
+    .map_err(|e| format!("增长对比任务执行失败: {}", e))??;
+
+    info!(
+        "ProgramData 增长对比完成: {} 个变化，总增长 {} 字节",
+        result.entries.len(),
+        result.total_growth
+    );
+
+    Ok(result)
+}
+
+/// 清理 ProgramData 目录
+///
+/// 将标记为可清理的目录移动到回收站
+/// - Safe 级别直接清理
+/// - Warning 级别需要 allow_warning = true
+/// - Dangerous 和 Protect 级别始终跳过
+#[tauri::command]
+pub async fn clean_programdata(
+    entries: Vec<ProgramDataAnalyzeEntryResponse>,
+    allow_warning: Option<bool>,
+) -> Result<crate::scanner::BatchCleanResult, String> {
+    use crate::scanner::{ProgramDataCleaner, CleanOptions};
+
+    let allow_warning = allow_warning.unwrap_or(false);
+
+    info!(
+        "开始清理 ProgramData: {} 个条目，allow_warning={}",
+        entries.len(),
+        allow_warning
+    );
+
+    // 转换为 AnalyzeResult
+    let analyze_entries: Vec<crate::scanner::AnalyzeResult> = entries
+        .into_iter()
+        .map(|e| crate::scanner::AnalyzeResult {
+            path: e.path,
+            size: e.size,
+            category: e.category,
+            risk: e.risk,
+            action: e.action,
+            reason: e.reason,
+            suggestion: e.suggestion,
+            matched_rule_id: e.matched_rule_id,
+            tags: e.tags,
+        })
+        .collect();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let options = if allow_warning {
+            CleanOptions::with_warning_allowed()
+        } else {
+            CleanOptions::default()
+        };
+        let cleaner = ProgramDataCleaner::with_options(options);
+        cleaner.clean(&analyze_entries)
+    })
+    .await
+    .map_err(|e| format!("清理任务执行失败: {}", e))?;
+
+    info!(
+        "ProgramData 清理完成: 成功 {} 个，失败 {} 个，跳过 {} 个，释放 {} 字节",
+        result.success_count,
+        result.failed_count,
+        result.skipped_count,
+        result.freed_size
+    );
+
+    Ok(result)
+}
+
+// ============================================================================
+// ProgramData 前端通信数据结构
+// ============================================================================
+
+/// 分析结果的前端响应格式（单条）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramDataAnalyzeEntryResponse {
+    pub path: String,
+    pub size: u64,
+    pub category: String,
+    pub risk: crate::scanner::programdata_rules::RiskLevel,
+    pub action: crate::scanner::programdata_rules::ActionType,
+    pub reason: String,
+    pub suggestion: String,
+    pub matched_rule_id: Option<String>,
+    pub tags: Vec<String>,
+}
+
+/// 分析结果的前端响应格式（批量）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramDataAnalyzeResponse {
+    pub entries: Vec<ProgramDataAnalyzeEntryResponse>,
+    pub cleanable_size: u64,
+    pub warning_size: u64,
+}

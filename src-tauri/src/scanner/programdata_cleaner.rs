@@ -252,24 +252,6 @@ impl ProgramDataCleaner {
     fn validate_path(&self, path: &str) -> Option<String> {
         let path_lower = path.to_lowercase();
 
-        // 禁止删除的关键路径
-        let forbidden_patterns = [
-            "\\windows\\",
-            "\\system32\\",
-            "\\syswow64\\",
-            "\\program files\\",
-            "\\program files (x86)\\",
-            "\\users\\",
-            "\\appdata\\local\\microsoft\\",
-            "\\appdata\\roaming\\microsoft\\",
-        ];
-
-        for pattern in forbidden_patterns {
-            if path_lower.contains(pattern) {
-                return Some(format!("包含受保护路径: {}", pattern));
-            }
-        }
-
         // 必须是 ProgramData 下的路径
         if !path_lower.contains("\\programdata\\") && !path_lower.contains("/programdata/") {
             return Some("不是 ProgramData 目录".to_string());
@@ -282,6 +264,24 @@ impl ProgramDataCleaner {
         
         if trimmed.is_empty() {
             return Some("不能删除 ProgramData 根目录".to_string());
+        }
+
+        // 对于 ProgramData 外部的路径片段进行受保护路径检查
+        // ProgramData 内部子目录名中包含 "Windows" 等是合法的（如 Microsoft\Windows\WER）
+        let prefix = &path_lower[..programdata_idx];
+        let non_programdata_forbidden = [
+            "\\system32\\",
+            "\\syswow64\\",
+            "\\program files\\",
+            "\\program files (x86)\\",
+            "\\users\\",
+            "\\appdata\\",
+        ];
+
+        for pattern in non_programdata_forbidden {
+            if prefix.contains(pattern) {
+                return Some(format!("包含受保护路径: {}", pattern));
+            }
         }
 
         None
@@ -330,9 +330,11 @@ fn parse_trash_error(error: &trash::Error) -> String {
 
     // 检查常见错误模式
     if error_lower.contains("access") || error_lower.contains("denied") || error_lower.contains("permission") {
-        "权限不足，无法删除".to_string()
+        "权限不足，请以管理员身份运行".to_string()
     } else if error_lower.contains("in use") || error_lower.contains("being used") || error_lower.contains("locked") {
-        "文件正在被占用".to_string()
+        "文件正在被占用，请关闭相关程序后重试".to_string()
+    } else if error_lower.contains("aborted") || error_lower.contains("cancelled") {
+        "部分文件被占用或权限不足，无法完整移动到回收站".to_string()
     } else if error_lower.contains("not found") || error_lower.contains("not exist") {
         "目录不存在".to_string()
     } else if error_lower.contains("not empty") {

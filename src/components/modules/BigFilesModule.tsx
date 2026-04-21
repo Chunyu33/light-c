@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { HardDrive, Trash2, Loader2, FileWarning, FolderOpen, ExternalLink, StopCircle } from 'lucide-react';
+import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, ExternalLink, StopCircle } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -308,7 +308,7 @@ export function BigFilesModule() {
         id="bigFiles"
         title="大文件清理"
         description="扫描 C 盘体积最大的文件，快速释放存储空间"
-        icon={<HardDrive className="w-6 h-6 text-[var(--brand-green)]" />}
+        icon={<FileBox className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}
@@ -367,7 +367,7 @@ export function BigFilesModule() {
           {moduleState.status === 'idle' && files.length === 0 && (
             <div className="py-12 flex flex-col items-center justify-center text-center">
               <div className="w-14 h-14 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-3">
-                <HardDrive className="w-7 h-7 text-[var(--fg-faint)]" />
+                <FileBox className="w-7 h-7 text-[var(--fg-faint)]" />
               </div>
               <p className="text-sm font-medium text-[var(--fg-secondary)]">等待扫描</p>
               <p className="text-xs text-[var(--fg-muted)] mt-1">点击扫描按钮开始查找大文件</p>

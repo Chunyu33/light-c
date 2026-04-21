@@ -102,11 +102,18 @@ certutil -hashfile 文件名 SHA256
 - **注册表深度扫描**：扫描 HKCU/HKLM Software 下的孤立注册表项和孤立驱动服务项
 - **大文件高亮**：模拟器残留和大型文件以红色高亮显示，方便快速识别
 
-### �️ 右键菜单清理
+### ️️ 右键菜单清理
 - **深度扫描注册表**：基于 Rust 高性能 winreg 扫描器，覆盖任意文件、文件夹、桌面背景、磁盘备山等所有场景
 - **智能识别失效项**：自动检查菜单命令中引用的 exe 文件是否存在，默认勾选失效条目
 - **分组展示**：按作用范围展示，支持展开条目查看完整注册表路径和原始命令
 - **分权限操作**：用户级（HKCU）不需管理员即可删除；系统级（HKLM）标识需要管理员权限
+
+### 📂 ProgramData 分析
+- **两层扫描策略**：一级目录全量扫描，超过 100MB 的目录自动下钻子目录
+- **规则引擎分析**：内置 20+ 条分类规则，自动识别 Windows Update、Defender、驱动缓存、Docker、Adobe 等目录
+- **风险分级**：安全/谨慎/危险三级标识，安全项可一键清理，危险项自动保护
+- **增长对比**：基于快照系统追踪目录大小变化，找出“悄悄变大”的目录
+- **安全清理**：所有删除移动到回收站，多层安全校验，稳定性优先
 
 ### �🛡️ 安全保护
 - **系统路径保护**：自动识别并跳过关键系统文件和目录
@@ -157,6 +164,7 @@ certutil -hashfile 文件名 SHA256
 │  │  - Leftovers       │                                                     │
 │  │  - Registry        │                                                     │
 │  │  - ContextMenu     │                                                     │
+│  │  - ProgramData     │                                                     │
 │  │  - SystemSlim      │                                                     │
 │  └────────────────────┘                                                     │
 │                                    │                                        │
@@ -174,6 +182,13 @@ certutil -hashfile 文件名 SHA256
 │  │  - hotspot          │                           └─────────────────────┘  │
 │  │  - leftovers        │  ┌─────────────────────┐                           │
 │  │  - registry         │  │   Logger Module     │                           │
+│  │  - context_menu     │  └─────────────────────┘                           │
+│  │  - programdata      │  ┌─────────────────────┐                           │
+│  │  - programdata_rules│  │ ProgramData Module  │                           │
+│  │                     │  │  - rules engine     │                           │
+│  │                     │  │  - snapshot system  │                           │
+│  │                     │  │  - growth analyzer  │                           │
+│  │                     │  │  - safe cleaner     │                           │
 │  └─────────────────────┘  └─────────────────────┘                           │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
@@ -208,6 +223,7 @@ LightC/
 │   │   │   ├── LeftoversModule.tsx   # 卸载残留模块
 │   │   │   ├── RegistryModule.tsx    # 注册表清理模块
 │   │   │   ├── ContextMenuModule.tsx # 右键菜单清理模块
+│   │   │   ├── ProgramDataModule.tsx # ProgramData 分析模块
 │   │   │   ├── SocialCleanModule.tsx # 社交软件专清模块
 │   │   │   ├── SystemSlimModule.tsx  # 系统瘦身模块
 │   │   │   └── index.ts
@@ -266,19 +282,26 @@ LightC/
 │   │   │   ├── hotspot.rs            # 大目录分析（语义识别）
 │   │   │   ├── leftovers.rs          # 卸载残留扫描
 │   │   │   ├── registry.rs           # 注册表冗余扫描
-│   │   │   └── context_menu.rs       # 右键菜单扫描与清理
+│   │   │   ├── context_menu.rs       # 右键菜单扫描与清理
+│   │   │   ├── programdata.rs        # ProgramData 目录扫描
+│   │   │   ├── programdata_rules.rs  # ProgramData 规则引擎
+│   │   │   ├── programdata_cleaner.rs# ProgramData 安全清理
+│   │   │   ├── programdata_snapshot.rs# ProgramData 快照系统
+│   │   │   └── programdata_growth.rs # ProgramData 增长对比
 │   │   ├── cleaner/                  # 清理器模块
 │   │   │   ├── mod.rs
 │   │   │   ├── delete_engine.rs      # 删除引擎（含安全保护）
 │   │   │   ├── enhanced_delete.rs    # 增强删除（所有权获取）
 │   │   │   └── permanent_delete.rs   # 永久删除（绕过回收站）
 │   │   ├── logger/                   # 日志模块
-│   │   ├── commands.rs               # Tauri 命令接口（含系统瘦身）
+│   │   ├── commands.rs               # Tauri 命令接口（含系统瘦身、ProgramData）
 │   │   ├── lib.rs                    # 应用库入口
 │   │   └── main.rs                   # 应用主入口
 │   ├── capabilities/
 │   │   └── default.json              # 权限配置
 │   ├── icons/                        # 应用图标
+│   ├── rules/
+│   │   └── programdata_rules.json   # ProgramData 分析规则（JSON 可配置）
 │   ├── tauri.conf.json               # Tauri 配置
 │   └── Cargo.toml                    # Rust 依赖
 │

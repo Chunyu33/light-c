@@ -13,6 +13,7 @@ import {
   Database,
   MousePointerClick,
   Flame,
+  HardDrive,
   Navigation,
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ const MODULE_ANCHORS = [
   { id: 'registry', label: '注册表冗余', icon: Database },
   { id: 'context-menu', label: '右键菜单清理', icon: MousePointerClick },
   { id: 'hotspot', label: '大目录分析', icon: Flame },
+  { id: 'programdata', label: 'ProgramData 分析', icon: HardDrive },
 ];
 
 interface AnchorNavProps {

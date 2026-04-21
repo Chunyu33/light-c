@@ -102,6 +102,11 @@ pub fn run() {
             // 系统快捷工具
             open_startup_manager,
             open_storage_settings,
+            // ProgramData 分析
+            scan_programdata,
+            analyze_programdata,
+            diff_programdata,
+            clean_programdata,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");
