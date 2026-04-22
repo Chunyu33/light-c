@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, Palette, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Navigation } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Navigation } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
@@ -149,11 +149,11 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
 
   return (
     <div className="space-y-6">
-      {/* 外观设置 */}
+      {/* 常规设置 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
-          <Palette className="w-3.5 h-3.5" />
-          外观设置
+          <MonitorCog className="w-3.5 h-3.5" />
+          常规设置
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
           {/* 主题模式 */}
