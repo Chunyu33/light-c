@@ -27,6 +27,7 @@
   --bg-hover: #FAFAFA;              /* 悬停状态 */
   --bg-active: #F0F0F0;             /* 激活状态 */
   --bg-input: #FFFFFF;              /* 输入框背景 */
+  --bg-switch: #d1d5db;             /* 开关背景 */
   
   /* 兼容旧变量名 */
   --bg-base: var(--bg-main);
@@ -103,6 +104,7 @@
   --bg-hover: #252525;              /* 悬停状态 */
   --bg-active: #2F2F2F;             /* 激活状态 */
   --bg-input: #1F1F1F;              /* 输入框背景 */
+  --bg-switch: #4b5563;             /* 开关背景 */
   
   /* 兼容旧变量名 */
   --bg-base: var(--bg-main);

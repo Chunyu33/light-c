@@ -220,11 +220,11 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
             <button
               onClick={() => updateSettings({ showAnchorNav: !settings.showAnchorNav })}
               className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                settings.showAnchorNav ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-hover)]'
+                settings.showAnchorNav ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-switch)]'
               }`}
             >
               <span
-                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${
                   settings.showAnchorNav ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
