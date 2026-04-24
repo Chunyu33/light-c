@@ -121,8 +121,12 @@ export function LeftoversModule() {
       const result = await scanUninstallLeftovers(deepScanEnabled);
       setScanResult(result);
       
-      // 默认全选
-      const defaultSelected = new Set(result.leftovers.map(l => l.path));
+      // 默认仅勾选高置信度残留（HighConfidenceLeftover）
+      const defaultSelected = new Set(
+        result.leftovers
+          .filter(l => l.detection_category === 'HighConfidenceLeftover')
+          .map(l => l.path)
+      );
       setSelectedPaths(defaultSelected);
 
       updateModuleState('leftovers', {
@@ -350,6 +354,38 @@ export function LeftoversModule() {
     return scanResult.leftovers.filter(l => l.is_virtual_disk).length;
   }, [scanResult]);
 
+  // 统计各置信度级别数量
+  const highConfidenceCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.leftovers.filter(l => l.detection_category === 'HighConfidenceLeftover').length;
+  }, [scanResult]);
+
+  const suspiciousCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.leftovers.filter(l => l.detection_category === 'Suspicious').length;
+  }, [scanResult]);
+
+  // 置信度分类标签
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'HighConfidenceLeftover': return '高置信度';
+      case 'Suspicious': return '可疑';
+      case 'LikelyAppData': return '可能在用';
+      case 'SystemShared': return '系统共享';
+      default: return category;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'HighConfidenceLeftover': return 'text-[var(--color-danger)] bg-[var(--color-danger)]/10';
+      case 'Suspicious': return 'text-[var(--color-warning)] bg-[var(--color-warning)]/10';
+      case 'LikelyAppData': return 'text-[var(--brand-green)] bg-[var(--brand-green-10)]';
+      case 'SystemShared': return 'text-[var(--text-muted)] bg-[var(--bg-hover)]';
+      default: return 'text-[var(--text-muted)] bg-[var(--bg-hover)]';
+    }
+  };
+
   const isExpanded = expandedModule === 'leftovers';
 
   return (
@@ -417,13 +453,17 @@ export function LeftoversModule() {
         {/* 扫描结果内容 */}
         {scanResult && scanResult.leftovers.length > 0 && (
           <div className="p-5 space-y-4">
-            {/* 风险提示 */}
+            {/* 风险提示 + 置信度统计 */}
             <div className="flex items-start gap-3 p-4 bg-[var(--color-warning)]/10 rounded-xl border border-[var(--color-warning)]/20">
               <AlertTriangle className="w-5 h-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">深度清理提示</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">置信度检测结果</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  这些文件夹可能是已卸载软件的残留数据。删除前请确认您不再需要这些数据。
+                  基于评分模型分析：
+                  {highConfidenceCount > 0 && <span className="text-[var(--color-danger)] font-medium"> {highConfidenceCount} 个高置信度残留</span>}
+                  {highConfidenceCount > 0 && suspiciousCount > 0 && '、'}
+                  {suspiciousCount > 0 && <span className="text-[var(--color-warning)] font-medium">{suspiciousCount} 个可疑项</span>}
+                  。已默认勾选高置信度条目，可疑项请自行判断。
                 </p>
               </div>
             </div>
@@ -582,6 +622,10 @@ export function LeftoversModule() {
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                         {leftover.app_name}
                       </p>
+                      {/* 置信度分类标签 */}
+                      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${getCategoryColor(leftover.detection_category)}`}>
+                        {getCategoryLabel(leftover.detection_category)}
+                      </span>
                       {/* 模拟器/虚拟磁盘标签 */}
                       {leftover.is_emulator && (
                         <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-[var(--color-danger)] bg-[var(--color-danger)]/10">
@@ -600,6 +644,7 @@ export function LeftoversModule() {
                     <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-faint)]">
                       <span>{getSourceName(leftover.source)}</span>
                       <span>{leftover.file_count} 个文件</span>
+                      <span title={leftover.reasons.join('\n')}>置信度 {Math.round(leftover.confidence * 100)}%</span>
                     </div>
                   </div>
 

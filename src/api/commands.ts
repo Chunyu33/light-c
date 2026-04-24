@@ -326,6 +326,9 @@ export interface LeftoverScanResult {
 /** 残留类型 */
 export type LeftoverType = 'Normal' | 'Emulator' | 'VirtualDisk' | 'RegistryOrphan';
 
+/** 检测分类（置信度分级） */
+export type DetectionCategory = 'HighConfidenceLeftover' | 'Suspicious' | 'LikelyAppData' | 'SystemShared';
+
 /** 单个残留条目 */
 export interface LeftoverEntry {
   /** 文件夹路径 */
@@ -346,6 +349,12 @@ export interface LeftoverEntry {
   is_virtual_disk: boolean;
   /** 残留类型 */
   leftover_type: LeftoverType;
+  /** 置信度分数 (0.0 ~ 1.0)，越高越可能是残留 */
+  confidence: number;
+  /** 检测分类 */
+  detection_category: DetectionCategory;
+  /** 评分理由列表（中文） */
+  reasons: string[];
 }
 
 /** 卸载残留删除结果 */
