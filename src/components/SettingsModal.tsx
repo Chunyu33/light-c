@@ -539,6 +539,28 @@ function GuideSettings() {
               弹窗顶部显示完整路径面包屑导航，可快速回溯到任意层级；按 <span className="font-medium">ESC</span> 键可快速关闭弹窗。
             </p>
           </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-[var(--brand-green)]" />
+              ProgramData 分析
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
+              深度分析 C:\ProgramData 目录，采用<span className="text-[var(--brand-green)] font-medium">两层扫描策略</span>：
+              一级目录全量扫描，超过 <span className="font-medium">100MB</span> 的目录自动下钻子目录。
+              内置 <span className="font-medium">20+</span> 条分类规则，自动识别 Windows Update、Defender、驱动缓存、Docker、Adobe 等目录。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-2">
+              <span className="text-[var(--brand-green)] font-medium">风险分级：</span>
+              每个目录标记为<span className="text-[var(--brand-green)] font-medium">安全</span>、
+              <span className="text-[var(--color-warning)] font-medium">谨慎</span>或
+              <span className="text-[var(--color-danger)] font-medium">危险</span>三级。
+              安全项可一键清理（移至回收站），危险项（如系统组件）自动保护不可勾选。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-2">
+              <span className="text-[var(--brand-green)] font-medium">增长对比：</span>基于快照系统追踪目录大小变化，自动生成增长报告，
+              找出"悄悄变大"的目录。最多保留 <span className="font-medium">3</span> 份历史快照。
+            </p>
+          </div>
         </div>
       </div>
 
