@@ -350,7 +350,7 @@ export function RegistryModule() {
             )}
 
             {/* 条目列表 */}
-            <div className="space-y-2 max-h-80 overflow-auto">
+            <div className="space-y-2">
               {scanResult.entries.map((entry) => {
                 const key = entry.path + '|' + entry.name;
                 const isSelected = selectedEntries.has(key);

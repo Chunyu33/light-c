@@ -567,7 +567,7 @@ export function LeftoversModule() {
             )}
 
             {/* 残留列表 */}
-            <div className="space-y-2 max-h-80 overflow-auto">
+            <div className="space-y-2">
               {scanResult.leftovers.map((leftover) => (
                 <div
                   key={leftover.path}

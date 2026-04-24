@@ -355,7 +355,7 @@ export function BigFilesModule() {
         }
       >
         {/* 展开内容 */}
-        <div className="max-h-[400px] overflow-auto">
+        <div>
           {/* 扫描进度提示 */}
           {isScanning && currentPath && (
             <div className="px-4 py-2 bg-emerald-500/5 border-b border-[var(--border-default)] text-xs text-[var(--fg-muted)] truncate">

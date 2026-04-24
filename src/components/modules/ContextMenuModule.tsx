@@ -616,7 +616,7 @@ export function ContextMenuModule() {
 
             {/* 条目列表（按 scope 分组） */}
             {filteredEntries.length > 0 ? (
-              <div className="space-y-3 max-h-[520px] overflow-auto">
+              <div className="space-y-3">
                 {Array.from(groupedEntries.entries()).map(([scope, entries]) => {
                   const isCollapsed = collapsedScopes.has(scope);
                   const scopeStyle = getScopeStyle(scope);
