@@ -1,8 +1,8 @@
 [package]
 name = "LightC"
-version = "2.2.3"
+version = "2.3.0"
 description = "Windows C盘智能清理工具"
-authors = ["chunyu"]
+authors = ["Evan Lau"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
