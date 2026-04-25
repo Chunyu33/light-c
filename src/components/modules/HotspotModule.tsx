@@ -95,7 +95,7 @@ interface HotspotItemProps {
   isFullScan: boolean; // 是否为深度扫描模式
   onOpenFolder: (path: string) => void;
   onCleanup: (entry: HotspotEntry) => void;
-  onSearch: (name: string) => void;
+  onSearch: (path: string) => void;
   /** 父目录名称（用于路径简写展示） */
   parentName?: string;
   /** 是否为子目录（下钻结果） */
@@ -247,11 +247,11 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
               </button>
             )}
             
-            {/* 搜索按钮 - 搜索该文件夹是否可以删除 */}
+            {/* 搜索按钮 - 搜索该文件夹是否可以删除 全路径用.path，文件夹名称用.name */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSearch(entry.name);
+                onSearch(entry.path);
               }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
               title="搜索该文件夹是否可以删除"
@@ -440,9 +440,9 @@ export function HotspotModule() {
   }, [cleanupTarget, handleScan, showToast]);
 
   // 搜索文件夹是否可以删除 - 使用 Tauri opener 插件打开浏览器
-  const handleSearch = useCallback(async (name: string) => {
+  const handleSearch = useCallback(async (path: string) => {
     try {
-      const query = encodeURIComponent(`Windows 文件夹 ${name} 可以删除吗`);
+      const query = encodeURIComponent(`Windows 文件夹 ${path} 可以删除吗`);
       const url = `https://www.bing.com/search?q=${query}`;
       await openUrl(url);
     } catch (err) {

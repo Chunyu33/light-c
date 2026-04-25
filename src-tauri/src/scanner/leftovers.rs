@@ -725,31 +725,30 @@ pub struct LeftoverScanner {
 }
 
 impl LeftoverScanner {
-    /// 创建新的扫描器实例
+    /// 创建新的扫描器实例（默认启用完整扫描，包括模拟器残留和虚拟磁盘检测）
     pub fn new() -> Self {
-        Self::with_deep_scan(false)
-    }
-
-    /// 创建带深度扫描选项的扫描器实例
-    pub fn with_deep_scan(deep_scan: bool) -> Self {
         let app_map = InstalledAppMap::build();
         let whitelist = build_whitelist_rules();
         log::info!(
-            "置信度评分引擎初始化: {} 个已安装应用, {} 条白名单规则, 深度扫描: {}",
+            "置信度评分引擎初始化: {} 个已安装应用, {} 条白名单规则",
             app_map.apps.len(),
             whitelist.len(),
-            deep_scan
         );
 
         LeftoverScanner {
             app_map,
             whitelist,
             min_size_threshold: 1024 * 1024, // 1MB
-            min_days_old: if deep_scan { 7 } else { 30 },
-            deep_scan,
+            min_days_old: 7,
+            deep_scan: true,
             // 只输出 score >= 0.40 的条目（Suspicious 阈值）
             min_confidence_threshold: 0.40,
         }
+    }
+
+    /// 兼容旧接口，参数已忽略，始终启用完整扫描
+    pub fn with_deep_scan(_deep_scan: bool) -> Self {
+        Self::new()
     }
 
     /// 执行卸载残留扫描

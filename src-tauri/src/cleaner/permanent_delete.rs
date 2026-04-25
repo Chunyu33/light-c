@@ -18,10 +18,12 @@
 // 如果检测到这些文件，我们将跳过该文件夹并标记为"需要人工审核"，
 // 让用户自行决定是否删除，从而避免误删正在使用的软件。
 // 
-// 【三重安全检查协议】
-// Check 1: 注册表缺失验证 - 确认目录名不在任何已安装程序的注册表项中
-// Check 2: 可执行文件检查 - 扫描 .exe/.dll/.sys 文件，发现则跳过
-// Check 3: 核心白名单检查 - 确保路径不在系统关键目录内
+// 【安全检查协议】
+// Check 1: 核心白名单检查 - 确保路径不在系统关键目录内
+// Check 2: 可执行文件检查 - 扫描 .exe/.dll/.sys 文件，发现则标记人工审核
+// 
+// 注意：不再执行注册表匹配检查，因为评分引擎已确认目标为卸载残留，
+// 而已卸载程序的注册表键本身就是残留数据（zombie entry），不应用来阻止清理。
 // 
 // 【错误处理】
 // - 所有 IO 操作都包裹在 Result 中
@@ -29,7 +31,6 @@
 // - 权限不足时尝试获取所有权后重试
 // ============================================================================
 
-use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -38,8 +39,6 @@ use log::{debug, info, warn};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
-use winreg::enums::*;
-use winreg::RegKey;
 
 #[cfg(windows)]
 use crate::cleaner::enhanced_delete::windows_api;
@@ -181,8 +180,6 @@ const EXECUTABLE_EXTENSIONS: &[&str] = &[
 /// 2. 可执行文件检查：确认目标不包含正在使用的程序
 /// 3. 白名单检查：确认目标不在系统关键路径内
 pub struct PermanentDeleteEngine {
-    /// 已安装程序信息缓存（用于 Check 1）
-    installed_apps_cache: HashSet<String>,
     /// 是否启用重启删除回退
     enable_reboot_fallback: bool,
 }
@@ -190,54 +187,15 @@ pub struct PermanentDeleteEngine {
 impl PermanentDeleteEngine {
     /// 创建新的永久删除引擎
     pub fn new() -> Self {
-        let installed_apps_cache = Self::load_installed_apps();
-        info!("永久删除引擎初始化完成，已加载 {} 个已安装程序信息", installed_apps_cache.len());
+        info!("永久删除引擎初始化完成");
         
         PermanentDeleteEngine {
-            installed_apps_cache,
             enable_reboot_fallback: true,
         }
     }
 
-    /// 从注册表加载已安装程序信息
-    fn load_installed_apps() -> HashSet<String> {
-        let mut apps = HashSet::new();
-        
-        let paths = [
-            (HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
-            (HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
-            (HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
-        ];
-
-        for (hkey, path) in paths {
-            if let Ok(key) = RegKey::predef(hkey).open_subkey_with_flags(path, KEY_READ) {
-                for subkey_name in key.enum_keys().filter_map(|k| k.ok()) {
-                    if let Ok(subkey) = key.open_subkey_with_flags(&subkey_name, KEY_READ) {
-                        // 读取 DisplayName
-                        if let Ok(display_name) = subkey.get_value::<String, _>("DisplayName") {
-                            apps.insert(display_name.to_lowercase());
-                        }
-                        // 读取 InstallLocation
-                        if let Ok(install_loc) = subkey.get_value::<String, _>("InstallLocation") {
-                            apps.insert(install_loc.to_lowercase());
-                            if let Some(folder) = Path::new(&install_loc).file_name() {
-                                apps.insert(folder.to_string_lossy().to_lowercase());
-                            }
-                        }
-                        // 读取 Publisher
-                        if let Ok(publisher) = subkey.get_value::<String, _>("Publisher") {
-                            apps.insert(publisher.to_lowercase());
-                        }
-                    }
-                }
-            }
-        }
-
-        apps
-    }
-
     // ========================================================================
-    // 三重安全检查协议
+    // 安全检查协议（白名单 + 可执行文件检查）
     // ========================================================================
 
     /// 执行完整的三重安全检查
@@ -247,25 +205,12 @@ impl PermanentDeleteEngine {
     /// 这是保护用户数据安全的核心机制。
     pub fn perform_safety_checks(&self, path: &Path) -> SafetyCheckResult {
         let path_str = path.to_string_lossy().to_string();
-        let folder_name = path.file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
 
         // ====================================================================
-        // Check 3: 核心白名单检查（最先执行，最严格）
+        // Check 1: 核心白名单检查（最先执行，最严格）
         // ====================================================================
         if let Some(reason) = self.check_protected_path(&path_str) {
             return SafetyCheckResult::InProtectedPath { reason };
-        }
-
-        // ====================================================================
-        // Check 1: 注册表缺失验证
-        // ====================================================================
-        if let Some((field, value)) = self.check_registry_presence(&folder_name) {
-            return SafetyCheckResult::FoundInRegistry {
-                matched_field: field,
-                matched_value: value,
-            };
         }
 
         // ====================================================================
@@ -276,28 +221,13 @@ impl PermanentDeleteEngine {
             return SafetyCheckResult::ContainsExecutables { files: executables };
         }
 
-        SafetyCheckResult::Safe
-    }
+        // 注意：不再执行注册表匹配检查。
+        // 原因：调用深度清理的前提是评分引擎已将文件夹判定为卸载残留，
+        // 而已卸载程序的注册表键本身就可能是残留（zombie entry），
+        // 用残留的注册表键来阻止删除残留文件夹是自相矛盾的。
+        // 白名单 + 可执行文件检查已提供足够的安全保障。
 
-    /// Check 1: 检查目录名是否在注册表中存在
-    /// 
-    /// 【中文说明】
-    /// 遍历已安装程序的 DisplayName、InstallLocation、Publisher 字段，
-    /// 检查目标文件夹名是否与任何已安装程序相关联。
-    fn check_registry_presence(&self, folder_name: &str) -> Option<(String, String)> {
-        let folder_lower = folder_name.to_lowercase();
-        
-        for app in &self.installed_apps_cache {
-            // 检查是否包含文件夹名
-            if app.contains(&folder_lower) || folder_lower.contains(app.as_str()) {
-                // 只有当匹配长度足够时才认为是有效匹配（避免短字符串误匹配）
-                if folder_lower.len() >= 4 && app.len() >= 4 {
-                    return Some(("已安装程序".to_string(), app.clone()));
-                }
-            }
-        }
-        
-        None
+        SafetyCheckResult::Safe
     }
 
     /// Check 2: 扫描目录中的可执行文件

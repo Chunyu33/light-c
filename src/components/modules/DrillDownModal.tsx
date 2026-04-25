@@ -158,7 +158,7 @@ interface ModalEntryItemProps {
   onDrillDown: (path: string) => void;
   onOpenFolder: (path: string) => void;
   onCleanup: (entry: HotspotEntry) => void;
-  onSearch: (name: string) => void;
+  onSearch: (path: string) => void;
 }
 
 function ModalEntryItem({
@@ -252,9 +252,9 @@ function ModalEntryItem({
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            {/* 搜索 */}
+            {/* 搜索 全路径用.path，文件夹名称用.name */}
             <button
-              onClick={(e) => { e.stopPropagation(); onSearch(entry.name); }}
+              onClick={(e) => { e.stopPropagation(); onSearch(entry.path); }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
               title="搜索该文件夹是否可以删除"
             >
@@ -395,9 +395,9 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
   }, []);
 
   // ====== 搜索 ======
-  const handleSearch = useCallback(async (name: string) => {
+  const handleSearch = useCallback(async (path: string) => {
     try {
-      const query = encodeURIComponent(`Windows 文件夹 ${name} 可以删除吗`);
+      const query = encodeURIComponent(`Windows 文件夹 ${path} 可以删除吗`);
       await openUrl(`https://www.bing.com/search?q=${query}`);
     } catch (err) {
       console.error('打开搜索链接失败:', err);

@@ -5,12 +5,12 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
+import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { 
-  scanUninstallLeftovers, 
+import {
+  scanUninstallLeftovers,
   deleteLeftoverFolders,
   deleteLeftoversPermanent,
   openInFolder,
@@ -41,10 +41,7 @@ export function LeftoversModule() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<string[]>([]); // 详细错误列表
   const [showErrorDetails, setShowErrorDetails] = useState(false); // 是否显示错误详情
-  
-  // 深度扫描模式（扫描模拟器残留、虚拟磁盘文件等）
-  const [deepScanEnabled, setDeepScanEnabled] = useState(false);
-  
+
   // 深度清理（永久删除）相关状态
   const [showDeepCleanWarning, setShowDeepCleanWarning] = useState(false); // 首次深度清理警告
   const [showDeepCleanConfirm, setShowDeepCleanConfirm] = useState(false); // 深度清理确认
@@ -117,10 +114,9 @@ export function LeftoversModule() {
     setShowErrorDetails(false);
 
     try {
-      // 传入深度扫描参数
-      const result = await scanUninstallLeftovers(deepScanEnabled);
+      const result = await scanUninstallLeftovers();
       setScanResult(result);
-      
+
       // 默认仅勾选高置信度残留（HighConfidenceLeftover）
       const defaultSelected = new Set(
         result.leftovers
@@ -140,7 +136,7 @@ export function LeftoversModule() {
       console.error('卸载残留扫描失败:', err);
       updateModuleState('leftovers', { status: 'error', error: String(err) });
     }
-  }, [updateModuleState, setExpandedModule, deepScanEnabled]);
+  }, [updateModuleState, setExpandedModule]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -158,7 +154,7 @@ export function LeftoversModule() {
     setDeleteError(null);
     setDeleteErrors([]);
     setShowErrorDetails(false);
-    
+
     try {
       const paths = Array.from(selectedPaths);
       const result = await deleteLeftoverFolders(paths);
@@ -191,7 +187,7 @@ export function LeftoversModule() {
           l => !selectedPaths.has(l.path) || result.failed_paths.includes(l.path)
         );
         const newTotalSize = remainingLeftovers.reduce((sum, l) => sum + l.size, 0);
-        
+
         setScanResult({
           ...scanResult,
           leftovers: remainingLeftovers,
@@ -243,11 +239,11 @@ export function LeftoversModule() {
     setDeleteErrors([]);
     setShowErrorDetails(false);
     setShowDeepCleanConfirm(false);
-    
+
     try {
       const paths = Array.from(selectedPaths);
       const result = await deleteLeftoversPermanent(paths);
-      
+
       setDeepCleanResult(result);
       setShowDeepCleanResult(true);
 
@@ -258,12 +254,12 @@ export function LeftoversModule() {
             .filter(d => d.success)
             .map(d => d.path)
         );
-        
+
         const remainingLeftovers = scanResult.leftovers.filter(
           l => !deletedPaths.has(l.path)
         );
         const newTotalSize = remainingLeftovers.reduce((sum, l) => sum + l.size, 0);
-        
+
         setScanResult({
           ...scanResult,
           leftovers: remainingLeftovers,
@@ -425,30 +421,6 @@ export function LeftoversModule() {
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'leftovers')}
         onScan={handleScan}
         error={moduleState.error}
-        headerExtra={
-          <div className="flex items-center gap-2">
-            {/* 深度扫描开关 */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeepScanEnabled(!deepScanEnabled);
-              }}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                deepScanEnabled
-                  ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)] border border-[var(--brand-green)]/20'
-                  : 'bg-[var(--bg-hover)] text-[var(--text-muted)] border border-[var(--border-color)]'
-              }`}
-              title="深度扫描：检测模拟器残留、虚拟磁盘文件等"
-            >
-              {deepScanEnabled ? (
-                <ToggleRight className="w-3 h-3" />
-              ) : (
-                <ToggleLeft className="w-3 h-3" />
-              )}
-              深度扫描
-            </button>
-          </div>
-        }
       >
         {/* 扫描结果内容 */}
         {scanResult && scanResult.leftovers.length > 0 && (
@@ -487,10 +459,10 @@ export function LeftoversModule() {
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={selectedPaths.size === 0 || isDeleting}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
+                      flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
                     ${selectedPaths.size === 0 || isDeleting
                       ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
-                      : 'bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)]'
+                      : 'bg-[var(--color-warning)] text-white hover:opacity-90'
                     }
                   `}
                 >
@@ -506,7 +478,7 @@ export function LeftoversModule() {
                   onClick={handleDeepCleanClick}
                   disabled={selectedPaths.size === 0 || isDeleting}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
+                      flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
                     ${selectedPaths.size === 0 || isDeleting
                       ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
                       : 'bg-[var(--color-danger)] text-white hover:opacity-90'
@@ -600,13 +572,12 @@ export function LeftoversModule() {
                   </div>
 
                   {/* 图标 - 根据类型显示不同图标 */}
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                    leftover.is_emulator
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${leftover.is_emulator
                       ? 'bg-[var(--color-danger)]/10'
                       : leftover.is_virtual_disk
                         ? 'bg-purple-500/10'
                         : 'bg-[var(--brand-green-10)]'
-                  }`}>
+                    }`}>
                     {leftover.is_emulator ? (
                       <Smartphone className="w-5 h-5 text-[var(--color-danger)]" />
                     ) : leftover.is_virtual_disk ? (
@@ -650,13 +621,12 @@ export function LeftoversModule() {
 
                   {/* 大小 - 大文件高亮 */}
                   <div className="text-right shrink-0">
-                    <p className={`text-sm font-bold tabular-nums ${
-                      leftover.size > 1024 * 1024 * 1024 
-                        ? 'text-[var(--color-danger)]' 
+                    <p className={`text-sm font-bold tabular-nums ${leftover.size > 1024 * 1024 * 1024
+                        ? 'text-[var(--color-danger)]'
                         : leftover.size > 100 * 1024 * 1024
                           ? 'text-[var(--color-warning)]'
                           : 'text-[var(--text-primary)]'
-                    }`}>
+                      }`}>
                       {formatSize(leftover.size)}
                     </p>
                   </div>
@@ -712,12 +682,12 @@ export function LeftoversModule() {
                 <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
               </div>
             </div>
-            
+
             {/* 标题 */}
             <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-3">
               深度清理警告
             </h3>
-            
+
             {/* 内容 */}
             <div className="space-y-3 mb-6">
               <p className="text-sm text-[var(--text-secondary)] text-center">
@@ -732,7 +702,7 @@ export function LeftoversModule() {
                 </p>
               </div>
             </div>
-            
+
             {/* 按钮 */}
             <div className="flex gap-3">
               <button
@@ -827,18 +797,17 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div 
-        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`} 
-        onClick={onClose} 
+      <div
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`}
+        onClick={onClose}
       />
       <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl w-[420px] max-h-[80vh] overflow-hidden flex flex-col mx-4 ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 结果图标 */}
         <div className="flex justify-center mb-4">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-            result.success_count > 0 
-              ? 'bg-[var(--brand-green)]/10' 
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${result.success_count > 0
+              ? 'bg-[var(--brand-green)]/10'
               : 'bg-[var(--color-danger)]/10'
-          }`}>
+            }`}>
             {result.success_count > 0 ? (
               <CheckCircle2 className="w-8 h-8 text-[var(--brand-green)]" />
             ) : (
@@ -846,12 +815,12 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
             )}
           </div>
         </div>
-        
+
         {/* 标题 */}
         <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">
           深度清理完成
         </h3>
-        
+
         {/* 统计信息 - 可滚动区域 */}
         <div className="flex-1 overflow-auto space-y-3 mb-4">
           {/* 成功删除 */}
@@ -863,7 +832,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
               </span>
             </div>
           )}
-          
+
           {/* 需要人工审核 - 可展开 */}
           {reviewItems.length > 0 && (
             <div className="bg-[var(--color-warning)]/10 rounded-xl overflow-hidden">
@@ -911,7 +880,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
               )}
             </div>
           )}
-          
+
           {/* 待重启删除 */}
           {result.reboot_pending_count > 0 && (
             <div className="flex items-center justify-between p-3 bg-[var(--color-info)]/10 rounded-xl">
@@ -921,7 +890,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
               </span>
             </div>
           )}
-          
+
           {/* 删除失败 - 可展开 */}
           {failedItems.length > 0 && (
             <div className="bg-[var(--color-danger)]/10 rounded-xl overflow-hidden">
@@ -968,7 +937,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
             </div>
           )}
         </div>
-        
+
         {/* 关闭按钮 */}
         <button
           onClick={onClose}
