@@ -171,7 +171,7 @@ impl SnapshotManager {
     pub fn new() -> Result<Self, SnapshotError> {
         let app_data = get_app_data_dir()?;
         let snapshot_dir = app_data.join(SNAPSHOT_DIR);
-        
+
         // 确保目录存在
         if !snapshot_dir.exists() {
             fs::create_dir_all(&snapshot_dir)
@@ -214,7 +214,7 @@ impl SnapshotManager {
     /// 加载最新快照
     pub fn load_latest_snapshot(&self) -> Result<Option<Snapshot>, SnapshotError> {
         let snapshots = self.list_snapshots()?;
-        
+
         if snapshots.is_empty() {
             return Ok(None);
         }
@@ -228,7 +228,7 @@ impl SnapshotManager {
     pub fn load_snapshot_by_date(&self, date: &str) -> Result<Option<Snapshot>, SnapshotError> {
         let filename = format!("{}{}{}", SNAPSHOT_PREFIX, date, SNAPSHOT_SUFFIX);
         let filepath = self.snapshot_dir.join(&filename);
-        
+
         if !filepath.exists() {
             return Ok(None);
         }
@@ -376,7 +376,7 @@ fn get_app_data_dir() -> Result<PathBuf, SnapshotError> {
 /// 标准化路径（移除 ProgramData 前缀，统一格式）
 fn normalize_path(path: &str) -> String {
     let path = path.replace('\\', "/");
-    
+
     // 移除 C:/ProgramData/ 前缀
     let prefixes = [
         "c:/programdata/",
@@ -384,13 +384,13 @@ fn normalize_path(path: &str) -> String {
         "c:\\programdata\\",
         "C:\\ProgramData\\",
     ];
-    
+
     for prefix in prefixes {
         if let Some(stripped) = path.strip_prefix(prefix) {
             return stripped.to_string();
         }
     }
-    
+
     // 如果没有前缀，返回原路径
     path
 }
@@ -424,7 +424,7 @@ pub fn has_today_snapshot() -> Result<bool, SnapshotError> {
 }
 
 /// 从扫描结果快速创建快照
-/// 
+///
 /// # 参数
 /// - `entries`: 目录列表 (路径, 大小)
 /// - `total_size`: 总大小
@@ -434,7 +434,7 @@ pub fn create_snapshot_from_scan(
     total_size: u64,
     matched_paths: &[String],
 ) -> Snapshot {
-    let matched_set: std::collections::HashSet<&str> = 
+    let matched_set: std::collections::HashSet<&str> =
         matched_paths.iter().map(|s| s.as_str()).collect();
 
     let mut builder = SnapshotBuilder::new().total_size(total_size);
@@ -465,18 +465,9 @@ mod tests {
 
     #[test]
     fn test_normalize_path() {
-        assert_eq!(
-            normalize_path("C:\\ProgramData\\Microsoft"),
-            "Microsoft"
-        );
-        assert_eq!(
-            normalize_path("c:/programdata/NVIDIA"),
-            "NVIDIA"
-        );
-        assert_eq!(
-            normalize_path("SomeDir"),
-            "SomeDir"
-        );
+        assert_eq!(normalize_path("C:\\ProgramData\\Microsoft"), "Microsoft");
+        assert_eq!(normalize_path("c:/programdata/NVIDIA"), "NVIDIA");
+        assert_eq!(normalize_path("SomeDir"), "SomeDir");
     }
 
     #[test]
@@ -499,12 +490,10 @@ mod tests {
             timestamp: 1234567890000,
             date: "2026-04-21".to_string(),
             total_size: 1024 * 1024 * 100,
-            entries: vec![
-                SnapshotEntry {
-                    path: "Microsoft".to_string(),
-                    size: 50 * 1024 * 1024,
-                },
-            ],
+            entries: vec![SnapshotEntry {
+                path: "Microsoft".to_string(),
+                size: 50 * 1024 * 1024,
+            }],
             version: 1,
         };
 

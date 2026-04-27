@@ -28,7 +28,7 @@ const MAX_LOG_FILES: usize = 10;
 // ============================================================================
 
 /// 单条清理记录
-/// 
+///
 /// 使用 serde 的 Serialize/Deserialize 特性实现 JSON 序列化：
 /// - #[derive(Serialize, Deserialize)] 自动生成序列化代码
 /// - serde_json::to_string_pretty() 将结构体转为格式化的 JSON 字符串
@@ -112,7 +112,7 @@ impl Default for CleanupSession {
 // ============================================================================
 
 /// 清理日志管理器
-/// 
+///
 /// 负责：
 /// 1. 将清理记录写入 JSON 文件
 /// 2. 管理日志文件数量（轮转）
@@ -126,17 +126,17 @@ pub struct CleanupLogger {
 
 impl CleanupLogger {
     /// 创建日志管理器
-    /// 
+    ///
     /// # Arguments
     /// * `app_data_dir` - 应用数据目录 (AppData/Roaming/LightC)
     pub fn new(app_data_dir: &Path) -> Self {
         let log_dir = app_data_dir.join("logs");
-        
+
         // 确保日志目录存在
         if let Err(e) = fs::create_dir_all(&log_dir) {
             error!("创建日志目录失败: {:?}, 错误: {}", log_dir, e);
         }
-        
+
         Self {
             log_dir,
             current_session: Arc::new(Mutex::new(None)),
@@ -156,7 +156,7 @@ impl CleanupLogger {
     }
 
     /// 记录单条清理操作
-    /// 
+    ///
     /// # Arguments
     /// * `category` - 清理模块分类
     /// * `path` - 文件路径
@@ -176,7 +176,11 @@ impl CleanupLogger {
             category: category.to_string(),
             path: path.to_string(),
             size,
-            result: if success { "Success".to_string() } else { "Failed".to_string() },
+            result: if success {
+                "Success".to_string()
+            } else {
+                "Failed".to_string()
+            },
             error_message: error_msg,
         };
 
@@ -192,24 +196,21 @@ impl CleanupLogger {
     }
 
     /// 结束当前会话并保存日志
-    /// 
+    ///
     /// 使用 serde_json 序列化日志数据：
     /// 1. 调用 serde_json::to_string_pretty() 生成格式化的 JSON
     /// 2. 使用 std::fs::write() 写入文件
     /// 3. 即使写入失败也不会影响程序运行
     pub async fn finish_session(&self) -> Result<PathBuf, String> {
         let mut session_guard = self.current_session.lock().await;
-        
+
         if let Some(ref mut session) = *session_guard {
             session.finish();
-            
+
             // 生成日志文件名
-            let filename = format!(
-                "cleanup_{}.json",
-                Local::now().format("%Y%m%d_%H%M%S")
-            );
+            let filename = format!("cleanup_{}.json", Local::now().format("%Y%m%d_%H%M%S"));
             let log_path = self.log_dir.join(&filename);
-            
+
             // 使用 serde_json 序列化为格式化的 JSON 字符串
             // to_string_pretty() 会生成带缩进的可读 JSON
             match serde_json::to_string_pretty(session) {
@@ -218,7 +219,7 @@ impl CleanupLogger {
                     match fs::write(&log_path, json_content) {
                         Ok(_) => {
                             info!("清理日志已保存: {:?}", log_path);
-                            
+
                             // 执行日志轮转（在后台线程中执行，不阻塞）
                             let log_dir = self.log_dir.clone();
                             tokio::spawn(async move {
@@ -226,7 +227,7 @@ impl CleanupLogger {
                                     warn!("日志轮转失败: {}", e);
                                 }
                             });
-                            
+
                             *session_guard = None;
                             return Ok(log_path);
                         }
@@ -246,14 +247,17 @@ impl CleanupLogger {
                 }
             }
         }
-        
+
         Err("没有活动的清理会话".to_string())
     }
 
     /// 直接保存一批清理记录（不使用会话模式）
-    /// 
+    ///
     /// 用于一次性记录多条清理结果
-    pub async fn save_cleanup_results(&self, entries: Vec<CleanupLogEntry>) -> Result<PathBuf, String> {
+    pub async fn save_cleanup_results(
+        &self,
+        entries: Vec<CleanupLogEntry>,
+    ) -> Result<PathBuf, String> {
         if entries.is_empty() {
             return Err("没有清理记录".to_string());
         }
@@ -265,18 +269,14 @@ impl CleanupLogger {
         session.finish();
 
         // 生成日志文件名
-        let filename = format!(
-            "cleanup_{}.json",
-            Local::now().format("%Y%m%d_%H%M%S")
-        );
+        let filename = format!("cleanup_{}.json", Local::now().format("%Y%m%d_%H%M%S"));
         let log_path = self.log_dir.join(&filename);
 
         // 序列化并写入
-        let json_content = serde_json::to_string_pretty(&session)
-            .map_err(|e| format!("序列化失败: {}", e))?;
-        
-        fs::write(&log_path, json_content)
-            .map_err(|e| format!("写入失败: {}", e))?;
+        let json_content =
+            serde_json::to_string_pretty(&session).map_err(|e| format!("序列化失败: {}", e))?;
+
+        fs::write(&log_path, json_content).map_err(|e| format!("写入失败: {}", e))?;
 
         info!("清理日志已保存: {:?}", log_path);
 
@@ -297,7 +297,7 @@ impl CleanupLogger {
 // ============================================================================
 
 /// 日志轮转 - 只保留最近 MAX_LOG_FILES 份日志
-/// 
+///
 /// 实现逻辑：
 /// 1. 使用 std::fs::read_dir() 遍历日志目录
 /// 2. 过滤出 .json 文件并收集文件信息
@@ -305,22 +305,22 @@ impl CleanupLogger {
 /// 4. 如果文件数量超过 MAX_LOG_FILES，删除最旧的文件
 async fn rotate_logs(log_dir: &Path) -> Result<(), String> {
     debug!("开始日志轮转检查，目录: {:?}", log_dir);
-    
+
     // 使用 read_dir 遍历目录，收集所有 JSON 日志文件
     let entries: Vec<_> = match fs::read_dir(log_dir) {
         Ok(dir) => dir
             .filter_map(|entry| entry.ok())
             .filter(|entry| {
-                entry.path().extension()
+                entry
+                    .path()
+                    .extension()
                     .map(|ext| ext == "json")
                     .unwrap_or(false)
             })
             .filter_map(|entry| {
                 // 获取文件的创建时间（或修改时间作为备选）
                 let metadata = entry.metadata().ok()?;
-                let created = metadata.created()
-                    .or_else(|_| metadata.modified())
-                    .ok()?;
+                let created = metadata.created().or_else(|_| metadata.modified()).ok()?;
                 Some((entry.path(), created))
             })
             .collect(),

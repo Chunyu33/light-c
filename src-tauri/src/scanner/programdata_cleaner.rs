@@ -59,7 +59,7 @@ pub struct CleanOptions {
 impl Default for CleanOptions {
     fn default() -> Self {
         Self {
-            allow_warning: false,  // 默认不清理 Warning 级别
+            allow_warning: false, // 默认不清理 Warning 级别
             dry_run: false,
             check_exists: true,
         }
@@ -137,7 +137,11 @@ impl ProgramDataCleaner {
 
         log::info!(
             "清理完成: 成功 {}, 失败 {}, 跳过 {}, 释放 {} bytes, 耗时 {}ms",
-            success_count, failed_count, skipped_count, freed_size, duration_ms
+            success_count,
+            failed_count,
+            skipped_count,
+            freed_size,
+            duration_ms
         );
 
         BatchCleanResult {
@@ -261,7 +265,7 @@ impl ProgramDataCleaner {
         let programdata_idx = path_lower.find("programdata").unwrap_or(0);
         let after_programdata = &path[programdata_idx + 11..]; // "programdata" 长度
         let trimmed = after_programdata.trim_start_matches(['\\', '/']);
-        
+
         if trimmed.is_empty() {
             return Some("不能删除 ProgramData 根目录".to_string());
         }
@@ -329,9 +333,15 @@ fn parse_trash_error(error: &trash::Error) -> String {
     let error_lower = error_str.to_lowercase();
 
     // 检查常见错误模式
-    if error_lower.contains("access") || error_lower.contains("denied") || error_lower.contains("permission") {
+    if error_lower.contains("access")
+        || error_lower.contains("denied")
+        || error_lower.contains("permission")
+    {
         "权限不足，请以管理员身份运行".to_string()
-    } else if error_lower.contains("in use") || error_lower.contains("being used") || error_lower.contains("locked") {
+    } else if error_lower.contains("in use")
+        || error_lower.contains("being used")
+        || error_lower.contains("locked")
+    {
         "文件正在被占用，请关闭相关程序后重试".to_string()
     } else if error_lower.contains("aborted") || error_lower.contains("cancelled") {
         "部分文件被占用或权限不足，无法完整移动到回收站".to_string()
@@ -366,7 +376,7 @@ fn is_directory_in_use(path: &Path) -> bool {
 // ============================================================================
 
 /// 清理分析结果中标记为可清理的目录（使用默认选项）
-/// 
+///
 /// # 安全说明
 /// - 只清理 Safe 级别 + Delete/Suggest 操作的目录
 /// - 所有文件移动到回收站，不会永久删除
@@ -417,7 +427,10 @@ pub fn calculate_cleanable_size(entries: &[AnalyzeResult]) -> u64 {
 
 /// 计算需要确认的总大小
 pub fn calculate_confirmation_size(entries: &[AnalyzeResult]) -> u64 {
-    filter_needs_confirmation(entries).iter().map(|e| e.size).sum()
+    filter_needs_confirmation(entries)
+        .iter()
+        .map(|e| e.size)
+        .sum()
 }
 
 // ============================================================================
@@ -450,7 +463,7 @@ mod tests {
             RiskLevel::Dangerous,
             ActionType::Delete,
         );
-        
+
         let skip = cleaner.should_skip(&entry);
         assert!(skip.is_some());
         assert!(skip.unwrap().contains("危险"));
@@ -464,7 +477,7 @@ mod tests {
             RiskLevel::Safe,
             ActionType::Protect,
         );
-        
+
         let skip = cleaner.should_skip(&entry);
         assert!(skip.is_some());
         assert!(skip.unwrap().contains("保护"));
@@ -473,12 +486,8 @@ mod tests {
     #[test]
     fn test_should_not_skip_safe_delete() {
         let cleaner = ProgramDataCleaner::new();
-        let entry = create_test_entry(
-            "C:\\ProgramData\\Test",
-            RiskLevel::Safe,
-            ActionType::Delete,
-        );
-        
+        let entry = create_test_entry("C:\\ProgramData\\Test", RiskLevel::Safe, ActionType::Delete);
+
         let skip = cleaner.should_skip(&entry);
         assert!(skip.is_none());
     }
@@ -491,7 +500,7 @@ mod tests {
             RiskLevel::Warning,
             ActionType::Delete,
         );
-        
+
         let skip = cleaner.should_skip(&entry);
         assert!(skip.is_some());
         assert!(skip.unwrap().contains("确认"));
@@ -505,7 +514,7 @@ mod tests {
             RiskLevel::Warning,
             ActionType::Delete,
         );
-        
+
         let skip = cleaner.should_skip(&entry);
         assert!(skip.is_none());
     }
@@ -513,7 +522,7 @@ mod tests {
     #[test]
     fn test_validate_path_forbidden() {
         let cleaner = ProgramDataCleaner::new();
-        
+
         assert!(cleaner.validate_path("C:\\Windows\\System32").is_some());
         assert!(cleaner.validate_path("C:\\Program Files\\Test").is_some());
         assert!(cleaner.validate_path("C:\\Users\\Test").is_some());
@@ -522,9 +531,11 @@ mod tests {
     #[test]
     fn test_validate_path_valid() {
         let cleaner = ProgramDataCleaner::new();
-        
+
         assert!(cleaner.validate_path("C:\\ProgramData\\Test").is_none());
-        assert!(cleaner.validate_path("C:\\ProgramData\\Microsoft\\Windows\\WER").is_none());
+        assert!(cleaner
+            .validate_path("C:\\ProgramData\\Microsoft\\Windows\\WER")
+            .is_none());
     }
 
     #[test]
@@ -532,7 +543,11 @@ mod tests {
         let entries = vec![
             create_test_entry("C:\\ProgramData\\A", RiskLevel::Safe, ActionType::Delete),
             create_test_entry("C:\\ProgramData\\B", RiskLevel::Warning, ActionType::Delete),
-            create_test_entry("C:\\ProgramData\\C", RiskLevel::Dangerous, ActionType::Delete),
+            create_test_entry(
+                "C:\\ProgramData\\C",
+                RiskLevel::Dangerous,
+                ActionType::Delete,
+            ),
             create_test_entry("C:\\ProgramData\\D", RiskLevel::Safe, ActionType::Protect),
         ];
 

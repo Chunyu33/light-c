@@ -224,9 +224,9 @@ impl RuleEngine {
 
     /// 从 JSON 文件加载规则
     pub fn from_file(path: &Path) -> Result<Self, RuleEngineError> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| RuleEngineError::IoError(e.to_string()))?;
-        
+        let content =
+            fs::read_to_string(path).map_err(|e| RuleEngineError::IoError(e.to_string()))?;
+
         let ruleset: RuleSet = serde_json::from_str(&content)
             .map_err(|e| RuleEngineError::ParseError(e.to_string()))?;
 
@@ -238,8 +238,8 @@ impl RuleEngine {
 
     /// 从 JSON 字符串加载规则
     pub fn from_json(json: &str) -> Result<Self, RuleEngineError> {
-        let ruleset: RuleSet = serde_json::from_str(json)
-            .map_err(|e| RuleEngineError::ParseError(e.to_string()))?;
+        let ruleset: RuleSet =
+            serde_json::from_str(json).map_err(|e| RuleEngineError::ParseError(e.to_string()))?;
 
         Ok(Self {
             ruleset,
@@ -258,9 +258,9 @@ impl RuleEngine {
     /// 重新加载规则文件
     pub fn reload(&mut self) -> Result<(), RuleEngineError> {
         if let Some(path) = &self.rules_path {
-            let content = fs::read_to_string(path)
-                .map_err(|e| RuleEngineError::IoError(e.to_string()))?;
-            
+            let content =
+                fs::read_to_string(path).map_err(|e| RuleEngineError::IoError(e.to_string()))?;
+
             self.ruleset = serde_json::from_str(&content)
                 .map_err(|e| RuleEngineError::ParseError(e.to_string()))?;
         }
@@ -288,7 +288,9 @@ impl RuleEngine {
         let normalized_path = normalize_path(path);
 
         // 查找匹配的规则（按优先级排序）
-        let mut matched_rules: Vec<&Rule> = self.ruleset.rules
+        let mut matched_rules: Vec<&Rule> = self
+            .ruleset
+            .rules
             .iter()
             .filter(|r| r.enabled && self.match_rule(r, &normalized_path, size))
             .collect();
@@ -494,7 +496,10 @@ fn infer_from_path(path: &str, size: u64) -> (String, RiskLevel, ActionType, Str
             "第三方软件".to_string(),
             RiskLevel::Warning,
             ActionType::Suggest,
-            format!("第三方软件目录（{:.2} GB），需自行判断，建议保留", size as f64 / 1024.0 / 1024.0 / 1024.0),
+            format!(
+                "第三方软件目录（{:.2} GB），需自行判断，建议保留",
+                size as f64 / 1024.0 / 1024.0 / 1024.0
+            ),
         );
     }
 
@@ -533,7 +538,11 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 100,
                 enabled: true,
-                tags: vec!["windows".to_string(), "update".to_string(), "cache".to_string()],
+                tags: vec![
+                    "windows".to_string(),
+                    "update".to_string(),
+                    "cache".to_string(),
+                ],
             },
             Rule {
                 id: "win-softwaredistribution".to_string(),
@@ -563,9 +572,12 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 100,
                 enabled: true,
-                tags: vec!["windows".to_string(), "error".to_string(), "dump".to_string()],
+                tags: vec![
+                    "windows".to_string(),
+                    "error".to_string(),
+                    "dump".to_string(),
+                ],
             },
-
             // ==================== Windows Defender 相关 ====================
             Rule {
                 id: "defender-scans".to_string(),
@@ -595,9 +607,12 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 200,
                 enabled: true,
-                tags: vec!["defender".to_string(), "security".to_string(), "protected".to_string()],
+                tags: vec![
+                    "defender".to_string(),
+                    "security".to_string(),
+                    "protected".to_string(),
+                ],
             },
-
             // ==================== 驱动程序缓存 ====================
             Rule {
                 id: "nvidia-cache".to_string(),
@@ -612,7 +627,11 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 100 * 1024 * 1024, // 100MB
                 priority: 70,
                 enabled: true,
-                tags: vec!["driver".to_string(), "nvidia".to_string(), "cache".to_string()],
+                tags: vec![
+                    "driver".to_string(),
+                    "nvidia".to_string(),
+                    "cache".to_string(),
+                ],
             },
             Rule {
                 id: "amd-cache".to_string(),
@@ -644,7 +663,6 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 enabled: true,
                 tags: vec!["driver".to_string(), "intel".to_string()],
             },
-
             // ==================== 软件包管理器 ====================
             Rule {
                 id: "package-cache".to_string(),
@@ -674,9 +692,12 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 200,
                 enabled: true,
-                tags: vec!["package".to_string(), "chocolatey".to_string(), "protected".to_string()],
+                tags: vec![
+                    "package".to_string(),
+                    "chocolatey".to_string(),
+                    "protected".to_string(),
+                ],
             },
-
             // ==================== 应用程序数据 ====================
             Rule {
                 id: "docker-data".to_string(),
@@ -691,7 +712,11 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 200,
                 enabled: true,
-                tags: vec!["docker".to_string(), "container".to_string(), "protected".to_string()],
+                tags: vec![
+                    "docker".to_string(),
+                    "container".to_string(),
+                    "protected".to_string(),
+                ],
             },
             Rule {
                 id: "adobe-cache".to_string(),
@@ -708,7 +733,6 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 enabled: true,
                 tags: vec!["adobe".to_string(), "cache".to_string()],
             },
-
             // ==================== 系统保护目录 ====================
             Rule {
                 id: "regid".to_string(),
@@ -723,7 +747,11 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 200,
                 enabled: true,
-                tags: vec!["system".to_string(), "license".to_string(), "protected".to_string()],
+                tags: vec![
+                    "system".to_string(),
+                    "license".to_string(),
+                    "protected".to_string(),
+                ],
             },
             Rule {
                 id: "ssh".to_string(),
@@ -738,7 +766,11 @@ pub fn get_builtin_ruleset() -> RuleSet {
                 min_size: 0,
                 priority: 200,
                 enabled: true,
-                tags: vec!["system".to_string(), "ssh".to_string(), "protected".to_string()],
+                tags: vec![
+                    "system".to_string(),
+                    "ssh".to_string(),
+                    "protected".to_string(),
+                ],
             },
         ],
     }
@@ -746,8 +778,7 @@ pub fn get_builtin_ruleset() -> RuleSet {
 
 /// 导出规则集为 JSON 字符串
 pub fn export_ruleset_json(ruleset: &RuleSet) -> Result<String, RuleEngineError> {
-    serde_json::to_string_pretty(ruleset)
-        .map_err(|e| RuleEngineError::ParseError(e.to_string()))
+    serde_json::to_string_pretty(ruleset).map_err(|e| RuleEngineError::ParseError(e.to_string()))
 }
 
 /// 导出内置规则集为 JSON 文件
@@ -802,7 +833,7 @@ mod tests {
             "C:\\ProgramData\\Microsoft\\Windows\\DeliveryOptimization",
             1024 * 1024 * 500, // 500MB
         );
-        
+
         assert_eq!(result.category, "Windows Update");
         assert_eq!(result.risk, RiskLevel::Safe);
         assert_eq!(result.action, ActionType::Delete);
@@ -815,7 +846,7 @@ mod tests {
             "C:\\ProgramData\\SomeUnknownApp",
             1024 * 1024, // 1MB
         );
-        
+
         assert_eq!(result.category, "第三方软件");
     }
 

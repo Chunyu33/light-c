@@ -204,9 +204,11 @@ impl ContextMenuScanner {
 
         // 按状态排序：无效条目（exe 不存在）排在前面
         entries.sort_by(|a, b| {
-            b.exe_exists
-                .cmp(&a.exe_exists)
-                .then_with(|| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()))
+            b.exe_exists.cmp(&a.exe_exists).then_with(|| {
+                a.display_name
+                    .to_lowercase()
+                    .cmp(&b.display_name.to_lowercase())
+            })
         });
 
         let invalid_count = entries.iter().filter(|e| !e.exe_exists).count();
@@ -242,7 +244,10 @@ impl ContextMenuScanner {
             ("桌面背景", r"Directory\Background\shell"),
             ("磁盘驱动器", r"Drive\shell"),
             ("库文件夹", r"LibraryFolder\Background\shell"),
-            ("任意文件(ContextMenuHandlers)", r"*\shellex\ContextMenuHandlers"),
+            (
+                "任意文件(ContextMenuHandlers)",
+                r"*\shellex\ContextMenuHandlers",
+            ),
         ];
 
         for (scope, rel_path) in scan_targets {
@@ -253,11 +258,7 @@ impl ContextMenuScanner {
                     self.scan_shell_key(
                         &shell_key,
                         hive_name,
-                        &format!(
-                            "{}\\{}",
-                            hive_name,
-                            full_rel
-                        ),
+                        &format!("{}\\{}", hive_name, full_rel),
                         &format!(r"{}", full_rel),
                         scope,
                         needs_admin,
@@ -424,8 +425,7 @@ impl ContextMenuScanner {
         // 只处理看起来像绝对路径的情况（含盘符或 UNC）
         if first_token.len() >= 3
             && first_token.chars().nth(1) == Some(':')
-            && (first_token.chars().nth(2) == Some('\\')
-                || first_token.chars().nth(2) == Some('/'))
+            && (first_token.chars().nth(2) == Some('\\') || first_token.chars().nth(2) == Some('/'))
         {
             return Some(Self::expand_env_vars(first_token));
         }

@@ -125,7 +125,10 @@ impl From<(String, u64)> for DirEntry {
 
 impl From<(&str, u64)> for DirEntry {
     fn from((path, size): (&str, u64)) -> Self {
-        Self { path: path.to_string(), size }
+        Self {
+            path: path.to_string(),
+            size,
+        }
     }
 }
 
@@ -194,10 +197,22 @@ impl GrowthAnalyzer {
 
         // 统计
         let total_growth: i64 = entries.iter().map(|e| e.diff).sum();
-        let significant_count = entries.iter().filter(|e| e.level == GrowthLevel::Significant).count();
-        let fast_count = entries.iter().filter(|e| e.level == GrowthLevel::Fast).count();
-        let new_count = entries.iter().filter(|e| e.level == GrowthLevel::New).count();
-        let decreased_count = entries.iter().filter(|e| e.level == GrowthLevel::Decreased).count();
+        let significant_count = entries
+            .iter()
+            .filter(|e| e.level == GrowthLevel::Significant)
+            .count();
+        let fast_count = entries
+            .iter()
+            .filter(|e| e.level == GrowthLevel::Fast)
+            .count();
+        let new_count = entries
+            .iter()
+            .filter(|e| e.level == GrowthLevel::New)
+            .count();
+        let decreased_count = entries
+            .iter()
+            .filter(|e| e.level == GrowthLevel::Decreased)
+            .count();
 
         // 生成摘要
         let summary = self.generate_summary(&entries, total_growth, significant_count, fast_count);
@@ -217,7 +232,7 @@ impl GrowthAnalyzer {
     /// 创建单个增长条目
     fn create_growth_entry(&self, path: &str, old_size: u64, new_size: u64) -> GrowthEntry {
         let diff = new_size as i64 - old_size as i64;
-        
+
         // 计算增长百分比
         let diff_percent = if old_size > 0 {
             (diff as f64 / old_size as f64) * 100.0
@@ -351,10 +366,7 @@ impl GrowthAnalyzer {
                     format!("该目录减少了 {:.1} MB", diff_mb.abs()),
                     "空间已释放".to_string(),
                 ),
-                GrowthLevel::Stable => (
-                    "该目录大小基本稳定".to_string(),
-                    "无需处理".to_string(),
-                ),
+                GrowthLevel::Stable => ("该目录大小基本稳定".to_string(), "无需处理".to_string()),
             }
         };
 
@@ -384,7 +396,10 @@ impl GrowthAnalyzer {
         } else if total_growth > 0 {
             format!("✅ ProgramData 总计增长 {:.1} MB，属于正常范围", total_mb)
         } else if total_growth < 0 {
-            format!("🎉 ProgramData 总计减少 {:.1} MB，空间已释放", total_mb.abs())
+            format!(
+                "🎉 ProgramData 总计减少 {:.1} MB，空间已释放",
+                total_mb.abs()
+            )
         } else {
             "✅ ProgramData 大小基本稳定，无明显变化".to_string()
         }
@@ -427,27 +442,30 @@ pub fn format_size_diff(diff: i64) -> String {
 // ============================================================================
 
 /// 对比当前扫描结果和历史快照
-/// 
+///
 /// # 参数
 /// - `current`: 当前扫描结果 (路径, 大小)
 /// - `previous`: 历史快照 (路径, 大小)
-/// 
+///
 /// # 返回
 /// 增长报告，包含所有变化的目录（按增长量降序排列）
-pub fn compare_growth(
-    current: &[(String, u64)],
-    previous: &[(String, u64)],
-) -> GrowthReport {
+pub fn compare_growth(current: &[(String, u64)], previous: &[(String, u64)]) -> GrowthReport {
     let analyzer = GrowthAnalyzer::new();
-    
+
     let current_entries: Vec<DirEntry> = current
         .iter()
-        .map(|(p, s)| DirEntry { path: p.clone(), size: *s })
+        .map(|(p, s)| DirEntry {
+            path: p.clone(),
+            size: *s,
+        })
         .collect();
-    
+
     let previous_entries: Vec<DirEntry> = previous
         .iter()
-        .map(|(p, s)| DirEntry { path: p.clone(), size: *s })
+        .map(|(p, s)| DirEntry {
+            path: p.clone(),
+            size: *s,
+        })
         .collect();
 
     analyzer.analyze(&current_entries, &previous_entries, None)
@@ -460,15 +478,21 @@ pub fn compare_growth_with_timespan(
     time_span: &str,
 ) -> GrowthReport {
     let analyzer = GrowthAnalyzer::new();
-    
+
     let current_entries: Vec<DirEntry> = current
         .iter()
-        .map(|(p, s)| DirEntry { path: p.clone(), size: *s })
+        .map(|(p, s)| DirEntry {
+            path: p.clone(),
+            size: *s,
+        })
         .collect();
-    
+
     let previous_entries: Vec<DirEntry> = previous
         .iter()
-        .map(|(p, s)| DirEntry { path: p.clone(), size: *s })
+        .map(|(p, s)| DirEntry {
+            path: p.clone(),
+            size: *s,
+        })
         .collect();
 
     analyzer.analyze(&current_entries, &previous_entries, Some(time_span))
@@ -513,37 +537,37 @@ mod tests {
     #[test]
     fn test_growth_level() {
         let analyzer = GrowthAnalyzer::new();
-        
+
         // 显著增长
         assert_eq!(
             analyzer.determine_level(600 * 1024 * 1024, 100),
             GrowthLevel::Significant
         );
-        
+
         // 快速增长
         assert_eq!(
             analyzer.determine_level(150 * 1024 * 1024, 100),
             GrowthLevel::Fast
         );
-        
+
         // 轻微增长
         assert_eq!(
             analyzer.determine_level(50 * 1024 * 1024, 100),
             GrowthLevel::Minor
         );
-        
+
         // 稳定
         assert_eq!(
             analyzer.determine_level(5 * 1024 * 1024, 100),
             GrowthLevel::Stable
         );
-        
+
         // 减少
         assert_eq!(
             analyzer.determine_level(-100 * 1024 * 1024, 200 * 1024 * 1024),
             GrowthLevel::Decreased
         );
-        
+
         // 新增
         assert_eq!(
             analyzer.determine_level(100 * 1024 * 1024, 0),
@@ -558,7 +582,7 @@ mod tests {
             ("NVIDIA".to_string(), 150 * 1024 * 1024),
             ("NewApp".to_string(), 50 * 1024 * 1024),
         ];
-        
+
         let previous = vec![
             ("Microsoft".to_string(), 100 * 1024 * 1024),
             ("NVIDIA".to_string(), 150 * 1024 * 1024),
@@ -568,7 +592,7 @@ mod tests {
 
         assert_eq!(report.entries.len(), 3);
         assert!(report.total_growth > 0);
-        
+
         // 第一个应该是增长最多的
         assert_eq!(report.entries[0].path, "Microsoft");
         assert_eq!(report.entries[0].diff, 100 * 1024 * 1024);

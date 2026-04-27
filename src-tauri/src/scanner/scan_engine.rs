@@ -3,17 +3,15 @@
 // 使用并行扫描优化性能
 // ============================================================================
 
+use log::{debug, info};
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 use std::thread;
+use std::time::Instant;
 use walkdir::WalkDir;
-use log::{info, debug};
 
-use super::{
-    CategoryScanResult, FileInfo, JunkCategory, ScanProgress, ScanResult,
-};
+use super::{CategoryScanResult, FileInfo, JunkCategory, ScanProgress, ScanResult};
 
 /// 扫描引擎
 pub struct ScanEngine {
@@ -49,7 +47,7 @@ impl ScanEngine {
         let start_time = Instant::now();
         let categories = self.categories.clone();
         let max_depth = self.max_depth;
-        
+
         info!("开始并行扫描，共 {} 个分类", categories.len());
 
         // 使用线程并行扫描所有分类
@@ -64,7 +62,7 @@ impl ScanEngine {
                     max_depth,
                 };
                 let category_result = engine.scan_category(&category);
-                
+
                 info!(
                     "分类 {} 扫描完成: {} 个文件, {}",
                     category.display_name(),
@@ -110,7 +108,7 @@ impl ScanEngine {
         let patterns = category.get_file_patterns();
 
         for scan_path in scan_paths {
-            if let Some(resolved_path) = scan_path.resolve() {
+            for resolved_path in scan_path.resolve_all() {
                 debug!("扫描路径: {:?}", resolved_path);
                 self.scan_path(&resolved_path, category, &patterns, &mut result);
             }
@@ -150,7 +148,7 @@ impl ScanEngine {
 
         for entry in walker.filter_map(|e| e.ok()) {
             let entry_path = entry.path();
-            
+
             // 跳过根目录本身
             if entry_path == path {
                 continue;
@@ -242,7 +240,7 @@ impl ScanEngine {
     /// 简单的glob模式匹配
     fn matches_glob(&self, name: &str, pattern: &str) -> bool {
         let pattern = pattern.to_lowercase();
-        
+
         if pattern == "*" {
             return true;
         }
@@ -272,7 +270,7 @@ impl ScanEngine {
     /// 检查是否为系统保护路径（不应扫描）
     fn is_system_protected(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        
+
         // 保护关键系统目录
         let protected_paths = [
             "system32",
@@ -325,7 +323,7 @@ mod tests {
     #[test]
     fn test_glob_matching() {
         let engine = ScanEngine::new();
-        
+
         assert!(engine.matches_glob("test.log", "*.log"));
         assert!(engine.matches_glob("test.LOG", "*.log"));
         assert!(!engine.matches_glob("test.txt", "*.log"));

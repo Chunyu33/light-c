@@ -3,9 +3,9 @@
 // 多层安全保护，确保不会误删重要文件
 // ============================================================================
 
+use log::{debug, error, info, warn};
 use std::fs;
 use std::path::Path;
-use log::{info, warn, error, debug};
 
 use crate::scanner::{DeleteResult, FileInfo};
 
@@ -32,7 +32,7 @@ const PROTECTED_PATH_PREFIXES: &[&str] = &[
     "c:\\programdata\\microsoft\\windows",
     "c:\\programdata\\microsoft\\windows defender",
     "c:\\recovery",
-    "c:\\$recycle.bin",  // 回收站根目录
+    "c:\\$recycle.bin", // 回收站根目录
 ];
 
 /// 绝对禁止删除的文件名
@@ -55,26 +55,25 @@ const PROTECTED_FILES: &[&str] = &[
     "pagefile.sys",
     "hiberfil.sys",
     "swapfile.sys",
-    "desktop.ini",  // 保护文件夹配置
-    "ntuser.dat",   // 用户配置
+    "desktop.ini", // 保护文件夹配置
+    "ntuser.dat",  // 用户配置
     "usrclass.dat",
     // 社交软件配置文件（防止误删导致数据丢失）
-    "config.data",      // 微信配置
-    "accinfo.dat",      // 微信账号信息
-    "msg.db",           // 消息数据库
-    "micromsg.db",      // 微信消息数据库
-    "contact.db",       // 联系人数据库
-    "emotion.db",       // 表情数据库
-    "favorite.db",      // 收藏数据库
-    "publicmsg.db",     // 公众号消息
-    "nt_db",            // NTQQ 数据库目录标识
-    "nt_config",        // NTQQ 配置目录标识
+    "config.data",  // 微信配置
+    "accinfo.dat",  // 微信账号信息
+    "msg.db",       // 消息数据库
+    "micromsg.db",  // 微信消息数据库
+    "contact.db",   // 联系人数据库
+    "emotion.db",   // 表情数据库
+    "favorite.db",  // 收藏数据库
+    "publicmsg.db", // 公众号消息
+    "nt_db",        // NTQQ 数据库目录标识
+    "nt_config",    // NTQQ 配置目录标识
 ];
 
 /// 在Windows目录下禁止删除的扩展名
 const PROTECTED_EXTENSIONS_IN_WINDOWS: &[&str] = &[
-    "sys", "dll", "exe", "drv", "ocx", "cpl",
-    "msi", "msp", "msu", "cat", "mum", "manifest",
+    "sys", "dll", "exe", "drv", "ocx", "cpl", "msi", "msp", "msu", "cat", "mum", "manifest",
 ];
 
 /// 删除引擎
@@ -109,7 +108,7 @@ impl DeleteEngine {
     /// 删除文件列表
     pub fn delete_files(&self, files: &[FileInfo]) -> DeleteResult {
         let mut result = DeleteResult::new();
-        
+
         info!("开始删除 {} 个文件", files.len());
 
         for file in files {
@@ -120,7 +119,15 @@ impl DeleteEngine {
                 }
                 Err(e) => {
                     result.add_failure(file.path.clone(), e);
-                    warn!("删除失败: {} - {}", file.path, result.failed_files.last().map(|f| &f.reason).unwrap_or(&String::new()));
+                    warn!(
+                        "删除失败: {} - {}",
+                        file.path,
+                        result
+                            .failed_files
+                            .last()
+                            .map(|f| &f.reason)
+                            .unwrap_or(&String::new())
+                    );
                 }
             }
         }
@@ -136,13 +143,13 @@ impl DeleteEngine {
     /// 删除指定路径列表
     pub fn delete_paths(&self, paths: &[String]) -> DeleteResult {
         let mut result = DeleteResult::new();
-        
+
         info!("开始删除 {} 个路径", paths.len());
 
         for path in paths {
             let file_path = Path::new(path);
             let size = self.get_path_size(file_path);
-            
+
             match self.delete_single_file(path, size) {
                 Ok(freed) => {
                     result.add_success(freed);
@@ -252,7 +259,7 @@ impl DeleteEngine {
     /// 检查是否为受保护的路径（多层安全检查）
     fn is_protected_path(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        
+
         // 第1层：检查路径前缀
         for protected in PROTECTED_PATH_PREFIXES {
             if path_str.starts_with(protected) {
@@ -311,7 +318,7 @@ impl DeleteEngine {
     /// 验证路径是否在允许删除的范围内
     fn is_in_allowed_scope(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        
+
         // 允许删除的路径范围
         let allowed_scopes = [
             "\\temp",
@@ -322,11 +329,11 @@ impl DeleteEngine {
             "\\appdata\\local\\temp",
             "\\appdata\\local\\microsoft\\windows\\temporary",
             "\\appdata\\local\\microsoft\\windows\\inetcache",
-            "\\appdata\\local\\microsoft\\windows\\explorer",  // 缩略图缓存
+            "\\appdata\\local\\microsoft\\windows\\explorer", // 缩略图缓存
             "\\windows\\temp",
             "\\windows\\prefetch",
             "\\windows\\softwaredistribution\\download",
-            "\\$recycle.bin",  // 回收站内容
+            "\\$recycle.bin", // 回收站内容
             "\\.log",
             "\\.tmp",
             "\\.bak",
@@ -366,7 +373,7 @@ mod tests {
     #[test]
     fn test_protected_paths() {
         let engine = DeleteEngine::new();
-        
+
         assert!(engine.is_protected_path(Path::new("C:\\Windows\\System32\\test.dll")));
         assert!(engine.is_protected_path(Path::new("C:\\Program Files\\App")));
         assert!(!engine.is_protected_path(Path::new("C:\\Temp\\test.tmp")));

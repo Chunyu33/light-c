@@ -3,8 +3,11 @@
 // 定义所有可从前端调用的Rust命令
 // ============================================================================
 
-use crate::scanner::{ScanEngine, ScanResult, JunkCategory, DeleteResult, CategoryScanResult};
-use crate::cleaner::{DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult, PermanentDeleteEngine, PermanentDeleteResult, SafetyCheckResult};
+use crate::cleaner::{
+    DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult, PermanentDeleteEngine,
+    PermanentDeleteResult, SafetyCheckResult,
+};
+use crate::scanner::{CategoryScanResult, DeleteResult, JunkCategory, ScanEngine, ScanResult};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ordering, Reverse};
@@ -75,7 +78,7 @@ pub struct DiskInfo {
 #[tauri::command]
 pub fn get_disk_info() -> Result<DiskInfo, String> {
     info!("获取磁盘信息");
-    
+
     // 使用Windows API获取磁盘信息
     #[cfg(target_os = "windows")]
     {
@@ -148,7 +151,7 @@ fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String>
     #[cfg(target_os = "windows")]
     {
         use std::time::Instant;
-        
+
         info!("开始扫描C盘大文件");
         let mut heap: BinaryHeap<Reverse<LargeFileEntry>> = BinaryHeap::new();
         let mut file_count: u64 = 0;
@@ -165,7 +168,8 @@ fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String>
                 info!("大文件扫描被用户取消，已扫描 {} 个文件", file_count);
                 let _ = window.emit("large-file-scan:cancelled", ());
                 // 返回当前已扫描到的结果
-                let mut results: Vec<LargeFileEntry> = heap.into_iter().map(|item| item.0).collect();
+                let mut results: Vec<LargeFileEntry> =
+                    heap.into_iter().map(|item| item.0).collect();
                 results.sort_by(|a, b| b.size.cmp(&a.size));
                 return Ok(results);
             }
@@ -183,7 +187,7 @@ fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String>
                     .unwrap_or(0);
 
                 file_count += 1;
-                
+
                 // 限制事件发送频率：每 200ms 或每 1000 个文件发送一次
                 if last_emit.elapsed().as_millis() >= 200 || file_count % 1000 == 0 {
                     let _ = window.emit("large-file-scan:progress", &path_str);
@@ -205,7 +209,11 @@ fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String>
         let mut results: Vec<LargeFileEntry> = heap.into_iter().map(|item| item.0).collect();
         results.sort_by(|a, b| b.size.cmp(&a.size));
 
-        info!("大文件扫描完成，共扫描 {} 个文件，返回 {} 项", file_count, results.len());
+        info!(
+            "大文件扫描完成，共扫描 {} 个文件，返回 {} 项",
+            file_count,
+            results.len()
+        );
         Ok(results)
     }
 
@@ -219,7 +227,7 @@ fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String>
 #[tauri::command]
 pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult, String> {
     info!("开始扫描垃圾文件");
-    
+
     // 使用 spawn_blocking 在后台线程执行扫描操作
     let result = tokio::task::spawn_blocking(move || {
         let engine = if let Some(req) = request {
@@ -229,7 +237,7 @@ pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult,
                     .into_iter()
                     .filter(|c| category_names.contains(&c.display_name().to_string()))
                     .collect();
-                
+
                 if categories.is_empty() {
                     ScanEngine::new()
                 } else {
@@ -246,12 +254,12 @@ pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult,
     })
     .await
     .map_err(|e| format!("扫描任务异常: {}", e))?;
-    
+
     info!(
         "扫描完成: {} 个文件, {} 字节",
         result.total_file_count, result.total_size
     );
-    
+
     Ok(result)
 }
 
@@ -259,7 +267,7 @@ pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult,
 #[tauri::command]
 pub async fn scan_category(category_name: String) -> Result<CategoryScanResult, String> {
     info!("扫描分类: {}", category_name);
-    
+
     let result = tokio::task::spawn_blocking(move || -> Result<CategoryScanResult, String> {
         let category = JunkCategory::all()
             .into_iter()
@@ -271,7 +279,7 @@ pub async fn scan_category(category_name: String) -> Result<CategoryScanResult, 
     })
     .await
     .map_err(|e| format!("扫描任务异常: {}", e))??;
-    
+
     Ok(result)
 }
 
@@ -279,7 +287,7 @@ pub async fn scan_category(category_name: String) -> Result<CategoryScanResult, 
 #[tauri::command]
 pub async fn delete_files(request: DeleteRequest) -> Result<DeleteResult, String> {
     info!("开始删除 {} 个文件", request.paths.len());
-    
+
     // 使用 spawn_blocking 在后台线程执行删除操作
     let result = tokio::task::spawn_blocking(move || {
         let engine = DeleteEngine::new();
@@ -287,12 +295,12 @@ pub async fn delete_files(request: DeleteRequest) -> Result<DeleteResult, String
     })
     .await
     .map_err(|e| format!("删除任务异常: {}", e))?;
-    
+
     info!(
         "删除完成: 成功 {}, 失败 {}, 释放 {} 字节",
         result.success_count, result.failed_count, result.freed_size
     );
-    
+
     Ok(result)
 }
 
@@ -330,20 +338,20 @@ pub fn format_size(bytes: u64) -> String {
 #[tauri::command]
 pub fn open_disk_cleanup() -> Result<(), String> {
     info!("打开Windows磁盘清理工具");
-    
+
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        
+
         Command::new("cleanmgr")
             .arg("/d")
             .arg("C")
             .spawn()
             .map_err(|e| format!("无法启动磁盘清理工具: {}", e))?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持Windows系统".to_string())
@@ -354,21 +362,21 @@ pub fn open_disk_cleanup() -> Result<(), String> {
 #[tauri::command]
 pub fn open_in_folder(path: String) -> Result<(), String> {
     info!("打开文件所在目录: {}", path);
-    
+
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        
+
         // 使用 explorer /select, 命令打开并选中文件
         Command::new("explorer")
             .arg("/select,")
             .arg(&path)
             .spawn()
             .map_err(|e| format!("无法打开文件夹: {}", e))?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持Windows系统".to_string())
@@ -379,20 +387,20 @@ pub fn open_in_folder(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn open_file(path: String) -> Result<(), String> {
     info!("打开文件: {}", path);
-    
+
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        
+
         // 使用 start 命令打开文件
         Command::new("cmd")
             .args(["/C", "start", "", &path])
             .spawn()
             .map_err(|e| format!("无法打开文件: {}", e))?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持Windows系统".to_string())
@@ -447,7 +455,7 @@ pub struct SocialScanResult {
 #[tauri::command]
 pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
     info!("开始扫描社交软件缓存");
-    
+
     let result = tokio::task::spawn_blocking(|| -> Result<SocialScanResult, String> {
         let mut categories = vec![
             SocialCategory {
@@ -477,28 +485,31 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
         ];
 
         // 获取用户目录
-        let user_profile = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Default".to_string());
-        let local_appdata = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| format!("{}\\AppData\\Local", user_profile));
-        let appdata = std::env::var("APPDATA").unwrap_or_else(|_| format!("{}\\AppData\\Roaming", user_profile));
-        
+        let user_profile =
+            std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Default".to_string());
+        let local_appdata = std::env::var("LOCALAPPDATA")
+            .unwrap_or_else(|_| format!("{}\\AppData\\Local", user_profile));
+        let appdata = std::env::var("APPDATA")
+            .unwrap_or_else(|_| format!("{}\\AppData\\Roaming", user_profile));
+
         // 获取真实的文档目录（可能在 D 盘等非系统盘）
         let documents_dir = dirs::document_dir()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| format!("{}\\Documents", user_profile));
-        
+
         // 默认文档目录
         let default_documents = format!("{}\\Documents", user_profile);
-        
+
         info!("用户目录: {}", user_profile);
         info!("文档目录: {}", documents_dir);
         info!("LocalAppData: {}", local_appdata);
-        
+
         // ========================================================================
         // 动态检测社交软件路径
         // ========================================================================
-        
+
         let mut social_paths: Vec<(&str, String, &str)> = Vec::new();
-        
+
         // ------------------------------------------------------------------------
         // 微信 (WeChat) - 动态检测
         // ------------------------------------------------------------------------
@@ -506,7 +517,7 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
             format!("{}\\WeChat Files", documents_dir),
             format!("{}\\WeChat Files", default_documents),
         ];
-        
+
         for base_path in &wechat_base_paths {
             let base = std::path::Path::new(base_path);
             if base.exists() {
@@ -516,57 +527,92 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                     for entry in entries.filter_map(|e| e.ok()) {
                         if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                             let user_dir = entry.path();
-                            let user_name = user_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
-                            
+                            let user_name = user_dir
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string();
+
                             // 跳过 All Users 和 Applet 等系统目录
-                            if user_name == "All Users" || user_name == "Applet" || user_name.starts_with(".") {
+                            if user_name == "All Users"
+                                || user_name == "Applet"
+                                || user_name.starts_with(".")
+                            {
                                 continue;
                             }
-                            
+
                             info!("  微信用户: {}", user_name);
-                            
+
                             // FileStorage 子目录
                             let file_storage = user_dir.join("FileStorage");
                             if file_storage.exists() {
                                 // 图片
                                 let image_dir = file_storage.join("Image");
                                 if image_dir.exists() {
-                                    social_paths.push(("微信", image_dir.to_string_lossy().to_string(), "images_videos"));
+                                    social_paths.push((
+                                        "微信",
+                                        image_dir.to_string_lossy().to_string(),
+                                        "images_videos",
+                                    ));
                                 }
                                 // 视频
                                 let video_dir = file_storage.join("Video");
                                 if video_dir.exists() {
-                                    social_paths.push(("微信", video_dir.to_string_lossy().to_string(), "images_videos"));
+                                    social_paths.push((
+                                        "微信",
+                                        video_dir.to_string_lossy().to_string(),
+                                        "images_videos",
+                                    ));
                                 }
                                 // 文件
                                 let file_dir = file_storage.join("File");
                                 if file_dir.exists() {
-                                    social_paths.push(("微信", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                                    social_paths.push((
+                                        "微信",
+                                        file_dir.to_string_lossy().to_string(),
+                                        "file_transfer",
+                                    ));
                                 }
                                 // 朋友圈
                                 let sns_dir = file_storage.join("Sns");
                                 if sns_dir.exists() {
-                                    social_paths.push(("微信", sns_dir.to_string_lossy().to_string(), "moments_cache"));
+                                    social_paths.push((
+                                        "微信",
+                                        sns_dir.to_string_lossy().to_string(),
+                                        "moments_cache",
+                                    ));
                                 }
                                 // 缓存
                                 let cache_dir = file_storage.join("Cache");
                                 if cache_dir.exists() {
-                                    social_paths.push(("微信", cache_dir.to_string_lossy().to_string(), "moments_cache"));
+                                    social_paths.push((
+                                        "微信",
+                                        cache_dir.to_string_lossy().to_string(),
+                                        "moments_cache",
+                                    ));
                                 }
                                 // 消息附件
                                 let msg_attach = file_storage.join("MsgAttach");
                                 if msg_attach.exists() {
-                                    social_paths.push(("微信", msg_attach.to_string_lossy().to_string(), "file_transfer"));
+                                    social_paths.push((
+                                        "微信",
+                                        msg_attach.to_string_lossy().to_string(),
+                                        "file_transfer",
+                                    ));
                                 }
                             }
-                            
+
                             // Msg 目录（消息数据库，通常较大）
                             let msg_dir = user_dir.join("Msg");
                             if msg_dir.exists() {
                                 // 只扫描 Attach 子目录，避免删除消息数据库
                                 let attach_dir = msg_dir.join("Attach");
                                 if attach_dir.exists() {
-                                    social_paths.push(("微信", attach_dir.to_string_lossy().to_string(), "file_transfer"));
+                                    social_paths.push((
+                                        "微信",
+                                        attach_dir.to_string_lossy().to_string(),
+                                        "file_transfer",
+                                    ));
                                 }
                             }
                         }
@@ -574,7 +620,7 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                 }
             }
         }
-        
+
         // ------------------------------------------------------------------------
         // QQ (传统版) - 动态检测
         // ------------------------------------------------------------------------
@@ -582,7 +628,7 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
             format!("{}\\Tencent Files", documents_dir),
             format!("{}\\Tencent Files", default_documents),
         ];
-        
+
         for base_path in &qq_base_paths {
             let base = std::path::Path::new(base_path);
             if base.exists() {
@@ -591,47 +637,69 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                     for entry in entries.filter_map(|e| e.ok()) {
                         if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                             let user_dir = entry.path();
-                            let user_name = user_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
-                            
+                            let user_name = user_dir
+                                .file_name()
+                                .unwrap_or_default()
+                                .to_string_lossy()
+                                .to_string();
+
                             // QQ号通常是纯数字
-                            if !user_name.chars().all(|c| c.is_ascii_digit()) && user_name != "All Users" {
+                            if !user_name.chars().all(|c| c.is_ascii_digit())
+                                && user_name != "All Users"
+                            {
                                 continue;
                             }
-                            
+
                             info!("  QQ用户: {}", user_name);
-                            
+
                             // 图片
                             let image_dir = user_dir.join("Image");
                             if image_dir.exists() {
-                                social_paths.push(("QQ", image_dir.to_string_lossy().to_string(), "images_videos"));
+                                social_paths.push((
+                                    "QQ",
+                                    image_dir.to_string_lossy().to_string(),
+                                    "images_videos",
+                                ));
                             }
                             // 视频
                             let video_dir = user_dir.join("Video");
                             if video_dir.exists() {
-                                social_paths.push(("QQ", video_dir.to_string_lossy().to_string(), "images_videos"));
+                                social_paths.push((
+                                    "QQ",
+                                    video_dir.to_string_lossy().to_string(),
+                                    "images_videos",
+                                ));
                             }
                             // 文件接收
                             let file_recv = user_dir.join("FileRecv");
                             if file_recv.exists() {
-                                social_paths.push(("QQ", file_recv.to_string_lossy().to_string(), "file_transfer"));
+                                social_paths.push((
+                                    "QQ",
+                                    file_recv.to_string_lossy().to_string(),
+                                    "file_transfer",
+                                ));
                             }
                             // 音频
                             let audio_dir = user_dir.join("Audio");
                             if audio_dir.exists() {
-                                social_paths.push(("QQ", audio_dir.to_string_lossy().to_string(), "images_videos"));
+                                social_paths.push((
+                                    "QQ",
+                                    audio_dir.to_string_lossy().to_string(),
+                                    "images_videos",
+                                ));
                             }
                         }
                     }
                 }
             }
         }
-        
+
         // QQ 临时文件
         let qq_temp = format!("{}\\Tencent\\QQ\\Temp", appdata);
         if std::path::Path::new(&qq_temp).exists() {
             social_paths.push(("QQ", qq_temp, "moments_cache"));
         }
-        
+
         // ------------------------------------------------------------------------
         // NTQQ (新版QQ) - 动态检测
         // ------------------------------------------------------------------------
@@ -644,51 +712,71 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                 for entry in entries.filter_map(|e| e.ok()) {
                     if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                         let sub_dir = entry.path();
-                        let dir_name = sub_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
-                        
+                        let dir_name = sub_dir
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+
                         // 跳过非用户目录
                         if dir_name == "global" || dir_name.starts_with(".") {
                             continue;
                         }
-                        
+
                         info!("  NTQQ用户目录: {}", dir_name);
-                        
+
                         // nt_data 目录
                         let nt_data = sub_dir.join("nt_data");
                         if nt_data.exists() {
                             // 图片缓存
                             let pic_dir = nt_data.join("Pic");
                             if pic_dir.exists() {
-                                social_paths.push(("NTQQ", pic_dir.to_string_lossy().to_string(), "images_videos"));
+                                social_paths.push((
+                                    "NTQQ",
+                                    pic_dir.to_string_lossy().to_string(),
+                                    "images_videos",
+                                ));
                             }
                             // 视频缓存
                             let video_dir = nt_data.join("Video");
                             if video_dir.exists() {
-                                social_paths.push(("NTQQ", video_dir.to_string_lossy().to_string(), "images_videos"));
+                                social_paths.push((
+                                    "NTQQ",
+                                    video_dir.to_string_lossy().to_string(),
+                                    "images_videos",
+                                ));
                             }
                             // 文件缓存
                             let file_dir = nt_data.join("File");
                             if file_dir.exists() {
-                                social_paths.push(("NTQQ", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                                social_paths.push((
+                                    "NTQQ",
+                                    file_dir.to_string_lossy().to_string(),
+                                    "file_transfer",
+                                ));
                             }
                         }
-                        
+
                         // nt_msg 目录（消息缓存）
                         let nt_msg = sub_dir.join("nt_msg");
                         if nt_msg.exists() {
-                            social_paths.push(("NTQQ", nt_msg.to_string_lossy().to_string(), "moments_cache"));
+                            social_paths.push((
+                                "NTQQ",
+                                nt_msg.to_string_lossy().to_string(),
+                                "moments_cache",
+                            ));
                         }
                     }
                 }
             }
         }
-        
+
         // NTQQ 全局缓存
         let ntqq_cache = format!("{}\\Tencent\\QQ\\Cache", local_appdata);
         if std::path::Path::new(&ntqq_cache).exists() {
             social_paths.push(("NTQQ", ntqq_cache, "moments_cache"));
         }
-        
+
         // ------------------------------------------------------------------------
         // 钉钉 (DingTalk) - 动态检测
         // ------------------------------------------------------------------------
@@ -703,34 +791,50 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                         // 图片
                         let image_dir = sub_dir.join("Image");
                         if image_dir.exists() {
-                            social_paths.push(("钉钉", image_dir.to_string_lossy().to_string(), "images_videos"));
+                            social_paths.push((
+                                "钉钉",
+                                image_dir.to_string_lossy().to_string(),
+                                "images_videos",
+                            ));
                         }
                         // 视频
                         let video_dir = sub_dir.join("Video");
                         if video_dir.exists() {
-                            social_paths.push(("钉钉", video_dir.to_string_lossy().to_string(), "images_videos"));
+                            social_paths.push((
+                                "钉钉",
+                                video_dir.to_string_lossy().to_string(),
+                                "images_videos",
+                            ));
                         }
                         // 文件
                         let file_dir = sub_dir.join("File");
                         if file_dir.exists() {
-                            social_paths.push(("钉钉", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                            social_paths.push((
+                                "钉钉",
+                                file_dir.to_string_lossy().to_string(),
+                                "file_transfer",
+                            ));
                         }
                         // 缓存
                         let cache_dir = sub_dir.join("Cache");
                         if cache_dir.exists() {
-                            social_paths.push(("钉钉", cache_dir.to_string_lossy().to_string(), "moments_cache"));
+                            social_paths.push((
+                                "钉钉",
+                                cache_dir.to_string_lossy().to_string(),
+                                "moments_cache",
+                            ));
                         }
                     }
                 }
             }
         }
-        
+
         // 钉钉文档目录
         let dingtalk_docs = format!("{}\\DingTalk", documents_dir);
         if std::path::Path::new(&dingtalk_docs).exists() {
             social_paths.push(("钉钉", dingtalk_docs, "file_transfer"));
         }
-        
+
         // ------------------------------------------------------------------------
         // 飞书 (Feishu/Lark) - 动态检测
         // ------------------------------------------------------------------------
@@ -745,35 +849,47 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                         // 图片
                         let image_dir = sub_dir.join("Image");
                         if image_dir.exists() {
-                            social_paths.push(("飞书", image_dir.to_string_lossy().to_string(), "images_videos"));
+                            social_paths.push((
+                                "飞书",
+                                image_dir.to_string_lossy().to_string(),
+                                "images_videos",
+                            ));
                         }
                         // 文件
                         let file_dir = sub_dir.join("File");
                         if file_dir.exists() {
-                            social_paths.push(("飞书", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                            social_paths.push((
+                                "飞书",
+                                file_dir.to_string_lossy().to_string(),
+                                "file_transfer",
+                            ));
                         }
                         // 缓存
                         let cache_dir = sub_dir.join("Cache");
                         if cache_dir.exists() {
-                            social_paths.push(("飞书", cache_dir.to_string_lossy().to_string(), "moments_cache"));
+                            social_paths.push((
+                                "飞书",
+                                cache_dir.to_string_lossy().to_string(),
+                                "moments_cache",
+                            ));
                         }
                     }
                 }
             }
         }
-        
+
         // 飞书文档目录
         let feishu_docs = format!("{}\\Feishu", documents_dir);
         if std::path::Path::new(&feishu_docs).exists() {
             social_paths.push(("飞书", feishu_docs, "file_transfer"));
         }
-        
+
         // Lark (国际版飞书)
         let lark_base = format!("{}\\Lark", appdata);
         if std::path::Path::new(&lark_base).exists() {
             social_paths.push(("Lark", lark_base, "moments_cache"));
         }
-        
+
         // ------------------------------------------------------------------------
         // 企业微信 (WXWork) - 动态检测
         // ------------------------------------------------------------------------
@@ -781,7 +897,7 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
             format!("{}\\WXWork", documents_dir),
             format!("{}\\WXWork", default_documents),
         ];
-        
+
         for base_path in &wxwork_base_paths {
             let base = std::path::Path::new(base_path);
             if base.exists() {
@@ -795,17 +911,29 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                                 // 图片
                                 let image_dir = cache_dir.join("Image");
                                 if image_dir.exists() {
-                                    social_paths.push(("企业微信", image_dir.to_string_lossy().to_string(), "images_videos"));
+                                    social_paths.push((
+                                        "企业微信",
+                                        image_dir.to_string_lossy().to_string(),
+                                        "images_videos",
+                                    ));
                                 }
                                 // 视频
                                 let video_dir = cache_dir.join("Video");
                                 if video_dir.exists() {
-                                    social_paths.push(("企业微信", video_dir.to_string_lossy().to_string(), "images_videos"));
+                                    social_paths.push((
+                                        "企业微信",
+                                        video_dir.to_string_lossy().to_string(),
+                                        "images_videos",
+                                    ));
                                 }
                                 // 文件
                                 let file_dir = cache_dir.join("File");
                                 if file_dir.exists() {
-                                    social_paths.push(("企业微信", file_dir.to_string_lossy().to_string(), "file_transfer"));
+                                    social_paths.push((
+                                        "企业微信",
+                                        file_dir.to_string_lossy().to_string(),
+                                        "file_transfer",
+                                    ));
                                 }
                             }
                         }
@@ -813,7 +941,7 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
                 }
             }
         }
-        
+
         // ------------------------------------------------------------------------
         // Telegram - 动态检测
         // ------------------------------------------------------------------------
@@ -822,21 +950,20 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
             info!("发现Telegram目录: {}", telegram_base);
             social_paths.push(("Telegram", telegram_base, "moments_cache"));
         }
-        
+
         // ========================================================================
         // 执行扫描
         // ========================================================================
-        
+
         // 图片视频扩展名
         let image_video_exts = [
-            "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "heif", "tiff",
-            "mp4", "avi", "mov", "wmv", "flv", "mkv", "webm", "m4v", "3gp",
-            "mp3", "wav", "aac", "flac", "ogg", "wma", "m4a",
-            "dat", "silk", "amr"  // 微信语音格式
+            "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "heif", "tiff", "mp4", "avi",
+            "mov", "wmv", "flv", "mkv", "webm", "m4v", "3gp", "mp3", "wav", "aac", "flac", "ogg",
+            "wma", "m4a", "dat", "silk", "amr", // 微信语音格式
         ];
-        
+
         info!("共发现 {} 个社交软件缓存路径", social_paths.len());
-        
+
         for (app_name, path_str, category_id) in &social_paths {
             let path = PathBuf::from(path_str);
             if path.exists() {
@@ -888,14 +1015,15 @@ fn scan_directory_for_social(
         if let Ok(metadata) = entry.metadata() {
             let file_path = entry.path().to_string_lossy().to_string();
             let size = metadata.len();
-            
+
             // 根据分类ID和文件扩展名决定归类
-            let ext = entry.path()
+            let ext = entry
+                .path()
                 .extension()
                 .and_then(|e| e.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            
+
             let target_category = if category_id == "images_videos" {
                 // 图片视频分类只收集对应扩展名的文件
                 if image_video_exts.contains(&ext.as_str()) {
@@ -926,16 +1054,16 @@ fn scan_directory_for_social(
 // 社交软件专清 V2 - 智能路径溯源与风险分级
 // ============================================================================
 
-use crate::scanner::{SocialScanner, SocialScanResultV2};
+use crate::scanner::{SocialScanResultV2, SocialScanner};
 
 /// 扫描社交软件缓存 V2（带风险分级）
-/// 
+///
 /// 支持智能路径溯源和文件类型深度分类：
 /// - 微信：通过注册表读取自定义路径，识别聊天记录数据库
 /// - QQ/NTQQ：定位 nt_data 目录，识别消息数据库
 /// - 钉钉：定位 storage 和 cache 目录
 /// - 飞书：扫描 LarkShell，定位 sdk_storage 和 file_storage
-/// 
+///
 /// # 风险等级
 /// - CRITICAL: 聊天记录数据库，禁止删除
 /// - MEDIUM: 接收的文件，谨慎清理
@@ -944,22 +1072,19 @@ use crate::scanner::{SocialScanner, SocialScanResultV2};
 #[tauri::command]
 pub async fn scan_social_cache_v2() -> Result<SocialScanResultV2, String> {
     info!("开始扫描社交软件缓存 V2（带风险分级）");
-    
+
     let result = tokio::task::spawn_blocking(|| {
         let scanner = SocialScanner::new();
         scanner.scan()
     })
     .await
     .map_err(|e| format!("扫描任务异常: {}", e))?;
-    
+
     info!(
         "社交软件扫描 V2 完成: {} 个文件, {} 字节, 可删除 {} 个文件 ({} 字节)",
-        result.total_files,
-        result.total_size,
-        result.deletable_files,
-        result.deletable_size
+        result.total_files, result.total_size, result.deletable_files, result.deletable_size
     );
-    
+
     Ok(result)
 }
 
@@ -1004,21 +1129,21 @@ pub struct SystemSlimStatus {
 pub fn check_admin_privilege() -> bool {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         // 尝试执行需要管理员权限的命令来检测
         let output = Command::new("net")
             .args(["session"])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .output();
-        
+
         match output {
             Ok(o) => o.status.success(),
             Err(_) => false,
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         false
@@ -1031,23 +1156,23 @@ pub fn get_system_slim_status() -> SystemSlimStatus {
     let is_admin = check_admin_privilege();
     let mut items = Vec::new();
     let mut total_reclaimable: u64 = 0;
-    
+
     // 1. 休眠文件检测
     let hibernation = get_hibernation_status();
     if hibernation.enabled {
         total_reclaimable += hibernation.size;
     }
     items.push(hibernation);
-    
+
     // 2. WinSxS 组件存储（估算可清理空间）
     let winsxs = get_winsxs_status();
     total_reclaimable += winsxs.size;
     items.push(winsxs);
-    
+
     // 3. 虚拟内存检测
     let pagefile = get_pagefile_status();
     items.push(pagefile);
-    
+
     SystemSlimStatus {
         is_admin,
         items,
@@ -1066,7 +1191,7 @@ fn get_hibernation_status() -> SlimItemStatus {
     } else {
         0
     };
-    
+
     SlimItemStatus {
         id: "hibernation".to_string(),
         name: "休眠文件".to_string(),
@@ -1075,7 +1200,11 @@ fn get_hibernation_status() -> SlimItemStatus {
         enabled: exists,
         size,
         actionable: exists,
-        action_text: if exists { "关闭休眠".to_string() } else { "已关闭".to_string() },
+        action_text: if exists {
+            "关闭休眠".to_string()
+        } else {
+            "已关闭".to_string()
+        },
     }
 }
 
@@ -1089,11 +1218,12 @@ fn get_winsxs_status() -> SlimItemStatus {
     } else {
         0
     };
-    
+
     SlimItemStatus {
         id: "winsxs".to_string(),
         name: "系统组件存储".to_string(),
-        description: "Windows 组件存储 (WinSxS) 包含系统更新的旧版本文件，可安全清理冗余部分".to_string(),
+        description: "Windows 组件存储 (WinSxS) 包含系统更新的旧版本文件，可安全清理冗余部分"
+            .to_string(),
         warning: "清理过程可能需要 5-15 分钟，期间请勿关闭程序或电脑".to_string(),
         enabled: true,
         size: estimated_reclaimable,
@@ -1113,16 +1243,20 @@ fn get_pagefile_status() -> SlimItemStatus {
     } else {
         0
     };
-    
+
     // 读取注册表获取分页文件配置
     let pagefile_location = get_pagefile_registry_info();
     let is_on_c_drive = pagefile_location.contains("C:") || pagefile_location.contains("c:");
-    
+
     SlimItemStatus {
         id: "pagefile".to_string(),
         name: "虚拟内存".to_string(),
-        description: format!("当前分页文件位置: {}。建议将虚拟内存迁移到非系统盘以释放 C 盘空间", pagefile_location),
-        warning: "虚拟内存对系统稳定性至关重要，不建议直接删除，请通过系统设置迁移到其他磁盘".to_string(),
+        description: format!(
+            "当前分页文件位置: {}。建议将虚拟内存迁移到非系统盘以释放 C 盘空间",
+            pagefile_location
+        ),
+        warning: "虚拟内存对系统稳定性至关重要，不建议直接删除，请通过系统设置迁移到其他磁盘"
+            .to_string(),
         enabled: exists && is_on_c_drive,
         size,
         actionable: is_on_c_drive,
@@ -1134,9 +1268,9 @@ fn get_pagefile_status() -> SlimItemStatus {
 fn get_pagefile_registry_info() -> String {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         let output = Command::new("reg")
             .args([
                 "query",
@@ -1146,7 +1280,7 @@ fn get_pagefile_registry_info() -> String {
             ])
             .creation_flags(0x08000000)
             .output();
-        
+
         match output {
             Ok(o) => {
                 let stdout = String::from_utf8_lossy(&o.stdout);
@@ -1162,7 +1296,7 @@ fn get_pagefile_registry_info() -> String {
             Err(_) => "读取失败".to_string(),
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         "不支持".to_string()
@@ -1175,20 +1309,20 @@ pub fn disable_hibernation() -> Result<String, String> {
     if !check_admin_privilege() {
         return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
     }
-    
+
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         info!("正在关闭休眠功能...");
-        
+
         let output = Command::new("powercfg")
             .args(["-h", "off"])
             .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("执行命令失败: {}", e))?;
-        
+
         if output.status.success() {
             info!("休眠功能已关闭");
             Ok("休眠功能已成功关闭，hiberfil.sys 文件将被删除".to_string())
@@ -1197,7 +1331,7 @@ pub fn disable_hibernation() -> Result<String, String> {
             Err(format!("关闭休眠失败: {}", stderr))
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持 Windows 系统".to_string())
@@ -1210,20 +1344,20 @@ pub fn enable_hibernation() -> Result<String, String> {
     if !check_admin_privilege() {
         return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
     }
-    
+
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         info!("正在开启休眠功能...");
-        
+
         let output = Command::new("powercfg")
             .args(["-h", "on"])
             .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("执行命令失败: {}", e))?;
-        
+
         if output.status.success() {
             info!("休眠功能已开启");
             Ok("休眠功能已成功开启".to_string())
@@ -1232,7 +1366,7 @@ pub fn enable_hibernation() -> Result<String, String> {
             Err(format!("开启休眠失败: {}", stderr))
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持 Windows 系统".to_string())
@@ -1245,20 +1379,23 @@ pub async fn cleanup_winsxs(window: Window) -> Result<String, String> {
     if !check_admin_privilege() {
         return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
     }
-    
+
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         info!("开始清理 WinSxS 组件存储...");
-        
+
         // 发送开始事件
-        let _ = window.emit("winsxs-cleanup-progress", serde_json::json!({
-            "status": "running",
-            "message": "正在清理系统组件存储，请耐心等待..."
-        }));
-        
+        let _ = window.emit(
+            "winsxs-cleanup-progress",
+            serde_json::json!({
+                "status": "running",
+                "message": "正在清理系统组件存储，请耐心等待..."
+            }),
+        );
+
         // 使用 tokio 的 spawn_blocking 来执行阻塞操作
         let result = tokio::task::spawn_blocking(move || {
             Command::new("dism.exe")
@@ -1274,7 +1411,7 @@ pub async fn cleanup_winsxs(window: Window) -> Result<String, String> {
         .await
         .map_err(|e| format!("任务执行失败: {}", e))?
         .map_err(|e| format!("执行 DISM 命令失败: {}", e))?;
-        
+
         if result.status.success() {
             info!("WinSxS 清理完成");
             Ok("系统组件存储清理完成".to_string())
@@ -1284,7 +1421,7 @@ pub async fn cleanup_winsxs(window: Window) -> Result<String, String> {
             Err(format!("清理失败: {} {}", stdout, stderr))
         }
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持 Windows 系统".to_string())
@@ -1296,20 +1433,20 @@ pub async fn cleanup_winsxs(window: Window) -> Result<String, String> {
 pub fn open_virtual_memory_settings() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         info!("打开虚拟内存设置...");
-        
+
         // 打开系统属性 - 高级选项卡
         Command::new("SystemPropertiesAdvanced.exe")
             .creation_flags(0x08000000)
             .spawn()
             .map_err(|e| format!("无法打开系统设置: {}", e))?;
-        
+
         Ok(())
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持 Windows 系统".to_string())
@@ -1349,21 +1486,24 @@ pub struct HealthScoreResult {
 #[tauri::command]
 pub fn get_health_score() -> HealthScoreResult {
     info!("计算系统健康评分...");
-    
+
     // 1. 获取C盘剩余空间百分比
     let (disk_free_percent, disk_score) = calculate_disk_score();
-    
+
     // 2. 检查休眠文件
     let (has_hibernation, hibernation_size, hibernation_score) = calculate_hibernation_score();
-    
+
     // 3. 快速估算垃圾文件大小
     let (junk_size, junk_score) = calculate_junk_score();
-    
+
     // 计算总分
     let score = disk_score + hibernation_score + junk_score;
-    
-    info!("健康评分: {} (磁盘:{}, 休眠:{}, 垃圾:{})", score, disk_score, hibernation_score, junk_score);
-    
+
+    info!(
+        "健康评分: {} (磁盘:{}, 休眠:{}, 垃圾:{})",
+        score, disk_score, hibernation_score, junk_score
+    );
+
     HealthScoreResult {
         score,
         disk_score,
@@ -1382,7 +1522,7 @@ fn calculate_disk_score() -> (f64, u32) {
     {
         use std::ffi::OsStr;
         use std::os::windows::ffi::OsStrExt;
-        
+
         #[link(name = "kernel32")]
         extern "system" {
             fn GetDiskFreeSpaceExW(
@@ -1392,16 +1532,16 @@ fn calculate_disk_score() -> (f64, u32) {
                 lpTotalNumberOfFreeBytes: *mut u64,
             ) -> i32;
         }
-        
+
         let path: Vec<u16> = OsStr::new("C:\\")
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
-        
+
         let mut free_bytes: u64 = 0;
         let mut total_bytes: u64 = 0;
         let mut _total_free: u64 = 0;
-        
+
         let success = unsafe {
             GetDiskFreeSpaceExW(
                 path.as_ptr(),
@@ -1410,7 +1550,7 @@ fn calculate_disk_score() -> (f64, u32) {
                 &mut _total_free,
             )
         };
-        
+
         if success != 0 && total_bytes > 0 {
             let free_percent = (free_bytes as f64 / total_bytes as f64) * 100.0;
             // 剩余空间评分：
@@ -1433,20 +1573,20 @@ fn calculate_disk_score() -> (f64, u32) {
             return (free_percent, score.min(40));
         }
     }
-    
+
     (50.0, 20) // 默认值
 }
 
 /// 计算休眠文件评分 (满分30)
 fn calculate_hibernation_score() -> (bool, u64, u32) {
     let hiberfil_path = std::path::Path::new("C:\\hiberfil.sys");
-    
+
     if hiberfil_path.exists() {
         // 获取休眠文件大小
         let size = std::fs::metadata(hiberfil_path)
             .map(|m| m.len())
             .unwrap_or(0);
-        
+
         // 休眠文件存在，根据大小扣分
         // < 4GB: 20分
         // 4-8GB: 15分
@@ -1461,7 +1601,7 @@ fn calculate_hibernation_score() -> (bool, u64, u32) {
         } else {
             5
         };
-        
+
         (true, size, score)
     } else {
         // 无休眠文件，得满分
@@ -1472,16 +1612,19 @@ fn calculate_hibernation_score() -> (bool, u64, u32) {
 /// 计算垃圾文件评分 (满分30)
 fn calculate_junk_score() -> (u64, u32) {
     let mut total_junk_size: u64 = 0;
-    
+
     // 快速检查常见垃圾目录
     let junk_paths = [
         std::env::var("TEMP").unwrap_or_default(),
         std::env::var("TMP").unwrap_or_default(),
-        format!("{}\\AppData\\Local\\Temp", std::env::var("USERPROFILE").unwrap_or_default()),
+        format!(
+            "{}\\AppData\\Local\\Temp",
+            std::env::var("USERPROFILE").unwrap_or_default()
+        ),
         "C:\\Windows\\Temp".to_string(),
         "C:\\Windows\\Prefetch".to_string(),
     ];
-    
+
     for path_str in &junk_paths {
         if path_str.is_empty() {
             continue;
@@ -1500,14 +1643,14 @@ fn calculate_junk_score() -> (u64, u32) {
             }
         }
     }
-    
+
     // 检查回收站大小（简化估算）
     let recycle_bin = format!("C:\\$Recycle.Bin");
     if std::path::Path::new(&recycle_bin).exists() {
         // 回收站通常有权限问题，简单估算
         total_junk_size += 100 * 1024 * 1024; // 假设100MB
     }
-    
+
     // 垃圾文件评分：
     // < 500MB: 满分30
     // 500MB-1GB: 25分
@@ -1528,7 +1671,7 @@ fn calculate_junk_score() -> (u64, u32) {
     } else {
         5
     };
-    
+
     (total_junk_size, score)
 }
 
@@ -1536,63 +1679,65 @@ fn calculate_junk_score() -> (u64, u32) {
 // 卸载残留扫描命令
 // ============================================================================
 
-use crate::scanner::{LeftoverScanner, LeftoverScanResult};
-use crate::scanner::{RegistryScanner, RegistryScanResult, RegistryEntry, RegistryBackup};
+use crate::scanner::{LeftoverScanResult, LeftoverScanner};
+use crate::scanner::{RegistryBackup, RegistryEntry, RegistryScanResult, RegistryScanner};
 
 /// 扫描卸载残留
-/// 
+///
 /// 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
-/// 
+///
 /// # 参数
 /// - `deep_scan`: 是否启用深度扫描模式（扫描模拟器残留、虚拟磁盘文件等）
 #[tauri::command]
-pub async fn scan_uninstall_leftovers(deep_scan: Option<bool>) -> Result<LeftoverScanResult, String> {
+pub async fn scan_uninstall_leftovers(
+    deep_scan: Option<bool>,
+) -> Result<LeftoverScanResult, String> {
     let is_deep = deep_scan.unwrap_or(false);
     info!("开始扫描卸载残留... 深度扫描: {}", is_deep);
-    
+
     let result = tokio::task::spawn_blocking(move || {
         let scanner = LeftoverScanner::with_deep_scan(is_deep);
         scanner.scan()
     })
     .await
     .map_err(|e| format!("扫描任务失败: {}", e))?;
-    
+
     info!(
         "卸载残留扫描完成: 发现 {} 个残留, 总大小 {} 字节",
         result.leftovers.len(),
         result.total_size
     );
-    
+
     Ok(result)
 }
 
 /// 删除卸载残留文件夹
-/// 
+///
 /// # 参数
 /// - `paths`: 要删除的文件夹路径列表
 #[tauri::command]
 pub async fn delete_leftover_folders(paths: Vec<String>) -> Result<LeftoverDeleteResult, String> {
     info!("开始删除 {} 个卸载残留文件夹...", paths.len());
-    
+
     let result = tokio::task::spawn_blocking(move || {
         let mut deleted_count = 0u32;
         let mut deleted_size = 0u64;
         let mut failed_paths = Vec::new();
         let mut errors = Vec::new();
-        
+
         for path in paths {
             let path_buf = std::path::PathBuf::from(&path);
-            
+
             // 安全检查：确保路径在允许的目录内
             if !is_safe_leftover_path(&path_buf) {
                 failed_paths.push(path.clone());
                 errors.push(format!("路径不在允许的目录内: {}", path));
                 continue;
             }
-            
+
             // 计算文件夹大小（删除前）
             let folder_size = calculate_dir_size(&path_buf);
-            
+
             // 递归删除目录
             match std::fs::remove_dir_all(&path_buf) {
                 Ok(_) => {
@@ -1605,7 +1750,7 @@ pub async fn delete_leftover_folders(paths: Vec<String>) -> Result<LeftoverDelet
                 }
             }
         }
-        
+
         LeftoverDeleteResult {
             deleted_count,
             deleted_size,
@@ -1615,13 +1760,13 @@ pub async fn delete_leftover_folders(paths: Vec<String>) -> Result<LeftoverDelet
     })
     .await
     .map_err(|e| format!("删除任务失败: {}", e))?;
-    
+
     info!(
         "卸载残留删除完成: 成功 {}, 失败 {}",
         result.deleted_count,
         result.failed_paths.len()
     );
-    
+
     Ok(result)
 }
 
@@ -1659,16 +1804,14 @@ fn calculate_dir_size(path: &std::path::Path) -> u64 {
 /// 检查路径是否在允许删除的目录内
 fn is_safe_leftover_path(path: &std::path::Path) -> bool {
     let path_str = path.to_string_lossy().to_lowercase();
-    
+
     // 允许的目录前缀
-    let allowed_prefixes = [
-        "appdata\\local",
-        "appdata\\roaming",
-        "programdata",
-    ];
-    
+    let allowed_prefixes = ["appdata\\local", "appdata\\roaming", "programdata"];
+
     // 检查路径是否包含允许的前缀
-    allowed_prefixes.iter().any(|prefix| path_str.contains(prefix))
+    allowed_prefixes
+        .iter()
+        .any(|prefix| path_str.contains(prefix))
 }
 
 // ============================================================================
@@ -1676,51 +1819,50 @@ fn is_safe_leftover_path(path: &std::path::Path) -> bool {
 // ============================================================================
 
 /// 扫描注册表冗余
-/// 
+///
 /// 安全扫描 Windows 注册表中的孤立键值和无效引用
 #[tauri::command]
 pub async fn scan_registry_redundancy() -> Result<RegistryScanResult, String> {
     info!("开始扫描注册表冗余...");
-    
+
     let result = tokio::task::spawn_blocking(|| {
         let scanner = RegistryScanner::new();
         scanner.scan()
     })
     .await
     .map_err(|e| format!("扫描任务失败: {}", e))?;
-    
-    info!(
-        "注册表扫描完成: 发现 {} 个冗余条目",
-        result.total_count
-    );
-    
+
+    info!("注册表扫描完成: 发现 {} 个冗余条目", result.total_count);
+
     Ok(result)
 }
 
 /// 备份并删除注册表条目
-/// 
+///
 /// # 参数
 /// - `entries`: 要删除的注册表条目列表
-/// 
+///
 /// # 返回
 /// - 备份文件路径和删除结果
 #[tauri::command]
-pub async fn delete_registry_entries(entries: Vec<RegistryEntry>) -> Result<RegistryDeleteResult, String> {
+pub async fn delete_registry_entries(
+    entries: Vec<RegistryEntry>,
+) -> Result<RegistryDeleteResult, String> {
     info!("开始删除 {} 个注册表条目...", entries.len());
-    
+
     // 首先创建备份
     let backup_dir = RegistryBackup::get_backup_dir();
     let backup_path = RegistryBackup::export_backup(&entries, &backup_dir)
         .map_err(|e| format!("创建备份失败: {}", e))?;
-    
+
     info!("注册表备份已保存到: {:?}", backup_path);
-    
+
     // 执行删除
     let result = tokio::task::spawn_blocking(move || {
         let mut deleted_count = 0u32;
         let mut failed_entries = Vec::new();
         let mut errors = Vec::new();
-        
+
         for entry in entries {
             match crate::scanner::delete_registry_entry(&entry) {
                 Ok(_) => {
@@ -1732,7 +1874,7 @@ pub async fn delete_registry_entries(entries: Vec<RegistryEntry>) -> Result<Regi
                 }
             }
         }
-        
+
         RegistryDeleteResult {
             backup_path: backup_path.to_string_lossy().to_string(),
             deleted_count,
@@ -1742,13 +1884,13 @@ pub async fn delete_registry_entries(entries: Vec<RegistryEntry>) -> Result<Regi
     })
     .await
     .map_err(|e| format!("删除任务失败: {}", e))?;
-    
+
     info!(
         "注册表删除完成: 成功 {}, 失败 {}",
         result.deleted_count,
         result.failed_entries.len()
     );
-    
+
     Ok(result)
 }
 
@@ -1769,11 +1911,10 @@ pub struct RegistryDeleteResult {
 #[tauri::command]
 pub async fn open_registry_backup_dir() -> Result<(), String> {
     let backup_dir = RegistryBackup::get_backup_dir();
-    
+
     // 确保目录存在
-    std::fs::create_dir_all(&backup_dir)
-        .map_err(|e| format!("创建备份目录失败: {}", e))?;
-    
+    std::fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {}", e))?;
+
     // 打开目录
     #[cfg(target_os = "windows")]
     {
@@ -1782,7 +1923,7 @@ pub async fn open_registry_backup_dir() -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("打开目录失败: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -1791,7 +1932,7 @@ pub async fn open_registry_backup_dir() -> Result<(), String> {
 // ============================================================================
 
 /// 增强删除文件
-/// 
+///
 /// 使用增强删除引擎删除文件，支持：
 /// - 物理大小计算（实际释放的磁盘空间）
 /// - 锁定文件处理（标记为重启删除）
@@ -1799,14 +1940,14 @@ pub async fn open_registry_backup_dir() -> Result<(), String> {
 #[tauri::command]
 pub async fn enhanced_delete_files(paths: Vec<String>) -> Result<EnhancedDeleteResult, String> {
     info!("增强删除: 开始删除 {} 个文件", paths.len());
-    
+
     let result = tokio::task::spawn_blocking(move || {
         let engine = EnhancedDeleteEngine::new();
         engine.delete_files(&paths)
     })
     .await
     .map_err(|e| format!("删除任务失败: {}", e))?;
-    
+
     info!(
         "增强删除完成: 成功 {}, 失败 {}, 待重启 {}, 释放 {} 字节",
         result.success_count,
@@ -1814,7 +1955,7 @@ pub async fn enhanced_delete_files(paths: Vec<String>) -> Result<EnhancedDeleteR
         result.reboot_pending_count,
         result.freed_physical_size
     );
-    
+
     Ok(result)
 }
 
@@ -1829,20 +1970,20 @@ pub async fn get_physical_size(logical_size: u64) -> Result<u64, String> {
 #[tauri::command]
 pub async fn check_admin_for_path(path: String) -> Result<bool, String> {
     let path_lower = path.to_lowercase();
-    
+
     // 需要管理员权限的路径
     let admin_required_paths = [
         "c:\\windows\\",
         "c:\\program files",
         "c:\\programdata\\microsoft\\windows",
     ];
-    
+
     for admin_path in &admin_required_paths {
         if path_lower.starts_with(admin_path) {
             return Ok(true);
         }
     }
-    
+
     Ok(false)
 }
 
@@ -1851,31 +1992,33 @@ pub async fn check_admin_for_path(path: String) -> Result<bool, String> {
 // ============================================================================
 
 /// 永久删除卸载残留（深度清理）
-/// 
+///
 /// ⚠️ 警告：此操作将直接从磁盘永久删除文件，不可恢复！
-/// 
+///
 /// 【安全机制】
 /// 执行删除前会进行三重安全检查：
 /// 1. 注册表检查 - 确认目录不在任何已安装程序中
 /// 2. 可执行文件检查 - 扫描 .exe/.dll/.sys 文件，发现则跳过
 /// 3. 核心白名单检查 - 确保路径不在系统关键目录内
-/// 
+///
 /// # 参数
 /// - `paths`: 要永久删除的文件夹路径列表
-/// 
+///
 /// # 返回
 /// - `PermanentDeleteResult`: 包含成功/失败数量、释放空间、详细结果等
 #[tauri::command]
-pub async fn delete_leftovers_permanent(paths: Vec<String>) -> Result<PermanentDeleteResult, String> {
+pub async fn delete_leftovers_permanent(
+    paths: Vec<String>,
+) -> Result<PermanentDeleteResult, String> {
     info!("⚠️ 永久删除: 开始深度清理 {} 个卸载残留文件夹", paths.len());
-    
+
     let result = tokio::task::spawn_blocking(move || {
         let engine = PermanentDeleteEngine::new();
         engine.delete_leftovers(paths)
     })
     .await
     .map_err(|e| format!("永久删除任务失败: {}", e))?;
-    
+
     info!(
         "永久删除完成: 成功 {}, 失败 {}, 待审核 {}, 待重启 {}, 释放 {} 字节",
         result.success_count,
@@ -1884,17 +2027,17 @@ pub async fn delete_leftovers_permanent(paths: Vec<String>) -> Result<PermanentD
         result.reboot_pending_count,
         result.freed_size
     );
-    
+
     Ok(result)
 }
 
 /// 执行单个路径的安全检查
-/// 
+///
 /// 在用户确认删除前，可以先调用此接口检查路径是否安全
-/// 
+///
 /// # 参数
 /// - `path`: 要检查的文件夹路径
-/// 
+///
 /// # 返回
 /// - `SafetyCheckResult`: 安全检查结果
 #[tauri::command]
@@ -1906,7 +2049,7 @@ pub async fn check_leftover_safety(path: String) -> Result<SafetyCheckResult, St
     })
     .await
     .map_err(|e| format!("安全检查失败: {}", e))?;
-    
+
     Ok(result)
 }
 
@@ -1943,14 +2086,16 @@ pub struct SystemInfo {
 #[tauri::command]
 pub async fn get_system_info() -> Result<SystemInfo, String> {
     info!("获取系统信息");
-    
+
     #[cfg(target_os = "windows")]
     {
-        use winapi::um::sysinfoapi::{GetSystemInfo, GlobalMemoryStatusEx, SYSTEM_INFO, MEMORYSTATUSEX};
-        
+        use winapi::um::sysinfoapi::{
+            GetSystemInfo, GlobalMemoryStatusEx, MEMORYSTATUSEX, SYSTEM_INFO,
+        };
+
         // 获取操作系统版本
         let os_version = get_windows_version();
-        
+
         // 获取系统架构
         let os_arch = if cfg!(target_arch = "x86_64") {
             "x64 (64位)".to_string()
@@ -1961,23 +2106,23 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
         } else {
             std::env::consts::ARCH.to_string()
         };
-        
+
         // 获取计算机名称
         let computer_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "未知".to_string());
-        
+
         // 获取用户名
         let user_name = std::env::var("USERNAME").unwrap_or_else(|_| "未知".to_string());
-        
+
         // 获取 CPU 信息
         let cpu_info = get_cpu_info();
-        
+
         // 获取 CPU 核心数
         let cpu_cores = unsafe {
             let mut sys_info: SYSTEM_INFO = std::mem::zeroed();
             GetSystemInfo(&mut sys_info);
             sys_info.dwNumberOfProcessors
         };
-        
+
         // 获取内存信息
         let (total_memory, available_memory) = unsafe {
             let mut mem_status: MEMORYSTATUSEX = std::mem::zeroed();
@@ -1988,12 +2133,10 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
                 (0, 0)
             }
         };
-        
+
         // 获取系统启动时间
-        let uptime_seconds = unsafe {
-            winapi::um::sysinfoapi::GetTickCount64() / 1000
-        };
-        
+        let uptime_seconds = unsafe { winapi::um::sysinfoapi::GetTickCount64() / 1000 };
+
         Ok(SystemInfo {
             os_name: "Microsoft Windows".to_string(),
             os_version,
@@ -2007,7 +2150,7 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
             uptime_seconds,
         })
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持Windows系统".to_string())
@@ -2018,7 +2161,7 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 fn get_windows_version() -> String {
     use winreg::enums::*;
     use winreg::RegKey;
-    
+
     // 从注册表读取系统版本信息（避免 wmic 编码问题）
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     if let Ok(key) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion") {
@@ -2027,7 +2170,7 @@ fn get_windows_version() -> String {
         let current_build: String = key.get_value("CurrentBuild").unwrap_or_default();
         let ubr: u32 = key.get_value("UBR").unwrap_or(0);
         let _edition_id: String = key.get_value("EditionID").unwrap_or_default();
-        
+
         if !product_name.is_empty() {
             // 根据 Build 号判断是否为 Windows 11（Build 22000+）
             // 注册表中的 ProductName 可能仍然显示 "Windows 10"，需要手动修正
@@ -2038,16 +2181,19 @@ fn get_windows_version() -> String {
             } else {
                 product_name
             };
-            
+
             let version_str = if !display_version.is_empty() {
-                format!("{} {} (Build {}.{})", corrected_name, display_version, current_build, ubr)
+                format!(
+                    "{} {} (Build {}.{})",
+                    corrected_name, display_version, current_build, ubr
+                )
             } else {
                 format!("{} (Build {}.{})", corrected_name, current_build, ubr)
             };
             return version_str;
         }
     }
-    
+
     // 回退到基本版本信息
     "Windows".to_string()
 }
@@ -2056,7 +2202,7 @@ fn get_windows_version() -> String {
 fn get_cpu_info() -> String {
     use winreg::enums::*;
     use winreg::RegKey;
-    
+
     // 从注册表读取 CPU 信息（避免 wmic 编码问题）
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     if let Ok(key) = hklm.open_subkey("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0") {
@@ -2065,7 +2211,7 @@ fn get_cpu_info() -> String {
             return processor_name.trim().to_string();
         }
     }
-    
+
     // 回退到环境变量
     std::env::var("PROCESSOR_IDENTIFIER").unwrap_or_else(|_| "未知处理器".to_string())
 }
@@ -2090,7 +2236,7 @@ pub struct CleanupLogEntryInput {
 }
 
 /// 记录清理操作到日志文件
-/// 
+///
 /// 接收一批清理结果，序列化为 JSON 并保存到日志文件
 /// 即使写入失败也不会影响清理逻辑
 #[tauri::command]
@@ -2100,21 +2246,22 @@ pub async fn record_cleanup_action(
 ) -> Result<String, String> {
     use crate::logger::{CleanupLogEntry, CleanupLogger};
     use chrono::Local;
-    
+
     info!("记录清理操作，共 {} 条记录", entries.len());
-    
+
     if entries.is_empty() {
         return Ok("没有需要记录的清理操作".to_string());
     }
-    
+
     // 获取应用数据目录
-    let app_data_dir = handle.path()
+    let app_data_dir = handle
+        .path()
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
-    
+
     // 创建日志管理器
     let logger = CleanupLogger::new(&app_data_dir);
-    
+
     // 转换为内部日志格式
     let log_entries: Vec<CleanupLogEntry> = entries
         .into_iter()
@@ -2123,11 +2270,15 @@ pub async fn record_cleanup_action(
             category: e.category,
             path: e.path,
             size: e.size,
-            result: if e.success { "Success".to_string() } else { "Failed".to_string() },
+            result: if e.success {
+                "Success".to_string()
+            } else {
+                "Failed".to_string()
+            },
             error_message: e.error_message,
         })
         .collect();
-    
+
     // 保存日志
     match logger.save_cleanup_results(log_entries).await {
         Ok(path) => {
@@ -2143,25 +2294,25 @@ pub async fn record_cleanup_action(
 }
 
 /// 打开日志文件夹
-/// 
+///
 /// 使用 explorer.exe 打开日志目录
 #[tauri::command]
 pub async fn open_logs_folder(handle: tauri::AppHandle) -> Result<(), String> {
     info!("打开日志文件夹");
-    
+
     // 获取应用数据目录
-    let app_data_dir = handle.path()
+    let app_data_dir = handle
+        .path()
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
-    
+
     let log_path = app_data_dir.join("logs");
-    
+
     // 确保目录存在
     if !log_path.exists() {
-        std::fs::create_dir_all(&log_path)
-            .map_err(|e| format!("创建日志目录失败: {}", e))?;
+        std::fs::create_dir_all(&log_path).map_err(|e| format!("创建日志目录失败: {}", e))?;
     }
-    
+
     // 使用 explorer.exe 打开目录
     #[cfg(target_os = "windows")]
     {
@@ -2170,34 +2321,37 @@ pub async fn open_logs_folder(handle: tauri::AppHandle) -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("打开文件夹失败: {}", e))?;
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         return Err("此功能仅支持 Windows 系统".to_string());
     }
-    
+
     Ok(())
 }
 
 /// 获取清理历史记录列表
-/// 
+///
 /// 返回日志目录中所有日志文件的摘要信息
 #[tauri::command]
-pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<CleanupHistorySummary>, String> {
+pub async fn get_cleanup_history(
+    handle: tauri::AppHandle,
+) -> Result<Vec<CleanupHistorySummary>, String> {
     info!("获取清理历史记录");
-    
-    let app_data_dir = handle.path()
+
+    let app_data_dir = handle
+        .path()
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
-    
+
     let log_path = app_data_dir.join("logs");
-    
+
     if !log_path.exists() {
         return Ok(Vec::new());
     }
-    
+
     let mut history: Vec<CleanupHistorySummary> = Vec::new();
-    
+
     // 遍历日志目录
     if let Ok(entries) = std::fs::read_dir(&log_path) {
         for entry in entries.filter_map(|e| e.ok()) {
@@ -2205,9 +2359,12 @@ pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<Cleanup
             if path.extension().map(|ext| ext == "json").unwrap_or(false) {
                 // 读取并解析日志文件
                 if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(session) = serde_json::from_str::<crate::logger::CleanupSession>(&content) {
+                    if let Ok(session) =
+                        serde_json::from_str::<crate::logger::CleanupSession>(&content)
+                    {
                         history.push(CleanupHistorySummary {
-                            filename: path.file_name()
+                            filename: path
+                                .file_name()
                                 .map(|n| n.to_string_lossy().to_string())
                                 .unwrap_or_default(),
                             session_start: session.session_start,
@@ -2222,10 +2379,10 @@ pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<Cleanup
             }
         }
     }
-    
+
     // 按时间倒序排列
     history.sort_by(|a, b| b.session_start.cmp(&a.session_start));
-    
+
     Ok(history)
 }
 
@@ -2253,11 +2410,11 @@ pub struct CleanupHistorySummary {
 // ============================================================================
 
 /// 扫描大目录
-/// 
+///
 /// # 参数
 /// - `top_n`: 返回的最大条目数，默认 20
 /// - `full_scan`: 是否启用全盘深度扫描，默认 false（仅扫描 AppData）
-/// 
+///
 /// # 安全措施
 /// 深度扫描模式下，所有结果的 is_safe_to_clean 强制为 false，
 /// 前端应禁用清理按钮，仅允许"打开位置"和"搜索"操作
@@ -2267,16 +2424,16 @@ pub async fn scan_hotspot(
     full_scan: Option<bool>,
 ) -> Result<crate::scanner::HotspotScanResult, String> {
     use crate::scanner::HotspotScanner;
-    
+
     let n = top_n.unwrap_or(20);
     let is_full_scan = full_scan.unwrap_or(false);
-    
+
     if is_full_scan {
         info!("开始全盘深度扫描，Top {}", n);
     } else {
         info!("开始扫描 AppData 目录，Top {}", n);
     }
-    
+
     // 在阻塞线程中执行扫描（避免阻塞异步运行时）
     // 使用 spawn_blocking 确保不会阻塞 Tokio 的异步运行时
     let result = tokio::task::spawn_blocking(move || {
@@ -2285,7 +2442,7 @@ pub async fn scan_hotspot(
     })
     .await
     .map_err(|e| format!("扫描任务执行失败: {}", e))?;
-    
+
     match &result {
         Ok(scan_result) => {
             info!(
@@ -2300,15 +2457,15 @@ pub async fn scan_hotspot(
             log::warn!("大目录扫描失败: {}", e);
         }
     }
-    
+
     result
 }
 
 /// 单层路径钻取扫描（动态下钻功能）
-/// 
+///
 /// 扫描指定路径的直接子文件夹，使用 rayon 并行计算大小
 /// 用于前端下钻模式，逐层展开深层目录结构
-/// 
+///
 /// # 参数
 /// - `path`: 要扫描的目标目录绝对路径
 #[tauri::command]
@@ -2317,11 +2474,9 @@ pub async fn scan_path_direct(path: String) -> Result<crate::scanner::HotspotSca
 
     info!("路径钻取扫描: {}", path);
 
-    let result = tokio::task::spawn_blocking(move || {
-        HotspotScanner::scan_path_direct(&path)
-    })
-    .await
-    .map_err(|e| format!("路径钻取扫描任务执行失败: {}", e))?;
+    let result = tokio::task::spawn_blocking(move || HotspotScanner::scan_path_direct(&path))
+        .await
+        .map_err(|e| format!("路径钻取扫描任务执行失败: {}", e))?;
 
     match &result {
         Ok(scan_result) => {
@@ -2340,18 +2495,18 @@ pub async fn scan_path_direct(path: String) -> Result<crate::scanner::HotspotSca
 }
 
 /// 清理目录内容（保留根目录）
-/// 
+///
 /// 遍历并删除目录内的所有文件和子文件夹，保留根目录本身
 /// 静默跳过被占用或无法访问的文件
 #[tauri::command]
 pub async fn cleanup_directory_contents(path: String) -> Result<CleanupDirectoryResult, String> {
     use std::fs;
     use walkdir::WalkDir;
-    
+
     info!("开始清理目录内容: {}", path);
-    
+
     let target_path = std::path::PathBuf::from(&path);
-    
+
     // 验证路径存在且是目录
     if !target_path.exists() {
         return Err(format!("目录不存在: {}", path));
@@ -2359,14 +2514,14 @@ pub async fn cleanup_directory_contents(path: String) -> Result<CleanupDirectory
     if !target_path.is_dir() {
         return Err(format!("路径不是目录: {}", path));
     }
-    
+
     // 在阻塞线程中执行清理
     let result = tokio::task::spawn_blocking(move || {
         let mut deleted_count: usize = 0;
         let mut failed_count: usize = 0;
         let mut freed_size: u64 = 0;
         let mut errors: Vec<String> = Vec::new();
-        
+
         // 收集所有需要删除的条目（先文件后目录，深度优先）
         let mut entries: Vec<_> = WalkDir::new(&target_path)
             .follow_links(false)
@@ -2374,27 +2529,27 @@ pub async fn cleanup_directory_contents(path: String) -> Result<CleanupDirectory
             .filter_map(|e| e.ok())
             .filter(|e| e.path() != target_path) // 排除根目录本身
             .collect();
-        
+
         // 按深度降序排列，确保先删除深层文件/目录
         entries.sort_by(|a, b| b.depth().cmp(&a.depth()));
-        
+
         for entry in entries {
             let entry_path = entry.path();
-            
+
             // 获取文件大小（仅文件）
             let file_size = if entry_path.is_file() {
                 entry_path.metadata().map(|m| m.len()).unwrap_or(0)
             } else {
                 0
             };
-            
+
             // 尝试删除
             let delete_result = if entry_path.is_dir() {
                 fs::remove_dir(entry_path)
             } else {
                 fs::remove_file(entry_path)
             };
-            
+
             match delete_result {
                 Ok(_) => {
                     deleted_count += 1;
@@ -2409,7 +2564,7 @@ pub async fn cleanup_directory_contents(path: String) -> Result<CleanupDirectory
                 }
             }
         }
-        
+
         CleanupDirectoryResult {
             deleted_count,
             failed_count,
@@ -2419,12 +2574,12 @@ pub async fn cleanup_directory_contents(path: String) -> Result<CleanupDirectory
     })
     .await
     .map_err(|e| format!("清理任务执行失败: {}", e))?;
-    
+
     info!(
         "目录清理完成: 删除 {} 项，失败 {} 项，释放 {} 字节",
         result.deleted_count, result.failed_count, result.freed_size
     );
-    
+
     Ok(result)
 }
 
@@ -2454,8 +2609,7 @@ pub struct CleanupDirectoryResult {
 ///
 /// 对每个条目检查其命令中引用的 exe 是否存在，返回完整列表供用户确认。
 #[tauri::command]
-pub async fn scan_context_menu(
-) -> Result<crate::scanner::ContextMenuScanResult, String> {
+pub async fn scan_context_menu() -> Result<crate::scanner::ContextMenuScanResult, String> {
     use crate::scanner::ContextMenuScanner;
 
     info!("开始扫描右键菜单注册表条目");
@@ -2494,11 +2648,9 @@ pub async fn delete_context_menu_entries(
 
     info!("开始删除 {} 个右键菜单条目", entries.len());
 
-    let result = tokio::task::spawn_blocking(move || {
-        do_delete(&entries)
-    })
-    .await
-    .map_err(|e| format!("删除任务执行失败: {}", e))?;
+    let result = tokio::task::spawn_blocking(move || do_delete(&entries))
+        .await
+        .map_err(|e| format!("删除任务执行失败: {}", e))?;
 
     info!(
         "右键菜单清理完成: 成功 {} 个，失败 {} 个",
@@ -2516,19 +2668,19 @@ pub async fn delete_context_menu_entries(
 #[tauri::command]
 pub fn open_startup_manager() -> Result<(), String> {
     info!("打开启动项管理器");
-    
+
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         Command::new("cmd")
             .args(["/c", "start", "taskmgr", "/0", "/startup"])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .spawn()
             .map_err(|e| format!("无法打开启动项管理器: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -2536,19 +2688,19 @@ pub fn open_startup_manager() -> Result<(), String> {
 #[tauri::command]
 pub fn open_storage_settings() -> Result<(), String> {
     info!("打开存储感知设置");
-    
+
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
-        
+        use std::process::Command;
+
         Command::new("cmd")
             .args(["/c", "start", "ms-settings:storagesense"])
             .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .spawn()
             .map_err(|e| format!("无法打开存储感知设置: {}", e))?;
     }
-    
+
     Ok(())
 }
 
@@ -2623,10 +2775,8 @@ pub async fn analyze_programdata(
         let engine = RuleEngine::default();
 
         // 将 ProgramDataEntry 转换为规则引擎需要的格式
-        let analyze_input: Vec<(String, u64)> = entries
-            .iter()
-            .map(|e| (e.path.clone(), e.size))
-            .collect();
+        let analyze_input: Vec<(String, u64)> =
+            entries.iter().map(|e| (e.path.clone(), e.size)).collect();
 
         engine.analyze_batch(&analyze_input)
     })
@@ -2635,8 +2785,9 @@ pub async fn analyze_programdata(
 
     // 计算可清理大小：只统计 Safe 级别 + Delete/Suggest 操作的条目
     // 与前端一键清理逻辑保持一致
-    use crate::scanner::programdata_rules::{RiskLevel as PdRiskLevel, ActionType as PdActionType};
-    let cleanable_size: u64 = result.results
+    use crate::scanner::programdata_rules::{ActionType as PdActionType, RiskLevel as PdRiskLevel};
+    let cleanable_size: u64 = result
+        .results
         .iter()
         .filter(|r| {
             r.risk == PdRiskLevel::Safe
@@ -2644,7 +2795,8 @@ pub async fn analyze_programdata(
         })
         .map(|r| r.size)
         .sum();
-    let warning_size: u64 = result.results
+    let warning_size: u64 = result
+        .results
         .iter()
         .filter(|r| r.risk == PdRiskLevel::Warning)
         .map(|r| r.size)
@@ -2686,63 +2838,60 @@ pub async fn analyze_programdata(
 /// 找出增长的目录并给出解释和建议
 #[tauri::command]
 pub async fn diff_programdata() -> Result<crate::scanner::GrowthReport, String> {
-    use crate::scanner::{
-        SnapshotManager,
-        compare_growth_with_timespan,
-    };
+    use crate::scanner::{compare_growth_with_timespan, SnapshotManager};
 
     info!("开始对比 ProgramData 增长");
 
-    let result = tokio::task::spawn_blocking(move || -> Result<crate::scanner::GrowthReport, String> {
-        // 加载最新快照作为历史数据
-        let manager = SnapshotManager::new()
-            .map_err(|e| format!("初始化快照管理器失败: {:?}", e))?;
+    let result =
+        tokio::task::spawn_blocking(move || -> Result<crate::scanner::GrowthReport, String> {
+            // 加载最新快照作为历史数据
+            let manager =
+                SnapshotManager::new().map_err(|e| format!("初始化快照管理器失败: {:?}", e))?;
 
-        let snapshots = manager.load_all_snapshots()
-            .map_err(|e| format!("加载快照失败: {:?}", e))?;
+            let snapshots = manager
+                .load_all_snapshots()
+                .map_err(|e| format!("加载快照失败: {:?}", e))?;
 
-        if snapshots.len() < 2 {
-            // 至少需要 2 个快照才能对比（当前 + 历史）
-            // 如果只有一个快照，返回空报告
-            return Ok(crate::scanner::GrowthReport {
-                entries: Vec::new(),
-                total_growth: 0,
-                significant_count: 0,
-                fast_count: 0,
-                new_count: 0,
-                decreased_count: 0,
-                time_span: "暂无历史数据".to_string(),
-                summary: "首次扫描，暂无增长对比数据。下次扫描后将自动生成增长报告。".to_string(),
-            });
-        }
+            if snapshots.len() < 2 {
+                // 至少需要 2 个快照才能对比（当前 + 历史）
+                // 如果只有一个快照，返回空报告
+                return Ok(crate::scanner::GrowthReport {
+                    entries: Vec::new(),
+                    total_growth: 0,
+                    significant_count: 0,
+                    fast_count: 0,
+                    new_count: 0,
+                    decreased_count: 0,
+                    time_span: "暂无历史数据".to_string(),
+                    summary: "首次扫描，暂无增长对比数据。下次扫描后将自动生成增长报告。"
+                        .to_string(),
+                });
+            }
 
-        // 最新快照 = 当前数据，第二新 = 历史数据
-        let current_snapshot = &snapshots[0];
-        let previous_snapshot = &snapshots[1];
+            // 最新快照 = 当前数据，第二新 = 历史数据
+            let current_snapshot = &snapshots[0];
+            let previous_snapshot = &snapshots[1];
 
-        let current: Vec<(String, u64)> = current_snapshot
-            .entries
-            .iter()
-            .map(|e| (e.path.clone(), e.size))
-            .collect();
+            let current: Vec<(String, u64)> = current_snapshot
+                .entries
+                .iter()
+                .map(|e| (e.path.clone(), e.size))
+                .collect();
 
-        let previous: Vec<(String, u64)> = previous_snapshot
-            .entries
-            .iter()
-            .map(|e| (e.path.clone(), e.size))
-            .collect();
+            let previous: Vec<(String, u64)> = previous_snapshot
+                .entries
+                .iter()
+                .map(|e| (e.path.clone(), e.size))
+                .collect();
 
-        let time_span = format!(
-            "{} → {}",
-            previous_snapshot.date, current_snapshot.date
-        );
+            let time_span = format!("{} → {}", previous_snapshot.date, current_snapshot.date);
 
-        let report = compare_growth_with_timespan(&current, &previous, &time_span);
+            let report = compare_growth_with_timespan(&current, &previous, &time_span);
 
-        Ok(report)
-    })
-    .await
-    .map_err(|e| format!("增长对比任务执行失败: {}", e))??;
+            Ok(report)
+        })
+        .await
+        .map_err(|e| format!("增长对比任务执行失败: {}", e))??;
 
     info!(
         "ProgramData 增长对比完成: {} 个变化，总增长 {} 字节",
@@ -2764,7 +2913,7 @@ pub async fn clean_programdata(
     entries: Vec<ProgramDataAnalyzeEntryResponse>,
     allow_warning: Option<bool>,
 ) -> Result<crate::scanner::BatchCleanResult, String> {
-    use crate::scanner::{ProgramDataCleaner, CleanOptions};
+    use crate::scanner::{CleanOptions, ProgramDataCleaner};
 
     let allow_warning = allow_warning.unwrap_or(false);
 
@@ -2804,10 +2953,7 @@ pub async fn clean_programdata(
 
     info!(
         "ProgramData 清理完成: 成功 {} 个，失败 {} 个，跳过 {} 个，释放 {} 字节",
-        result.success_count,
-        result.failed_count,
-        result.skipped_count,
-        result.freed_size
+        result.success_count, result.failed_count, result.skipped_count, result.freed_size
     );
 
     Ok(result)

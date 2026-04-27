@@ -3,8 +3,8 @@
 // 用于存储扫描到的文件详细信息
 // ============================================================================
 
-use serde::{Deserialize, Serialize};
 use super::JunkCategory;
+use serde::{Deserialize, Serialize};
 
 /// 单个文件的详细信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -186,7 +186,7 @@ impl ScanProgress {
     /// 完成一个分类
     pub fn complete_category(&mut self) {
         self.completed_categories += 1;
-        self.progress_percent = 
+        self.progress_percent =
             (self.completed_categories as f32 / self.total_categories as f32) * 100.0;
     }
 

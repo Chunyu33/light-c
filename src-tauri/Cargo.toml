@@ -25,6 +25,7 @@ serde_json = "1"
 
 # 文件系统操作
 walkdir = "2"              # 递归遍历目录
+glob = "0.3"               # 通配符路径展开
 # 异步运行时
 tokio = { version = "1", features = ["full"] }
 # 日期时间处理

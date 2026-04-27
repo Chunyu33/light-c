@@ -36,6 +36,8 @@ pub enum JunkCategory {
     InstallerTemp,
     /// 剪贴板缓存
     ClipboardCache,
+    /// DirectX/GPU Shader 缓存
+    ShaderCache,
 }
 
 impl JunkCategory {
@@ -56,6 +58,7 @@ impl JunkCategory {
             JunkCategory::WindowsErrorReports => "Windows错误报告",
             JunkCategory::InstallerTemp => "安装程序临时文件",
             JunkCategory::ClipboardCache => "剪贴板缓存",
+            JunkCategory::ShaderCache => "DirectX Shader 缓存",
         }
     }
 
@@ -64,7 +67,9 @@ impl JunkCategory {
         match self {
             JunkCategory::WindowsTemp => "系统和应用程序产生的临时文件，可安全删除",
             JunkCategory::SystemCache => "Windows系统预读取和分发缓存文件",
-            JunkCategory::BrowserCache => "浏览器保存的网页缓存、Cookie等数据",
+            JunkCategory::BrowserCache => {
+                "浏览器保存的网页资源缓存（不含 Cookie 和登录状态），删除后网页首次访问较慢"
+            }
             JunkCategory::RecycleBin => "已删除但未彻底清除的文件",
             JunkCategory::WindowsUpdate => "Windows更新下载的安装包缓存",
             JunkCategory::ThumbnailCache => "文件夹中图片和视频的缩略图缓存",
@@ -76,6 +81,7 @@ impl JunkCategory {
             JunkCategory::WindowsErrorReports => "系统和应用崩溃时生成的错误报告文件",
             JunkCategory::InstallerTemp => "软件安装过程中产生的临时文件",
             JunkCategory::ClipboardCache => "剪贴板历史记录缓存文件",
+            JunkCategory::ShaderCache => "GPU 着色器编译缓存，删除后游戏和应用首次运行时会重新生成",
         }
     }
 
@@ -86,16 +92,17 @@ impl JunkCategory {
             JunkCategory::ThumbnailCache => 1,
             JunkCategory::FontCache => 1,
             JunkCategory::ClipboardCache => 1,
+            JunkCategory::ShaderCache => 1,
             JunkCategory::BrowserCache => 2,
-            JunkCategory::RecycleBin => 2,
+            JunkCategory::WindowsUpdate => 2,
             JunkCategory::LogFiles => 2,
             JunkCategory::WindowsErrorReports => 2,
             JunkCategory::InstallerTemp => 2,
+            JunkCategory::RecycleBin => 3,
             JunkCategory::SystemCache => 3,
-            JunkCategory::WindowsUpdate => 3,
             JunkCategory::AppCache => 3,
             JunkCategory::MemoryDump => 3,
-            JunkCategory::OldWindowsInstallation => 4,
+            JunkCategory::OldWindowsInstallation => 3,
         }
     }
 
@@ -119,34 +126,69 @@ impl JunkCategory {
             ],
             JunkCategory::BrowserCache => vec![
                 // Chrome - 主缓存
-                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\Cache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\Code Cache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\GPUCache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\Default\\Service Worker\\CacheStorage")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Google\\Chrome\\User Data\\ShaderCache")),
+                ScanPath::glob_path("LOCALAPPDATA", "Google\\Chrome\\User Data\\Default\\Cache"),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Google\\Chrome\\User Data\\Default\\Code Cache",
+                ),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Google\\Chrome\\User Data\\Default\\GPUCache",
+                ),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Google\\Chrome\\User Data\\Profile *\\Cache",
+                ),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Google\\Chrome\\User Data\\Profile *\\Code Cache",
+                ),
+                ScanPath::glob_path("LOCALAPPDATA", "Google\\Chrome\\User Data\\ShaderCache"),
                 // Edge - 主缓存
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\Cache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\Code Cache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\GPUCache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\Default\\Service Worker\\CacheStorage")),
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Edge\\User Data\\ShaderCache")),
-                // Firefox - 配置文件夹下的缓存
-                ScanPath::env_path("LOCALAPPDATA", Some("Mozilla\\Firefox\\Profiles")),
+                ScanPath::glob_path("LOCALAPPDATA", "Microsoft\\Edge\\User Data\\Default\\Cache"),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Microsoft\\Edge\\User Data\\Default\\Code Cache",
+                ),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Microsoft\\Edge\\User Data\\Default\\GPUCache",
+                ),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Microsoft\\Edge\\User Data\\Profile *\\Cache",
+                ),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Microsoft\\Edge\\User Data\\Profile *\\Code Cache",
+                ),
+                ScanPath::glob_path("LOCALAPPDATA", "Microsoft\\Edge\\User Data\\ShaderCache"),
+                // Firefox - 具体缓存目录
+                ScanPath::glob_path("LOCALAPPDATA", "Mozilla\\Firefox\\Profiles\\*\\cache2"),
+                ScanPath::glob_path("APPDATA", "Mozilla\\Firefox\\Profiles\\*\\cache2"),
                 // Brave 浏览器
-                ScanPath::env_path("LOCALAPPDATA", Some("BraveSoftware\\Brave-Browser\\User Data\\Default\\Cache")),
-                ScanPath::env_path("LOCALAPPDATA", Some("BraveSoftware\\Brave-Browser\\User Data\\Default\\Code Cache")),
+                ScanPath::env_path(
+                    "LOCALAPPDATA",
+                    Some("BraveSoftware\\Brave-Browser\\User Data\\Default\\Cache"),
+                ),
+                ScanPath::env_path(
+                    "LOCALAPPDATA",
+                    Some("BraveSoftware\\Brave-Browser\\User Data\\Default\\Code Cache"),
+                ),
                 // Opera 浏览器
                 ScanPath::env_path("APPDATA", Some("Opera Software\\Opera Stable\\Cache")),
             ],
-            JunkCategory::RecycleBin => vec![
-                ScanPath::fixed_path("C:\\$Recycle.Bin"),
-            ],
-            JunkCategory::WindowsUpdate => vec![
-                ScanPath::fixed_path("C:\\Windows\\SoftwareDistribution\\Download"),
-            ],
-            JunkCategory::ThumbnailCache => vec![
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Explorer")),
-            ],
+            JunkCategory::RecycleBin => get_all_drive_letters()
+                .into_iter()
+                .map(|letter| ScanPath::fixed_path(&format!("{}:\\$Recycle.Bin", letter)))
+                .collect(),
+            JunkCategory::WindowsUpdate => vec![ScanPath::fixed_path(
+                "C:\\Windows\\SoftwareDistribution\\Download",
+            )],
+            JunkCategory::ThumbnailCache => vec![ScanPath::env_path(
+                "LOCALAPPDATA",
+                Some("Microsoft\\Windows\\Explorer"),
+            )],
             JunkCategory::LogFiles => vec![
                 ScanPath::fixed_path("C:\\Windows\\Logs"),
                 ScanPath::env_path("LOCALAPPDATA", Some("CrashDumps")),
@@ -161,12 +203,13 @@ impl JunkCategory {
                 ScanPath::fixed_path("C:\\$Windows.~WS"),
             ],
             JunkCategory::AppCache => vec![
-                ScanPath::env_path("LOCALAPPDATA", Some("Temp")),
-                ScanPath::env_path("APPDATA", Some("Local\\Temp")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\INetCache\\IE")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\WebCache")),
+                ScanPath::glob_path("LOCALAPPDATA", "Packages\\*\\LocalCache"),
             ],
-            JunkCategory::FontCache => vec![
-                ScanPath::fixed_path("C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache"),
-            ],
+            JunkCategory::FontCache => vec![ScanPath::fixed_path(
+                "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache",
+            )],
             JunkCategory::WindowsErrorReports => vec![
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\WER")),
                 ScanPath::fixed_path("C:\\ProgramData\\Microsoft\\Windows\\WER"),
@@ -183,8 +226,16 @@ impl JunkCategory {
                 // Intel 安装缓存
                 ScanPath::fixed_path("C:\\Intel"),
             ],
-            JunkCategory::ClipboardCache => vec![
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Clipboard")),
+            JunkCategory::ClipboardCache => vec![ScanPath::env_path(
+                "LOCALAPPDATA",
+                Some("Microsoft\\Windows\\Clipboard"),
+            )],
+            JunkCategory::ShaderCache => vec![
+                ScanPath::fixed_path("C:\\Windows\\System32\\d3d_cache"),
+                ScanPath::env_path("LOCALAPPDATA", Some("D3DSCache")),
+                ScanPath::env_path("LOCALAPPDATA", Some("AMD\\DxCache")),
+                ScanPath::env_path("LOCALAPPDATA", Some("NVIDIA\\DXCache")),
+                ScanPath::env_path("LOCALAPPDATA", Some("Intel\\ShaderCache")),
             ],
         }
     }
@@ -206,6 +257,7 @@ impl JunkCategory {
             JunkCategory::WindowsErrorReports => vec!["*"],
             JunkCategory::InstallerTemp => vec!["*"],
             JunkCategory::ClipboardCache => vec!["*"],
+            JunkCategory::ShaderCache => vec!["*"],
         }
     }
 
@@ -226,8 +278,19 @@ impl JunkCategory {
             JunkCategory::WindowsErrorReports,
             JunkCategory::InstallerTemp,
             JunkCategory::ClipboardCache,
+            JunkCategory::ShaderCache,
         ]
     }
+}
+
+/// 获取当前系统中存在的驱动器盘符
+fn get_all_drive_letters() -> Vec<char> {
+    ('A'..='Z')
+        .filter(|letter| {
+            let path = std::path::PathBuf::from(format!("{}:\\", letter));
+            path.exists() && path.is_dir()
+        })
+        .collect()
 }
 
 /// 扫描路径配置
@@ -248,6 +311,8 @@ pub enum PathType {
     Fixed,
     /// 基于环境变量的路径
     EnvBased,
+    /// 基于环境变量的通配符展开路径
+    GlobExpand,
 }
 
 impl ScanPath {
@@ -269,6 +334,15 @@ impl ScanPath {
         }
     }
 
+    /// 创建基于环境变量的通配符路径
+    pub fn glob_path(env_var: &str, pattern: &str) -> Self {
+        ScanPath {
+            path_type: PathType::GlobExpand,
+            base: env_var.to_string(),
+            sub_path: Some(pattern.to_string()),
+        }
+    }
+
     /// 解析为实际路径
     pub fn resolve(&self) -> Option<std::path::PathBuf> {
         match &self.path_type {
@@ -277,22 +351,93 @@ impl ScanPath {
                 if path.exists() {
                     Some(path)
                 } else {
+                    log::debug!("扫描路径不存在，跳过: {:?}", path);
                     None
                 }
             }
-            PathType::EnvBased => {
-                std::env::var(&self.base).ok().and_then(|base_path| {
-                    let mut path = std::path::PathBuf::from(base_path);
-                    if let Some(sub) = &self.sub_path {
-                        path.push(sub);
+            PathType::EnvBased => std::env::var(&self.base).ok().and_then(|base_path| {
+                let mut path = std::path::PathBuf::from(base_path);
+                if let Some(sub) = &self.sub_path {
+                    path.push(sub);
+                }
+                if path.exists() {
+                    Some(path)
+                } else {
+                    log::debug!("扫描路径不存在，跳过: {:?}", path);
+                    None
+                }
+            }),
+            PathType::GlobExpand => None,
+        }
+    }
+
+    /// 解析为实际路径列表
+    pub fn resolve_all(&self) -> Vec<std::path::PathBuf> {
+        match &self.path_type {
+            PathType::Fixed | PathType::EnvBased => self.resolve().into_iter().collect(),
+            PathType::GlobExpand => {
+                let Some(pattern) = &self.sub_path else {
+                    return Vec::new();
+                };
+
+                let Ok(base_path) = std::env::var(&self.base) else {
+                    log::debug!("环境变量不存在，跳过 Glob 展开: {}", self.base);
+                    return Vec::new();
+                };
+
+                let mut full_pattern = std::path::PathBuf::from(base_path);
+                full_pattern.push(pattern);
+                let pattern_string = full_pattern.to_string_lossy().to_string();
+
+                let results: Vec<std::path::PathBuf> = match glob::glob(&pattern_string) {
+                    Ok(paths) => paths
+                        .filter_map(|entry| entry.ok())
+                        .filter(|path| path.exists())
+                        .collect(),
+                    Err(err) => {
+                        log::debug!("Glob 模式无效，跳过: {} ({})", pattern_string, err);
+                        Vec::new()
                     }
-                    if path.exists() {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
+                };
+
+                log::debug!(
+                    "Glob 展开 '{}' 得到 {} 个路径",
+                    pattern_string,
+                    results.len()
+                );
+                results
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_categories_covered() {
+        const JUNK_CATEGORY_VARIANT_COUNT: usize = 15;
+        assert_eq!(JunkCategory::all().len(), JUNK_CATEGORY_VARIANT_COUNT);
+    }
+
+    #[test]
+    fn test_recycle_bin_multi_drive() {
+        assert!(get_all_drive_letters().contains(&'C'));
+    }
+
+    #[test]
+    fn test_glob_path_resolve_all() {
+        let fixed_path = ScanPath::fixed_path("C:\\");
+        assert_eq!(
+            fixed_path.resolve_all().len(),
+            fixed_path.resolve().map_or(0, |_| 1)
+        );
+
+        let env_path = ScanPath::env_path("LOCALAPPDATA", None);
+        assert_eq!(
+            env_path.resolve_all().len(),
+            env_path.resolve().map_or(0, |_| 1)
+        );
     }
 }

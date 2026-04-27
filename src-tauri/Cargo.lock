@@ -9,6 +9,7 @@ dependencies = [
  "chrono",
  "dirs",
  "env_logger",
+ "glob",
  "log",
  "num_cpus",
  "once_cell",

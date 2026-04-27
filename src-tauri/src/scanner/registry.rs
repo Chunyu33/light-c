@@ -105,7 +105,6 @@ const REGISTRY_WHITELIST: &[&str] = &[
     "explorer",
     "shell",
     "currentversion",
-    
     // 硬件和驱动
     "nvidia",
     "amd",
@@ -114,14 +113,12 @@ const REGISTRY_WHITELIST: &[&str] = &[
     "hardware",
     "device",
     "driver",
-    
     // 系统服务
     "services",
     "system",
     "security",
     "sam",
     "software\\classes",
-    
     // 常用软件（用户可能仍在使用）
     "google",
     "chrome",
@@ -148,18 +145,27 @@ impl RegistryScanner {
     pub fn new() -> Self {
         let installed_apps = Self::get_installed_programs();
         log::info!("注册表扫描器已加载 {} 个已安装程序", installed_apps.len());
-        
+
         RegistryScanner { installed_apps }
     }
 
     /// 从注册表获取已安装程序列表
     fn get_installed_programs() -> HashSet<String> {
         let mut programs = HashSet::new();
-        
+
         let paths = [
-            (HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
-            (HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
-            (HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+            (
+                HKEY_CURRENT_USER,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
         ];
 
         for (hkey, path) in paths {
@@ -211,7 +217,7 @@ impl RegistryScanner {
     }
 
     /// 扫描 MUI 缓存
-    /// 
+    ///
     /// 【安全说明】
     /// MUI 缓存存储了可执行文件的显示名称缓存，
     /// 当对应的可执行文件不存在时，这些缓存条目就是无效的。
@@ -226,8 +232,8 @@ impl RegistryScanner {
         ];
 
         for path in mui_paths {
-            if let Ok(key) = RegKey::predef(HKEY_CURRENT_USER)
-                .open_subkey_with_flags(path, KEY_READ)
+            if let Ok(key) =
+                RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(path, KEY_READ)
             {
                 // 【安全说明】只读取值，不进行任何写入
                 for value_result in key.enum_values() {
@@ -258,10 +264,10 @@ impl RegistryScanner {
     /// 从 MUI 缓存键名中提取可执行文件路径
     fn extract_exe_path_from_mui(&self, name: &str) -> Option<String> {
         // MUI 缓存键名格式: "path.exe.FriendlyAppName" 或 "@path.exe,-resourceId"
-        
+
         // 处理 @ 开头的格式
         let name = name.trim_start_matches('@');
-        
+
         // 查找 .exe 的位置
         if let Some(exe_pos) = name.to_lowercase().find(".exe") {
             let path = &name[..exe_pos + 4];
@@ -283,7 +289,7 @@ impl RegistryScanner {
     }
 
     /// 扫描 HKCU\Software 中的孤立软件键
-    /// 
+    ///
     /// 【安全说明】
     /// 此函数扫描用户软件配置区域，查找已卸载软件的残留配置。
     /// 采用保守策略：只标记那些明确不在已安装列表中的键。
@@ -291,8 +297,8 @@ impl RegistryScanner {
         let mut entries = Vec::new();
 
         // 【安全说明】只扫描 HKEY_CURRENT_USER\Software，不触碰 HKEY_LOCAL_MACHINE
-        if let Ok(software_key) = RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey_with_flags("Software", KEY_READ)
+        if let Ok(software_key) =
+            RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags("Software", KEY_READ)
         {
             for subkey_name in software_key.enum_keys().filter_map(|k| k.ok()) {
                 // 检查是否在白名单中
@@ -330,7 +336,7 @@ impl RegistryScanner {
     }
 
     /// 扫描 HKCR\Applications 中的孤立应用关联
-    /// 
+    ///
     /// 【安全说明】
     /// 此函数扫描应用程序文件关联，查找指向不存在可执行文件的条目。
     fn scan_applications(&self) -> Vec<RegistryEntry> {
@@ -338,8 +344,8 @@ impl RegistryScanner {
 
         // 【安全说明】HKEY_CLASSES_ROOT 是 HKLM 和 HKCU 的合并视图
         // 我们只读取，不写入
-        if let Ok(apps_key) = RegKey::predef(HKEY_CLASSES_ROOT)
-            .open_subkey_with_flags("Applications", KEY_READ)
+        if let Ok(apps_key) =
+            RegKey::predef(HKEY_CLASSES_ROOT).open_subkey_with_flags("Applications", KEY_READ)
         {
             for app_name in apps_key.enum_keys().filter_map(|k| k.ok()) {
                 // 检查是否在白名单中
@@ -375,14 +381,14 @@ impl RegistryScanner {
     /// 从命令行字符串中提取可执行文件路径
     fn extract_exe_from_command(&self, command: &str) -> Option<String> {
         let command = command.trim();
-        
+
         // 处理带引号的路径
         if command.starts_with('"') {
             if let Some(end_quote) = command[1..].find('"') {
                 return Some(command[1..end_quote + 1].to_string());
             }
         }
-        
+
         // 处理不带引号的路径（取第一个空格之前的部分）
         let parts: Vec<&str> = command.split_whitespace().collect();
         if let Some(first) = parts.first() {
@@ -404,7 +410,7 @@ impl RegistryScanner {
     /// 检查是否对应已安装程序
     fn is_installed(&self, key_name: &str) -> bool {
         let name_lower = key_name.to_lowercase();
-        
+
         // 完全匹配
         if self.installed_apps.contains(&name_lower) {
             return true;
@@ -437,40 +443,42 @@ pub struct RegistryBackup;
 
 impl RegistryBackup {
     /// 导出注册表键到 .reg 文件
-    /// 
+    ///
     /// 【安全说明】
     /// 此函数在删除任何注册表键之前被调用，
     /// 将要删除的键导出为标准 .reg 文件格式，
     /// 用户可以通过双击 .reg 文件恢复删除的键。
-    /// 
+    ///
     /// # 参数
     /// - `entries`: 要备份的注册表条目列表
     /// - `backup_dir`: 备份文件保存目录
-    /// 
+    ///
     /// # 返回
     /// - `Ok(PathBuf)`: 备份文件路径
     /// - `Err(String)`: 错误信息
     pub fn export_backup(entries: &[RegistryEntry], backup_dir: &Path) -> Result<PathBuf, String> {
         // 确保备份目录存在
-        fs::create_dir_all(backup_dir)
-            .map_err(|e| format!("创建备份目录失败: {}", e))?;
+        fs::create_dir_all(backup_dir).map_err(|e| format!("创建备份目录失败: {}", e))?;
 
         // 生成备份文件名（包含时间戳）
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
         let backup_file = backup_dir.join(format!("lightc_registry_backup_{}.reg", timestamp));
 
         // 创建备份文件
-        let mut file = File::create(&backup_file)
-            .map_err(|e| format!("创建备份文件失败: {}", e))?;
+        let mut file =
+            File::create(&backup_file).map_err(|e| format!("创建备份文件失败: {}", e))?;
 
         // 写入 .reg 文件头
         writeln!(file, "Windows Registry Editor Version 5.00")
             .map_err(|e| format!("写入备份文件失败: {}", e))?;
         writeln!(file).map_err(|e| format!("写入备份文件失败: {}", e))?;
-        writeln!(file, "; LightC 注册表备份")
-            .map_err(|e| format!("写入备份文件失败: {}", e))?;
-        writeln!(file, "; 创建时间: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"))
-            .map_err(|e| format!("写入备份文件失败: {}", e))?;
+        writeln!(file, "; LightC 注册表备份").map_err(|e| format!("写入备份文件失败: {}", e))?;
+        writeln!(
+            file,
+            "; 创建时间: {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        )
+        .map_err(|e| format!("写入备份文件失败: {}", e))?;
         writeln!(file, "; 如需恢复，请双击此文件")
             .map_err(|e| format!("写入备份文件失败: {}", e))?;
         writeln!(file).map_err(|e| format!("写入备份文件失败: {}", e))?;
@@ -478,13 +486,11 @@ impl RegistryBackup {
         // 导出每个条目
         for entry in entries {
             // 写入注册表路径
-            writeln!(file, "[{}]", entry.path)
-                .map_err(|e| format!("写入备份文件失败: {}", e))?;
-            
+            writeln!(file, "[{}]", entry.path).map_err(|e| format!("写入备份文件失败: {}", e))?;
+
             // 如果是值条目，需要导出值内容
             // 这里简化处理，实际实现需要读取并导出值
-            writeln!(file, "; {}", entry.issue)
-                .map_err(|e| format!("写入备份文件失败: {}", e))?;
+            writeln!(file, "; {}", entry.issue).map_err(|e| format!("写入备份文件失败: {}", e))?;
             writeln!(file).map_err(|e| format!("写入备份文件失败: {}", e))?;
         }
 
@@ -503,16 +509,16 @@ impl RegistryBackup {
 }
 
 /// 删除注册表键
-/// 
+///
 /// 【安全说明】
 /// 此函数执行实际的注册表删除操作。
 /// 调用此函数前，必须：
 /// 1. 已通过 RegistryBackup::export_backup 创建备份
 /// 2. 用户已明确确认删除操作
-/// 
+///
 /// # 参数
 /// - `entry`: 要删除的注册表条目
-/// 
+///
 /// # 返回
 /// - `Ok(())`: 删除成功
 /// - `Err(String)`: 删除失败的原因
@@ -526,23 +532,25 @@ pub fn delete_registry_entry(entry: &RegistryEntry) -> Result<(), String> {
             let key = root_key
                 .open_subkey_with_flags(subpath, KEY_WRITE)
                 .map_err(|e| format!("打开注册表键失败: {}", e))?;
-            
+
             key.delete_value(&entry.name)
                 .map_err(|e| format!("删除注册表值失败: {}", e))?;
         }
-        RegistryEntryType::SoftwareKey | 
-        RegistryEntryType::ApplicationAssociation |
-        RegistryEntryType::FileTypeAssociation => {
+        RegistryEntryType::SoftwareKey
+        | RegistryEntryType::ApplicationAssociation
+        | RegistryEntryType::FileTypeAssociation => {
             // 删除整个键
-            let parent_path = subpath.rsplit_once('\\')
+            let parent_path = subpath
+                .rsplit_once('\\')
                 .map(|(parent, _)| parent)
                 .unwrap_or("");
-            
+
             let parent_key = root_key
                 .open_subkey_with_flags(parent_path, KEY_WRITE)
                 .map_err(|e| format!("打开父键失败: {}", e))?;
-            
-            parent_key.delete_subkey_all(&entry.name)
+
+            parent_key
+                .delete_subkey_all(&entry.name)
                 .map_err(|e| format!("删除注册表键失败: {}", e))?;
         }
     }
@@ -579,12 +587,12 @@ mod tests {
     #[test]
     fn test_extract_exe_from_command() {
         let scanner = RegistryScanner::new();
-        
+
         assert_eq!(
             scanner.extract_exe_from_command(r#""C:\Program Files\App\app.exe" "%1""#),
             Some(r"C:\Program Files\App\app.exe".to_string())
         );
-        
+
         assert_eq!(
             scanner.extract_exe_from_command(r"C:\App\app.exe %1"),
             Some(r"C:\App\app.exe".to_string())

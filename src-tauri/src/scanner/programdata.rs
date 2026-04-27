@@ -130,7 +130,7 @@ impl ProgramDataScanner {
     /// 执行扫描
     pub fn scan(&self) -> ProgramDataScanResult {
         let start_time = Instant::now();
-        
+
         // 统计计数器
         let total_dirs = Arc::new(AtomicU64::new(0));
         let total_files = Arc::new(AtomicU64::new(0));
@@ -158,13 +158,7 @@ impl ProgramDataScanner {
             .par_iter()
             .with_max_len(MAX_PARALLEL_DIRS)
             .filter_map(|dir_path| {
-                self.scan_directory(
-                    dir_path,
-                    0,
-                    &total_dirs,
-                    &total_files,
-                    &inaccessible,
-                )
+                self.scan_directory(dir_path, 0, &total_dirs, &total_files, &inaccessible)
             })
             .collect();
 
@@ -189,7 +183,7 @@ impl ProgramDataScanner {
     /// 列出一级目录
     fn list_first_level_dirs(&self) -> Result<Vec<PathBuf>, std::io::Error> {
         let mut dirs = Vec::new();
-        
+
         for entry in fs::read_dir(&self.config.root_path)? {
             let entry = match entry {
                 Ok(e) => e,
@@ -197,7 +191,7 @@ impl ProgramDataScanner {
             };
 
             let path = entry.path();
-            
+
             // 跳过非目录
             if !path.is_dir() {
                 continue;
@@ -262,7 +256,7 @@ impl ProgramDataScanner {
         }
 
         // 统计当前目录
-        let (size, file_count, dir_count, last_modified, sub_dirs) = 
+        let (size, file_count, dir_count, last_modified, sub_dirs) =
             self.calculate_dir_stats(path, total_files);
 
         // 判断是否需要深度扫描子目录
@@ -272,20 +266,14 @@ impl ProgramDataScanner {
                 .par_iter()
                 .with_max_len(MAX_PARALLEL_DIRS)
                 .filter_map(|sub_path| {
-                    self.scan_directory(
-                        sub_path,
-                        depth + 1,
-                        total_dirs,
-                        total_files,
-                        inaccessible,
-                    )
+                    self.scan_directory(sub_path, depth + 1, total_dirs, total_files, inaccessible)
                 })
                 .collect();
 
             // 按大小降序排序
             let mut sorted_children = child_entries;
             sorted_children.sort_by(|a, b| b.size.cmp(&a.size));
-            
+
             if sorted_children.is_empty() {
                 None
             } else {
@@ -326,10 +314,11 @@ impl ProgramDataScanner {
         for entry in walkdir::WalkDir::new(path)
             .follow_links(false) // 不跟随符号链接
             .into_iter()
-            .filter_map(|e| e.ok()) // 跳过无权限的条目
+            .filter_map(|e| e.ok())
+        // 跳过无权限的条目
         {
             let entry_path = entry.path();
-            
+
             if entry_path == path {
                 continue; // 跳过根目录本身
             }
@@ -339,7 +328,7 @@ impl ProgramDataScanner {
                 if let Ok(metadata) = entry.metadata() {
                     size += metadata.len();
                     total_files.fetch_add(1, Ordering::Relaxed);
-                    
+
                     // 仅统计直接子文件
                     if entry_path.parent() == Some(path) {
                         file_count += 1;
@@ -405,11 +394,11 @@ fn system_time_to_millis(time: SystemTime) -> i64 {
 // ============================================================================
 
 /// 扫描 ProgramData 目录（使用默认配置）
-/// 
+///
 /// # 返回值
 /// 返回扫描结果，包含所有一级目录的大小统计
 /// 对于超过 100MB 的目录，会额外扫描其子目录
-/// 
+///
 /// # 示例
 /// ```no_run
 /// let result = scan_programdata();
@@ -424,10 +413,10 @@ pub fn scan_programdata() -> ProgramDataScanResult {
 }
 
 /// 使用自定义阈值扫描 ProgramData 目录
-/// 
+///
 /// # 参数
 /// - `threshold_mb`: 触发深度扫描的大小阈值（MB）
-/// 
+///
 /// # 返回值
 /// 返回扫描结果
 pub fn scan_programdata_with_threshold(threshold_mb: u64) -> ProgramDataScanResult {
@@ -440,11 +429,11 @@ pub fn scan_programdata_with_threshold(threshold_mb: u64) -> ProgramDataScanResu
 }
 
 /// 扫描指定目录（用于测试或扫描其他类似目录）
-/// 
+///
 /// # 参数
 /// - `path`: 要扫描的目录路径
 /// - `threshold_mb`: 触发深度扫描的大小阈值（MB）
-/// 
+///
 /// # 返回值
 /// 返回扫描结果
 pub fn scan_directory_tree(path: &str, threshold_mb: u64) -> ProgramDataScanResult {
@@ -474,7 +463,10 @@ mod tests {
 
     #[test]
     fn test_get_dir_name() {
-        assert_eq!(get_dir_name(Path::new("C:\\ProgramData\\Microsoft")), "Microsoft");
+        assert_eq!(
+            get_dir_name(Path::new("C:\\ProgramData\\Microsoft")),
+            "Microsoft"
+        );
         assert_eq!(get_dir_name(Path::new("C:\\ProgramData")), "ProgramData");
     }
 

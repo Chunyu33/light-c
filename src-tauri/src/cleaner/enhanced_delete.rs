@@ -1,11 +1,11 @@
 // ============================================================================
 // 增强删除引擎 - 处理锁定文件和权限问题
-// 
+//
 // 核心功能：
 // 1. Take Ownership - 获取文件所有权以删除受保护文件
 // 2. Delete on Reboot - 使用 MOVEFILE_DELAY_UNTIL_REBOOT 处理锁定文件
 // 3. 物理大小计算 - 返回实际释放的磁盘空间
-// 
+//
 // 安全机制：
 // - 严格的白名单路径检查，只在安全目录执行 Take Ownership
 // - 系统关键文件绝对禁止删除
@@ -14,10 +14,10 @@
 
 use std::fs;
 use std::io;
-use std::path::Path;
-use std::process::Command;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+use std::path::Path;
+use std::process::Command;
 
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
@@ -42,11 +42,11 @@ pub(crate) mod windows_api {
     #[link(name = "kernel32")]
     extern "system" {
         /// 标记文件在重启时删除
-        /// 
+        ///
         /// # 安全说明
         /// 此函数使用 MOVEFILE_DELAY_UNTIL_REBOOT 标志将文件标记为重启时删除。
         /// 这是 Windows 系统存储感知（Storage Sense）处理被锁定文件的标准方式。
-        /// 
+        ///
         /// # 参数
         /// - lpExistingFileName: 要删除的文件路径（宽字符）
         /// - lpNewFileName: 目标路径，设为 NULL 表示删除
@@ -86,27 +86,27 @@ pub(crate) mod windows_api {
     }
 
     /// 标记文件在重启时删除
-    /// 
+    ///
     /// # 中文说明
     /// 此函数使用 Windows API MoveFileExW 配合 MOVEFILE_DELAY_UNTIL_REBOOT 标志，
     /// 将被锁定的文件标记为"重启时删除"。这是 Windows 系统存储感知处理顽固文件的标准方式。
-    /// 
+    ///
     /// 工作原理：
     /// 1. 调用 MoveFileExW，目标路径设为 NULL
     /// 2. Windows 将此操作记录到注册表 PendingFileRenameOperations
     /// 3. 下次系统启动时，在用户登录前执行删除操作
-    /// 
+    ///
     /// 安全考虑：
     /// - 只对已通过安全检查的文件执行此操作
     /// - 系统关键文件绝对禁止使用此功能
     /// - 用户会收到"需要重启完成清理"的提示
     pub fn mark_for_delete_on_reboot(path: &str) -> Result<(), String> {
         let wide_path = to_wide_string(path);
-        
+
         unsafe {
             let result = MoveFileExW(
                 wide_path.as_ptr(),
-                ptr::null(),  // NULL 表示删除而非移动
+                ptr::null(), // NULL 表示删除而非移动
                 MOVEFILE_DELAY_UNTIL_REBOOT,
             );
 
@@ -122,7 +122,7 @@ pub(crate) mod windows_api {
     /// 移除文件的只读、隐藏、系统属性
     pub fn remove_protection_attributes(path: &str) -> Result<(), String> {
         let wide_path = to_wide_string(path);
-        
+
         unsafe {
             let attrs = GetFileAttributesW(wide_path.as_ptr());
             if attrs == u32::MAX {
@@ -130,8 +130,9 @@ pub(crate) mod windows_api {
             }
 
             // 移除只读、隐藏、系统属性
-            let new_attrs = attrs & !(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
-            
+            let new_attrs =
+                attrs & !(FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
+
             if new_attrs != attrs {
                 let result = SetFileAttributesW(wide_path.as_ptr(), new_attrs);
                 if result == 0 {
@@ -139,7 +140,7 @@ pub(crate) mod windows_api {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -304,7 +305,10 @@ impl EnhancedDeleteResult {
 
         // 重启待删除部分
         if self.reboot_pending_count > 0 {
-            parts.push(format!("{} 个文件将在重启后删除", self.reboot_pending_count));
+            parts.push(format!(
+                "{} 个文件将在重启后删除",
+                self.reboot_pending_count
+            ));
         }
 
         self.summary_message = if parts.is_empty() {
@@ -326,7 +330,7 @@ impl Default for EnhancedDeleteResult {
 // ============================================================================
 
 /// 允许执行 Take Ownership 的安全目录
-/// 
+///
 /// # 中文说明
 /// 只有在这些目录下的文件才允许执行"获取所有权"操作。
 /// 这是为了防止误操作导致系统文件被删除。
@@ -360,7 +364,7 @@ impl EnhancedDeleteEngine {
     pub fn new() -> Self {
         // 获取 C 盘簇大小，默认 4096 字节
         let cluster_size = windows_api::get_cluster_size("C:\\").unwrap_or(4096);
-        
+
         Self {
             cluster_size,
             enable_reboot_delete: false,  // 默认禁用，避免性能问题
@@ -381,7 +385,7 @@ impl EnhancedDeleteEngine {
     }
 
     /// 计算文件的物理占用大小（按簇对齐）
-    /// 
+    ///
     /// # 中文说明
     /// 文件在磁盘上的实际占用空间是按簇（cluster）分配的。
     /// 例如，一个 1 字节的文件在 4KB 簇大小的磁盘上实际占用 4KB。
@@ -397,12 +401,12 @@ impl EnhancedDeleteEngine {
     /// 删除文件列表
     pub fn delete_files(&self, paths: &[String]) -> EnhancedDeleteResult {
         let mut result = EnhancedDeleteResult::new();
-        
+
         info!("增强删除引擎：开始删除 {} 个文件", paths.len());
 
         for path in paths {
             let file_result = self.delete_single_file(path);
-            
+
             match &file_result.failure_reason {
                 None => {
                     result.success_count += 1;
@@ -418,12 +422,12 @@ impl EnhancedDeleteEngine {
                     result.skipped_size += file_result.physical_size;
                 }
             }
-            
+
             result.file_results.push(file_result);
         }
 
         result.generate_summary();
-        
+
         info!(
             "增强删除完成: 成功 {}, 失败 {}, 待重启 {}, 释放 {} 字节",
             result.success_count,
@@ -438,7 +442,7 @@ impl EnhancedDeleteEngine {
     /// 删除单个文件
     fn delete_single_file(&self, path: &str) -> FileDeleteResult {
         let file_path = Path::new(path);
-        
+
         // 获取文件大小
         let logical_size = self.get_file_size(file_path);
         let physical_size = self.calculate_physical_size(logical_size);
@@ -482,10 +486,10 @@ impl EnhancedDeleteEngine {
             }
             Err(e) => {
                 // 判断错误类型
-                let is_locked = e.contains("正在使用") || 
-                               e.contains("被另一个进程") ||
-                               e.contains("sharing violation") ||
-                               e.contains("access is denied");
+                let is_locked = e.contains("正在使用")
+                    || e.contains("被另一个进程")
+                    || e.contains("sharing violation")
+                    || e.contains("access is denied");
 
                 if is_locked && self.enable_reboot_delete {
                     // 尝试标记为重启删除
@@ -507,7 +511,7 @@ impl EnhancedDeleteEngine {
                             }
                         }
                     }
-                    
+
                     FileDeleteResult {
                         path: path.to_string(),
                         success: false,
@@ -574,27 +578,27 @@ impl EnhancedDeleteEngine {
     /// 移除保护属性后删除
     fn delete_after_remove_attrs(&self, path: &Path) -> Result<(), String> {
         let path_str = path.to_string_lossy();
-        
+
         // 移除只读等属性
         windows_api::remove_protection_attributes(&path_str)?;
-        
+
         // 再次尝试删除
         self.direct_delete(path)
             .map_err(|e| format!("移除属性后仍无法删除: {}", e))
     }
 
     /// 获取所有权后删除
-    /// 
+    ///
     /// # 中文说明
     /// 使用 icacls 命令获取文件所有权，然后删除。
     /// 注意：为了性能，不使用 /T 递归标志，只处理单个文件。
-    /// 
+    ///
     /// 安全考虑：
     /// - 只在 SAFE_OWNERSHIP_PATHS 列表中的目录执行
     /// - 不会对系统关键文件执行此操作
     fn delete_with_ownership(&self, path: &Path) -> Result<(), String> {
         let path_str = path.to_string_lossy();
-        
+
         debug!("尝试获取所有权: {}", path_str);
 
         // 使用 icacls 获取所有权（不使用 /T 递归，提升性能）
@@ -602,8 +606,8 @@ impl EnhancedDeleteEngine {
             .arg(&*path_str)
             .arg("/setowner")
             .arg("Administrators")
-            .arg("/C")  // 继续处理错误
-            .arg("/Q")  // 静默模式
+            .arg("/C") // 继续处理错误
+            .arg("/Q") // 静默模式
             .creation_flags(0x08000000) // CREATE_NO_WINDOW - 不显示命令行窗口
             .output()
             .map_err(|e| format!("执行 icacls 失败: {}", e))?;
@@ -636,20 +640,20 @@ impl EnhancedDeleteEngine {
     /// 检查路径是否安全执行 Take Ownership
     fn is_safe_for_ownership(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        
+
         for safe_path in SAFE_OWNERSHIP_PATHS {
             if path_str.contains(safe_path) {
                 return true;
             }
         }
-        
+
         false
     }
 
     /// 检查是否为系统保护文件
     fn is_system_protected(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        
+
         // 系统关键路径
         let protected_prefixes = [
             "c:\\windows\\system32",
@@ -667,8 +671,14 @@ impl EnhancedDeleteEngine {
 
         // 系统关键文件
         let protected_files = [
-            "ntoskrnl.exe", "hal.dll", "ntdll.dll", "kernel32.dll",
-            "bootmgr", "pagefile.sys", "hiberfil.sys", "swapfile.sys",
+            "ntoskrnl.exe",
+            "hal.dll",
+            "ntdll.dll",
+            "kernel32.dll",
+            "bootmgr",
+            "pagefile.sys",
+            "hiberfil.sys",
+            "swapfile.sys",
         ];
 
         if let Some(file_name) = path.file_name() {
@@ -735,7 +745,7 @@ mod tests {
     #[test]
     fn test_physical_size_calculation() {
         let engine = EnhancedDeleteEngine::new();
-        
+
         // 假设簇大小为 4096
         assert_eq!(engine.calculate_physical_size(1), 4096);
         assert_eq!(engine.calculate_physical_size(4096), 4096);
@@ -746,16 +756,17 @@ mod tests {
     #[test]
     fn test_safe_ownership_check() {
         let engine = EnhancedDeleteEngine::new();
-        
+
         assert!(engine.is_safe_for_ownership(Path::new("C:\\Windows\\Temp\\test.tmp")));
-        assert!(engine.is_safe_for_ownership(Path::new("C:\\Users\\Test\\AppData\\Local\\Temp\\file.log")));
+        assert!(engine
+            .is_safe_for_ownership(Path::new("C:\\Users\\Test\\AppData\\Local\\Temp\\file.log")));
         assert!(!engine.is_safe_for_ownership(Path::new("C:\\Windows\\System32\\test.dll")));
     }
 
     #[test]
     fn test_system_protected_check() {
         let engine = EnhancedDeleteEngine::new();
-        
+
         assert!(engine.is_system_protected(Path::new("C:\\Windows\\System32\\ntdll.dll")));
         assert!(engine.is_system_protected(Path::new("C:\\pagefile.sys")));
         assert!(!engine.is_system_protected(Path::new("C:\\Temp\\test.tmp")));

@@ -68,8 +68,7 @@ static RE_PACKAGE_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*){2,}$").unwrap());
 
 /// 纯版本号格式：1.2.3.4、v2.0 等
-static RE_VERSION_FOLDER: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^v?\d+(\.\d+){1,3}$").unwrap());
+static RE_VERSION_FOLDER: Lazy<Regex> = Lazy::new(|| Regex::new(r"^v?\d+(\.\d+){1,3}$").unwrap());
 
 // ============================================================================
 // 数据模型
@@ -219,7 +218,6 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("publishers".into()),
         WhitelistRule::Exact("temp".into()),
         WhitelistRule::Exact("temporary internet files".into()),
-
         // ==================== 硬件驱动相关（精确 + 前缀） ====================
         WhitelistRule::Exact("nvidia".into()),
         WhitelistRule::Exact("nvidia corporation".into()),
@@ -233,7 +231,6 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("razer".into()),
         WhitelistRule::Exact("corsair".into()),
         WhitelistRule::Exact("steelseries".into()),
-
         // ==================== 运行时和框架（精确匹配） ====================
         WhitelistRule::Exact(".net".into()),
         WhitelistRule::Exact("dotnet".into()),
@@ -248,7 +245,6 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("cargo".into()),
         WhitelistRule::Exact("go".into()),
         WhitelistRule::Exact("golang".into()),
-
         // ==================== 开发工具（精确 + 前缀） ====================
         WhitelistRule::Exact("vscode".into()),
         WhitelistRule::Exact("visual studio".into()),
@@ -273,7 +269,6 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("pnpm".into()),
         WhitelistRule::Exact("bun".into()),
         WhitelistRule::Exact("deno".into()),
-
         // ==================== 系统服务（精确匹配） ====================
         WhitelistRule::Exact("application data".into()),
         WhitelistRule::Exact("local settings".into()),
@@ -284,7 +279,6 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("logs".into()),
         WhitelistRule::Exact("crash reports".into()),
         WhitelistRule::Exact("crashdumps".into()),
-
         // ==================== 常见应用（精确匹配） ====================
         WhitelistRule::Exact("google".into()),
         WhitelistRule::Exact("chrome".into()),
@@ -326,7 +320,6 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("7-zip".into()),
         WhitelistRule::Exact("winrar".into()),
         WhitelistRule::Exact("bandizip".into()),
-
         // ==================== 隐藏文件夹（通配符） ====================
         WhitelistRule::Pattern(".*".into()),
     ]
@@ -340,19 +333,55 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
 /// 已知共享厂商/系统目录名（精确匹配，小写）
 /// 命中时扣分 -0.5
 const KNOWN_SHARED_VENDORS: &[&str] = &[
-    "adobe", "microsoft", "google", "apple", "intel", "nvidia", "nvidia corporation",
-    "amd", "realtek", "qualcomm", "broadcom", "dell", "hp", "lenovo", "asus",
-    "msi", "gigabyte", "logitech", "razer", "corsair", "steelseries", "mozilla",
+    "adobe",
+    "microsoft",
+    "google",
+    "apple",
+    "intel",
+    "nvidia",
+    "nvidia corporation",
+    "amd",
+    "realtek",
+    "qualcomm",
+    "broadcom",
+    "dell",
+    "hp",
+    "lenovo",
+    "asus",
+    "msi",
+    "gigabyte",
+    "logitech",
+    "razer",
+    "corsair",
+    "steelseries",
+    "mozilla",
 ];
 
 /// 通用目录名（负向信号，小写）
 /// 这些名称太通用，不太可能是某个特定已卸载应用的残留
 /// 命中时扣分 -0.4
 const GENERIC_FOLDER_NAMES: &[&str] = &[
-    "cache", "caches", "logs", "log", "temp", "tmp", "data", "config",
-    "settings", "preferences", "backup", "backups", "crash reports",
-    "crashdumps", "diagnostics", "telemetry", "update", "updates",
-    "downloads", "icons", "thumbnails",
+    "cache",
+    "caches",
+    "logs",
+    "log",
+    "temp",
+    "tmp",
+    "data",
+    "config",
+    "settings",
+    "preferences",
+    "backup",
+    "backups",
+    "crash reports",
+    "crashdumps",
+    "diagnostics",
+    "telemetry",
+    "update",
+    "updates",
+    "downloads",
+    "icons",
+    "thumbnails",
 ];
 
 // ============================================================================
@@ -456,8 +485,7 @@ struct InstalledAppMap {
 fn normalize_display_name(name: &str) -> String {
     let lower = name.to_lowercase();
     // 去除括号内容（如 "Foo App (x64)"  → "foo app"）
-    let no_parens = lower
-        .replace(|c: char| c == '(' || c == ')', " ");
+    let no_parens = lower.replace(|c: char| c == '(' || c == ')', " ");
     // 去除版本号模式（如 "v1.2.3"、"1.0.0"）
     let cleaned: String = no_parens
         .split_whitespace()
@@ -490,18 +518,26 @@ impl InstalledAppMap {
 
         // 【安全说明】只读取注册表，不进行任何写入操作
         let reg_paths = [
-            (HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
-            (HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
-            (HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+            (
+                HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
+            (
+                HKEY_CURRENT_USER,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            ),
         ];
 
         for (hkey, path) in reg_paths {
             if let Ok(key) = RegKey::predef(hkey).open_subkey_with_flags(path, KEY_READ) {
                 for subkey_name in key.enum_keys().filter_map(|k| k.ok()) {
                     if let Ok(subkey) = key.open_subkey_with_flags(&subkey_name, KEY_READ) {
-                        let display_name: String = subkey
-                            .get_value("DisplayName")
-                            .unwrap_or_default();
+                        let display_name: String =
+                            subkey.get_value("DisplayName").unwrap_or_default();
                         if display_name.is_empty() {
                             continue;
                         }
@@ -533,8 +569,7 @@ impl InstalledAppMap {
                             if let Some(parent) = loc_path.parent() {
                                 if let Some(vendor) = parent.file_name() {
                                     let v = vendor.to_string_lossy().to_lowercase();
-                                    if !v.is_empty()
-                                        && !EXCLUDED_PARENT_DIRS.contains(&v.as_str())
+                                    if !v.is_empty() && !EXCLUDED_PARENT_DIRS.contains(&v.as_str())
                                     {
                                         inferred.push(v);
                                     }
@@ -845,10 +880,10 @@ impl LeftoverScanner {
 
                         // +0.20 包含 .exe 或 .dll 文件
                         if probe.executable_count > 0 {
-                            ctx.add(0.20, format!(
-                                "包含 {} 个可执行文件",
-                                probe.executable_count
-                            ));
+                            ctx.add(
+                                0.20,
+                                format!("包含 {} 个可执行文件", probe.executable_count),
+                            );
                         }
 
                         // 修改时间（只计算一次）
@@ -956,8 +991,14 @@ impl LeftoverScanner {
         log::info!(
             "卸载残留扫描完成: 发现 {} 个条目 (高置信度 {}, 可疑 {}), 总大小 {} 字节, 耗时 {}ms",
             leftovers.len(),
-            leftovers.iter().filter(|l| l.detection_category == DetectionCategory::HighConfidenceLeftover).count(),
-            leftovers.iter().filter(|l| l.detection_category == DetectionCategory::Suspicious).count(),
+            leftovers
+                .iter()
+                .filter(|l| l.detection_category == DetectionCategory::HighConfidenceLeftover)
+                .count(),
+            leftovers
+                .iter()
+                .filter(|l| l.detection_category == DetectionCategory::Suspicious)
+                .count(),
             total_size,
             scan_duration_ms
         );
@@ -1253,20 +1294,44 @@ mod tests {
     #[test]
     fn test_package_name_filtered() {
         // 验证包名格式目录被预过滤跳过
-        assert!(RE_PACKAGE_NAME.is_match("com.example.app"), "com.example.app 应匹配包名格式");
-        assert!(RE_PACKAGE_NAME.is_match("org.apache.commons.lang"), "org.apache.commons.lang 应匹配");
-        assert!(!RE_PACKAGE_NAME.is_match("steamapp"), "steamapp 不应匹配包名格式");
-        assert!(!RE_PACKAGE_NAME.is_match("com.x"), "com.x 只有两段，不应匹配");
+        assert!(
+            RE_PACKAGE_NAME.is_match("com.example.app"),
+            "com.example.app 应匹配包名格式"
+        );
+        assert!(
+            RE_PACKAGE_NAME.is_match("org.apache.commons.lang"),
+            "org.apache.commons.lang 应匹配"
+        );
+        assert!(
+            !RE_PACKAGE_NAME.is_match("steamapp"),
+            "steamapp 不应匹配包名格式"
+        );
+        assert!(
+            !RE_PACKAGE_NAME.is_match("com.x"),
+            "com.x 只有两段，不应匹配"
+        );
     }
 
     #[test]
     fn test_version_folder_filtered() {
         // 验证纯版本号目录被预过滤跳过
-        assert!(RE_VERSION_FOLDER.is_match("1.2.3.4"), "1.2.3.4 应匹配版本号格式");
+        assert!(
+            RE_VERSION_FOLDER.is_match("1.2.3.4"),
+            "1.2.3.4 应匹配版本号格式"
+        );
         assert!(RE_VERSION_FOLDER.is_match("v2.0"), "v2.0 应匹配版本号格式");
-        assert!(RE_VERSION_FOLDER.is_match("10.0.1"), "10.0.1 应匹配版本号格式");
-        assert!(!RE_VERSION_FOLDER.is_match("v2"), "v2 没有点号分隔，不应匹配");
-        assert!(!RE_VERSION_FOLDER.is_match("foobar"), "foobar 不应匹配版本号格式");
+        assert!(
+            RE_VERSION_FOLDER.is_match("10.0.1"),
+            "10.0.1 应匹配版本号格式"
+        );
+        assert!(
+            !RE_VERSION_FOLDER.is_match("v2"),
+            "v2 没有点号分隔，不应匹配"
+        );
+        assert!(
+            !RE_VERSION_FOLDER.is_match("foobar"),
+            "foobar 不应匹配版本号格式"
+        );
     }
 
     #[test]
@@ -1274,20 +1339,32 @@ mod tests {
         // 验证阈值 >= 0.65 分类为 HighConfidenceLeftover
         let mut ctx = ScoringContext::new();
         ctx.score = 0.65;
-        assert_eq!(ctx.category(), DetectionCategory::HighConfidenceLeftover,
-            "score = 0.65 应为 HighConfidenceLeftover");
+        assert_eq!(
+            ctx.category(),
+            DetectionCategory::HighConfidenceLeftover,
+            "score = 0.65 应为 HighConfidenceLeftover"
+        );
 
         ctx.score = 0.64;
-        assert_eq!(ctx.category(), DetectionCategory::Suspicious,
-            "score = 0.64 应为 Suspicious");
+        assert_eq!(
+            ctx.category(),
+            DetectionCategory::Suspicious,
+            "score = 0.64 应为 Suspicious"
+        );
 
         ctx.score = 0.40;
-        assert_eq!(ctx.category(), DetectionCategory::Suspicious,
-            "score = 0.40 应为 Suspicious");
+        assert_eq!(
+            ctx.category(),
+            DetectionCategory::Suspicious,
+            "score = 0.40 应为 Suspicious"
+        );
 
         ctx.score = 0.39;
-        assert_eq!(ctx.category(), DetectionCategory::LikelyAppData,
-            "score = 0.39 应为 LikelyAppData");
+        assert_eq!(
+            ctx.category(),
+            DetectionCategory::LikelyAppData,
+            "score = 0.39 应为 LikelyAppData"
+        );
     }
 
     #[test]
@@ -1300,8 +1377,11 @@ mod tests {
             // 长度 <= 3 的条目必须是合法目录名（如 "amd"、"git"），不是 token 碎片
             // 验证方式：known_folders 中不应出现纯数字或常见 token 碎片
             let is_pure_numeric = folder.chars().all(|c| c.is_ascii_digit());
-            assert!(!is_pure_numeric || folder.len() > 3,
-                "known_folders 不应包含纯数字短 token: \"{}\"", folder);
+            assert!(
+                !is_pure_numeric || folder.len() > 3,
+                "known_folders 不应包含纯数字短 token: \"{}\"",
+                folder
+            );
         }
     }
 }

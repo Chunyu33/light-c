@@ -17,7 +17,8 @@ export type JunkCategory =
   | 'FontCache'
   | 'WindowsErrorReports'
   | 'InstallerTemp'
-  | 'ClipboardCache';
+  | 'ClipboardCache'
+  | 'ShaderCache';
 
 /** 单个文件信息 */
 export interface FileInfo {
