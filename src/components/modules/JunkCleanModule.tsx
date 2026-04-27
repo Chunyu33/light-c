@@ -11,6 +11,7 @@ import { CategoryCard } from '../CategoryCard';
 import { ScanSummary } from '../ScanSummary';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
+import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import { scanJunkFiles, enhancedDeleteFiles, recordCleanupAction, type EnhancedDeleteResult, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -23,6 +24,7 @@ import type { ScanResult, FileInfo } from '../../types';
 export function JunkCleanModule() {
   const { modules, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.junk;
+  const { showToast } = useToast();
 
   // 用于跟踪是否已处理过当前的一键扫描触发
   const lastScanTriggerRef = useRef(0);
@@ -114,6 +116,40 @@ export function JunkCleanModule() {
         // 异步记录日志，不阻塞 UI
         recordCleanupAction(logEntries).catch((err) => {
           console.warn('记录清理日志失败:', err);
+          showToast({
+            type: 'warning',
+            title: '清理完成，但日志记录失败',
+            description: String(err),
+          });
+        });
+      }
+
+      if (result.success_count > 0) {
+        const blockedText = result.failed_count > 0
+          ? `，${result.failed_count} 个文件因占用或权限问题跳过`
+          : '';
+        const rebootText = result.reboot_pending_count > 0
+          ? `，${result.reboot_pending_count} 个文件将在重启后删除`
+          : '';
+        showToast({
+          type: result.failed_count > 0 || result.reboot_pending_count > 0 ? 'warning' : 'success',
+          title: '垃圾清理完成',
+          description: `${result.summary_message || `成功释放 ${formatSize(result.freed_physical_size)}`}${blockedText}${rebootText}`,
+        });
+      } else if (result.failed_count > 0 || result.reboot_pending_count > 0) {
+        const firstFailure = result.file_results.find((f) => !f.success && !f.marked_for_reboot);
+        showToast({
+          type: 'warning',
+          title: '清理受阻',
+          description: firstFailure
+            ? `部分文件未能删除：${firstFailure.path}`
+            : result.summary_message || '部分文件将在重启后删除',
+        });
+      } else {
+        showToast({
+          type: 'info',
+          title: '没有文件被清理',
+          description: result.summary_message || '所选文件未发生变化',
         });
       }
 
@@ -161,10 +197,11 @@ export function JunkCleanModule() {
       }
     } catch (err) {
       console.error('删除失败:', err);
+      showToast({ type: 'error', title: '垃圾清理失败', description: String(err) });
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh]);
+  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh, showToast]);
 
   // 切换文件选中状态
   const toggleFileSelection = useCallback((path: string) => {

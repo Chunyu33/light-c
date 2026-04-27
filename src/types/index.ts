@@ -13,7 +13,11 @@ export type JunkCategory =
   | 'LogFiles'
   | 'MemoryDump'
   | 'OldWindowsInstallation'
-  | 'AppCache';
+  | 'AppCache'
+  | 'FontCache'
+  | 'WindowsErrorReports'
+  | 'InstallerTemp'
+  | 'ClipboardCache';
 
 /** 单个文件信息 */
 export interface FileInfo {
