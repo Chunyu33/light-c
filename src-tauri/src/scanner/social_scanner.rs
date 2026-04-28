@@ -202,7 +202,7 @@ pub struct SocialCategoryStats {
 
 /// 社交软件扫描结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SocialScanResultV2 {
+pub struct SocialScanResult {
     /// 按分类统计
     pub categories: Vec<SocialCategoryStats>,
     /// 总文件数
@@ -322,7 +322,7 @@ impl SocialScanner {
     }
 
     /// 执行扫描
-    pub fn scan(&self) -> SocialScanResultV2 {
+    pub fn scan(&self) -> SocialScanResult {
         let mut all_paths = Vec::new();
         let mut detected_apps = Vec::new();
 
@@ -398,7 +398,7 @@ impl SocialScanner {
         let deletable_files: usize = categories.iter().map(|c| c.deletable_count).sum();
         let deletable_size: u64 = categories.iter().map(|c| c.deletable_size).sum();
 
-        SocialScanResultV2 {
+        SocialScanResult {
             categories,
             total_files,
             total_size,

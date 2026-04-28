@@ -85,13 +85,6 @@ export async function cancelLargeFileScan(): Promise<void> {
 }
 
 /**
- * 扫描社交软件缓存
- */
-export async function scanSocialCache(): Promise<SocialScanResult> {
-  return invoke<SocialScanResult>('scan_social_cache');
-}
-
-/**
  * 在文件资源管理器中打开文件所在目录
  */
 export async function openInFolder(path: string): Promise<void> {
@@ -193,30 +186,8 @@ export async function getHealthScore(): Promise<HealthScoreResult> {
   return invoke<HealthScoreResult>('get_health_score');
 }
 
-// 社交软件扫描结果类型
-export interface SocialScanResult {
-  categories: SocialCategory[];
-  total_files: number;
-  total_size: number;
-}
-
-export interface SocialCategory {
-  id: string;
-  name: string;
-  description: string;
-  file_count: number;
-  total_size: number;
-  files: SocialFile[];
-}
-
-export interface SocialFile {
-  path: string;
-  size: number;
-  app_name: string;
-}
-
 // ============================================================================
-// 社交软件扫描 V2 - 带风险分级
+// 社交软件扫描 - 带风险分级
 // ============================================================================
 
 /** 风险等级 */
@@ -225,8 +196,8 @@ export type RiskLevel = 'critical' | 'medium' | 'low' | 'none';
 /** 文件分类 */
 export type FileCategory = 'chat_database' | 'image_video' | 'file_transfer' | 'temp_cache' | 'moments_cache';
 
-/** 社交软件文件条目 V2 */
-export interface SocialFileEntryV2 {
+/** 社交软件文件条目 */
+export interface SocialFileEntry {
   /** 文件完整路径 */
   path: string;
   /** 文件大小（字节） */
@@ -241,8 +212,8 @@ export interface SocialFileEntryV2 {
   deletable: boolean;
 }
 
-/** 社交软件分类统计 V2 */
-export interface SocialCategoryStatsV2 {
+/** 社交软件分类统计 */
+export interface SocialCategoryStats {
   /** 分类ID */
   id: string;
   /** 分类名称 */
@@ -258,13 +229,13 @@ export interface SocialCategoryStatsV2 {
   /** 可删除的文件大小 */
   deletable_size: number;
   /** 文件列表 */
-  files: SocialFileEntryV2[];
+  files: SocialFileEntry[];
 }
 
 /** 社交软件扫描结果 V2 */
-export interface SocialScanResultV2 {
+export interface SocialScanResult {
   /** 按分类统计 */
-  categories: SocialCategoryStatsV2[];
+  categories: SocialCategoryStats[];
   /** 总文件数 */
   total_files: number;
   /** 总大小 */
@@ -278,16 +249,16 @@ export interface SocialScanResultV2 {
 }
 
 /**
- * 扫描社交软件缓存 V2（带风险分级）
- * 
+ * 扫描社交软件缓存（带风险分级）
+ *
  * 支持智能路径溯源和文件类型深度分类：
  * - 微信：通过注册表读取自定义路径，识别聊天记录数据库
  * - QQ/NTQQ：定位 nt_data 目录，识别消息数据库
  * - 钉钉：定位 storage 和 cache 目录
  * - 飞书：扫描 LarkShell，定位 sdk_storage 和 file_storage
  */
-export async function scanSocialCacheV2(): Promise<SocialScanResultV2> {
-  return invoke<SocialScanResultV2>('scan_social_cache_v2');
+export async function scanSocialCache(): Promise<SocialScanResult> {
+  return invoke<SocialScanResult>('scan_social_cache');
 }
 
 /** 获取风险等级的中文描述 */

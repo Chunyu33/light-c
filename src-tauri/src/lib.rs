@@ -55,7 +55,6 @@ pub fn run() {
             scan_large_files,
             cancel_large_file_scan,
             scan_social_cache,
-            scan_social_cache_v2,
             get_categories,
             // 删除相关
             delete_files,

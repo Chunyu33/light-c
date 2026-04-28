@@ -15,7 +15,7 @@ import {
   DashboardHeader,
   JunkCleanModule,
   BigFilesModule,
-  SocialCleanModuleV2,
+  SocialCleanModule,
   SystemSlimModule,
   LeftoversModule,
   RegistryModule,
@@ -87,7 +87,7 @@ function DashboardContent() {
 
           {/* 社交软件专清模块 */}
           <div data-module-id="social-clean">
-            <SocialCleanModuleV2 />
+            <SocialCleanModule />
           </div>
 
           {/* 系统瘦身模块 */}

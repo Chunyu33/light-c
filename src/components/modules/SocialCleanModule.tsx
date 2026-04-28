@@ -1,6 +1,6 @@
 // ============================================================================
-// 社交软件专清模块组件
-// 在仪表盘中展示社交软件缓存扫描和清理功能
+// 社交软件专清模块组件 - 带风险分级
+// 支持智能路径溯源和文件类型深度分类
 // ============================================================================
 
 import { useState, useCallback, useRef, memo, useEffect } from 'react';
@@ -18,13 +18,32 @@ import {
   FolderOpen,
   X,
   File,
-  ExternalLink
+  ExternalLink,
+  Database,
+  AlertTriangle,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  Clock
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanSocialCache, deleteFiles, openInFolder, openFile, recordCleanupAction, SocialScanResult, SocialFile, type CleanupLogEntryInput } from '../../api/commands';
+import {
+  scanSocialCache,
+  deleteFiles,
+  openInFolder,
+  openFile,
+  recordCleanupAction,
+  type SocialScanResult,
+  type SocialFileEntry,
+  type SocialCategoryStats,
+  type RiskLevel,
+  type CleanupLogEntryInput,
+  getRiskLevelDescription,
+  getRiskLevelTooltip
+} from '../../api/commands';
 import { formatSize } from '../../utils/format';
 
 // ============================================================================
@@ -32,15 +51,52 @@ import { formatSize } from '../../utils/format';
 // ============================================================================
 
 const categoryIcons: Record<string, typeof Image> = {
-  images_videos: Image,
-  file_transfer: FileText,
-  moments_cache: Share2,
+  chatdatabase: Database,
+  imagevideo: Image,
+  filetransfer: FileText,
+  tempcache: Clock,
+  momentscache: Share2,
 };
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
-  images_videos: { bg: 'bg-emerald-500/10', text: 'text-emerald-600' },
-  file_transfer: { bg: 'bg-teal-500/10', text: 'text-teal-600' },
-  moments_cache: { bg: 'bg-cyan-500/10', text: 'text-cyan-600' },
+  chatdatabase: { bg: 'bg-red-500/10', text: 'text-red-600' },
+  imagevideo: { bg: 'bg-emerald-500/10', text: 'text-emerald-600' },
+  filetransfer: { bg: 'bg-amber-500/10', text: 'text-amber-600' },
+  tempcache: { bg: 'bg-teal-500/10', text: 'text-teal-600' },
+  momentscache: { bg: 'bg-cyan-500/10', text: 'text-cyan-600' },
+};
+
+// 风险等级配置
+const riskLevelConfig: Record<RiskLevel, { 
+  icon: typeof Shield; 
+  color: string; 
+  bgColor: string;
+  borderColor: string;
+}> = {
+  critical: { 
+    icon: ShieldAlert, 
+    color: 'text-red-600', 
+    bgColor: 'bg-red-500/10',
+    borderColor: 'border-red-500/30'
+  },
+  medium: { 
+    icon: AlertTriangle, 
+    color: 'text-amber-600', 
+    bgColor: 'bg-amber-500/10',
+    borderColor: 'border-amber-500/30'
+  },
+  low: { 
+    icon: Shield, 
+    color: 'text-emerald-600', 
+    bgColor: 'bg-emerald-500/10',
+    borderColor: 'border-emerald-500/30'
+  },
+  none: { 
+    icon: ShieldCheck, 
+    color: 'text-teal-600', 
+    bgColor: 'bg-teal-500/10',
+    borderColor: 'border-teal-500/30'
+  },
 };
 
 // ============================================================================
@@ -61,8 +117,25 @@ export function SocialCleanModule() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [fileModalData, setFileModalData] = useState<{ name: string; files: SocialFile[] } | null>(null);
+  const [fileModalData, setFileModalData] = useState<{ name: string; files: SocialFileEntry[] } | null>(null);
   const [showTip, setShowTip] = useState(true);
+
+  // 删除遮罩动画状态 - 使用 CSS keyframe 动画类
+  const [isDeletingVisible, setIsDeletingVisible] = useState(false);
+  const [isDeletingAnimating, setIsDeletingAnimating] = useState(false);
+  const deletingEnteredRef = useRef(false);
+  if (isDeletingVisible) deletingEnteredRef.current = true;
+  
+  useEffect(() => {
+    if (isDeleting) {
+      setIsDeletingAnimating(true);
+      setIsDeletingVisible(true);
+    } else {
+      setIsDeletingVisible(false);
+      const timer = setTimeout(() => setIsDeletingAnimating(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDeleting]);
 
   // 开始扫描
   const handleScan = useCallback(async () => {
@@ -75,9 +148,12 @@ export function SocialCleanModule() {
       const result = await scanSocialCache();
       setScanResult(result);
       
-      // 默认全选所有文件
-      const allPaths = result.categories.flatMap(c => c.files.map(f => f.path));
-      setSelectedPaths(new Set(allPaths));
+      // 默认只选中可删除的文件（排除 Critical 级别）
+      const deletablePaths = result.categories
+        .flatMap(c => c.files)
+        .filter(f => f.deletable)
+        .map(f => f.path);
+      setSelectedPaths(new Set(deletablePaths));
 
       updateModuleState('social', {
         status: 'done',
@@ -100,22 +176,25 @@ export function SocialCleanModule() {
     }
   }, [oneClickScanTrigger, handleScan]);
 
-  // 切换单个文件选中
-  const toggleFile = useCallback((path: string) => {
+  // 切换单个文件选中（只允许可删除的文件）
+  const toggleFile = useCallback((file: SocialFileEntry) => {
+    if (!file.deletable) return; // Critical 级别不允许选中
+    
     setSelectedPaths(prev => {
       const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
+      if (next.has(file.path)) {
+        next.delete(file.path);
       } else {
-        next.add(path);
+        next.add(file.path);
       }
       return next;
     });
   }, []);
 
-  // 切换分类选中
-  const toggleCategory = useCallback((category: { files: SocialFile[] }) => {
-    const categoryPaths = category.files.map(f => f.path);
+  // 切换分类选中（只选中可删除的文件）
+  const toggleCategory = useCallback((category: SocialCategoryStats) => {
+    const deletableFiles = category.files.filter(f => f.deletable);
+    const categoryPaths = deletableFiles.map(f => f.path);
     const allSelected = categoryPaths.every(p => selectedPaths.has(p));
     
     setSelectedPaths(prev => {
@@ -129,16 +208,21 @@ export function SocialCleanModule() {
     });
   }, [selectedPaths]);
 
-  // 全选/取消全选
+  // 全选/取消全选（只选中可删除的文件）
   const toggleSelectAll = useCallback(() => {
     if (!scanResult) return;
-    const allPaths = scanResult.categories.flatMap(c => c.files.map(f => f.path));
-    if (selectedPaths.size === allPaths.length) {
+    const deletablePaths = scanResult.categories
+      .flatMap(c => c.files)
+      .filter(f => f.deletable)
+      .map(f => f.path);
+    
+    const allSelected = deletablePaths.every(p => selectedPaths.has(p));
+    if (allSelected) {
       setSelectedPaths(new Set());
     } else {
-      setSelectedPaths(new Set(allPaths));
+      setSelectedPaths(new Set(deletablePaths));
     }
-  }, [scanResult, selectedPaths.size]);
+  }, [scanResult, selectedPaths]);
 
   // 执行删除
   const handleDelete = useCallback(async () => {
@@ -149,7 +233,7 @@ export function SocialCleanModule() {
     try {
       const result = await deleteFiles(paths);
 
-      // 记录清理日志（所有操作都记录）
+      // 记录清理日志
       const failedPathSet = new Set(result.failed_files?.map((f) => f.path) || []);
       const allFiles = scanResult?.categories.flatMap(c => c.files) || [];
       const logEntries: CleanupLogEntryInput[] = paths.map((path) => {
@@ -212,10 +296,11 @@ export function SocialCleanModule() {
 
   return (
     <>
-      {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+      {/* 删除进度遮罩 */}
+      {isDeletingAnimating && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4 ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
             </div>
@@ -265,7 +350,7 @@ export function SocialCleanModule() {
                 onClick={toggleSelectAll}
                 className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
               >
-                {selectedPaths.size === scanResult.categories.flatMap(c => c.files).length ? '取消全选' : '全选'}
+                {selectedPaths.size === scanResult.deletable_files ? '取消全选' : '全选'}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
@@ -289,12 +374,16 @@ export function SocialCleanModule() {
         <div className="max-h-[500px] overflow-auto">
           {/* 说明提示 */}
           {showTip && (
-            <div className="mx-4 mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
+            <div className="mx-4 mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
               <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-amber-600 text-[10px] font-bold">!</span>
               </div>
               <p className="text-[11px] text-amber-600/80 leading-relaxed flex-1">
-                本工具会自动检测"文档"文件夹的实际位置进行扫描，即使已迁移到其他磁盘也能正确识别。
+                <span className="font-medium">智能风险分级：</span>
+                <span className="text-red-600">红色</span>为聊天记录（禁止删除），
+                <span className="text-amber-600">橙色</span>为传输文件（谨慎清理），
+                <span className="text-emerald-600">绿色</span>为图片视频（建议清理），
+                <span className="text-teal-600">青色</span>为临时缓存（安全清理）。
               </p>
               <button onClick={() => setShowTip(false)} className="text-amber-500 hover:text-amber-700 transition shrink-0">
                 <X className="w-3.5 h-3.5" />
@@ -320,7 +409,7 @@ export function SocialCleanModule() {
                 <Loader2 className="w-7 h-7 text-emerald-500 animate-spin" />
               </div>
               <p className="text-sm font-medium text-[var(--fg-secondary)]">正在扫描中...</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">正在检索社交软件缓存目录</p>
+              <p className="text-xs text-[var(--fg-muted)] mt-1">正在智能检索社交软件缓存目录</p>
             </div>
           )}
 
@@ -338,31 +427,49 @@ export function SocialCleanModule() {
           {/* 分类列表 */}
           {moduleState.status === 'done' && scanResult && scanResult.categories.map((category) => {
             const Icon = categoryIcons[category.id] || FolderOpen;
-            const colors = categoryColors[category.id] || categoryColors.images_videos;
-            const isExpanded = expandedCategory === category.id;
+            const colors = categoryColors[category.id] || categoryColors.imagevideo;
+            const isCategoryExpanded = expandedCategory === category.id;
             const hasFiles = category.file_count > 0;
-            const categoryPaths = category.files.map(f => f.path);
+            const deletableFiles = category.files.filter(f => f.deletable);
+            const categoryPaths = deletableFiles.map(f => f.path);
             const selectedInCategory = categoryPaths.filter(p => selectedPaths.has(p)).length;
             const isAllSelected = selectedInCategory === categoryPaths.length && categoryPaths.length > 0;
             const isPartialSelected = selectedInCategory > 0 && selectedInCategory < categoryPaths.length;
+            
+            // 判断是否为危险分类（聊天记录）
+            const isCriticalCategory = category.id === 'chatdatabase';
 
             return (
-              <div key={category.id} className="border-b border-[var(--border-default)] last:border-b-0">
+              <div key={category.id} className={`border-b border-[var(--border-default)] last:border-b-0 ${isCriticalCategory ? 'bg-red-500/5' : ''}`}>
                 {/* 分类行 */}
                 <div
                   className={`px-4 py-3 flex items-center gap-3 transition-all ${hasFiles ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : 'opacity-50'}`}
-                  onClick={() => hasFiles && setExpandedCategory(isExpanded ? null : category.id)}
+                  onClick={() => hasFiles && setExpandedCategory(isCategoryExpanded ? null : category.id)}
                 >
-                  <div className={`text-[var(--fg-muted)] transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                  <div className={`text-[var(--fg-muted)] transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`}>
                     <ChevronRight className="w-4 h-4" />
                   </div>
 
+                  {/* 复选框 - 危险分类禁用 */}
                   <div
-                    onClick={(e) => { e.stopPropagation(); if (hasFiles) toggleCategory(category); }}
-                    className={`w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-colors
-                      ${isAllSelected ? 'bg-emerald-500 border-emerald-500' : isPartialSelected ? 'bg-emerald-500/50 border-emerald-500' : 'border-[var(--fg-faint)]'}`}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (hasFiles && !isCriticalCategory) toggleCategory(category); 
+                    }}
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
+                      ${isCriticalCategory 
+                        ? 'border-red-300 bg-red-100 cursor-not-allowed' 
+                        : isAllSelected 
+                          ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
+                          : isPartialSelected 
+                            ? 'bg-emerald-500/50 border-emerald-500 cursor-pointer' 
+                            : 'border-[var(--fg-faint)] cursor-pointer'
+                      }`}
+                    title={isCriticalCategory ? '聊天记录不可删除' : undefined}
                   >
-                    {(isAllSelected || isPartialSelected) && (
+                    {isCriticalCategory ? (
+                      <X className="w-2.5 h-2.5 text-red-500" />
+                    ) : (isAllSelected || isPartialSelected) && (
                       <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -376,53 +483,41 @@ export function SocialCleanModule() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-[var(--fg-primary)]">{category.name}</p>
-                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${colors.bg} ${colors.text}`}>
-                        {hasFiles ? '可清理' : '无文件'}
-                      </span>
+                      {isCriticalCategory ? (
+                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-red-500/10 text-red-600 flex items-center gap-0.5">
+                          <ShieldAlert className="w-2.5 h-2.5" />
+                          禁止删除
+                        </span>
+                      ) : (
+                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${colors.bg} ${colors.text}`}>
+                          {hasFiles ? `可清理 ${category.deletable_count}` : '无文件'}
+                        </span>
+                      )}
                     </div>
                     <p className="text-[11px] text-[var(--fg-muted)] mt-0.5 truncate">{category.description}</p>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-emerald-600">{formatSize(category.total_size)}</p>
+                    <p className={`text-sm font-bold ${isCriticalCategory ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {formatSize(category.total_size)}
+                    </p>
                     <p className="text-[11px] text-[var(--fg-muted)]">{category.file_count.toLocaleString()} 个文件</p>
                   </div>
                 </div>
 
                 {/* 展开的文件列表 */}
-                {isExpanded && hasFiles && (
+                {isCategoryExpanded && hasFiles && (
                   <div className="bg-[var(--bg-base)] border-t border-[var(--border-default)]">
                     <div className="max-h-48 overflow-auto">
-                      {category.files.slice(0, 20).map((file, index) => {
-                        const isFileSelected = selectedPaths.has(file.path);
-                        return (
-                          <div
-                            key={file.path}
-                            className={`px-4 py-2 flex items-center gap-2 text-xs border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--bg-hover)] cursor-pointer ${isFileSelected ? 'bg-emerald-500/5' : ''}`}
-                            onClick={() => toggleFile(file.path)}
-                          >
-                            <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${isFileSelected ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--fg-faint)]'}`}>
-                              {isFileSelected && (
-                                <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <span className="w-5 text-center text-[var(--fg-faint)]">{index + 1}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] shrink-0 text-[10px]">{file.app_name}</span>
-                            <span className="flex-1 truncate text-[var(--fg-secondary)]" title={file.path}>{file.path}</span>
-                            <span className="text-emerald-600 font-medium shrink-0">{formatSize(file.size)}</span>
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <button onClick={(e) => { e.stopPropagation(); openInFolder(file.path); }} className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开所在文件夹">
-                                <FolderOpen className="w-3 h-3" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); openFile(file.path); }} className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开文件">
-                                <ExternalLink className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {category.files.slice(0, 20).map((file, index) => (
+                        <FileRow
+                          key={file.path}
+                          index={index}
+                          file={file}
+                          isSelected={selectedPaths.has(file.path)}
+                          onToggle={() => toggleFile(file)}
+                        />
+                      ))}
                     </div>
                     {category.files.length > 20 && (
                       <button
@@ -445,9 +540,106 @@ export function SocialCleanModule() {
         isOpen={fileModalData !== null}
         title={fileModalData?.name || ''}
         files={fileModalData?.files || []}
+        selectedPaths={selectedPaths}
+        onToggleFile={toggleFile}
         onClose={() => setFileModalData(null)}
       />
     </>
+  );
+}
+
+// ============================================================================
+// 文件行组件
+// ============================================================================
+
+interface FileRowProps {
+  index: number;
+  file: SocialFileEntry;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
+  const riskConfig = riskLevelConfig[file.risk_level];
+  const RiskIcon = riskConfig.icon;
+  const isCritical = file.risk_level === 'critical';
+  
+  return (
+    <div
+      className={`px-4 py-2 flex items-center gap-2 text-xs border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors
+        ${isCritical ? 'bg-red-500/5 cursor-not-allowed' : 'cursor-pointer'}
+        ${isSelected && !isCritical ? 'bg-emerald-500/5' : ''}`}
+      onClick={() => !isCritical && onToggle()}
+    >
+      {/* 复选框 */}
+      <div 
+        className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center shrink-0 transition-colors
+          ${isCritical 
+            ? 'border-red-300 bg-red-100' 
+            : isSelected 
+              ? 'bg-emerald-500 border-emerald-500' 
+              : 'border-[var(--fg-faint)]'
+          }`}
+        title={isCritical ? getRiskLevelTooltip(file.risk_level) : undefined}
+      >
+        {isCritical ? (
+          <X className="w-2 h-2 text-red-500" />
+        ) : isSelected && (
+          <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </div>
+      
+      {/* 序号 */}
+      <span className="w-5 text-center text-[var(--fg-faint)]">{index + 1}</span>
+      
+      {/* 风险等级图标 */}
+      <div 
+        className={`p-0.5 rounded ${riskConfig.bgColor}`}
+        title={getRiskLevelTooltip(file.risk_level)}
+      >
+        <RiskIcon className={`w-3 h-3 ${riskConfig.color}`} />
+      </div>
+      
+      {/* 应用名称 */}
+      <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] shrink-0 text-[10px]">
+        {file.app_name}
+      </span>
+      
+      {/* 文件路径 */}
+      <span className="flex-1 truncate text-[var(--fg-secondary)]" title={file.path}>
+        {file.path}
+      </span>
+      
+      {/* 风险标签 */}
+      <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${riskConfig.bgColor} ${riskConfig.color}`}>
+        {getRiskLevelDescription(file.risk_level)}
+      </span>
+      
+      {/* 文件大小 */}
+      <span className={`font-medium shrink-0 ${isCritical ? 'text-red-600' : 'text-emerald-600'}`}>
+        {formatSize(file.size)}
+      </span>
+      
+      {/* 操作按钮 */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        <button 
+          onClick={(e) => { e.stopPropagation(); openInFolder(file.path); }} 
+          className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" 
+          title="打开所在文件夹"
+        >
+          <FolderOpen className="w-3 h-3" />
+        </button>
+        <button 
+          onClick={(e) => { e.stopPropagation(); openFile(file.path); }} 
+          className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" 
+          title="打开文件"
+        >
+          <ExternalLink className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -457,12 +649,14 @@ export function SocialCleanModule() {
 
 interface FileListModalProps {
   title: string;
-  files: SocialFile[];
+  files: SocialFileEntry[];
+  selectedPaths: Set<string>;
+  onToggleFile: (file: SocialFileEntry) => void;
   isOpen: boolean;
   onClose: () => void;
 }
 
-function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
+function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onClose }: FileListModalProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -490,21 +684,29 @@ function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
   return createPortal(
     <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100' : 'scale-95'}`}>
+      <div className={`relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100' : 'scale-95'}`}>
         <div className="px-6 py-4 border-b border-[var(--border-default)] flex items-center justify-between shrink-0">
           <div>
             <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{title}</h3>
-            <p className="text-xs text-[var(--fg-muted)] mt-0.5">共 {files.length.toLocaleString()} 个文件，总计 {formatSize(files.reduce((sum, f) => sum + f.size, 0))}</p>
+            <p className="text-xs text-[var(--fg-muted)] mt-0.5">
+              共 {files.length.toLocaleString()} 个文件，总计 {formatSize(files.reduce((sum, f) => sum + f.size, 0))}
+              <span className="mx-2">|</span>
+              可删除 {files.filter(f => f.deletable).length} 个
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition">
             <X className="w-5 h-5 text-[var(--fg-muted)]" />
           </button>
         </div>
         <div className="px-6 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-4 text-xs font-medium text-[var(--fg-muted)] shrink-0">
-          <span className="w-12 text-center">#</span>
+          <span className="w-8"></span>
+          <span className="w-8 text-center">#</span>
+          <span className="w-6"></span>
           <span className="w-16">来源</span>
           <span className="flex-1">文件路径</span>
+          <span className="w-20">风险</span>
           <span className="w-20 text-right">大小</span>
+          <span className="w-16"></span>
         </div>
         <div ref={parentRef} className="flex-1 overflow-auto">
           <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
@@ -515,6 +717,8 @@ function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
                   key={file.path}
                   index={virtualRow.index}
                   file={file}
+                  isSelected={selectedPaths.has(file.path)}
+                  onToggle={() => onToggleFile(file)}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -540,21 +744,73 @@ function FileListModal({ title, files, isOpen, onClose }: FileListModalProps) {
 
 interface VirtualFileRowProps {
   index: number;
-  file: SocialFile;
+  file: SocialFileEntry;
+  isSelected: boolean;
+  onToggle: () => void;
   style: React.CSSProperties;
 }
 
-const VirtualFileRow = memo(function VirtualFileRow({ index, file, style }: VirtualFileRowProps) {
+const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, onToggle, style }: VirtualFileRowProps) {
+  const riskConfig = riskLevelConfig[file.risk_level];
+  const RiskIcon = riskConfig.icon;
+  const isCritical = file.risk_level === 'critical';
+  
   return (
-    <div style={style} className="px-6 flex items-center gap-4 text-xs border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors">
-      <span className="w-12 text-center text-[var(--fg-faint)]">{index + 1}</span>
-      <span className="w-16 px-2 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] text-center truncate">{file.app_name}</span>
+    <div 
+      style={style} 
+      className={`px-6 flex items-center gap-4 text-xs border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors
+        ${isCritical ? 'bg-red-500/5' : ''}`}
+    >
+      {/* 复选框 */}
+      <div 
+        onClick={() => !isCritical && onToggle()}
+        className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors
+          ${isCritical 
+            ? 'border-red-300 bg-red-100 cursor-not-allowed' 
+            : isSelected 
+              ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
+              : 'border-[var(--fg-faint)] cursor-pointer'
+          }`}
+        title={isCritical ? getRiskLevelTooltip(file.risk_level) : undefined}
+      >
+        {isCritical ? (
+          <X className="w-2.5 h-2.5 text-red-500" />
+        ) : isSelected && (
+          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </div>
+      
+      <span className="w-8 text-center text-[var(--fg-faint)]">{index + 1}</span>
+      
+      {/* 风险图标 */}
+      <div 
+        className={`p-1 rounded ${riskConfig.bgColor}`}
+        title={getRiskLevelTooltip(file.risk_level)}
+      >
+        <RiskIcon className={`w-3.5 h-3.5 ${riskConfig.color}`} />
+      </div>
+      
+      <span className="w-16 px-2 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] text-center truncate">
+        {file.app_name}
+      </span>
+      
       <div className="flex-1 min-w-0 flex items-center gap-2">
         <File className="w-3.5 h-3.5 text-[var(--fg-faint)] shrink-0" />
         <span className="truncate text-[var(--fg-secondary)]" title={file.path}>{file.path}</span>
       </div>
-      <span className="w-20 text-right text-emerald-600 font-medium tabular-nums">{formatSize(file.size)}</span>
-      <div className="flex items-center gap-0.5 shrink-0">
+      
+      {/* 风险标签 */}
+      <span className={`w-20 px-1.5 py-0.5 rounded text-[9px] font-medium text-center ${riskConfig.bgColor} ${riskConfig.color}`}>
+        {getRiskLevelDescription(file.risk_level)}
+      </span>
+      
+      <span className={`w-20 text-right font-medium tabular-nums ${isCritical ? 'text-red-600' : 'text-emerald-600'}`}>
+        {formatSize(file.size)}
+      </span>
+      
+      <div className="w-16 flex items-center justify-end gap-0.5 shrink-0">
         <button onClick={() => openInFolder(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开所在文件夹">
           <FolderOpen className="w-3.5 h-3.5" />
         </button>
