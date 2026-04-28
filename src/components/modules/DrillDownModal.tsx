@@ -4,11 +4,11 @@
 // 支持面包屑导航、ESC 关闭、Portal 渲染、清理同步回调
 // ============================================================================
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Loader2, FolderOpen, Clock, HardDrive, ChevronRight,
-  CornerLeftUp, Search, Shield, Trash2,
+  CornerLeftUp, Search, Shield, Trash2, ChevronDown,
 } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -161,7 +161,8 @@ interface ModalEntryItemProps {
   onSearch: (path: string) => void;
 }
 
-function ModalEntryItem({
+// 使用 React.memo 避免列表项无关重渲染（父组件 state 变化时不波及已渲染的条目）
+const ModalEntryItem = memo(function ModalEntryItem({
   entry, rank, maxSize, onDrillDown, onOpenFolder, onCleanup, onSearch,
 }: ModalEntryItemProps) {
   const percentage = maxSize > 0 ? (entry.total_size / maxSize) * 100 : 0;
@@ -273,7 +274,7 @@ function ModalEntryItem({
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // DrillDownModal 主组件
@@ -309,6 +310,10 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
   const [cleanupTarget, setCleanupTarget] = useState<HotspotEntry | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
 
+  // ====== 条目上限：默认展示30条，超出时显示"展示全部"（防止数百个子目录撑爆 DOM） ======
+  const [showAll, setShowAll] = useState(false);
+  const DEFAULT_DISPLAY_COUNT = 30;
+
   // 当前路径（栈顶）
   const currentPath = pathStack[pathStack.length - 1];
 
@@ -342,9 +347,10 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
     }
   }, [showToast]);
 
-  // 初始加载 + 路径变化时重新加载
+  // 初始加载 + 路径变化时重新加载，同时重置展示上限
   useEffect(() => {
     fetchData(currentPath);
+    setShowAll(false);
   }, [currentPath, fetchData]);
 
   // ====== 关闭（带退出动画） ======
@@ -433,11 +439,17 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
     }
   }, [cleanupTarget, currentPath, fetchData, showToast]);
 
-  // 面包屑段
-  const breadcrumbSegments = buildBreadcrumbs(currentPath);
+  // 面包屑段（useMemo 避免每次 render 重新计算）
+  const breadcrumbSegments = useMemo(() => buildBreadcrumbs(currentPath), [currentPath]);
   // 初始路径的层级数（前 initialDepth 级不可点击，因为父模块已扫描过）
-  const initialDepth = buildBreadcrumbs(initialPath).length;
+  const initialDepth = useMemo(() => buildBreadcrumbs(initialPath).length, [initialPath]);
   const maxSize = scanResult?.entries[0]?.total_size || 0;
+
+  // 显示的条目列表（默认限制 30 条，超出时显示"展示全部"按钮）
+  const displayedEntries = useMemo(() => {
+    if (!scanResult) return [];
+    return showAll ? scanResult.entries : scanResult.entries.slice(0, DEFAULT_DISPLAY_COUNT);
+  }, [scanResult, showAll]);
 
   if (!isAnimating) return null;
 
@@ -498,8 +510,8 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
                 </span>
               </button>
 
-              {/* 目录条目 */}
-              {scanResult.entries.map((entry, index) => (
+              {/* 目录条目（默认 30 条上限，防止大目录卡顿） */}
+              {displayedEntries.map((entry, index) => (
                 <ModalEntryItem
                   key={entry.path}
                   entry={entry}
@@ -511,6 +523,17 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
                   onSearch={handleSearch}
                 />
               ))}
+
+              {/* 展示全部按钮（条目数超过限制时显示） */}
+              {!showAll && scanResult.entries.length > DEFAULT_DISPLAY_COUNT && (
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="w-full flex items-center justify-center gap-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <span>展示全部 {scanResult.entries.length} 项</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              )}
 
               {/* 空状态 */}
               {scanResult.entries.length === 0 && (
