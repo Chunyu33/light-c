@@ -559,8 +559,8 @@ export function HotspotModule() {
                     : ''}
                 </span>
               </div>
-              {/* 进度条 */}
-              <div className="w-full h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden">
+              {/* 进度条 — 轨道使用半透明色确保在深/浅主题下都可见 */}
+              <div className="w-full h-2 bg-[var(--bg-main)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[var(--brand-green)] rounded-full transition-all duration-300"
                   style={{
