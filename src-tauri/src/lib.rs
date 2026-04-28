@@ -6,8 +6,10 @@
 // 模块声明
 mod cleaner;
 mod commands;
+mod health_score;
 mod logger;
 mod scanner;
+mod system_info;
 mod system_slim;
 
 // 导出命令模块

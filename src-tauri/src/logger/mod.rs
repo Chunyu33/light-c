@@ -371,6 +371,149 @@ pub async fn cleanup_old_logs(app_data_dir: &Path) {
 }
 
 // ============================================================================
+// 日志命令函数（供 commands.rs 薄包装器调用）
+// ============================================================================
+
+/// 清理日志条目（前端传入格式）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanupLogEntryInput {
+    pub category: String,
+    pub path: String,
+    pub size: u64,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+
+/// 清理历史摘要
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CleanupHistorySummary {
+    pub filename: String,
+    pub session_start: String,
+    pub session_end: String,
+    pub total_files: usize,
+    pub success_count: usize,
+    pub failed_count: usize,
+    pub total_freed_bytes: u64,
+}
+
+/// 记录清理操作到日志文件
+pub async fn record_cleanup_action(
+    app_data_dir: &Path,
+    entries: Vec<CleanupLogEntryInput>,
+) -> Result<String, String> {
+    use log::info;
+
+    info!("记录清理操作，共 {} 条记录", entries.len());
+
+    if entries.is_empty() {
+        return Ok("没有需要记录的清理操作".to_string());
+    }
+
+    let logger = CleanupLogger::new(app_data_dir);
+
+    let log_entries: Vec<CleanupLogEntry> = entries
+        .into_iter()
+        .map(|e| CleanupLogEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+            category: e.category,
+            path: e.path,
+            size: e.size,
+            result: if e.success {
+                "Success".to_string()
+            } else {
+                "Failed".to_string()
+            },
+            error_message: e.error_message,
+        })
+        .collect();
+
+    match logger.save_cleanup_results(log_entries).await {
+        Ok(path) => {
+            info!("清理日志已保存: {:?}", path);
+            Ok(format!("日志已保存: {}", path.display()))
+        }
+        Err(e) => {
+            log::warn!("保存清理日志失败: {}", e);
+            Err(e)
+        }
+    }
+}
+
+/// 打开日志文件夹（explorer.exe）
+pub fn open_logs_folder(app_data_dir: &Path) -> Result<(), String> {
+    use log::info;
+
+    info!("打开日志文件夹");
+
+    let log_path = app_data_dir.join("logs");
+
+    if !log_path.exists() {
+        std::fs::create_dir_all(&log_path)
+            .map_err(|e| format!("创建日志目录失败: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&log_path)
+            .spawn()
+            .map_err(|e| format!("打开文件夹失败: {}", e))?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("此功能仅支持 Windows 系统".to_string());
+    }
+
+    Ok(())
+}
+
+/// 获取清理历史记录列表
+pub fn get_cleanup_history(app_data_dir: &Path) -> Result<Vec<CleanupHistorySummary>, String> {
+    use log::info;
+
+    info!("获取清理历史记录");
+
+    let log_path = app_data_dir.join("logs");
+
+    if !log_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut history: Vec<CleanupHistorySummary> = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(&log_path) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().map(|ext| ext == "json").unwrap_or(false) {
+                if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(session) =
+                        serde_json::from_str::<CleanupSession>(&content)
+                    {
+                        history.push(CleanupHistorySummary {
+                            filename: path
+                                .file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_default(),
+                            session_start: session.session_start,
+                            session_end: session.session_end,
+                            total_files: session.total_files,
+                            success_count: session.success_count,
+                            failed_count: session.failed_count,
+                            total_freed_bytes: session.total_freed_bytes,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    history.sort_by(|a, b| b.session_start.cmp(&a.session_start));
+
+    Ok(history)
+}
+
+// ============================================================================
 // 全局日志管理器实例
 // ============================================================================
 

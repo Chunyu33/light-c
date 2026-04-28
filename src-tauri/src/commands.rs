@@ -13,7 +13,7 @@ use crate::scanner::{
 };
 use log::info;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager, Window};
+use tauri::{Manager, Window};
 
 /// 扫描请求参数
 #[derive(Debug, Deserialize)]
@@ -385,225 +385,17 @@ pub fn open_virtual_memory_settings() -> Result<(), String> {
 }
 
 // ============================================================================
-// 系统健康评分
+// ============================================================================
+// 系统健康评分（薄包装器 → health_score 模块）
 // ============================================================================
 
-/// 系统健康评分结果
-#[derive(Debug, Clone, Serialize)]
-pub struct HealthScoreResult {
-    /// 总分 (0-100)
-    pub score: u32,
-    /// C盘剩余空间评分 (0-40)
-    pub disk_score: u32,
-    /// 休眠文件评分 (0-30)
-    pub hibernation_score: u32,
-    /// 垃圾文件评分 (0-30)
-    pub junk_score: u32,
-    /// C盘剩余百分比
-    pub disk_free_percent: f64,
-    /// 是否存在休眠文件
-    pub has_hibernation: bool,
-    /// 休眠文件大小
-    pub hibernation_size: u64,
-    /// 预估垃圾文件大小
-    pub junk_size: u64,
-}
+/// 系统健康评分结果（重新导出供前端使用）
+pub use crate::health_score::HealthScoreResult;
 
 /// 计算系统健康评分
-/// 评分算法：
-/// - C盘剩余百分比 (40%权重)：剩余空间越多分数越高
-/// - 休眠文件 (30%权重)：无休眠文件得满分，有则根据大小扣分
-/// - 垃圾文件 (30%权重)：垃圾越少分数越高
 #[tauri::command]
 pub fn get_health_score() -> HealthScoreResult {
-    info!("计算系统健康评分...");
-
-    // 1. 获取C盘剩余空间百分比
-    let (disk_free_percent, disk_score) = calculate_disk_score();
-
-    // 2. 检查休眠文件
-    let (has_hibernation, hibernation_size, hibernation_score) = calculate_hibernation_score();
-
-    // 3. 快速估算垃圾文件大小
-    let (junk_size, junk_score) = calculate_junk_score();
-
-    // 计算总分
-    let score = disk_score + hibernation_score + junk_score;
-
-    info!(
-        "健康评分: {} (磁盘:{}, 休眠:{}, 垃圾:{})",
-        score, disk_score, hibernation_score, junk_score
-    );
-
-    HealthScoreResult {
-        score,
-        disk_score,
-        hibernation_score,
-        junk_score,
-        disk_free_percent,
-        has_hibernation,
-        hibernation_size,
-        junk_size,
-    }
-}
-
-/// 计算磁盘空间评分 (满分40)
-fn calculate_disk_score() -> (f64, u32) {
-    #[cfg(target_os = "windows")]
-    {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
-        #[link(name = "kernel32")]
-        extern "system" {
-            fn GetDiskFreeSpaceExW(
-                lpDirectoryName: *const u16,
-                lpFreeBytesAvailableToCaller: *mut u64,
-                lpTotalNumberOfBytes: *mut u64,
-                lpTotalNumberOfFreeBytes: *mut u64,
-            ) -> i32;
-        }
-
-        let path: Vec<u16> = OsStr::new("C:\\")
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-
-        let mut free_bytes: u64 = 0;
-        let mut total_bytes: u64 = 0;
-        let mut _total_free: u64 = 0;
-
-        let success = unsafe {
-            GetDiskFreeSpaceExW(
-                path.as_ptr(),
-                &mut free_bytes,
-                &mut total_bytes,
-                &mut _total_free,
-            )
-        };
-
-        if success != 0 && total_bytes > 0 {
-            let free_percent = (free_bytes as f64 / total_bytes as f64) * 100.0;
-            // 剩余空间评分：
-            // >= 30% 得满分40
-            // 20-30% 得30分
-            // 10-20% 得20分
-            // 5-10% 得10分
-            // < 5% 得0分
-            let score = if free_percent >= 30.0 {
-                40
-            } else if free_percent >= 20.0 {
-                30 + ((free_percent - 20.0) / 10.0 * 10.0) as u32
-            } else if free_percent >= 10.0 {
-                20 + ((free_percent - 10.0) / 10.0 * 10.0) as u32
-            } else if free_percent >= 5.0 {
-                10 + ((free_percent - 5.0) / 5.0 * 10.0) as u32
-            } else {
-                (free_percent / 5.0 * 10.0) as u32
-            };
-            return (free_percent, score.min(40));
-        }
-    }
-
-    (50.0, 20) // 默认值
-}
-
-/// 计算休眠文件评分 (满分30)
-fn calculate_hibernation_score() -> (bool, u64, u32) {
-    let hiberfil_path = std::path::Path::new("C:\\hiberfil.sys");
-
-    if hiberfil_path.exists() {
-        // 获取休眠文件大小
-        let size = std::fs::metadata(hiberfil_path)
-            .map(|m| m.len())
-            .unwrap_or(0);
-
-        // 休眠文件存在，根据大小扣分
-        // < 4GB: 20分
-        // 4-8GB: 15分
-        // 8-16GB: 10分
-        // > 16GB: 5分
-        let score = if size < 4 * 1024 * 1024 * 1024 {
-            20
-        } else if size < 8 * 1024 * 1024 * 1024 {
-            15
-        } else if size < 16 * 1024 * 1024 * 1024 {
-            10
-        } else {
-            5
-        };
-
-        (true, size, score)
-    } else {
-        // 无休眠文件，得满分
-        (false, 0, 30)
-    }
-}
-
-/// 计算垃圾文件评分 (满分30)
-fn calculate_junk_score() -> (u64, u32) {
-    let mut total_junk_size: u64 = 0;
-
-    // 快速检查常见垃圾目录
-    let junk_paths = [
-        std::env::var("TEMP").unwrap_or_default(),
-        std::env::var("TMP").unwrap_or_default(),
-        format!(
-            "{}\\AppData\\Local\\Temp",
-            std::env::var("USERPROFILE").unwrap_or_default()
-        ),
-        "C:\\Windows\\Temp".to_string(),
-        "C:\\Windows\\Prefetch".to_string(),
-    ];
-
-    for path_str in &junk_paths {
-        if path_str.is_empty() {
-            continue;
-        }
-        let path = std::path::Path::new(path_str);
-        if path.exists() && path.is_dir() {
-            // 快速统计目录大小（只遍历一层）
-            if let Ok(entries) = std::fs::read_dir(path) {
-                for entry in entries.flatten() {
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.is_file() {
-                            total_junk_size += metadata.len();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 检查回收站大小（简化估算）
-    let recycle_bin = format!("C:\\$Recycle.Bin");
-    if std::path::Path::new(&recycle_bin).exists() {
-        // 回收站通常有权限问题，简单估算
-        total_junk_size += 100 * 1024 * 1024; // 假设100MB
-    }
-
-    // 垃圾文件评分：
-    // < 500MB: 满分30
-    // 500MB-1GB: 25分
-    // 1-2GB: 20分
-    // 2-5GB: 15分
-    // 5-10GB: 10分
-    // > 10GB: 5分
-    let score = if total_junk_size < 500 * 1024 * 1024 {
-        30
-    } else if total_junk_size < 1024 * 1024 * 1024 {
-        25
-    } else if total_junk_size < 2 * 1024 * 1024 * 1024 {
-        20
-    } else if total_junk_size < 5 * 1024 * 1024 * 1024 {
-        15
-    } else if total_junk_size < 10 * 1024 * 1024 * 1024 {
-        10
-    } else {
-        5
-    };
-
-    (total_junk_size, score)
+    crate::health_score::calculate()
 }
 
 // ============================================================================
@@ -644,55 +436,16 @@ pub async fn scan_uninstall_leftovers(
     Ok(result)
 }
 
-/// 删除卸载残留文件夹
-///
-/// # 参数
-/// - `paths`: 要删除的文件夹路径列表
+/// 删除卸载残留文件夹（薄包装器 → scanner::leftovers 模块）
 #[tauri::command]
-pub async fn delete_leftover_folders(paths: Vec<String>) -> Result<LeftoverDeleteResult, String> {
+pub async fn delete_leftover_folders(
+    paths: Vec<String>,
+) -> Result<crate::scanner::LeftoverDeleteResult, String> {
     info!("开始删除 {} 个卸载残留文件夹...", paths.len());
 
-    let result = tokio::task::spawn_blocking(move || {
-        let mut deleted_count = 0u32;
-        let mut deleted_size = 0u64;
-        let mut failed_paths = Vec::new();
-        let mut errors = Vec::new();
-
-        for path in paths {
-            let path_buf = std::path::PathBuf::from(&path);
-
-            // 安全检查：确保路径在允许的目录内
-            if !is_safe_leftover_path(&path_buf) {
-                failed_paths.push(path.clone());
-                errors.push(format!("路径不在允许的目录内: {}", path));
-                continue;
-            }
-
-            // 计算文件夹大小（删除前）
-            let folder_size = calculate_dir_size(&path_buf);
-
-            // 递归删除目录
-            match std::fs::remove_dir_all(&path_buf) {
-                Ok(_) => {
-                    deleted_count += 1;
-                    deleted_size += folder_size;
-                }
-                Err(e) => {
-                    failed_paths.push(path.clone());
-                    errors.push(format!("删除失败 {}: {}", path, e));
-                }
-            }
-        }
-
-        LeftoverDeleteResult {
-            deleted_count,
-            deleted_size,
-            failed_paths,
-            errors,
-        }
-    })
-    .await
-    .map_err(|e| format!("删除任务失败: {}", e))?;
+    let result = tokio::task::spawn_blocking(move || crate::scanner::delete_folders(paths))
+        .await
+        .map_err(|e| format!("删除任务失败: {}", e))?;
 
     info!(
         "卸载残留删除完成: 成功 {}, 失败 {}",
@@ -701,50 +454,6 @@ pub async fn delete_leftover_folders(paths: Vec<String>) -> Result<LeftoverDelet
     );
 
     Ok(result)
-}
-
-/// 卸载残留删除结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LeftoverDeleteResult {
-    /// 成功删除的文件夹数
-    pub deleted_count: u32,
-    /// 释放的空间大小（字节）
-    pub deleted_size: u64,
-    /// 删除失败的路径
-    pub failed_paths: Vec<String>,
-    /// 错误信息列表
-    pub errors: Vec<String>,
-}
-
-/// 计算目录大小
-fn calculate_dir_size(path: &std::path::Path) -> u64 {
-    let mut size = 0u64;
-    if let Ok(entries) = std::fs::read_dir(path) {
-        for entry in entries.flatten() {
-            let entry_path = entry.path();
-            if entry_path.is_file() {
-                if let Ok(metadata) = entry.metadata() {
-                    size += metadata.len();
-                }
-            } else if entry_path.is_dir() {
-                size += calculate_dir_size(&entry_path);
-            }
-        }
-    }
-    size
-}
-
-/// 检查路径是否在允许删除的目录内
-fn is_safe_leftover_path(path: &std::path::Path) -> bool {
-    let path_str = path.to_string_lossy().to_lowercase();
-
-    // 允许的目录前缀
-    let allowed_prefixes = ["appdata\\local", "appdata\\roaming", "programdata"];
-
-    // 检查路径是否包含允许的前缀
-    allowed_prefixes
-        .iter()
-        .any(|prefix| path_str.contains(prefix))
 }
 
 // ============================================================================
@@ -974,355 +683,57 @@ pub async fn check_leftover_safety(path: String) -> Result<SafetyCheckResult, St
 }
 
 // ============================================================================
-// 系统信息获取
+// 系统信息获取（薄包装器 → system_info 模块）
 // ============================================================================
 
-/// 系统信息结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemInfo {
-    /// 操作系统名称
-    pub os_name: String,
-    /// 操作系统版本
-    pub os_version: String,
-    /// 系统架构
-    pub os_arch: String,
-    /// 计算机名称
-    pub computer_name: String,
-    /// 用户名
-    pub user_name: String,
-    /// CPU 信息
-    pub cpu_info: String,
-    /// CPU 核心数
-    pub cpu_cores: u32,
-    /// 总内存（字节）
-    pub total_memory: u64,
-    /// 可用内存（字节）
-    pub available_memory: u64,
-    /// 系统启动时间（秒）
-    pub uptime_seconds: u64,
-}
+/// 系统信息结构（重新导出供前端使用）
+pub use crate::system_info::SystemInfo;
 
 /// 获取系统信息
 #[tauri::command]
 pub async fn get_system_info() -> Result<SystemInfo, String> {
     info!("获取系统信息");
-
-    #[cfg(target_os = "windows")]
-    {
-        use winapi::um::sysinfoapi::{
-            GetSystemInfo, GlobalMemoryStatusEx, MEMORYSTATUSEX, SYSTEM_INFO,
-        };
-
-        // 获取操作系统版本
-        let os_version = get_windows_version();
-
-        // 获取系统架构
-        let os_arch = if cfg!(target_arch = "x86_64") {
-            "x64 (64位)".to_string()
-        } else if cfg!(target_arch = "x86") {
-            "x86 (32位)".to_string()
-        } else if cfg!(target_arch = "aarch64") {
-            "ARM64".to_string()
-        } else {
-            std::env::consts::ARCH.to_string()
-        };
-
-        // 获取计算机名称
-        let computer_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "未知".to_string());
-
-        // 获取用户名
-        let user_name = std::env::var("USERNAME").unwrap_or_else(|_| "未知".to_string());
-
-        // 获取 CPU 信息
-        let cpu_info = get_cpu_info();
-
-        // 获取 CPU 核心数
-        let cpu_cores = unsafe {
-            let mut sys_info: SYSTEM_INFO = std::mem::zeroed();
-            GetSystemInfo(&mut sys_info);
-            sys_info.dwNumberOfProcessors
-        };
-
-        // 获取内存信息
-        let (total_memory, available_memory) = unsafe {
-            let mut mem_status: MEMORYSTATUSEX = std::mem::zeroed();
-            mem_status.dwLength = std::mem::size_of::<MEMORYSTATUSEX>() as u32;
-            if GlobalMemoryStatusEx(&mut mem_status) != 0 {
-                (mem_status.ullTotalPhys, mem_status.ullAvailPhys)
-            } else {
-                (0, 0)
-            }
-        };
-
-        // 获取系统启动时间
-        let uptime_seconds = unsafe { winapi::um::sysinfoapi::GetTickCount64() / 1000 };
-
-        Ok(SystemInfo {
-            os_name: "Microsoft Windows".to_string(),
-            os_version,
-            os_arch,
-            computer_name,
-            user_name,
-            cpu_info,
-            cpu_cores,
-            total_memory,
-            available_memory,
-            uptime_seconds,
-        })
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持Windows系统".to_string())
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn get_windows_version() -> String {
-    use winreg::enums::*;
-    use winreg::RegKey;
-
-    // 从注册表读取系统版本信息（避免 wmic 编码问题）
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    if let Ok(key) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion") {
-        let product_name: String = key.get_value("ProductName").unwrap_or_default();
-        let display_version: String = key.get_value("DisplayVersion").unwrap_or_default();
-        let current_build: String = key.get_value("CurrentBuild").unwrap_or_default();
-        let ubr: u32 = key.get_value("UBR").unwrap_or(0);
-        let _edition_id: String = key.get_value("EditionID").unwrap_or_default();
-
-        if !product_name.is_empty() {
-            // 根据 Build 号判断是否为 Windows 11（Build 22000+）
-            // 注册表中的 ProductName 可能仍然显示 "Windows 10"，需要手动修正
-            let build_num: u32 = current_build.parse().unwrap_or(0);
-            let corrected_name = if build_num >= 22000 && product_name.contains("Windows 10") {
-                // Windows 11 的 Build 号从 22000 开始
-                product_name.replace("Windows 10", "Windows 11")
-            } else {
-                product_name
-            };
-
-            let version_str = if !display_version.is_empty() {
-                format!(
-                    "{} {} (Build {}.{})",
-                    corrected_name, display_version, current_build, ubr
-                )
-            } else {
-                format!("{} (Build {}.{})", corrected_name, current_build, ubr)
-            };
-            return version_str;
-        }
-    }
-
-    // 回退到基本版本信息
-    "Windows".to_string()
-}
-
-#[cfg(target_os = "windows")]
-fn get_cpu_info() -> String {
-    use winreg::enums::*;
-    use winreg::RegKey;
-
-    // 从注册表读取 CPU 信息（避免 wmic 编码问题）
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    if let Ok(key) = hklm.open_subkey("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0") {
-        let processor_name: String = key.get_value("ProcessorNameString").unwrap_or_default();
-        if !processor_name.is_empty() {
-            return processor_name.trim().to_string();
-        }
-    }
-
-    // 回退到环境变量
-    std::env::var("PROCESSOR_IDENTIFIER").unwrap_or_else(|_| "未知处理器".to_string())
+    crate::system_info::gather()
 }
 
 // ============================================================================
-// 清理日志相关命令
+// 清理日志相关命令（薄包装器 → logger 模块）
 // ============================================================================
 
-/// 清理日志条目（用于前端传入）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CleanupLogEntryInput {
-    /// 清理模块分类
-    pub category: String,
-    /// 文件路径
-    pub path: String,
-    /// 文件大小（字节）
-    pub size: u64,
-    /// 是否成功
-    pub success: bool,
-    /// 错误信息（可选）
-    pub error_message: Option<String>,
-}
+/// 清理日志类型（重新导出供前端使用）
+pub use crate::logger::{CleanupHistorySummary, CleanupLogEntryInput};
 
 /// 记录清理操作到日志文件
-///
-/// 接收一批清理结果，序列化为 JSON 并保存到日志文件
-/// 即使写入失败也不会影响清理逻辑
 #[tauri::command]
 pub async fn record_cleanup_action(
     handle: tauri::AppHandle,
     entries: Vec<CleanupLogEntryInput>,
 ) -> Result<String, String> {
-    use crate::logger::{CleanupLogEntry, CleanupLogger};
-    use chrono::Local;
-
-    info!("记录清理操作，共 {} 条记录", entries.len());
-
-    if entries.is_empty() {
-        return Ok("没有需要记录的清理操作".to_string());
-    }
-
-    // 获取应用数据目录
     let app_data_dir = handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
-
-    // 创建日志管理器
-    let logger = CleanupLogger::new(&app_data_dir);
-
-    // 转换为内部日志格式
-    let log_entries: Vec<CleanupLogEntry> = entries
-        .into_iter()
-        .map(|e| CleanupLogEntry {
-            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
-            category: e.category,
-            path: e.path,
-            size: e.size,
-            result: if e.success {
-                "Success".to_string()
-            } else {
-                "Failed".to_string()
-            },
-            error_message: e.error_message,
-        })
-        .collect();
-
-    // 保存日志
-    match logger.save_cleanup_results(log_entries).await {
-        Ok(path) => {
-            info!("清理日志已保存: {:?}", path);
-            Ok(format!("日志已保存: {}", path.display()))
-        }
-        Err(e) => {
-            // 记录错误但不影响清理流程
-            log::warn!("保存清理日志失败: {}", e);
-            Err(e)
-        }
-    }
+    crate::logger::record_cleanup_action(&app_data_dir, entries).await
 }
 
 /// 打开日志文件夹
-///
-/// 使用 explorer.exe 打开日志目录
 #[tauri::command]
 pub async fn open_logs_folder(handle: tauri::AppHandle) -> Result<(), String> {
-    info!("打开日志文件夹");
-
-    // 获取应用数据目录
     let app_data_dir = handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
-
-    let log_path = app_data_dir.join("logs");
-
-    // 确保目录存在
-    if !log_path.exists() {
-        std::fs::create_dir_all(&log_path).map_err(|e| format!("创建日志目录失败: {}", e))?;
-    }
-
-    // 使用 explorer.exe 打开目录
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .arg(&log_path)
-            .spawn()
-            .map_err(|e| format!("打开文件夹失败: {}", e))?;
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err("此功能仅支持 Windows 系统".to_string());
-    }
-
-    Ok(())
+    crate::logger::open_logs_folder(&app_data_dir)
 }
 
 /// 获取清理历史记录列表
-///
-/// 返回日志目录中所有日志文件的摘要信息
 #[tauri::command]
-pub async fn get_cleanup_history(
-    handle: tauri::AppHandle,
-) -> Result<Vec<CleanupHistorySummary>, String> {
-    info!("获取清理历史记录");
-
+pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<CleanupHistorySummary>, String> {
     let app_data_dir = handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
-
-    let log_path = app_data_dir.join("logs");
-
-    if !log_path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut history: Vec<CleanupHistorySummary> = Vec::new();
-
-    // 遍历日志目录
-    if let Ok(entries) = std::fs::read_dir(&log_path) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.extension().map(|ext| ext == "json").unwrap_or(false) {
-                // 读取并解析日志文件
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(session) =
-                        serde_json::from_str::<crate::logger::CleanupSession>(&content)
-                    {
-                        history.push(CleanupHistorySummary {
-                            filename: path
-                                .file_name()
-                                .map(|n| n.to_string_lossy().to_string())
-                                .unwrap_or_default(),
-                            session_start: session.session_start,
-                            session_end: session.session_end,
-                            total_files: session.total_files,
-                            success_count: session.success_count,
-                            failed_count: session.failed_count,
-                            total_freed_bytes: session.total_freed_bytes,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    // 按时间倒序排列
-    history.sort_by(|a, b| b.session_start.cmp(&a.session_start));
-
-    Ok(history)
-}
-
-/// 清理历史摘要
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CleanupHistorySummary {
-    /// 日志文件名
-    pub filename: String,
-    /// 会话开始时间
-    pub session_start: String,
-    /// 会话结束时间
-    pub session_end: String,
-    /// 总文件数
-    pub total_files: usize,
-    /// 成功数
-    pub success_count: usize,
-    /// 失败数
-    pub failed_count: usize,
-    /// 总释放空间
-    pub total_freed_bytes: u64,
+    crate::logger::get_cleanup_history(&app_data_dir)
 }
 
 // ============================================================================

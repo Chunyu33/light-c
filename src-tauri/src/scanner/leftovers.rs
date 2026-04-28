@@ -1195,6 +1195,92 @@ impl Default for LeftoverScanner {
 }
 
 // ============================================================================
+// 卸载残留删除操作
+// ============================================================================
+
+/// 卸载残留删除结果
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LeftoverDeleteResult {
+    /// 成功删除的文件夹数
+    pub deleted_count: u32,
+    /// 释放的空间大小（字节）
+    pub deleted_size: u64,
+    /// 删除失败的路径
+    pub failed_paths: Vec<String>,
+    /// 错误信息列表
+    pub errors: Vec<String>,
+}
+
+/// 删除卸载残留文件夹
+///
+/// 对每个路径执行安全检查后递归删除，返回详细结果
+pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
+    let mut deleted_count = 0u32;
+    let mut deleted_size = 0u64;
+    let mut failed_paths = Vec::new();
+    let mut errors = Vec::new();
+
+    for path in paths {
+        let path_buf = std::path::PathBuf::from(&path);
+
+        // 安全检查：确保路径在允许的目录内
+        if !is_safe_leftover_path(&path_buf) {
+            failed_paths.push(path.clone());
+            errors.push(format!("路径不在允许的目录内: {}", path));
+            continue;
+        }
+
+        // 删除前计算文件夹大小
+        let folder_size = calculate_dir_size(&path_buf);
+
+        match std::fs::remove_dir_all(&path_buf) {
+            Ok(_) => {
+                deleted_count += 1;
+                deleted_size += folder_size;
+            }
+            Err(e) => {
+                failed_paths.push(path.clone());
+                errors.push(format!("删除失败 {}: {}", path, e));
+            }
+        }
+    }
+
+    LeftoverDeleteResult {
+        deleted_count,
+        deleted_size,
+        failed_paths,
+        errors,
+    }
+}
+
+/// 递归计算目录大小
+fn calculate_dir_size(path: &std::path::Path) -> u64 {
+    let mut size = 0u64;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_file() {
+                if let Ok(metadata) = entry.metadata() {
+                    size += metadata.len();
+                }
+            } else if entry_path.is_dir() {
+                size += calculate_dir_size(&entry_path);
+            }
+        }
+    }
+    size
+}
+
+/// 检查路径是否在允许删除的目录内
+fn is_safe_leftover_path(path: &std::path::Path) -> bool {
+    let path_str = path.to_string_lossy().to_lowercase();
+    let allowed_prefixes = ["appdata\\local", "appdata\\roaming", "programdata"];
+    allowed_prefixes
+        .iter()
+        .any(|prefix| path_str.contains(prefix))
+}
+
+// ============================================================================
 // 单元测试
 // ============================================================================
 
