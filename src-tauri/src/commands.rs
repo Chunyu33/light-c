@@ -1680,7 +1680,9 @@ fn calculate_junk_score() -> (u64, u32) {
 // ============================================================================
 
 use crate::scanner::{LeftoverScanResult, LeftoverScanner};
-use crate::scanner::{RegistryBackup, RegistryEntry, RegistryScanResult, RegistryScanner};
+use crate::scanner::{
+    RegistryBackup, RegistryDeleteResult, RegistryEntry, RegistryScanResult, RegistryScanner,
+};
 
 /// 扫描卸载残留
 ///
@@ -1826,7 +1828,7 @@ pub async fn scan_registry_redundancy() -> Result<RegistryScanResult, String> {
     info!("开始扫描注册表冗余...");
 
     let result = tokio::task::spawn_blocking(|| {
-        let scanner = RegistryScanner::new();
+        let mut scanner = RegistryScanner::new();
         scanner.scan()
     })
     .await
@@ -1892,19 +1894,6 @@ pub async fn delete_registry_entries(
     );
 
     Ok(result)
-}
-
-/// 注册表删除结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegistryDeleteResult {
-    /// 备份文件路径
-    pub backup_path: String,
-    /// 成功删除的条目数
-    pub deleted_count: u32,
-    /// 删除失败的条目路径
-    pub failed_entries: Vec<String>,
-    /// 错误信息列表
-    pub errors: Vec<String>,
 }
 
 /// 打开注册表备份目录

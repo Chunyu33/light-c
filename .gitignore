@@ -33,3 +33,5 @@ update.md
 release.ps1
 /docs
 /dist_release
+/CLAUDE.md
+/.claude

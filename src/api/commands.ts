@@ -387,50 +387,39 @@ export async function deleteLeftoverFolders(paths: string[]): Promise<LeftoverDe
 }
 
 // ============================================================================
-// 注册表冗余扫描相关
+// 注册表冗余扫描相关 (v3 — 硬过滤收敛)
 // ============================================================================
 
 /** 注册表扫描结果 */
 export interface RegistryScanResult {
-  /** 发现的冗余注册表项 */
   entries: RegistryEntry[];
-  /** 总条目数 */
   total_count: number;
-  /** 扫描耗时（毫秒） */
   scan_duration_ms: number;
 }
 
 /** 单个注册表条目 */
 export interface RegistryEntry {
-  /** 注册表完整路径 */
+  /** HKCR\Applications 下的完整路径 */
   path: string;
-  /** 键名或值名 */
+  /** 应用程序名 */
   name: string;
-  /** 条目类型 */
-  entry_type: 'MuiCache' | 'SoftwareKey' | 'ApplicationAssociation' | 'FileTypeAssociation';
-  /** 关联的文件路径（如果有） */
-  associated_path: string | null;
+  /** 关联的不存在的可执行文件路径 */
+  associated_path: string;
   /** 问题描述 */
   issue: string;
-  /** 风险等级 (1-5) */
-  risk_level: number;
 }
 
 /** 注册表删除结果 */
 export interface RegistryDeleteResult {
-  /** 备份文件路径 */
   backup_path: string;
-  /** 成功删除的条目数 */
   deleted_count: number;
-  /** 删除失败的条目路径 */
   failed_entries: string[];
-  /** 错误信息列表 */
   errors: string[];
 }
 
 /**
  * 扫描注册表冗余
- * 安全扫描 Windows 注册表中的孤立键值和无效引用
+ * 只扫描 MUI 缓存和 HKCR\Applications，通过铁证条件过滤
  */
 export async function scanRegistryRedundancy(): Promise<RegistryScanResult> {
   return invoke<RegistryScanResult>('scan_registry_redundancy');

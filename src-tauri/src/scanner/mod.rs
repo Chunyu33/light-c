@@ -13,6 +13,7 @@ mod programdata_growth;
 pub(crate) mod programdata_rules;
 mod programdata_snapshot;
 mod registry;
+mod registry_scoring;
 mod scan_engine;
 mod social_scanner;
 
@@ -27,5 +28,6 @@ pub use programdata_growth::*;
 pub use programdata_rules::*;
 pub use programdata_snapshot::*;
 pub use registry::*;
+// registry_scoring types are used via registry::RegistryEntry, no need to re-export
 pub use scan_engine::*;
 pub use social_scanner::*;

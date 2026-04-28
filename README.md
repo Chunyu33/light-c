@@ -107,6 +107,12 @@ certutil -hashfile 文件名 SHA256
 - **注册表深度扫描**：扫描 HKCU/HKLM Software 下的孤立注册表项和孤立驱动服务项
 - **大文件高亮**：模拟器残留和大型文件以红色高亮显示，方便快速识别
 
+### 📝 注册表残留清理
+- **单一目标扫描**：只扫描 `HKCR\Applications` 下的文件关联残留，不碰系统关键区域
+- **铁证条件过滤**：关联 exe 不存在 + 非系统路径 (Windows/System32/SysWOW64) + 非系统进程 (svchost/rundll32)
+- **真实备份恢复**：删除前使用 `reg.exe export` 生成完整 .reg 备份文件，支持双击恢复
+- **一键安全清理**：所有输出均已通过安全验证，默认全选，一键删除
+
 ### ️️ 右键菜单清理
 - **深度扫描注册表**：基于 Rust 高性能 winreg 扫描器，覆盖任意文件、文件夹、桌面背景、磁盘备山等所有场景
 - **智能识别失效项**：自动检查菜单命令中引用的 exe 文件是否存在，默认勾选失效条目
@@ -287,7 +293,8 @@ LightC/
 │   │   │   ├── social_scanner.rs     # 社交软件缓存扫描器
 │   │   │   ├── hotspot.rs            # 大目录分析（语义识别）
 │   │   │   ├── leftovers.rs          # 卸载残留扫描（置信度评分引擎）
-│   │   │   ├── registry.rs           # 注册表冗余扫描
+│   │   │   ├── registry.rs           # 注册表残留扫描 (HKCR\Applications)
+│   │   │   ├── registry_scoring.rs    # 路径解析 / 存在性缓存 / 安全过滤
 │   │   │   ├── context_menu.rs       # 右键菜单扫描与清理
 │   │   │   ├── programdata.rs        # ProgramData 目录扫描
 │   │   │   ├── programdata_rules.rs  # ProgramData 规则引擎
