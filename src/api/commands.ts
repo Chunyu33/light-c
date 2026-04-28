@@ -772,15 +772,41 @@ export interface HotspotScanResult {
 }
 
 /**
+ * 扫描进度事件（仅深扫描时推送）
+ */
+export interface HotspotScanProgress {
+  /** 当前正在扫描的目录 */
+  current_dir: string;
+  /** 已扫描的文件夹数 */
+  scanned_dirs: number;
+  /** 发现的大目录数（≥100MB） */
+  found_entries: number;
+  /** 已扫描范围的总大小（字节） */
+  total_size: number;
+  /** 一级目录总数（用于进度百分比） */
+  total_first_level_dirs: number;
+}
+
+/**
  * 扫描大目录
  * @param topN 返回 Top N 结果，默认 20
  * @param fullScan 是否启用全盘深度扫描，默认 false（仅扫描 AppData）
- * 
+ *
  * 【安全措施】深度扫描模式下，所有结果的 is_safe_to_clean 为 false，
  * 前端应禁用清理按钮，仅允许"打开位置"和"搜索"操作
+ *
+ * 【进度事件】深度扫描时监听 `hotspot-scan:progress` 获取实时进度，
+ * `hotspot-scan:cancelled` 表示扫描被取消
  */
 export async function scanHotspot(topN?: number, fullScan?: boolean): Promise<HotspotScanResult> {
   return invoke<HotspotScanResult>('scan_hotspot', { topN, fullScan });
+}
+
+/**
+ * 取消正在执行的大目录扫描
+ */
+export async function cancelHotspotScan(): Promise<void> {
+  return invoke<void>('cancel_hotspot_scan');
 }
 
 /**

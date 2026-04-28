@@ -96,6 +96,7 @@ pub fn run() {
             get_cleanup_history,
             // C盘热点扫描
             scan_hotspot,
+            cancel_hotspot_scan,
             scan_path_direct,
             cleanup_directory_contents,
             // 右键菜单清理

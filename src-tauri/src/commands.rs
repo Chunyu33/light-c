@@ -119,6 +119,12 @@ pub fn cancel_large_file_scan() {
     big_files::cancel();
 }
 
+/// 取消大目录扫描
+#[tauri::command]
+pub fn cancel_hotspot_scan() {
+    crate::scanner::cancel_hotspot_scan();
+}
+
 /// 执行垃圾文件扫描（异步执行，避免阻塞 UI）
 #[tauri::command]
 pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult, String> {
@@ -749,8 +755,12 @@ pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<Cleanup
 /// # 安全措施
 /// 深度扫描模式下，所有结果的 is_safe_to_clean 强制为 false，
 /// 前端应禁用清理按钮，仅允许"打开位置"和"搜索"操作
+///
+/// # 进度事件
+/// 深度扫描时通过 `hotspot-scan:progress` 推送实时进度
 #[tauri::command]
 pub async fn scan_hotspot(
+    app: tauri::AppHandle,
     top_n: Option<usize>,
     full_scan: Option<bool>,
 ) -> Result<crate::scanner::HotspotScanResult, String> {
@@ -761,15 +771,17 @@ pub async fn scan_hotspot(
 
     if is_full_scan {
         info!("开始全盘深度扫描，Top {}", n);
+        // 重置取消标志
+        crate::scanner::reset_hotspot_cancelled();
     } else {
         info!("开始扫描 AppData 目录，Top {}", n);
     }
 
     // 在阻塞线程中执行扫描（避免阻塞异步运行时）
-    // 使用 spawn_blocking 确保不会阻塞 Tokio 的异步运行时
+    // 使用 scan_with_ui 以获取实时进度通知
     let result = tokio::task::spawn_blocking(move || {
         let scanner = HotspotScanner::new(is_full_scan, n);
-        scanner.scan()
+        scanner.scan_with_ui(&app)
     })
     .await
     .map_err(|e| format!("扫描任务执行失败: {}", e))?;

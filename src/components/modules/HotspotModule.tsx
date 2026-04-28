@@ -5,13 +5,14 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2 } from 'lucide-react';
+import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2, XCircle } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { scanHotspot, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry } from '../../api/commands';
+import { scanHotspot, cancelHotspotScan, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry, type HotspotScanProgress } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { DrillDownModal } from './DrillDownModal';
 
@@ -310,6 +311,7 @@ export function HotspotModule() {
   const { showToast } = useToast();
 
   const lastScanTriggerRef = useRef(0);
+  const scanningRef = useRef(false);
 
   // 本地状态
   const [scanResult, setScanResult] = useState<HotspotScanResult | null>(null);
@@ -320,6 +322,9 @@ export function HotspotModule() {
   // 清理确认对话框状态
   const [cleanupTarget, setCleanupTarget] = useState<HotspotEntry | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
+
+  // ====== 扫描进度状态（仅深度扫描时有效） ======
+  const [scanProgress, setScanProgress] = useState<HotspotScanProgress | null>(null);
 
   // ====== 下钻模态框状态 ======
   /** 选中的路径：非空时弹出 DrillDownModal */
@@ -344,22 +349,48 @@ export function HotspotModule() {
   // 使用 ref 打破 handleScan ↔ handleModalCleanupDone 的循环依赖
   const handleScanRef = useRef<(() => void) | null>(null);
 
+  // ====== 监听扫描进度事件 ======
+  useEffect(() => {
+    let unlistenProgress: (() => void) | null = null;
+    let unlistenCancelled: (() => void) | null = null;
+
+    const setupListeners = async () => {
+      unlistenProgress = await listen<HotspotScanProgress>('hotspot-scan:progress', (event) => {
+        setScanProgress(event.payload);
+      });
+      unlistenCancelled = await listen('hotspot-scan:cancelled', () => {
+        // 扫描被取消，UI 由 handleScan 的 catch/finally 处理
+      });
+    };
+
+    setupListeners();
+
+    return () => {
+      if (unlistenProgress) unlistenProgress();
+      if (unlistenCancelled) unlistenCancelled();
+    };
+  }, []);
+
   // 执行扫描
   const handleScan = useCallback(async () => {
+    if (scanningRef.current) return;
+    scanningRef.current = true;
+
     updateModuleState('hotspot', { status: 'scanning' });
     setError(null);
     setScanResult(null);
     setShowAll(false);
     setSelectedPath(null);
+    setScanProgress(null);
 
     try {
       // 根据深度扫描开关决定扫描模式
       const result = await scanHotspot(30, fullScanEnabled);
       setScanResult(result);
-      
+
       // 计算 Top 10 的总大小作为模块显示
       const top10Size = result.entries.slice(0, 10).reduce((sum, e) => sum + e.total_size, 0);
-      
+
       updateModuleState('hotspot', {
         status: 'done',
         fileCount: result.entries.length,
@@ -369,8 +400,21 @@ export function HotspotModule() {
       console.error('大目录分析扫描失败:', err);
       setError(String(err));
       updateModuleState('hotspot', { status: 'error' });
+    } finally {
+      scanningRef.current = false;
+      setScanProgress(null);
     }
   }, [updateModuleState, fullScanEnabled]);
+
+  // 取消扫描
+  const handleStopScan = useCallback(async () => {
+    try {
+      await cancelHotspotScan();
+      showToast({ type: 'info', title: '扫描已停止', description: '将显示已扫描到的目录' });
+    } catch (err) {
+      console.error('停止扫描失败:', err);
+    }
+  }, [showToast]);
 
   // 同步 handleScanRef 供模态框清理回调使用
   handleScanRef.current = handleScan;
@@ -500,6 +544,52 @@ export function HotspotModule() {
           <p className="text-xs mt-1">
             {fullScanEnabled ? '深度扫描可能需要较长时间，请耐心等待' : '这可能需要几秒钟'}
           </p>
+
+          {/* 深度扫描进度条 */}
+          {fullScanEnabled && scanProgress && (
+            <div className="mt-4 w-full max-w-xs space-y-2">
+              {/* 进度百分比 */}
+              <div className="flex items-center justify-between text-xs">
+                <span className="truncate max-w-[200px]" title={scanProgress.current_dir}>
+                  {scanProgress.current_dir}
+                </span>
+                <span className="shrink-0">
+                  {scanProgress.total_first_level_dirs > 0
+                    ? `${Math.round((scanProgress.scanned_dirs / scanProgress.total_first_level_dirs) * 100)}%`
+                    : ''}
+                </span>
+              </div>
+              {/* 进度条 */}
+              <div className="w-full h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[var(--brand-green)] rounded-full transition-all duration-300"
+                  style={{
+                    width: `${scanProgress.total_first_level_dirs > 0
+                      ? (scanProgress.scanned_dirs / scanProgress.total_first_level_dirs) * 100
+                      : 0}%`
+                  }}
+                />
+              </div>
+              {/* 统计信息 */}
+              <div className="flex justify-center gap-3 text-[10px] text-[var(--text-faint)]">
+                <span>已扫描 {scanProgress.scanned_dirs} 个目录</span>
+                <span>发现 {scanProgress.found_entries} 个大目录</span>
+              </div>
+            </div>
+          )}
+
+          {/* 取消按钮（仅深度扫描时显示） */}
+          {fullScanEnabled && (
+            <button
+              onClick={handleStopScan}
+              className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30
+                border border-red-200 dark:border-red-800/30 transition-colors"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              停止扫描
+            </button>
+          )}
         </div>
       )}
 
