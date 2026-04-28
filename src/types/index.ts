@@ -132,6 +132,20 @@ export interface LargeFileEntry {
   size: number;
   /** 最后修改时间（Unix时间戳，秒） */
   modified: number;
+  /** 风险等级 (1-5)，由后端路径规则计算 */
+  risk_level: number;
+  /** 来源标签（如"微信文件"、"虚拟机磁盘"、"系统临时文件"） */
+  source_label: string;
+}
+
+/** 大文件扫描进度事件负载 */
+export interface LargeFileScanProgress {
+  /** 当前正在扫描的文件路径 */
+  current_path: string;
+  /** 已扫描的文件数 */
+  scanned_count: number;
+  /** 当前 Top N 已收集的文件数 */
+  found_count: number;
 }
 
 /** 应用状态 */

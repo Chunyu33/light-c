@@ -70,10 +70,11 @@ export async function openDiskCleanup(): Promise<void> {
 }
 
 /**
- * 扫描C盘大文件（前 50 项）
+ * 扫描C盘大文件
+ * @param topN 返回前 N 个最大文件 (10-200，默认 50)
  */
-export async function scanLargeFiles(): Promise<LargeFileEntry[]> {
-  return invoke<LargeFileEntry[]>('scan_large_files');
+export async function scanLargeFiles(topN?: number): Promise<LargeFileEntry[]> {
+  return invoke<LargeFileEntry[]>('scan_large_files', { topN });
 }
 
 /**

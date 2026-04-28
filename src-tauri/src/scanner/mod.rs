@@ -2,6 +2,7 @@
 // 扫描器模块 - 负责扫描Windows系统中的垃圾文件
 // ============================================================================
 
+pub(crate) mod big_files;
 mod categories;
 mod context_menu;
 mod file_info;
@@ -28,6 +29,5 @@ pub use programdata_growth::*;
 pub use programdata_rules::*;
 pub use programdata_snapshot::*;
 pub use registry::*;
-// registry_scoring types are used via registry::RegistryEntry, no need to re-export
 pub use scan_engine::*;
 pub use social_scanner::*;

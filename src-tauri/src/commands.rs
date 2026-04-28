@@ -7,49 +7,20 @@ use crate::cleaner::{
     DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult, PermanentDeleteEngine,
     PermanentDeleteResult, SafetyCheckResult,
 };
-use crate::scanner::{CategoryScanResult, DeleteResult, JunkCategory, ScanEngine, ScanResult};
+use crate::scanner::{
+    big_files, CategoryScanResult, DeleteResult, JunkCategory, ScanEngine, ScanResult,
+};
 use log::info;
 use serde::{Deserialize, Serialize};
-use std::cmp::{Ordering, Reverse};
-use std::collections::BinaryHeap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use tauri::{Emitter, Manager, Window};
 use walkdir::WalkDir;
-
-// 全局取消标志，用于停止大文件扫描
-static LARGE_FILE_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 
 /// 扫描请求参数
 #[derive(Debug, Deserialize)]
 pub struct ScanRequest {
     /// 要扫描的分类列表（可选，为空则扫描全部）
     pub categories: Option<Vec<String>>,
-}
-
-/// 大文件扫描结果
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct LargeFileEntry {
-    /// 文件路径
-    pub path: String,
-    /// 文件大小（字节）
-    pub size: u64,
-    /// 最后修改时间（Unix 时间戳，秒）
-    pub modified: i64,
-}
-
-impl Ord for LargeFileEntry {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.size
-            .cmp(&other.size)
-            .then_with(|| self.path.cmp(&other.path))
-    }
-}
-
-impl PartialOrd for LargeFileEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 /// 删除请求参数
@@ -129,13 +100,16 @@ pub fn get_disk_info() -> Result<DiskInfo, String> {
     }
 }
 
-/// 扫描C盘大文件（前 50 项），并实时推送当前路径
+/// 扫描系统盘大文件，并实时推送进度
 #[tauri::command]
-pub async fn scan_large_files(window: Window) -> Result<Vec<LargeFileEntry>, String> {
-    // 重置取消标志
-    LARGE_FILE_SCAN_CANCELLED.store(false, AtomicOrdering::SeqCst);
+pub async fn scan_large_files(
+    window: Window,
+    top_n: Option<usize>,
+) -> Result<Vec<big_files::LargeFileEntry>, String> {
+    big_files::reset_cancelled();
     let window = window.clone();
-    tokio::task::spawn_blocking(move || scan_large_files_impl(&window))
+    let top_n = top_n.unwrap_or(50).clamp(10, 200);
+    tokio::task::spawn_blocking(move || big_files::scan(&window, top_n))
         .await
         .map_err(|e| format!("扫描任务异常: {}", e))?
 }
@@ -143,84 +117,7 @@ pub async fn scan_large_files(window: Window) -> Result<Vec<LargeFileEntry>, Str
 /// 取消大文件扫描
 #[tauri::command]
 pub fn cancel_large_file_scan() {
-    info!("收到取消大文件扫描请求");
-    LARGE_FILE_SCAN_CANCELLED.store(true, AtomicOrdering::SeqCst);
-}
-
-fn scan_large_files_impl(window: &Window) -> Result<Vec<LargeFileEntry>, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::time::Instant;
-
-        info!("开始扫描C盘大文件");
-        let mut heap: BinaryHeap<Reverse<LargeFileEntry>> = BinaryHeap::new();
-        let mut file_count: u64 = 0;
-        let mut last_emit = Instant::now();
-
-        for entry in WalkDir::new("C:\\")
-            .follow_links(false)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-        {
-            // 检查是否被取消
-            if LARGE_FILE_SCAN_CANCELLED.load(AtomicOrdering::SeqCst) {
-                info!("大文件扫描被用户取消，已扫描 {} 个文件", file_count);
-                let _ = window.emit("large-file-scan:cancelled", ());
-                // 返回当前已扫描到的结果
-                let mut results: Vec<LargeFileEntry> =
-                    heap.into_iter().map(|item| item.0).collect();
-                results.sort_by(|a, b| b.size.cmp(&a.size));
-                return Ok(results);
-            }
-
-            let path = entry.path().to_path_buf();
-            let path_str = path.to_string_lossy().to_string();
-
-            if let Ok(metadata) = entry.metadata() {
-                let size = metadata.len();
-                let modified = metadata
-                    .modified()
-                    .ok()
-                    .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs() as i64)
-                    .unwrap_or(0);
-
-                file_count += 1;
-
-                // 限制事件发送频率：每 200ms 或每 1000 个文件发送一次
-                if last_emit.elapsed().as_millis() >= 200 || file_count % 1000 == 0 {
-                    let _ = window.emit("large-file-scan:progress", &path_str);
-                    last_emit = Instant::now();
-                }
-
-                heap.push(Reverse(LargeFileEntry {
-                    path: path_str,
-                    size,
-                    modified,
-                }));
-
-                if heap.len() > 50 {
-                    heap.pop();
-                }
-            }
-        }
-
-        let mut results: Vec<LargeFileEntry> = heap.into_iter().map(|item| item.0).collect();
-        results.sort_by(|a, b| b.size.cmp(&a.size));
-
-        info!(
-            "大文件扫描完成，共扫描 {} 个文件，返回 {} 项",
-            file_count,
-            results.len()
-        );
-        Ok(results)
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持Windows系统".to_string())
-    }
+    big_files::cancel();
 }
 
 /// 执行垃圾文件扫描（异步执行，避免阻塞 UI）
@@ -392,9 +289,11 @@ pub fn open_file(path: String) -> Result<(), String> {
     {
         use std::process::Command;
 
-        // 使用 start 命令打开文件
+        // 使用 ShellExecuteW 语义打开文件（利用系统文件关联）
+        // 路径用双引号包裹，防止 &、| 等特殊字符被 cmd 解释为命令
+        let quoted_path = format!("\"{}\"", path);
         Command::new("cmd")
-            .args(["/C", "start", "", &path])
+            .args(["/C", "start", "", &quoted_path])
             .spawn()
             .map_err(|e| format!("无法打开文件: {}", e))?;
 

@@ -13,65 +13,7 @@ import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelText } from '../../utils/format';
-import type { LargeFileEntry } from '../../types';
-
-// ============================================================================
-// 风险等级计算函数
-// ============================================================================
-
-function getLargeFileRiskLevel(path: string): number {
-  const lowerPath = path.toLowerCase();
-  const fileName = lowerPath.split('\\').pop() || '';
-  const ext = fileName.includes('.') ? fileName.split('.').pop() || '' : '';
-
-  // 高风险 (5) - 系统关键文件
-  if (lowerPath.includes('\\windows\\system32\\') || 
-      lowerPath.includes('\\windows\\syswow64\\') ||
-      lowerPath.includes('\\windows\\winsxs\\')) {
-    return 5;
-  }
-  if (['pagefile.sys', 'hiberfil.sys', 'swapfile.sys', 'ntoskrnl.exe', 'bootmgr'].includes(fileName)) {
-    return 5;
-  }
-  if (ext === 'sys' && lowerPath.includes('\\windows\\')) {
-    return 5;
-  }
-
-  // 较高风险 (4) - 程序文件
-  if ((lowerPath.includes('\\program files\\') || lowerPath.includes('\\program files (x86)\\')) &&
-      ['exe', 'dll', 'ocx', 'msi'].includes(ext)) {
-    return 4;
-  }
-  if (lowerPath.includes('\\windows\\') && !lowerPath.includes('\\temp\\')) {
-    return 4;
-  }
-
-  // 中等风险 (3) - 数据文件
-  if (['db', 'sqlite', 'mdf', 'ldf', 'accdb', 'mdb', 'vmdk', 'vdi', 'vhd', 'vhdx'].includes(ext)) {
-    return 3;
-  }
-  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'].includes(ext)) {
-    return 3;
-  }
-
-  // 低风险 (2) - 媒体文件
-  if (['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', 'mp3', 'wav', 'flac'].includes(ext)) {
-    return 2;
-  }
-  if (lowerPath.includes('\\downloads\\') || lowerPath.includes('\\desktop\\')) {
-    return 2;
-  }
-
-  // 安全 (1) - 临时文件
-  if (lowerPath.includes('\\temp\\') || lowerPath.includes('\\tmp\\') || lowerPath.includes('\\cache\\')) {
-    return 1;
-  }
-  if (['log', 'tmp', 'bak', 'old', 'dmp'].includes(ext)) {
-    return 1;
-  }
-
-  return 3;
-}
+import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
 
 // ============================================================================
 // 组件实现
@@ -82,6 +24,8 @@ export function BigFilesModule() {
   const moduleState = modules.bigFiles;
   const { showToast } = useToast();
 
+  // 防止重复扫描
+  const scanningRef = useRef(false);
   // 用于跟踪是否已处理过当前的一键扫描触发
   const lastScanTriggerRef = useRef(0);
 
@@ -89,6 +33,7 @@ export function BigFilesModule() {
   const [files, setFiles] = useState<LargeFileEntry[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [currentPath, setCurrentPath] = useState('');
+  const [scannedCount, setScannedCount] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -97,8 +42,10 @@ export function BigFilesModule() {
     let unlisten: (() => void) | null = null;
 
     const setupListener = async () => {
-      unlisten = await listen<string>('large-file-scan:progress', (event) => {
-        setCurrentPath(event.payload);
+      unlisten = await listen<LargeFileScanProgress>('large-file-scan:progress', (event) => {
+        const { current_path, scanned_count } = event.payload;
+        setCurrentPath(current_path);
+        setScannedCount(scanned_count);
       });
     };
 
@@ -111,17 +58,21 @@ export function BigFilesModule() {
     };
   }, []);
 
-  // 开始扫描
+  // 开始扫描 (带防抖 — scanningRef 防止重复触发)
   const handleScan = useCallback(async () => {
+    if (scanningRef.current) return;
+    scanningRef.current = true;
+
     updateModuleState('bigFiles', { status: 'scanning', error: null });
     setFiles([]);
     setCurrentPath('');
+    setScannedCount(0);
     setSelectedFiles(new Set());
 
     try {
       const results = await scanLargeFiles();
       setFiles(results);
-      
+
       const totalSize = results.reduce((sum, f) => sum + f.size, 0);
       updateModuleState('bigFiles', {
         status: 'done',
@@ -129,11 +80,12 @@ export function BigFilesModule() {
         totalSize,
       });
 
-      // 自动展开模块
       setExpandedModule('bigFiles');
     } catch (err) {
       console.error('扫描大文件失败:', err);
       updateModuleState('bigFiles', { status: 'error', error: String(err) });
+    } finally {
+      scanningRef.current = false;
     }
   }, [updateModuleState, setExpandedModule]);
 
@@ -155,8 +107,10 @@ export function BigFilesModule() {
     }
   }, [showToast]);
 
-  // 切换文件选中状态
-  const toggleFileSelection = useCallback((path: string) => {
+  // 切换文件选中状态（后端风险等级 >= 4 锁定不可选）
+  const toggleFileSelection = useCallback((path: string, riskLevel: number) => {
+    if (riskLevel >= 4) return;
+
     setSelectedFiles((prev) => {
       const next = new Set(prev);
       if (next.has(path)) {
@@ -168,12 +122,13 @@ export function BigFilesModule() {
     });
   }, []);
 
-  // 全选/取消全选
+  // 全选/取消全选（后端风险等级 >= 4 锁定不可选）
   const toggleSelectAll = useCallback(() => {
-    if (selectedFiles.size === files.length) {
+    const selectable = files.filter((f) => f.risk_level <= 3);
+    if (selectedFiles.size === selectable.length) {
       setSelectedFiles(new Set());
     } else {
-      setSelectedFiles(new Set(files.map((f) => f.path)));
+      setSelectedFiles(new Set(selectable.map((f) => f.path)));
     }
   }, [selectedFiles.size, files]);
 
@@ -358,8 +313,9 @@ export function BigFilesModule() {
         <div>
           {/* 扫描进度提示 */}
           {isScanning && currentPath && (
-            <div className="px-4 py-2 bg-emerald-500/5 border-b border-[var(--border-default)] text-xs text-[var(--fg-muted)] truncate">
-              正在扫描: {currentPath}
+            <div className="px-4 py-2 bg-emerald-500/5 border-b border-[var(--border-default)] text-xs text-[var(--fg-muted)] truncate flex items-center gap-4">
+              <span className="truncate">正在扫描: {currentPath}</span>
+              <span className="shrink-0 text-[var(--fg-faint)]">{scannedCount.toLocaleString()} 文件</span>
             </div>
           )}
 
@@ -389,15 +345,18 @@ export function BigFilesModule() {
           {files.length > 0 && (
             <div className="divide-y divide-[var(--border-default)]">
               {files.map((file, index) => {
-                const riskLevel = getLargeFileRiskLevel(file.path);
+                const riskLevel = file.risk_level;
                 const isSelected = selectedFiles.has(file.path);
+                const isLocked = riskLevel >= 4; // 后端风险等级 >= 4，锁定不可删除
+
                 return (
                   <div
                     key={file.path}
-                    onClick={() => toggleFileSelection(file.path)}
+                    onClick={() => toggleFileSelection(file.path, riskLevel)}
                     className={`
                       px-4 py-3 flex items-center gap-3 cursor-pointer transition-all
-                      ${isSelected ? 'bg-[var(--brand-green-10)] hover:bg-[var(--brand-green-10)]' : 'hover:bg-[var(--bg-hover)]'}
+                      ${isLocked ? 'bg-rose-500/5 cursor-not-allowed' :
+                        isSelected ? 'bg-[var(--brand-green-10)] hover:bg-[var(--brand-green-10)]' : 'hover:bg-[var(--bg-hover)]'}
                     `}
                   >
                     {/* 序号 + 复选框 */}
@@ -406,17 +365,23 @@ export function BigFilesModule() {
                         {index + 1}
                       </span>
                       <div className={`
-                        w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer
-                        ${isSelected
-                          ? 'bg-[var(--brand-green)] border-[var(--brand-green)]'
-                          : 'border-[var(--text-faint)]'
+                        w-5 h-5 rounded border-2 flex items-center justify-center
+                        ${isLocked
+                          ? 'border-rose-300 bg-rose-100'
+                          : isSelected
+                            ? 'bg-[var(--brand-green)] border-[var(--brand-green)] cursor-pointer'
+                            : 'border-[var(--text-faint)] cursor-pointer'
                         }
                       `}>
-                        {isSelected && (
+                        {isLocked ? (
+                          <svg className="w-3 h-3 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : isSelected ? (
                           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
-                        )}
+                        ) : null}
                       </div>
                     </div>
 
@@ -427,9 +392,16 @@ export function BigFilesModule() {
 
                     {/* 文件信息 */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[var(--fg-primary)] truncate font-medium" title={file.path}>
-                        {file.path.split('\\').pop() || file.path}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-[var(--fg-primary)] truncate font-medium" title={file.path}>
+                          {file.path.split('\\').pop() || file.path}
+                        </p>
+                        {file.source_label && file.source_label !== '未知来源' && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
+                            {file.source_label}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-[var(--fg-muted)] truncate mt-0.5" title={file.path}>
                         {file.path}
                       </p>
@@ -441,7 +413,7 @@ export function BigFilesModule() {
                       <div className="flex items-center justify-end gap-2 mt-0.5">
                         <span className="text-[10px] text-[var(--fg-muted)]">{formatDate(file.modified)}</span>
                         <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${getRiskLevelColor(riskLevel)} ${getRiskLevelBgColor(riskLevel)}`}>
-                          {getRiskLevelText(riskLevel)}
+                          {isLocked ? '🔒 ' : ''}{getRiskLevelText(riskLevel)}
                         </span>
                       </div>
                     </div>
