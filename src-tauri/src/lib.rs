@@ -8,6 +8,7 @@ mod cleaner;
 mod commands;
 mod logger;
 mod scanner;
+mod system_slim;
 
 // 导出命令模块
 use commands::*;

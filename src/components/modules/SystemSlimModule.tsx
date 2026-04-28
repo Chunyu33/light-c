@@ -20,13 +20,14 @@ import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
-import { 
-  getSystemSlimStatus, 
-  disableHibernation, 
-  cleanupWinsxs, 
+import {
+  getSystemSlimStatus,
+  disableHibernation,
+  enableHibernation,
+  cleanupWinsxs,
   openVirtualMemorySettings,
   SlimItemStatus,
-  SystemSlimStatus 
+  SystemSlimStatus
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 
@@ -120,8 +121,13 @@ export function SystemSlimModule() {
     try {
       switch (item.id) {
         case 'hibernation':
-          const hibResult = await disableHibernation();
-          showToast({ title: '操作成功', description: hibResult, type: 'success' });
+          if (item.enabled) {
+            const hibResult = await disableHibernation();
+            showToast({ title: '操作成功', description: hibResult, type: 'success' });
+          } else {
+            const hibResult = await enableHibernation();
+            showToast({ title: '操作成功', description: hibResult, type: 'success' });
+          }
           break;
         case 'winsxs':
           showToast({ title: '正在清理', description: '系统组件存储清理中，这可能需要几分钟...', type: 'info' });

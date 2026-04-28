@@ -342,368 +342,46 @@ pub async fn scan_social_cache() -> Result<SocialScanResult, String> {
 }
 
 // ============================================================================
-// 系统瘦身相关
+// 系统瘦身相关（薄包装器 → system_slim 模块）
 // ============================================================================
 
-/// 系统瘦身项状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlimItemStatus {
-    /// 项目ID
-    pub id: String,
-    /// 项目名称
-    pub name: String,
-    /// 项目描述
-    pub description: String,
-    /// 风险提示
-    pub warning: String,
-    /// 是否启用/存在
-    pub enabled: bool,
-    /// 占用空间（字节）
-    pub size: u64,
-    /// 是否可操作
-    pub actionable: bool,
-    /// 操作按钮文本
-    pub action_text: String,
-}
-
-/// 系统瘦身状态汇总
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemSlimStatus {
-    /// 是否以管理员权限运行
-    pub is_admin: bool,
-    /// 各瘦身项状态
-    pub items: Vec<SlimItemStatus>,
-    /// 总可释放空间
-    pub total_reclaimable: u64,
-}
+/// 系统瘦身状态类型（重新导出供前端使用）
+pub use crate::system_slim::SystemSlimStatus;
 
 /// 检查是否以管理员权限运行
 #[tauri::command]
 pub fn check_admin_privilege() -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        // 尝试执行需要管理员权限的命令来检测
-        let output = Command::new("net")
-            .args(["session"])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
-            .output();
-
-        match output {
-            Ok(o) => o.status.success(),
-            Err(_) => false,
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        false
-    }
+    crate::system_slim::check_admin()
 }
 
 /// 获取系统瘦身状态
 #[tauri::command]
 pub fn get_system_slim_status() -> SystemSlimStatus {
-    let is_admin = check_admin_privilege();
-    let mut items = Vec::new();
-    let mut total_reclaimable: u64 = 0;
-
-    // 1. 休眠文件检测
-    let hibernation = get_hibernation_status();
-    if hibernation.enabled {
-        total_reclaimable += hibernation.size;
-    }
-    items.push(hibernation);
-
-    // 2. WinSxS 组件存储（估算可清理空间）
-    let winsxs = get_winsxs_status();
-    total_reclaimable += winsxs.size;
-    items.push(winsxs);
-
-    // 3. 虚拟内存检测
-    let pagefile = get_pagefile_status();
-    items.push(pagefile);
-
-    SystemSlimStatus {
-        is_admin,
-        items,
-        total_reclaimable,
-    }
-}
-
-/// 获取休眠文件状态
-fn get_hibernation_status() -> SlimItemStatus {
-    let hiberfil_path = std::path::Path::new("C:\\hiberfil.sys");
-    let exists = hiberfil_path.exists();
-    let size = if exists {
-        std::fs::metadata(hiberfil_path)
-            .map(|m| m.len())
-            .unwrap_or(0)
-    } else {
-        0
-    };
-
-    SlimItemStatus {
-        id: "hibernation".to_string(),
-        name: "休眠文件".to_string(),
-        description: "Windows 休眠功能会在 C 盘创建与内存大小相当的 hiberfil.sys 文件".to_string(),
-        warning: "关闭休眠将导致快速启动功能失效，电脑无法进入休眠状态".to_string(),
-        enabled: exists,
-        size,
-        actionable: exists,
-        action_text: if exists {
-            "关闭休眠".to_string()
-        } else {
-            "已关闭".to_string()
-        },
-    }
-}
-
-/// 获取 WinSxS 组件存储状态
-fn get_winsxs_status() -> SlimItemStatus {
-    // WinSxS 目录大小估算（实际清理效果取决于系统状态）
-    let winsxs_path = std::path::Path::new("C:\\Windows\\WinSxS");
-    let estimated_reclaimable: u64 = if winsxs_path.exists() {
-        // 估算可清理空间为 1-3GB（保守估计）
-        2 * 1024 * 1024 * 1024 // 2GB
-    } else {
-        0
-    };
-
-    SlimItemStatus {
-        id: "winsxs".to_string(),
-        name: "系统组件存储".to_string(),
-        description: "Windows 组件存储 (WinSxS) 包含系统更新的旧版本文件，可安全清理冗余部分"
-            .to_string(),
-        warning: "清理过程可能需要 5-15 分钟，期间请勿关闭程序或电脑".to_string(),
-        enabled: true,
-        size: estimated_reclaimable,
-        actionable: true,
-        action_text: "开始清理".to_string(),
-    }
-}
-
-/// 获取虚拟内存状态
-fn get_pagefile_status() -> SlimItemStatus {
-    let pagefile_path = std::path::Path::new("C:\\pagefile.sys");
-    let exists = pagefile_path.exists();
-    let size = if exists {
-        std::fs::metadata(pagefile_path)
-            .map(|m| m.len())
-            .unwrap_or(0)
-    } else {
-        0
-    };
-
-    // 读取注册表获取分页文件配置
-    let pagefile_location = get_pagefile_registry_info();
-    let is_on_c_drive = pagefile_location.contains("C:") || pagefile_location.contains("c:");
-
-    SlimItemStatus {
-        id: "pagefile".to_string(),
-        name: "虚拟内存".to_string(),
-        description: format!(
-            "当前分页文件位置: {}。建议将虚拟内存迁移到非系统盘以释放 C 盘空间",
-            pagefile_location
-        ),
-        warning: "虚拟内存对系统稳定性至关重要，不建议直接删除，请通过系统设置迁移到其他磁盘"
-            .to_string(),
-        enabled: exists && is_on_c_drive,
-        size,
-        actionable: is_on_c_drive,
-        action_text: "打开系统设置".to_string(),
-    }
-}
-
-/// 从注册表读取分页文件配置
-fn get_pagefile_registry_info() -> String {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        let output = Command::new("reg")
-            .args([
-                "query",
-                r"HKLM\System\CurrentControlSet\Control\Session Manager\Memory Management",
-                "/v",
-                "PagingFiles",
-            ])
-            .creation_flags(0x08000000)
-            .output();
-
-        match output {
-            Ok(o) => {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                // 解析输出获取分页文件路径
-                if let Some(line) = stdout.lines().find(|l| l.contains("PagingFiles")) {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() >= 3 {
-                        return parts[2..].join(" ");
-                    }
-                }
-                "未知".to_string()
-            }
-            Err(_) => "读取失败".to_string(),
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        "不支持".to_string()
-    }
+    crate::system_slim::get_status()
 }
 
 /// 关闭休眠功能
 #[tauri::command]
 pub fn disable_hibernation() -> Result<String, String> {
-    if !check_admin_privilege() {
-        return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        info!("正在关闭休眠功能...");
-
-        let output = Command::new("powercfg")
-            .args(["-h", "off"])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("执行命令失败: {}", e))?;
-
-        if output.status.success() {
-            info!("休眠功能已关闭");
-            Ok("休眠功能已成功关闭，hiberfil.sys 文件将被删除".to_string())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("关闭休眠失败: {}", stderr))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows 系统".to_string())
-    }
+    crate::system_slim::disable_hibernation()
 }
 
 /// 开启休眠功能
 #[tauri::command]
 pub fn enable_hibernation() -> Result<String, String> {
-    if !check_admin_privilege() {
-        return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        info!("正在开启休眠功能...");
-
-        let output = Command::new("powercfg")
-            .args(["-h", "on"])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("执行命令失败: {}", e))?;
-
-        if output.status.success() {
-            info!("休眠功能已开启");
-            Ok("休眠功能已成功开启".to_string())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("开启休眠失败: {}", stderr))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows 系统".to_string())
-    }
+    crate::system_slim::enable_hibernation()
 }
 
 /// 清理 WinSxS 组件存储（异步执行）
 #[tauri::command]
 pub async fn cleanup_winsxs(window: Window) -> Result<String, String> {
-    if !check_admin_privilege() {
-        return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        info!("开始清理 WinSxS 组件存储...");
-
-        // 发送开始事件
-        let _ = window.emit(
-            "winsxs-cleanup-progress",
-            serde_json::json!({
-                "status": "running",
-                "message": "正在清理系统组件存储，请耐心等待..."
-            }),
-        );
-
-        // 使用 tokio 的 spawn_blocking 来执行阻塞操作
-        let result = tokio::task::spawn_blocking(move || {
-            Command::new("dism.exe")
-                .args([
-                    "/online",
-                    "/cleanup-image",
-                    "/startcomponentcleanup",
-                    "/resetbase",
-                ])
-                .creation_flags(0x08000000)
-                .output()
-        })
-        .await
-        .map_err(|e| format!("任务执行失败: {}", e))?
-        .map_err(|e| format!("执行 DISM 命令失败: {}", e))?;
-
-        if result.status.success() {
-            info!("WinSxS 清理完成");
-            Ok("系统组件存储清理完成".to_string())
-        } else {
-            let stderr = String::from_utf8_lossy(&result.stderr);
-            let stdout = String::from_utf8_lossy(&result.stdout);
-            Err(format!("清理失败: {} {}", stdout, stderr))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows 系统".to_string())
-    }
+    crate::system_slim::cleanup_winsxs(&window).await
 }
 
 /// 打开系统虚拟内存设置
 #[tauri::command]
 pub fn open_virtual_memory_settings() -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        info!("打开虚拟内存设置...");
-
-        // 打开系统属性 - 高级选项卡
-        Command::new("SystemPropertiesAdvanced.exe")
-            .creation_flags(0x08000000)
-            .spawn()
-            .map_err(|e| format!("无法打开系统设置: {}", e))?;
-
-        Ok(())
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows 系统".to_string())
-    }
+    crate::system_slim::open_virtual_memory_settings()
 }
 
 // ============================================================================
