@@ -56,9 +56,11 @@ jobs:
             ## 更新内容
             请查看 [CHANGELOG](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细更新内容。
             
-            ## 安装说明
-            - 下载 `.msi` 文件进行安装
-            - 首次安装可能需要管理员权限
+            - **首次安装提示**：
+            - Windows 可能会弹出“已保护你的电脑”或“Windows 安全”警告，这是因为应用暂未进行代码签名导致的**正常现象**。
+            - 请点击 **“更多信息”** → **“仍要安装”**（或“仍要运行”）即可继续安装。
+            - 安装过程中可能需要**管理员权限**，请允许后继续。
+            - Windows 的安全提示是新应用常见的保护机制，随着使用用户增多，后续版本的警告会逐渐减少。
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
