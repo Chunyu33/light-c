@@ -19,6 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-updater = { version = "2.9.0", features = ["native-tls"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
@@ -43,7 +44,6 @@ env_logger = "0.11"
 # 并行处理
 rayon = "1.10"
 num_cpus = "1.16"
-tauri-plugin-updater = "2.9.0"
 tauri-plugin-process = "2.3.1"
 dirs = "6.0.0"
 # 单例模式
