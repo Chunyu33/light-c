@@ -69,17 +69,20 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
   const [expanded, setExpanded] = useState(false);
   const scope = getScopeStyle(entry.scope);
   const isInvalid = !entry.exe_exists && entry.exe_path !== null;
+  const isProtected = entry.is_system_protected;
 
   return (
     <div
       className={`
-        rounded-xl border transition-colors cursor-pointer
-        ${isSelected
-          ? 'bg-[var(--brand-green-10)] border-[var(--brand-green-20)]'
-          : 'bg-[var(--bg-main)] border-transparent hover:bg-[var(--bg-hover)]'
+        rounded-xl border transition-colors
+        ${isProtected
+          ? 'bg-[var(--color-danger)]/5 border-[var(--color-danger)]/15 cursor-not-allowed'
+          : isSelected
+            ? 'bg-[var(--brand-green-10)] border-[var(--brand-green-20)] cursor-pointer'
+            : 'bg-[var(--bg-main)] border-transparent hover:bg-[var(--bg-hover)] cursor-pointer'
         }
       `}
-      onClick={() => onToggle(entry)}
+      onClick={() => !isProtected && onToggle(entry)}
     >
       {/* 主行 */}
       <div className="flex items-center gap-3 p-3">
@@ -87,16 +90,21 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
         <div
           className={`
             w-5 h-5 rounded border-2 flex items-center justify-center shrink-0
-            ${isSelected
-              ? 'bg-[var(--brand-green)] border-[var(--brand-green)]'
-              : 'border-[var(--text-faint)]'
+            ${isProtected
+              ? 'border-[var(--text-faint)] bg-[var(--bg-hover)] opacity-40'
+              : isSelected
+                ? 'bg-[var(--brand-green)] border-[var(--brand-green)]'
+                : 'border-[var(--text-faint)]'
             }
           `}
         >
-          {isSelected && (
+          {isSelected && !isProtected && (
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
+          )}
+          {isProtected && (
+            <Shield className="w-3 h-3 text-[var(--text-faint)]" />
           )}
         </div>
 
@@ -104,15 +112,19 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
         <div
           className={`
             w-9 h-9 rounded-lg flex items-center justify-center shrink-0
-            ${isInvalid
-              ? 'bg-[var(--color-danger)]/10'
-              : 'bg-[var(--brand-green-10)]'
+            ${isProtected
+              ? 'bg-[var(--color-danger)]/15'
+              : isInvalid
+                ? 'bg-[var(--color-danger)]/10'
+                : 'bg-[var(--brand-green-10)]'
             }
           `}
         >
-          {isInvalid
-            ? <AlertTriangle className="w-4 h-4 text-[var(--color-danger)]" />
-            : <MousePointerClick className="w-4 h-4 text-[var(--brand-green)]" />
+          {isProtected
+            ? <Shield className="w-4 h-4 text-[var(--color-danger)]" />
+            : isInvalid
+              ? <AlertTriangle className="w-4 h-4 text-[var(--color-danger)]" />
+              : <MousePointerClick className="w-4 h-4 text-[var(--brand-green)]" />
           }
         </div>
 
@@ -122,6 +134,18 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             <p className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[240px]">
               {entry.display_name || entry.key_name}
             </p>
+
+            {/* 风险等级标签 */}
+            {entry.risk_level === 'danger' && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-danger)]/15 text-[var(--color-danger)] shrink-0">
+                系统保护
+              </span>
+            )}
+            {entry.risk_level === 'caution' && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-warning)]/10 text-[var(--color-warning)] shrink-0">
+                需谨慎
+              </span>
+            )}
 
             {/* 作用范围标签 */}
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${scope.className}`}>
@@ -158,6 +182,13 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             >
               <FolderOpen className="inline w-3 h-3 mr-1 opacity-60" />
               {entry.exe_path}
+            </p>
+          )}
+
+          {/* 系统保护提示 */}
+          {isProtected && (
+            <p className="text-xs mt-0.5 text-[var(--color-danger)]/70">
+              此条目为系统 COM 处理器，不建议清理
             </p>
           )}
         </div>
@@ -292,10 +323,15 @@ export function ContextMenuModule() {
       const result = await scanContextMenu();
       setScanResult(result);
 
-      // 默认仅自动勾选 exe 不存在的无效条目
+      // 默认仅自动勾选 exe 不存在的无效条目（排除系统保护条目）
       const defaultSelected = new Set(
         result.entries
-          .filter((e) => !e.exe_exists && e.exe_path !== null)
+          .filter(
+            (e) =>
+              !e.exe_exists &&
+              e.exe_path !== null &&
+              !e.is_system_protected
+          )
           .map((e) => e.id)
       );
       setSelectedIds(defaultSelected);
@@ -334,18 +370,23 @@ export function ContextMenuModule() {
     });
   }, []);
 
-  /** 全选/取消全选（仅操作当前过滤后的条目） */
+  /** 全选/取消全选（仅操作当前过滤后且非系统保护的条目） */
   const toggleSelectAll = useCallback(() => {
     if (!scanResult) return;
-    const currentIds = filteredEntries.map((e) => e.id);
-    const allSelected = currentIds.every((id) => selectedIds.has(id));
+    // 排除系统保护条目的可选中 ID
+    const selectableIds = filteredEntries
+      .filter((e) => !e.is_system_protected)
+      .map((e) => e.id);
+    const allSelected =
+      selectableIds.length > 0 &&
+      selectableIds.every((id) => selectedIds.has(id));
 
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (allSelected) {
-        currentIds.forEach((id) => next.delete(id));
+        selectableIds.forEach((id) => next.delete(id));
       } else {
-        currentIds.forEach((id) => next.add(id));
+        selectableIds.forEach((id) => next.add(id));
       }
       return next;
     });
@@ -451,9 +492,14 @@ export function ContextMenuModule() {
   // ── 渲染 ─────────────────────────────────────────────────────────────────
 
   const isExpanded = expandedModule === 'contextMenu';
+  /** 可选中条目（排除系统保护） */
+  const selectableEntries = useMemo(
+    () => filteredEntries.filter((e) => !e.is_system_protected),
+    [filteredEntries]
+  );
   const allFilteredSelected =
-    filteredEntries.length > 0 &&
-    filteredEntries.every((e) => selectedIds.has(e.id));
+    selectableEntries.length > 0 &&
+    selectableEntries.every((e) => selectedIds.has(e.id));
 
   return (
     <>
@@ -510,8 +556,8 @@ export function ContextMenuModule() {
               <div>
                 <p className="text-sm font-medium text-[var(--text-primary)]">操作安全提示</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  默认仅勾选"文件不存在"的无效菜单项。HKLM 条目删除需要管理员权限，
-                  删除后右键菜单中对应项目将不再出现。
+                  默认仅勾选"文件不存在"的无效菜单项。标记为「系统保护」的 COM 处理器条目无法选中删除。
+                  HKLM 条目需要管理员权限，删除前会自动导出 .reg 备份文件。
                 </p>
               </div>
             </div>

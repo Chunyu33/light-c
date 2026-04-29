@@ -850,7 +850,7 @@ export async function cleanupDirectoryContents(path: string): Promise<CleanupDir
 export interface ContextMenuEntry {
   /** 唯一 ID（reg_root + "||" + reg_subpath） */
   id: string;
-  /** 菜单显示名称 */
+  /** 菜单显示名称（已解析 MUIVerb 间接字符串） */
   display_name: string;
   /** 注册表子键名 */
   key_name: string;
@@ -872,6 +872,10 @@ export interface ContextMenuEntry {
   exe_exists: boolean;
   /** 是否需要管理员权限才能删除 */
   needs_admin: boolean;
+  /** 是否为系统保护条目（不可选中删除） */
+  is_system_protected: boolean;
+  /** 风险等级（"safe" | "caution" | "danger"） */
+  risk_level: string;
 }
 
 /** 右键菜单扫描结果 */

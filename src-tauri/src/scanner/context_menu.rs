@@ -27,9 +27,84 @@
 // ============================================================================
 
 use serde::{Deserialize, Serialize};
+use std::ffi::OsString;
+use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
 use winreg::enums::*;
 use winreg::RegKey;
+
+// ============================================================================
+// Windows API FFI（用于解析 MUIVerb 间接字符串 @path,-id）
+// ============================================================================
+
+#[link(name = "shlwapi")]
+extern "system" {
+    /// https://learn.microsoft.com/en-us/windows/win32/api/shlwapi/nf-shlwapi-shloadindirectstring
+    fn SHLoadIndirectString(
+        pszSource: *const u16,
+        pszOutBuf: *mut u16,
+        cchOutBuf: u32,
+        ppvReserved: *mut *const std::ffi::c_void,
+    ) -> i32;
+}
+
+/// 调用 SHLoadIndirectString 解析 @path,-id 格式的间接字符串
+/// 失败时返回原始字符串
+fn resolve_indirect_string(raw: &str) -> String {
+    if !raw.starts_with('@') {
+        return raw.to_string();
+    }
+
+    // 先展开环境变量（如 @%SystemRoot%\system32\shell32.dll,-21769）
+    let expanded = expand_env_vars(raw);
+
+    // 转换为 UTF-16 宽字符
+    let source_wide: Vec<u16> = expanded.encode_utf16().chain(std::iter::once(0)).collect();
+    let mut out_buf: Vec<u16> = vec![0u16; 512]; // 512 字符足够容纳菜单文字
+
+    let hr = unsafe {
+        SHLoadIndirectString(
+            source_wide.as_ptr(),
+            out_buf.as_mut_ptr(),
+            out_buf.len() as u32,
+            std::ptr::null_mut(),
+        )
+    };
+
+    if hr == 0 {
+        // S_OK — 成功，截取到 null
+        if let Some(null_pos) = out_buf.iter().position(|&c| c == 0) {
+            let resolved_wide = &out_buf[..null_pos];
+            return OsString::from_wide(resolved_wide)
+                .to_string_lossy()
+                .to_string();
+        }
+    }
+
+    // 解析失败，回退到原始值
+    raw.to_string()
+}
+
+/// 简单展开常见环境变量
+fn expand_env_vars(path: &str) -> String {
+    let mut result = path.to_string();
+    let vars = [
+        ("%SystemRoot%", "C:\\Windows"),
+        ("%SYSTEMROOT%", "C:\\Windows"),
+        ("%ProgramFiles%", "C:\\Program Files"),
+        ("%ProgramFiles(x86)%", "C:\\Program Files (x86)"),
+        ("%PROGRAMFILES%", "C:\\Program Files"),
+        ("%WINDIR%", "C:\\Windows"),
+    ];
+    for (var, default) in vars {
+        if result.to_uppercase().contains(&var.to_uppercase()) {
+            let env_name = var.trim_matches('%');
+            let actual = std::env::var(env_name).unwrap_or_else(|_| default.to_string());
+            result = result.replace(var, &actual);
+        }
+    }
+    result
+}
 
 // ============================================================================
 // 数据结构
@@ -51,7 +126,7 @@ pub struct ContextMenuScanResult {
 pub struct ContextMenuEntry {
     /// 唯一 ID，用于删除时定位（reg_root + "||" + reg_subpath）
     pub id: String,
-    /// 菜单显示名称（来自 (Default) 或 MUIVerb 值）
+    /// 菜单显示名称（已解析 MUIVerb 间接字符串）
     pub display_name: String,
     /// 注册表子键名（shell 下的子键名，如 "VSCode"）
     pub key_name: String,
@@ -73,6 +148,10 @@ pub struct ContextMenuEntry {
     pub exe_exists: bool,
     /// 删除此条目是否需要管理员权限（HKLM 条目需要）
     pub needs_admin: bool,
+    /// 是否为系统保护条目（不可选中删除）
+    pub is_system_protected: bool,
+    /// 风险等级（"safe" | "caution" | "danger"）
+    pub risk_level: String,
 }
 
 /// 右键菜单条目删除请求
@@ -284,10 +363,10 @@ impl ContextMenuScanner {
         entries: &mut Vec<ContextMenuEntry>,
     ) {
         for subkey_name in shell_key.enum_keys().filter_map(|k| k.ok()) {
-            // 跳过白名单条目
+            // 跳过白名单条目（精确匹配，不区分大小写）
             if SHELL_KEY_WHITELIST
                 .iter()
-                .any(|w| subkey_name.to_lowercase().contains(w))
+                .any(|w| subkey_name.eq_ignore_ascii_case(w))
             {
                 continue;
             }
@@ -326,21 +405,24 @@ impl ContextMenuScanner {
         needs_admin: bool,
     ) -> Option<ContextMenuEntry> {
         // 读取菜单显示名称（优先 MUIVerb，其次 (Default)，最后用键名）
-        let display_name: String = entry_key
+        let display_name_raw: String = entry_key
             .get_value::<String, _>("MUIVerb")
             .or_else(|_| entry_key.get_value::<String, _>(""))
             .unwrap_or_else(|_| key_name.to_string());
 
         // 过滤掉名称为空或纯空白的条目
-        let display_name = display_name.trim().to_string();
-        if display_name.is_empty() && key_name.trim().is_empty() {
+        let display_name_raw = display_name_raw.trim().to_string();
+        if display_name_raw.is_empty() && key_name.trim().is_empty() {
             return None;
         }
-        let display_name = if display_name.is_empty() {
+        let display_name_raw = if display_name_raw.is_empty() {
             key_name.to_string()
         } else {
-            display_name
+            display_name_raw
         };
+
+        // 解析 MUIVerb 间接字符串（@path,-id → 人类可读文字）
+        let display_name = resolve_indirect_string(&display_name_raw);
 
         // 读取图标路径
         let icon_path: Option<String> = entry_key.get_value::<String, _>("Icon").ok();
@@ -360,7 +442,23 @@ impl ContextMenuScanner {
         let exe_exists = exe_path
             .as_deref()
             .map(|p| Path::new(p).exists())
-            .unwrap_or(true); // 无 exe 路径则视为"存在"（可能是内置命令）
+            .unwrap_or_else(|| {
+                // 无 exe 路径时：ContextMenuHandlers 等 COM 类条目视为"存在"（不可判定）
+                // 但优先标记为需要谨慎（因为没有可验证的 exe）
+                command.is_none() || command.as_deref().is_some_and(|c| c.trim().is_empty())
+            });
+
+        // 系统保护判定：shellex\ContextMenuHandlers 路径下的 COM 处理器
+        let is_system_protected = reg_subpath.contains(r"shellex\ContextMenuHandlers");
+
+        // 风险分级
+        let risk_level = if is_system_protected {
+            "danger".to_string()
+        } else if needs_admin {
+            "caution".to_string()
+        } else {
+            "safe".to_string()
+        };
 
         let id = format!("{}||{}", reg_root, reg_subpath);
 
@@ -377,6 +475,8 @@ impl ContextMenuScanner {
             exe_path,
             exe_exists,
             needs_admin,
+            is_system_protected,
+            risk_level,
         })
     }
 
@@ -393,8 +493,18 @@ impl ContextMenuScanner {
             return None;
         }
 
-        // 跳过内置系统命令（以 % 开头的环境变量展开命令）
+        // 对于以 % 开头的命令，先展开环境变量再检查
         if cmd.starts_with('%') {
+            let expanded = expand_env_vars(cmd);
+            // 展开后如果变成绝对路径，按不带引号路径处理
+            if expanded.len() >= 3
+                && expanded.chars().nth(1) == Some(':')
+                && (expanded.chars().nth(2) == Some('\\') || expanded.chars().nth(2) == Some('/'))
+            {
+                let first_token = expanded.split_whitespace().next().unwrap_or(&expanded);
+                return Some(first_token.to_string());
+            }
+            // 展开后仍无法识别，放弃（可能是系统内部命令）
             return None;
         }
 
@@ -403,7 +513,7 @@ impl ContextMenuScanner {
             if let Some(end_quote) = cmd[1..].find('"') {
                 let path = &cmd[1..=end_quote];
                 if !path.is_empty() {
-                    return Some(Self::expand_env_vars(path));
+                    return Some(expand_env_vars(path));
                 }
             }
         }
@@ -427,32 +537,10 @@ impl ContextMenuScanner {
             && first_token.chars().nth(1) == Some(':')
             && (first_token.chars().nth(2) == Some('\\') || first_token.chars().nth(2) == Some('/'))
         {
-            return Some(Self::expand_env_vars(first_token));
+            return Some(expand_env_vars(first_token));
         }
 
         None
-    }
-
-    /// 简单展开常见环境变量（%SystemRoot%, %ProgramFiles% 等）
-    fn expand_env_vars(path: &str) -> String {
-        let mut result = path.to_string();
-        let vars = [
-            ("%SystemRoot%", "C:\\Windows"),
-            ("%SYSTEMROOT%", "C:\\Windows"),
-            ("%ProgramFiles%", "C:\\Program Files"),
-            ("%ProgramFiles(x86)%", "C:\\Program Files (x86)"),
-            ("%PROGRAMFILES%", "C:\\Program Files"),
-            ("%WINDIR%", "C:\\Windows"),
-        ];
-        for (var, default) in vars {
-            if result.to_uppercase().contains(&var.to_uppercase()) {
-                // 先尝试从系统获取真实值
-                let env_name = var.trim_matches('%');
-                let actual = std::env::var(env_name).unwrap_or_else(|_| default.to_string());
-                result = result.replace(var, &actual);
-            }
-        }
-        result
     }
 
     /// 对条目去重：HKCU 和 HKLM 中相同键名的条目只保留 HKCU 版本
@@ -535,7 +623,13 @@ pub fn delete_context_menu_entries(
 }
 
 /// 删除单个注册表条目（递归删除整个 shell 子键）
+/// 删除前自动导出 .reg 备份文件至数据目录
 fn delete_single_entry(req: &ContextMenuDeleteRequest) -> Result<(), String> {
+    // 安全阀：拒绝删除系统保护的条目（shellex\ContextMenuHandlers）
+    if req.reg_subpath.contains(r"shellex\ContextMenuHandlers") {
+        return Err("系统保护的条目，不允许删除（ContextMenuHandlers）".to_string());
+    }
+
     // 根据 reg_root 选择根 hive
     let hive = match req.reg_root.as_str() {
         "HKCU" => RegKey::predef(HKEY_CURRENT_USER),
@@ -553,6 +647,9 @@ fn delete_single_entry(req: &ContextMenuDeleteRequest) -> Result<(), String> {
         }
     };
 
+    // 删除前导出 .reg 备份
+    export_reg_backup(req.reg_root.as_str(), subpath);
+
     // 打开父键（需要写权限）
     let parent_key = hive
         .open_subkey_with_flags(parent_path, KEY_READ | KEY_WRITE)
@@ -564,4 +661,45 @@ fn delete_single_entry(req: &ContextMenuDeleteRequest) -> Result<(), String> {
         .map_err(|e| format!("删除键 {} 失败: {}", key_name, e))?;
 
     Ok(())
+}
+
+/// 导出注册表键的 .reg 备份（用于误删恢复）
+/// 使用 reg.exe export 命令，备份文件存放在数据目录的 reg_backups/ 下
+fn export_reg_backup(reg_root: &str, subpath: &str) {
+    let data_dir = crate::data_dir::get_data_dir();
+    let backup_dir = data_dir.join("reg_backups");
+    if let Err(e) = std::fs::create_dir_all(&backup_dir) {
+        log::warn!("无法创建注册表备份目录: {}", e);
+        return;
+    }
+
+    // 生成唯一文件名：reg_root_subpath_时间戳.reg
+    let safe_name = format!(
+        "{}_{}",
+        reg_root,
+        subpath.replace('\\', "_").replace('*', "all")
+    );
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let file_name = format!("{}_{}.reg", safe_name, timestamp);
+    let backup_path = backup_dir.join(&file_name);
+
+    // 调用 reg.exe export 导出
+    match std::process::Command::new("reg.exe")
+        .args(["export", &format!("{}\\{}", reg_root, subpath)])
+        .arg(&backup_path)
+        .arg("/y") // 覆盖已有文件
+        .output()
+    {
+        Ok(output) => {
+            if output.status.success() {
+                log::info!("已导出注册表备份: {}", backup_path.display());
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                log::warn!("注册表备份导出失败: {}", stderr);
+            }
+        }
+        Err(e) => {
+            log::warn!("执行 reg.exe export 失败: {}", e);
+        }
+    }
 }
