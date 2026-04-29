@@ -60,6 +60,43 @@ use winreg::enums::*;
 use winreg::RegKey;
 
 // ============================================================================
+// 安装历史持久化（用于检测"曾经安装但现已卸载"的残留文件夹）
+// 使用统一数据目录管理模块 (crate::data_dir) 获取存储路径
+// ============================================================================
+
+/// 安装历史缓存文件名
+const INSTALL_HISTORY_FILE: &str = "install_history.json";
+
+/// 从持久化缓存加载历史安装文件夹名集合
+fn load_install_history() -> HashSet<String> {
+    let path = crate::data_dir::get_data_dir().join(INSTALL_HISTORY_FILE);
+    match fs::read_to_string(&path) {
+        Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+        Err(_) => HashSet::new(),
+    }
+}
+
+/// 将当前已知安装文件夹名持久化保存（与历史合并）
+fn save_install_history(folders: &HashSet<String>) {
+    let dir = crate::data_dir::get_data_dir();
+    if let Err(e) = fs::create_dir_all(&dir) {
+        log::warn!("无法创建数据目录 {}: {}", dir.display(), e);
+        return;
+    }
+    let path = dir.join(INSTALL_HISTORY_FILE);
+    let json = serde_json::to_string_pretty(folders).unwrap_or_default();
+    if let Err(e) = fs::write(&path, &json) {
+        log::warn!("无法保存安装历史缓存 {}. {}", path.display(), e);
+    }
+}
+
+/// 根据统一数据目录构造路径（兼容程序内部其他模块使用）
+#[allow(dead_code)]
+fn get_data_sub_path(relative: &str) -> PathBuf {
+    crate::data_dir::get_data_dir().join(relative)
+}
+
+// ============================================================================
 // 预编译正则（包名格式 / 版本号格式）
 // ============================================================================
 
@@ -479,6 +516,8 @@ struct InstalledAppMap {
     known_folders: HashSet<String>,
     /// 规范化后的 DisplayName 集合（小写，去除版本号和特殊字符）
     display_names: HashSet<String>,
+    /// 疑似残留候选：历史 InstallLocation 中出现过但当前注册表中找不到的文件夹名
+    leftover_candidates: HashSet<String>,
 }
 
 /// 规范化 DisplayName：转小写，去除版本号、括号内容、多余空格
@@ -597,11 +636,24 @@ impl InstalledAppMap {
             }
         }
 
+        // 加载历史安装文件夹并计算疑似残留候选
+        // leftover_candidates = 曾经在 InstallLocation 中出现过但当前注册表中已找不到的文件夹
+        let mut historical = load_install_history();
+        let leftover_candidates: HashSet<String> = historical
+            .difference(&known_folders)
+            .cloned()
+            .collect();
+
+        // 将当前已知文件夹合并到历史记录中并持久化
+        historical.extend(known_folders.iter().cloned());
+        save_install_history(&historical);
+
         log::info!(
-            "已安装应用映射构建完成: {} 个应用, {} 个已知文件夹名, {} 个 DisplayName",
+            "已安装应用映射构建完成: {} 个应用, {} 个已知文件夹名, {} 个 DisplayName, {} 个历史残留候选",
             apps.len(),
             known_folders.len(),
-            display_names.len()
+            display_names.len(),
+            leftover_candidates.len()
         );
 
         InstalledAppMap {
@@ -609,6 +661,7 @@ impl InstalledAppMap {
             folder_to_app,
             known_folders,
             display_names,
+            leftover_candidates,
         }
     }
 
@@ -635,6 +688,11 @@ impl InstalledAppMap {
     /// 结构化路径所有权推断：检查文件夹名是否映射到某个已安装应用的 InstallLocation
     fn has_inferred_ownership(&self, folder_name_lower: &str) -> bool {
         self.has_exact_owner(folder_name_lower)
+    }
+
+    /// 检查文件夹名是否为历史残留候选（曾经在 InstallLocation 中但当前注册表找不到）
+    fn is_leftover_candidate(&self, folder_name_lower: &str) -> bool {
+        self.leftover_candidates.contains(folder_name_lower)
     }
 }
 
@@ -873,10 +931,15 @@ impl LeftoverScanner {
                             ctx.add(0.35, "包含卸载程序残留 (uninstall*.exe)".into());
                         }
 
-                        // +0.25 文件夹名匹配 InstallLocation 末级目录且应用已不在注册表
-                        // （find_owner 返回 Some 说明应用仍在注册表，返回 None 但
-                        //  known_folders 曾包含说明是卸载后残留 —— 但当前 build()
-                        //  只保留在册应用，所以此信号暂不触发，留作未来增量扫描扩展）
+                        // +0.25 文件夹名匹配历史 InstallLocation 且应用已不在注册表
+                        // （历史缓存中记录了过去所有 InstallLocation 文件夹，
+                        //   若某文件夹曾在历史中出现但当前注册表中找不到，说明已卸载）
+                        if self.app_map.is_leftover_candidate(&folder_lower) {
+                            ctx.add(
+                                0.25,
+                                format!("匹配已知安装路径但应用已卸载: {}", folder_name),
+                            );
+                        }
 
                         // +0.20 包含 .exe 或 .dll 文件
                         if probe.executable_count > 0 {
@@ -1209,24 +1272,89 @@ pub struct LeftoverDeleteResult {
     pub failed_paths: Vec<String>,
     /// 错误信息列表
     pub errors: Vec<String>,
+    /// 因包含可执行文件而被跳过的路径
+    pub skipped_executables: Vec<String>,
 }
 
-/// 删除卸载残留文件夹
+/// 浅层可执行文件扫描，发现则返回警告信息
 ///
-/// 对每个路径执行安全检查后递归删除，返回详细结果
+/// 【中文说明】
+/// 快速扫描目标文件夹的浅层（depth=3），如果发现 .exe/.dll/.sys 文件，
+/// 说明该目录可能包含正在使用的便携软件或系统组件。
+/// 返回 Some(消息) 表示发现可执行文件，应跳过删除。
+fn has_executables_shallow(path: &Path) -> Option<String> {
+    const EXE_EXTENSIONS: &[&str] = &["exe", "dll", "sys"];
+    let max_depth = 3;
+    let max_found = 5;
+    let mut found = 0u32;
+    let mut example = String::new();
+
+    for entry in WalkDir::new(path)
+        .max_depth(max_depth)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if let Some(ext) = entry.path().extension() {
+            let ext_lower = ext.to_string_lossy().to_lowercase();
+            if EXE_EXTENSIONS.contains(&ext_lower.as_str()) {
+                found += 1;
+                if example.is_empty() {
+                    example = entry.file_name().to_string_lossy().to_string();
+                }
+                if found >= max_found {
+                    break;
+                }
+            }
+        }
+    }
+
+    if found > 0 {
+        if found == 1 {
+            Some(format!(
+                "文件夹包含可执行文件 (如 {})，已跳过，请使用深度清理手动确认",
+                example
+            ))
+        } else {
+            Some(format!(
+                "文件夹包含 {} 个可执行文件 (如 {})，已跳过，请使用深度清理手动确认",
+                found, example
+            ))
+        }
+    } else {
+        None
+    }
+}
+
+/// 删除卸载残留文件夹（含安全预检查）
+///
+/// 【中文说明】
+/// 每个路径依次执行：路径范围检查 → 可执行文件扫描 → 删除。
+/// 包含可执行文件的文件夹不会被删除，而是标记为 skipped_executables，
+/// 引导用户通过深度清理（含人工审核机制）处理。
 pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
     let mut deleted_count = 0u32;
     let mut deleted_size = 0u64;
     let mut failed_paths = Vec::new();
     let mut errors = Vec::new();
+    let mut skipped_executables = Vec::new();
 
     for path in paths {
         let path_buf = std::path::PathBuf::from(&path);
 
-        // 安全检查：确保路径在允许的目录内
+        // 安全检查 1: 路径在允许范围内
         if !is_safe_leftover_path(&path_buf) {
             failed_paths.push(path.clone());
             errors.push(format!("路径不在允许的目录内: {}", path));
+            continue;
+        }
+
+        // 安全检查 2: 浅层可执行文件扫描
+        if let Some(msg) = has_executables_shallow(&path_buf) {
+            skipped_executables.push(path.clone());
+            errors.push(format!("{}: {}", path, msg));
             continue;
         }
 
@@ -1250,6 +1378,7 @@ pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
         deleted_size,
         failed_paths,
         errors,
+        skipped_executables,
     }
 }
 
@@ -1272,12 +1401,39 @@ fn calculate_dir_size(path: &std::path::Path) -> u64 {
 }
 
 /// 检查路径是否在允许删除的目录内
+///
+/// 【安全说明】使用真实用户路径的 starts_with 匹配，而非模糊 contains，
+/// 防止 C:\MyApp\fake\appdata\local 这类非 AppData 路径通过检查。
 fn is_safe_leftover_path(path: &std::path::Path) -> bool {
-    let path_str = path.to_string_lossy().to_lowercase();
-    let allowed_prefixes = ["appdata\\local", "appdata\\roaming", "programdata"];
-    allowed_prefixes
-        .iter()
-        .any(|prefix| path_str.contains(prefix))
+    let path_lower = path.to_string_lossy().to_lowercase();
+
+    // 使用真实 AppData 路径前缀进行精确匹配
+    if let Some(local) = dirs::data_local_dir() {
+        let local_str = local.to_string_lossy().to_lowercase();
+        if path_lower.starts_with(&local_str) {
+            return true;
+        }
+        // LocalLow（与 Local 同级，如 C:\Users\<user>\AppData\LocalLow）
+        if let Some(parent) = local.parent() {
+            let local_low = parent.join("LocalLow");
+            let low_str = local_low.to_string_lossy().to_lowercase();
+            if path_lower.starts_with(&low_str) {
+                return true;
+            }
+        }
+    }
+    if let Some(roaming) = dirs::data_dir() {
+        let roaming_str = roaming.to_string_lossy().to_lowercase();
+        if path_lower.starts_with(&roaming_str) {
+            return true;
+        }
+    }
+    // ProgramData 固定路径
+    if path_lower.starts_with(r"c:\programdata") {
+        return true;
+    }
+
+    false
 }
 
 // ============================================================================

@@ -712,34 +712,78 @@ pub use crate::logger::{CleanupHistorySummary, CleanupLogEntryInput};
 /// 记录清理操作到日志文件
 #[tauri::command]
 pub async fn record_cleanup_action(
-    handle: tauri::AppHandle,
     entries: Vec<CleanupLogEntryInput>,
 ) -> Result<String, String> {
-    let app_data_dir = handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    let app_data_dir = crate::data_dir::get_data_dir();
     crate::logger::record_cleanup_action(&app_data_dir, entries).await
 }
 
 /// 打开日志文件夹
 #[tauri::command]
-pub async fn open_logs_folder(handle: tauri::AppHandle) -> Result<(), String> {
-    let app_data_dir = handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+pub async fn open_logs_folder() -> Result<(), String> {
+    let app_data_dir = crate::data_dir::get_data_dir();
     crate::logger::open_logs_folder(&app_data_dir)
 }
 
 /// 获取清理历史记录列表
 #[tauri::command]
-pub async fn get_cleanup_history(handle: tauri::AppHandle) -> Result<Vec<CleanupHistorySummary>, String> {
-    let app_data_dir = handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+pub async fn get_cleanup_history() -> Result<Vec<CleanupHistorySummary>, String> {
+    let app_data_dir = crate::data_dir::get_data_dir();
     crate::logger::get_cleanup_history(&app_data_dir)
+}
+
+// ============================================================================
+// 数据目录管理命令
+// ============================================================================
+
+/// 获取当前数据目录路径
+#[tauri::command]
+pub fn get_data_directory() -> Result<String, String> {
+    Ok(crate::data_dir::get_data_dir()
+        .to_string_lossy()
+        .to_string())
+}
+
+/// 设置数据目录并迁移数据
+///
+/// # 参数
+/// - `path`: 新的数据目录路径
+#[tauri::command]
+pub fn set_data_directory(path: String) -> Result<String, String> {
+    let new_path = std::path::Path::new(&path);
+    crate::data_dir::set_data_dir(new_path)?;
+    Ok(format!(
+        "数据目录已更改为: {}",
+        crate::data_dir::get_data_dir().display()
+    ))
+}
+
+/// 清空本地数据（安装历史缓存 + 清理日志）
+///
+/// # 返回
+/// - `[file_count, freed_bytes]`: 删除的文件数和释放的字节数
+#[tauri::command]
+pub fn clear_local_data() -> Result<(usize, u64), String> {
+    crate::data_dir::clear_local_data()
+}
+
+/// 打开系统文件夹选择对话框
+///
+/// # 返回
+/// - 用户选择的文件夹路径，取消则返回 None
+#[tauri::command]
+pub async fn pick_folder_dialog(
+    app: tauri::AppHandle,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    // 使用阻塞式调用，在 Tauri 主线程上弹出原生对话框
+    let result = app
+        .dialog()
+        .file()
+        .set_title("选择数据存储目录")
+        .blocking_pick_folder();
+
+    Ok(result.map(|p| p.to_string()))
 }
 
 // ============================================================================

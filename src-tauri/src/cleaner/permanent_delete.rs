@@ -271,13 +271,41 @@ impl PermanentDeleteEngine {
     /// 【中文说明】
     /// 验证目标路径不在 C:\Windows、桌面、文档等系统关键目录内。
     /// 这是最后一道防线，确保不会误删系统文件。
+    ///
+    /// 路径匹配规则：
+    /// - 绝对路径（如 C:\Windows）：仅使用 starts_with + 路径分隔符边界检查
+    /// - 相对路径（如 \Desktop、\Documents）：使用路径组件匹配（\Desktop\ 或以 \Desktop 结尾）
     fn check_protected_path(&self, path: &str) -> Option<String> {
         let path_lower = path.to_lowercase();
 
         for protected in PROTECTED_PATHS {
             let protected_lower = protected.to_lowercase();
-            if path_lower.starts_with(&protected_lower) || path_lower.contains(&protected_lower) {
-                return Some(format!("路径包含受保护目录: {}", protected));
+
+            // 判断是绝对路径（含盘符）还是相对路径（以 \ 开头）
+            let is_absolute = protected_lower.len() >= 2
+                && protected_lower.as_bytes().get(1).copied() == Some(b':');
+
+            if is_absolute {
+                // 绝对路径：仅 starts_with + 路径分隔符边界检查
+                // 例如 C:\Windows 匹配 C:\Windows\System32，但不匹配 C:\WindowsApp
+                if path_lower.starts_with(&protected_lower) {
+                    let next_char = path_lower[protected_lower.len()..].chars().next();
+                    if next_char.is_none() || next_char == Some('\\') {
+                        return Some(format!("路径包含受保护目录: {}", protected));
+                    }
+                }
+            } else {
+                // 相对路径（如 \Desktop）：路径组件级别匹配
+                // 检查路径中是否包含 \Desktop\ 或以 \Desktop 结尾
+                // 防止 \Desktop 误匹配 \DesktopApp
+                let comp_with_sep = format!("{}\\", protected_lower);
+                if path_lower.starts_with(&format!("{}\\", protected_lower.trim_start_matches('\\')))
+                    || path_lower.contains(&comp_with_sep)
+                    || path_lower.ends_with(&protected_lower)
+                {
+                    let reason = format!("路径包含受保护目录: {}", protected.trim_start_matches('\\'));
+                    return Some(reason);
+                }
             }
         }
 

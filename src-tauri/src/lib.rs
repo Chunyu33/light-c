@@ -6,6 +6,7 @@
 // 模块声明
 mod cleaner;
 mod commands;
+mod data_dir;
 mod health_score;
 mod logger;
 mod scanner;
@@ -45,6 +46,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         // .plugin(tauri_plugin_updater::Builder::new().build()) // 自动更新功能已停用
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
@@ -110,6 +112,11 @@ pub fn run() {
             analyze_programdata,
             diff_programdata,
             clean_programdata,
+            // 数据目录管理
+            get_data_directory,
+            set_data_directory,
+            clear_local_data,
+            pick_folder_dialog,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

@@ -177,14 +177,20 @@ export function LeftoversModule() {
       });
 
       if (result.errors.length > 0) {
-        setDeleteError(`${result.errors.length} 个文件夹删除失败`);
-        setDeleteErrors(result.errors); // 保存详细错误列表
+        const skippedMsg = result.skipped_executables?.length
+          ? `（${result.skipped_executables.length} 个因包含可执行文件被跳过，请使用深度清理）`
+          : '';
+        setDeleteError(`${result.errors.length} 个文件夹处理异常${skippedMsg}`);
+        setDeleteErrors(result.errors);
       }
 
-      // 从结果中移除已删除的项
+      // 从结果中移除已删除的项（保留失败和因可执行文件跳过的项）
       if (scanResult) {
+        const skippedSet = new Set(result.skipped_executables || []);
         const remainingLeftovers = scanResult.leftovers.filter(
-          l => !selectedPaths.has(l.path) || result.failed_paths.includes(l.path)
+          l => !selectedPaths.has(l.path)
+            || result.failed_paths.includes(l.path)
+            || skippedSet.has(l.path)
         );
         const newTotalSize = remainingLeftovers.reduce((sum, l) => sum + l.size, 0);
 
@@ -194,9 +200,11 @@ export function LeftoversModule() {
           total_size: newTotalSize,
         });
 
-        // 更新选中状态
+        // 更新选中状态（仅保留未成功删除的项）
         const newSelected = new Set(
-          Array.from(selectedPaths).filter(p => result.failed_paths.includes(p))
+          Array.from(selectedPaths).filter(
+            p => result.failed_paths.includes(p) || skippedSet.has(p)
+          )
         );
         setSelectedPaths(newSelected);
 
@@ -327,6 +335,17 @@ export function LeftoversModule() {
     }
   }, [scanResult, selectedPaths]);
 
+  // 选择全部可疑项
+  const selectAllSuspicious = useCallback(() => {
+    if (!scanResult) return;
+    const suspicious = new Set(
+      scanResult.leftovers
+        .filter(l => l.detection_category === 'Suspicious')
+        .map(l => l.path)
+    );
+    setSelectedPaths(suspicious);
+  }, [scanResult]);
+
   // 获取来源显示名称
   const getSourceName = (source: LeftoverEntry['source']) => {
     switch (source) {
@@ -449,6 +468,14 @@ export function LeftoversModule() {
                 >
                   {selectedPaths.size === scanResult.leftovers.length ? '取消全选' : '全选'}
                 </button>
+                {suspiciousCount > 0 && (
+                  <button
+                    onClick={selectAllSuspicious}
+                    className="text-sm text-[var(--color-warning)] hover:underline"
+                  >
+                    选择可疑项
+                  </button>
+                )}
                 <span className="text-sm text-[var(--text-muted)]">
                   已选 {selectedPaths.size} 项，共 {formatSize(selectedSize)}
                 </span>

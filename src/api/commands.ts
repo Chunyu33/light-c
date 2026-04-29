@@ -339,6 +339,8 @@ export interface LeftoverDeleteResult {
   failed_paths: string[];
   /** 错误信息列表 */
   errors: string[];
+  /** 因包含可执行文件被跳过的路径（需通过深度清理处理） */
+  skipped_executables: string[];
 }
 
 /**
@@ -1136,4 +1138,39 @@ export async function cleanProgramData(
   allowWarning: boolean = false,
 ): Promise<ProgramDataCleanResult> {
   return invoke<ProgramDataCleanResult>('clean_programdata', { entries, allow_warning: allowWarning });
+}
+
+// ============================================================================
+// 数据目录管理 API
+// ============================================================================
+
+/**
+ * 获取当前数据目录路径
+ */
+export async function getDataDirectory(): Promise<string> {
+  return invoke<string>('get_data_directory');
+}
+
+/**
+ * 设置数据目录并迁移已有数据
+ * @param path 新的数据目录路径
+ */
+export async function setDataDirectory(path: string): Promise<string> {
+  return invoke<string>('set_data_directory', { path });
+}
+
+/**
+ * 清空本地数据（安装历史缓存 + 清理日志）
+ * @returns [删除文件数, 释放字节数]
+ */
+export async function clearLocalData(): Promise<[number, number]> {
+  return invoke<[number, number]>('clear_local_data');
+}
+
+/**
+ * 打开系统文件夹选择对话框
+ * @returns 用户选择的文件夹路径，取消则返回 null
+ */
+export async function pickFolderDialog(): Promise<string | null> {
+  return invoke<string | null>('pick_folder_dialog');
 }

@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Navigation } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Navigation, Trash2 } from 'lucide-react';
 
 // 赞赏码图片
 import wechatQr from '../assets/r_wechat_qr.jpg';
@@ -14,7 +14,7 @@ import { Type } from 'lucide-react';
 // import { check } from '@tauri-apps/plugin-updater'; // 自动更新功能已停用
 // import { relaunch } from '@tauri-apps/plugin-process'; // 自动更新功能已停用
 import { getVersion } from '@tauri-apps/api/app';
-import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings } from '../api/commands';
+import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, clearLocalData, pickFolderDialog } from '../api/commands';
 import { formatSize } from '../utils/format';
 
 type SettingsTab = 'general' | 'security' | 'guide' | 'feedback' | 'about';
@@ -138,12 +138,50 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
   const { level: fontSizeLevel, setLevel: setFontSizeLevel } = useFontSize();
   const { settings, updateSettings } = useSettings();
+  const [dataDir, setDataDir] = useState('');
+  const [isChangingDir, setIsChangingDir] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  // 加载当前数据目录
+  useEffect(() => {
+    getDataDirectory().then(setDataDir).catch(() => setDataDir('未知'));
+  }, []);
 
   const handleOpenLogsFolder = async () => {
     try {
       await openLogsFolder();
     } catch (error) {
       console.error('打开日志文件夹失败:', error);
+    }
+  };
+
+  // 更改数据目录
+  const handleChangeDataDir = async () => {
+    try {
+      setIsChangingDir(true);
+      const folder = await pickFolderDialog();
+      if (!folder) { setIsChangingDir(false); return; }
+      const msg = await setDataDirectory(folder);
+      setDataDir(folder);
+      console.log(msg);
+    } catch (error) {
+      console.error('更改数据目录失败:', error);
+    } finally {
+      setIsChangingDir(false);
+    }
+  };
+
+  // 清空本地数据
+  const handleClearData = async () => {
+    if (!window.confirm('确定要清空所有本地数据吗？\n\n这将删除：\n• 安装历史缓存\n• 所有清理日志记录\n\n此操作不可撤销。')) return;
+    try {
+      setIsClearing(true);
+      const [fileCount, freedBytes] = await clearLocalData();
+      console.log(`已清空 ${fileCount} 个文件，释放 ${formatSize(freedBytes)}`);
+    } catch (error) {
+      console.error('清空数据失败:', error);
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -233,25 +271,76 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
         </div>
       </div>
 
-      {/* 数据管理 - 使用 border-t 分隔 */}
+      {/* 数据管理 */}
       <div className="space-y-3 pt-2 border-t border-[var(--border-color)]">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <History className="w-3.5 h-3.5" />
           数据管理
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl">
-          {/* 清理日志记录 */}
+        <div className="bg-[var(--bg-main)] rounded-2xl divide-y divide-[var(--border-color)]">
+          {/* 当前数据目录 */}
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-[var(--text-muted)]">存储位置</span>
+              <span className="text-[10px] text-[var(--text-faint)] max-w-[250px] truncate" title={dataDir}>
+                {dataDir || '加载中...'}
+              </span>
+            </div>
+          </div>
+          {/* 更改数据目录 */}
           <button
-            onClick={handleOpenLogsFolder}
-            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] rounded-2xl transition-colors group"
+            onClick={handleChangeDataDir}
+            disabled={isChangingDir}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] transition-colors group disabled:opacity-50"
           >
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center">
-                <FolderOpen className="w-4.5 h-4.5 text-[var(--brand-green)]" />
+                {isChangingDir ? (
+                  <RefreshCw className="w-4.5 h-4.5 text-[var(--brand-green)] animate-spin" />
+                ) : (
+                  <FolderOpen className="w-4.5 h-4.5 text-[var(--brand-green)]" />
+                )}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-[var(--text-primary)]">更改数据目录</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">选择存储清理日志和缓存数据的位置，已有数据将自动迁移</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
+          </button>
+          {/* 打开日志文件夹 */}
+          <button
+            onClick={handleOpenLogsFolder}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center">
+                <History className="w-4.5 h-4.5 text-[var(--brand-green)]" />
               </div>
               <div className="text-left">
                 <p className="text-sm font-medium text-[var(--text-primary)]">清理日志</p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">记录最近10次清理的详细文件清单与结果</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">查看历史清理记录与详细文件清单</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
+          </button>
+          {/* 清空本地数据 */}
+          <button
+            onClick={handleClearData}
+            disabled={isClearing}
+            className="w-full flex items-center justify-between p-4 hover:bg-[var(--bg-hover)] rounded-b-2xl transition-colors group disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[var(--color-danger)]/10 flex items-center justify-center">
+                {isClearing ? (
+                  <RefreshCw className="w-4.5 h-4.5 text-[var(--color-danger)] animate-spin" />
+                ) : (
+                  <Trash2 className="w-4.5 h-4.5 text-[var(--color-danger)]" />
+                )}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-[var(--text-primary)]">清空本地数据</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">删除安装历史缓存与所有清理日志记录</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
@@ -488,8 +577,17 @@ function GuideSettings() {
               卸载残留
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              扫描 AppData 和 ProgramData 目录中已卸载软件遗留的孤立文件夹。系统会自动排除仍在注册表中的已安装程序。
-              <span className="text-[var(--color-warning)] font-medium">深度清理</span>功能将直接从磁盘永久删除文件，不经过回收站。
+              基于<span className="text-[var(--brand-green)] font-medium">置信度评分引擎</span>（7项正向信号 + 7项负向信号），智能识别 AppData 和 ProgramData 中已卸载软件的残留文件夹。
+              系统会自动读取注册表构建已安装应用映射，结合<span className="text-[var(--brand-green)] font-medium">安装历史缓存</span>检测"曾经安装现已卸载"的残留。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              <span className="text-[var(--brand-green)] font-medium">双重删除模式：</span>
+              普通删除含可执行文件预检查（含 .exe/.dll/.sys 的文件夹自动跳过），
+              深度清理执行完整的<span className="text-[var(--color-warning)] font-medium">安全检查协议</span>（白名单 + 可执行文件扫描），发现风险项标记为人工审核。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              <span className="text-[var(--color-danger)] font-medium">模拟器残留：</span>
+              自动检测雷电、蓝叠、夜神、MuMu、MEmu 等7款安卓模拟器的卸载残留和虚拟磁盘文件（.vmdk/.vdi/.vhd）。
             </p>
           </div>
           <div>
@@ -564,39 +662,36 @@ function GuideSettings() {
         </div>
       </div>
 
-      {/* 深度扫描功能说明 */}
+      {/* 置信度评分说明 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
-          <Layers className="w-3.5 h-3.5" />
-          深度扫描功能
+          <ShieldCheck className="w-3.5 h-3.5" />
+          评分与安全保障
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
-              <Package className="w-4 h-4 text-[var(--color-warning)]" />
-              模拟器残留检测
+              <Cpu className="w-4 h-4 text-[var(--brand-green)]" />
+              置信度评分引擎
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              支持检测主流安卓模拟器（<span className="font-medium">雷电、蓝叠、夜神、MuMu、MEmu、腾讯手游助手</span>等）的卸载残留。
-              系统会扫描 AppData、LocalLow、ProgramData 目录下的模拟器配置文件、虚拟磁盘文件（.vmdk/.vmdk/.vhd）等大型残留，
-              这些文件通常占用<span className="text-[var(--color-danger)] font-medium">数十GB</span>空间。
+              卸载残留模块采用加权评分模型（0.0~1.0），综合<span className="font-medium">7项正向信号</span>（如文件夹名匹配已知应用、含卸载程序残留）
+              和<span className="font-medium">7项负向信号</span>（如通用目录名、已安装应用映射、共享厂商目录）。
+              <span className="text-[var(--brand-green)] font-medium">≥0.65 高置信度</span>的条目默认勾选，
+              <span className="text-[var(--color-warning)] font-medium">0.40~0.65 可疑项</span>供手动判断，&lt;0.40 的条目不输出。
             </p>
           </div>
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
-              <Database className="w-4 h-4 text-[var(--color-warning)]" />
-              冗余注册表深度扫描
+              <Shield className="w-4 h-4 text-[var(--brand-green)]" />
+              删除安全机制
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              深度扫描 HKEY_CURRENT_USER\Software 和 HKEY_LOCAL_MACHINE\SOFTWARE 下的孤立注册表项，
-              识别已卸载软件遗留的配置信息和<span className="text-[var(--color-warning)] font-medium">孤立驱动服务项</span>。
-              清理前会自动创建备份，确保操作安全可逆。
+              <span className="font-medium">普通删除：</span>路径范围校验 + 浅层可执行文件扫描（exe/dll/sys），含可执行文件的目录自动跳过并引导使用深度清理。
             </p>
-          </div>
-          <div className="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/20 rounded-xl p-3">
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              <span className="font-medium">💡 使用提示：</span>在卸载残留模块中开启"深度扫描"开关，即可启用模拟器残留和虚拟磁盘文件检测功能。
-              大型残留文件会以<span className="text-[var(--color-danger)] font-medium">红色高亮</span>显示，方便快速识别。
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              <span className="text-[var(--color-warning)] font-medium">深度清理：</span>白名单校验（19项系统保护路径）+ 可执行文件扫描（7种扩展名）+ 重启删除回退，
+              检测到风险项标记为"需人工审核"，确保不会误删正在使用的软件。
             </p>
           </div>
         </div>
