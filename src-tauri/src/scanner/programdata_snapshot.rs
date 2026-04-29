@@ -192,6 +192,9 @@ impl SnapshotManager {
 
     /// 保存快照
     pub fn save_snapshot(&self, snapshot: &Snapshot) -> Result<PathBuf, SnapshotError> {
+        // 在保存新快照前，清理旧格式快照（路径不含 "programdata" 的旧版数据）
+        self.cleanup_legacy_snapshots()?;
+
         // 生成文件名
         let filename = format!("{}{}{}", SNAPSHOT_PREFIX, snapshot.date, SNAPSHOT_SUFFIX);
         let filepath = self.snapshot_dir.join(&filename);
@@ -209,6 +212,43 @@ impl SnapshotManager {
 
         log::info!("快照已保存: {}", filepath.display());
         Ok(filepath)
+    }
+
+    /// 清理旧格式快照（路径不含 "programdata" 前缀的残留数据）
+    ///
+    /// v2.4 之前快照路径仅存目录名（如 "Microsoft"），与新版全路径格式
+    /// （"c:/programdata/microsoft"）不兼容，导致增长对比全部判定为"新增"。
+    /// 检测到旧格式快照时自动删除，下次扫描即可正常对比。
+    fn cleanup_legacy_snapshots(&self) -> Result<(), SnapshotError> {
+        let snapshots = self.list_snapshots()?;
+        let mut removed = 0usize;
+
+        for path in &snapshots {
+            let needs_removal = match self.load_snapshot(path) {
+                Ok(Some(snapshot)) => {
+                    // 检查第一个条目（如果有）的路径格式
+                    snapshot.entries.first().map_or(false, |e| {
+                        let p = e.path.to_lowercase();
+                        !p.contains("programdata")
+                    })
+                }
+                _ => false,
+            };
+
+            if needs_removal {
+                if let Err(e) = fs::remove_file(path) {
+                    log::warn!("删除旧格式快照失败: {} - {}", path.display(), e);
+                } else {
+                    removed += 1;
+                    log::info!("已删除旧格式快照: {}", path.display());
+                }
+            }
+        }
+
+        if removed > 0 {
+            log::info!("共清理 {} 个旧格式快照，下次扫描后可正常进行增长对比", removed);
+        }
+        Ok(())
     }
 
     /// 加载最新快照
@@ -358,41 +398,15 @@ impl std::error::Error for SnapshotError {}
 // 辅助函数
 // ============================================================================
 
-/// 获取应用数据目录
+/// 获取应用数据目录（统一使用 data_dir 模块）
 fn get_app_data_dir() -> Result<PathBuf, SnapshotError> {
-    // 优先使用 dirs crate 获取 LocalAppData
-    if let Some(local_data) = dirs::data_local_dir() {
-        return Ok(local_data.join("LightC"));
-    }
-
-    // 回退：使用环境变量
-    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        return Ok(PathBuf::from(local_app_data).join("LightC"));
-    }
-
-    Err(SnapshotError::IoError("无法获取应用数据目录".to_string()))
+    Ok(crate::data_dir::get_data_dir())
 }
 
-/// 标准化路径（移除 ProgramData 前缀，统一格式）
+/// 标准化路径（小写 + 统一分隔符，与 programdata_growth 保持一致）
+/// 保持完整路径以确保快照对比能正确匹配同名目录
 fn normalize_path(path: &str) -> String {
-    let path = path.replace('\\', "/");
-
-    // 移除 C:/ProgramData/ 前缀
-    let prefixes = [
-        "c:/programdata/",
-        "C:/ProgramData/",
-        "c:\\programdata\\",
-        "C:\\ProgramData\\",
-    ];
-
-    for prefix in prefixes {
-        if let Some(stripped) = path.strip_prefix(prefix) {
-            return stripped.to_string();
-        }
-    }
-
-    // 如果没有前缀，返回原路径
-    path
+    path.to_lowercase().replace('\\', "/")
 }
 
 // ============================================================================
@@ -440,9 +454,12 @@ pub fn create_snapshot_from_scan(
     let mut builder = SnapshotBuilder::new().total_size(total_size);
 
     for (path, size) in entries {
-        // 一级目录（不包含子路径分隔符的就是一级目录）
+        // 一级目录：Path 去掉 ProgramData 前缀后不含分隔符
         let normalized = normalize_path(path);
-        if !normalized.contains('/') {
+        let without_prefix = normalized
+            .strip_prefix("c:/programdata/")
+            .unwrap_or(&normalized);
+        if !without_prefix.contains('/') {
             builder.add_first_level(path, *size);
         }
 
@@ -465,9 +482,15 @@ mod tests {
 
     #[test]
     fn test_normalize_path() {
-        assert_eq!(normalize_path("C:\\ProgramData\\Microsoft"), "Microsoft");
-        assert_eq!(normalize_path("c:/programdata/NVIDIA"), "NVIDIA");
-        assert_eq!(normalize_path("SomeDir"), "SomeDir");
+        assert_eq!(
+            normalize_path("C:\\ProgramData\\Microsoft"),
+            "c:/programdata/microsoft"
+        );
+        assert_eq!(
+            normalize_path("c:/programdata/NVIDIA"),
+            "c:/programdata/nvidia"
+        );
+        assert_eq!(normalize_path("SomeDir"), "somedir");
     }
 
     #[test]

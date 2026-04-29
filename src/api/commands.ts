@@ -1040,6 +1040,20 @@ export interface ProgramDataAnalyzeResult {
   warning_size: number;
 }
 
+/** 合并扫描+分析的响应格式（减少一次 IPC 往返） */
+export interface ProgramDataScanAndAnalyzeResponse {
+  /** ProgramData 总大小（字节） */
+  total_size: number;
+  /** 扫描文件总数 */
+  total_files_scanned: number;
+  /** 扫描耗时（毫秒） */
+  scan_duration_ms: number;
+  /** 无权限访问的目录数 */
+  inaccessible_count: number;
+  /** 分析结果 */
+  analyze: ProgramDataAnalyzeResult;
+}
+
 /** ProgramData 增长条目 */
 export interface ProgramDataGrowthEntry {
   /** 目录路径 */
@@ -1115,6 +1129,16 @@ export interface ProgramDataCleanResult {
  */
 export async function scanProgramData(): Promise<ProgramDataScanResult> {
   return invoke<ProgramDataScanResult>('scan_programdata');
+}
+
+/**
+ * 扫描并分析 ProgramData（合并 scan + analyze，减少一次 IPC 往返）
+ *
+ * 在同一个后端 spawn_blocking 中完成扫描和规则分析，
+ * 同时异步保存快照用于后续增长对比。
+ */
+export async function scanAndAnalyzeProgramData(): Promise<ProgramDataScanAndAnalyzeResponse> {
+  return invoke<ProgramDataScanAndAnalyzeResponse>('scan_and_analyze_programdata');
 }
 
 /**

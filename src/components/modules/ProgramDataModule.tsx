@@ -11,12 +11,11 @@ import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import {
-  scanProgramData,
-  analyzeProgramData,
+  scanAndAnalyzeProgramData,
   diffProgramData,
   cleanProgramData,
   openInFolder,
-  type ProgramDataScanResult,
+  type ProgramDataScanAndAnalyzeResponse,
   type ProgramDataAnalyzeEntry,
   type ProgramDataAnalyzeResult,
   type ProgramDataGrowthReport,
@@ -245,7 +244,7 @@ export function ProgramDataModule() {
   const lastScanTriggerRef = useRef(0);
 
   // 本地状态
-  const [scanResult, setScanResult] = useState<ProgramDataScanResult | null>(null);
+  const [scanSummary, setScanSummary] = useState<ProgramDataScanAndAnalyzeResponse | null>(null);
   const [analyzeResult, setAnalyzeResult] = useState<ProgramDataAnalyzeResult | null>(null);
   const [growthReport, setGrowthReport] = useState<ProgramDataGrowthReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -260,28 +259,25 @@ export function ProgramDataModule() {
 
   const isExpanded = expandedModule === 'programdata';
 
-  // 执行完整扫描流程：scan → analyze → diff
+  // 执行完整扫描流程：合并 scan+analyze 为一个调用，diff 异步
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
     scanningRef.current = true;
 
     updateModuleState('programdata', { status: 'scanning' });
     setError(null);
-    setScanResult(null);
+    setScanSummary(null);
     setAnalyzeResult(null);
     setGrowthReport(null);
     setShowAll(false);
 
     try {
-      // 1. 扫描
-      const scan = await scanProgramData();
-      setScanResult(scan);
+      // 1. 合并扫描+分析（单次 IPC）
+      const combined = await scanAndAnalyzeProgramData();
+      setScanSummary(combined);
+      setAnalyzeResult(combined.analyze);
 
-      // 2. 分析
-      const analyze = await analyzeProgramData(scan.entries);
-      setAnalyzeResult(analyze);
-
-      // 3. 增长对比（可能没有历史数据，不报错）
+      // 2. 增长对比（不阻塞主结果展示，失败静默忽略）
       try {
         const diff = await diffProgramData();
         setGrowthReport(diff);
@@ -291,8 +287,8 @@ export function ProgramDataModule() {
 
       updateModuleState('programdata', {
         status: 'done',
-        fileCount: analyze.entries.length,
-        totalSize: analyze.cleanable_size,
+        fileCount: combined.analyze.entries.length,
+        totalSize: combined.analyze.cleanable_size,
       });
     } catch (err) {
       console.error('ProgramData 扫描失败:', err);
@@ -325,10 +321,12 @@ export function ProgramDataModule() {
     setCleanTarget(entry);
   }, []);
 
-  // 执行单项清理
+  // 执行单项清理（本地更新状态，避免完整 re-scan）
   const handleSingleCleanConfirm = useCallback(async () => {
     if (!cleanTarget) return;
     setIsCleaning(true);
+    const targetPath = cleanTarget.path;
+    const targetSize = cleanTarget.size;
     try {
       const result: ProgramDataCleanResult = await cleanProgramData([cleanTarget], false);
       if (result.success_count > 0) {
@@ -337,8 +335,26 @@ export function ProgramDataModule() {
           title: '清理完成',
           description: `已释放 ${formatSize(result.freed_size)}`,
         });
-        // 重新扫描更新数据
-        handleScan();
+
+        // 本地更新状态：移除已清理条目
+        setAnalyzeResult((prev) => {
+          if (!prev) return prev;
+          const updated = prev.entries.filter((e) => e.path !== targetPath);
+          const cleanableSize = updated
+            .filter(
+              (e) =>
+                e.risk === 'safe' &&
+                (e.action === 'delete' || e.action === 'suggest')
+            )
+            .reduce((sum, e) => sum + e.size, 0);
+          return { ...prev, entries: updated, cleanable_size: cleanableSize };
+        });
+
+        // 更新 Dashboard 状态
+        updateModuleState('programdata', {
+          fileCount: (analyzeResult?.entries.length ?? 1) - 1,
+          totalSize: (analyzeResult?.cleanable_size ?? targetSize) - targetSize,
+        });
       } else if (result.skipped_count > 0) {
         showToast({
           type: 'warning',
@@ -358,9 +374,9 @@ export function ProgramDataModule() {
       setIsCleaning(false);
       setCleanTarget(null);
     }
-  }, [cleanTarget, handleScan, showToast]);
+  }, [cleanTarget, analyzeResult, updateModuleState, showToast]);
 
-  // 一键清理（只清理 Safe 级别）
+  // 一键清理（只清理 Safe 级别，本地更新状态）
   const handleBatchClean = useCallback(async () => {
     if (!analyzeResult) return;
     const safeEntries = analyzeResult.entries.filter(
@@ -382,7 +398,30 @@ export function ProgramDataModule() {
           title: '一键清理完成',
           description: `成功清理 ${result.success_count} 项，释放 ${formatSize(result.freed_size)}${extra}`,
         });
-        handleScan();
+
+        // 本地更新：移除成功清理的条目
+        const successPaths = new Set(
+          result.results.filter((r) => r.success).map((r) => r.path.toLowerCase())
+        );
+        setAnalyzeResult((prev) => {
+          if (!prev) return prev;
+          const updated = prev.entries.filter(
+            (e) => !successPaths.has(e.path.toLowerCase())
+          );
+          const cleanableSize = updated
+            .filter(
+              (e) =>
+                e.risk === 'safe' &&
+                (e.action === 'delete' || e.action === 'suggest')
+            )
+            .reduce((sum, e) => sum + e.size, 0);
+          return { ...prev, entries: updated, cleanable_size: cleanableSize };
+        });
+
+        updateModuleState('programdata', {
+          fileCount: analyzeResult.entries.length - result.success_count,
+          totalSize: Math.max(0, (analyzeResult.cleanable_size ?? 0) - (result.freed_size ?? 0)),
+        });
       } else if (result.skipped_count > 0) {
         const reason = result.results.find(r => r.skip_reason)?.skip_reason ?? '条目被跳过';
         showToast({ type: 'warning', title: '清理受阻', description: reason });
@@ -396,7 +435,7 @@ export function ProgramDataModule() {
       setIsCleaning(false);
       setShowBatchCleanConfirm(false);
     }
-  }, [analyzeResult, handleScan, showToast]);
+  }, [analyzeResult, updateModuleState, showToast]);
 
   // 显示的条目
   const entries = analyzeResult?.entries ?? [];
@@ -450,7 +489,7 @@ export function ProgramDataModule() {
           <div className="p-4 space-y-4">
             {/* Summary 卡片 */}
             <SummaryCards
-              totalSize={scanResult?.total_size ?? 0}
+              totalSize={scanSummary?.total_size ?? 0}
               cleanableSize={analyzeResult.cleanable_size}
               growthReport={growthReport}
             />

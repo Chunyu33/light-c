@@ -252,40 +252,21 @@ impl ProgramDataCleaner {
         None
     }
 
-    /// 验证路径是否安全
+    /// 验证路径是否安全（使用路径组件边界匹配，防止前缀绕过）
     fn validate_path(&self, path: &str) -> Option<String> {
-        let path_lower = path.to_lowercase();
+        let path_lower = path.to_lowercase().replace('\\', "/");
 
-        // 必须是 ProgramData 下的路径
-        if !path_lower.contains("\\programdata\\") && !path_lower.contains("/programdata/") {
+        // 必须是 ProgramData 下的路径（路径组件边界匹配）
+        if !path_lower.starts_with("c:/programdata/") {
             return Some("不是 ProgramData 目录".to_string());
         }
 
-        // 路径深度检查（至少要有 ProgramData 下的一级目录）
-        let programdata_idx = path_lower.find("programdata").unwrap_or(0);
-        let after_programdata = &path[programdata_idx + 11..]; // "programdata" 长度
-        let trimmed = after_programdata.trim_start_matches(['\\', '/']);
+        // 路径深度检查：至少要有 ProgramData 下的一级子目录
+        let after_programdata: &str = &path_lower["c:/programdata/".len()..];
+        let trimmed = after_programdata.trim_start_matches('/');
 
         if trimmed.is_empty() {
             return Some("不能删除 ProgramData 根目录".to_string());
-        }
-
-        // 对于 ProgramData 外部的路径片段进行受保护路径检查
-        // ProgramData 内部子目录名中包含 "Windows" 等是合法的（如 Microsoft\Windows\WER）
-        let prefix = &path_lower[..programdata_idx];
-        let non_programdata_forbidden = [
-            "\\system32\\",
-            "\\syswow64\\",
-            "\\program files\\",
-            "\\program files (x86)\\",
-            "\\users\\",
-            "\\appdata\\",
-        ];
-
-        for pattern in non_programdata_forbidden {
-            if prefix.contains(pattern) {
-                return Some(format!("包含受保护路径: {}", pattern));
-            }
         }
 
         None
@@ -523,9 +504,16 @@ mod tests {
     fn test_validate_path_forbidden() {
         let cleaner = ProgramDataCleaner::new();
 
-        assert!(cleaner.validate_path("C:\\Windows\\System32").is_some());
-        assert!(cleaner.validate_path("C:\\Program Files\\Test").is_some());
+        assert!(cleaner
+            .validate_path("C:\\Windows\\System32")
+            .is_some());
+        assert!(cleaner
+            .validate_path("C:\\Program Files\\Test")
+            .is_some());
         assert!(cleaner.validate_path("C:\\Users\\Test").is_some());
+        // 不能删除 ProgramData 根目录
+        assert!(cleaner.validate_path("C:\\ProgramData").is_some());
+        assert!(cleaner.validate_path("C:\\ProgramData\\").is_some());
     }
 
     #[test]

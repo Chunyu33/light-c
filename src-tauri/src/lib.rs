@@ -109,6 +109,7 @@ pub fn run() {
             open_storage_settings,
             // ProgramData 分析
             scan_programdata,
+            scan_and_analyze_programdata,
             analyze_programdata,
             diff_programdata,
             clean_programdata,

@@ -380,9 +380,19 @@ impl RuleEngine {
             MatchMode::Contains => normalized_path.contains(&pattern),
             MatchMode::Suffix => normalized_path.ends_with(&pattern),
             MatchMode::Regex => {
-                // 正则匹配（简化实现，生产环境建议使用 regex crate）
-                // 这里暂时退化为包含匹配
-                normalized_path.contains(&pattern)
+                // 使用 regex crate 进行真正的正则匹配
+                match regex::Regex::new(&pattern) {
+                    Ok(re) => re.is_match(normalized_path),
+                    Err(e) => {
+                        log::warn!(
+                            "规则 '{}' 的正则表达式无效 '{}': {}",
+                            rule.id,
+                            rule.pattern,
+                            e
+                        );
+                        false
+                    }
+                }
             }
         }
     }
