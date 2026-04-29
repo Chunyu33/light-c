@@ -11,7 +11,7 @@ import {
   ToastProvider, 
   WelcomeModal, 
   shouldShowWelcome,
-  // UpdateModal, // 自动更新功能已停用
+  UpdateModal,
   DashboardHeader,
   JunkCleanModule,
   BigFilesModule,
@@ -66,8 +66,8 @@ function DashboardContent() {
       {/* 欢迎弹窗 */}
       <WelcomeModal isOpen={showWelcome} onClose={() => setShowWelcome(false)} />
 
-      {/* 自动更新检查弹窗 - 功能已停用 */}
-      {/* <UpdateModal autoCheck={true} /> */}
+      {/* 自动更新检查弹窗 */}
+      <UpdateModal autoCheck={true} />
 
       {/* 锚点导航（根据设置显示） */}
       {settings.showAnchorNav && <AnchorNav scrollContainerRef={scrollContainerRef} />}

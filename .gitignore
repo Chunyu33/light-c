@@ -29,6 +29,8 @@ dist-ssr
 build.sh
 build.ps1
 
+/src-tauri/~/.tauri
+
 update.md
 release.ps1
 /docs

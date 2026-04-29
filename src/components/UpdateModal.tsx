@@ -3,12 +3,13 @@
 // 启动时自动检查更新，发现新版本时弹出精致的更新提示
 // ============================================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Download, RefreshCw, CheckCircle, AlertCircle, Sparkles, FileText, AlertTriangle } from 'lucide-react';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
+import { useToast } from './Toast';
 
 // ============================================================================
 // 类型定义
@@ -83,48 +84,61 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
+  const { showToast } = useToast();
+  const sourceRef = useRef<'auto' | 'manual'>('auto');
 
   // 获取当前版本
   useEffect(() => {
     getVersion().then(setCurrentVersion).catch(() => setCurrentVersion('未知'));
   }, []);
 
-  // 检查更新
-  const checkForUpdate = useCallback(async () => {
+  // 检查更新（source: 'auto' 启动自动检查 / 'manual' 用户手动触发）
+  const checkForUpdate = useCallback(async (source: 'auto' | 'manual' = 'auto') => {
+    sourceRef.current = source;
     setStatus('checking');
     setErrorMessage('');
-    
+
     try {
       const updateResult = await check();
-      
+
       if (updateResult) {
         setUpdate(updateResult);
         setStatus('available');
         setIsOpen(true);
-        // 延迟显示动画
         requestAnimationFrame(() => setIsVisible(true));
+      } else if (source === 'manual') {
+        showToast({
+          type: 'success',
+          title: '已是最新版本',
+          description: `当前版本 v${currentVersion} 已是最新`,
+        });
       }
-      // 如果没有更新，不显示模态框
     } catch (error) {
       console.error('检查更新失败:', error);
-      // 自动检查时不显示错误，只在手动检查时显示
-      if (!autoCheck) {
-        setErrorMessage(getErrorMessage(error));
-        setStatus('error');
+      // 始终记录错误状态，避免卡在 checking
+      setErrorMessage(getErrorMessage(error));
+      setStatus('error');
+      if (source === 'manual') {
         setIsOpen(true);
         requestAnimationFrame(() => setIsVisible(true));
       }
     }
-  }, [autoCheck]);
+  }, [autoCheck, currentVersion, showToast]);
 
   // 启动时自动检查
   useEffect(() => {
     if (autoCheck) {
-      // 延迟 2 秒检查，让应用先完成加载
-      const timer = setTimeout(checkForUpdate, 2000);
+      const timer = setTimeout(() => checkForUpdate('auto'), 2000);
       return () => clearTimeout(timer);
     }
   }, [autoCheck, checkForUpdate]);
+
+  // 监听手动触发事件（来自 SettingsModal 的"检查更新"按钮）
+  useEffect(() => {
+    const handler = () => checkForUpdate('manual');
+    window.addEventListener('lightc:check-update', handler);
+    return () => window.removeEventListener('lightc:check-update', handler);
+  }, [checkForUpdate]);
 
   // 下载并安装更新
   const handleDownloadAndInstall = async () => {
@@ -173,15 +187,15 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     setTimeout(() => setIsOpen(false), 200);
   };
 
-  // 重试
+  // 重试（沿用上次的触发来源）
   const handleRetry = () => {
-    checkForUpdate();
+    checkForUpdate(sourceRef.current);
   };
 
   if (!isOpen) return null;
 
   return createPortal(
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`fixed inset-0 z-[10000] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩 */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -316,7 +330,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-[var(--color-warning)] mt-0.5 shrink-0" />
                   <p className="text-xs text-[var(--text-muted)]">
-                    如果问题持续存在，请访问 GitHub 手动下载最新版本
+                    如果问题持续存在，请访问 GitHub 或 作者分享的其他下载渠道手动下载最新版本
                   </p>
                 </div>
               </div>

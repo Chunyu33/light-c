@@ -49,7 +49,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",
@@ -59,6 +59,14 @@
         "languages": ["SimpChinese", "English"],
         "displayLanguageSelector": false
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Chunyu33/light-c/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDOEQwNjIzNEM0M0E1OUIKUldTYnBVTk1Jd2FOYkxieVcrQVU4L1I2MHkyVE14Nkl0UlpuUzJVK0JrWVZ3b3BRNS80RkZKN0kK"
     }
   }
 }

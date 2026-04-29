@@ -10,9 +10,8 @@ import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, Ref
 import wechatQr from '../assets/r_wechat_qr.jpg';
 import alipayQr from '../assets/r_alipay_qr.jpg';
 import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSizeLevel, useSettings } from '../contexts';
+import { useToast } from './Toast';
 import { Type } from 'lucide-react';
-// import { check } from '@tauri-apps/plugin-updater'; // 自动更新功能已停用
-// import { relaunch } from '@tauri-apps/plugin-process'; // 自动更新功能已停用
 import { getVersion } from '@tauri-apps/api/app';
 import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, clearLocalData, pickFolderDialog } from '../api/commands';
 import { formatSize } from '../utils/format';
@@ -138,6 +137,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
   const { level: fontSizeLevel, setLevel: setFontSizeLevel } = useFontSize();
   const { settings, updateSettings } = useSettings();
+  const { showToast } = useToast();
   const [dataDir, setDataDir] = useState('');
   const [isChangingDir, setIsChangingDir] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -177,9 +177,17 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
     try {
       setIsClearing(true);
       const [fileCount, freedBytes] = await clearLocalData();
-      console.log(`已清空 ${fileCount} 个文件，释放 ${formatSize(freedBytes)}`);
+      showToast({
+        type: 'success',
+        title: '数据已清空',
+        description: `已删除 ${fileCount} 个文件，释放 ${formatSize(freedBytes)}`,
+      });
     } catch (error) {
-      console.error('清空数据失败:', error);
+      showToast({
+        type: 'error',
+        title: '清空失败',
+        description: String(error),
+      });
     } finally {
       setIsClearing(false);
     }
@@ -318,7 +326,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 <History className="w-4.5 h-4.5 text-[var(--brand-green)]" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-medium text-[var(--text-primary)]">清理日志</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">查看清理日志</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">查看历史清理记录与详细文件清单</p>
               </div>
             </div>
@@ -927,8 +935,6 @@ function AboutSettings() {
       .finally(() => setLoadingSystemInfo(false));
   }, []);
 
-  // 自动更新功能已停用，相关代码已移除
-
   return (
     <div className="space-y-6">
       <div className="space-y-3">
@@ -947,6 +953,15 @@ function AboutSettings() {
               <p className="text-xs text-[var(--text-faint)] mt-1">版本 {appVersion || '...'}</p>
             </div>
           </div>
+          {/* 检查更新按钮 */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('lightc:check-update'))}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--brand-green)] bg-[var(--brand-green)]/10 rounded-xl hover:bg-[var(--brand-green)]/20 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            检查更新
+          </button>
+          <p className="text-xs text-[var(--text-faint)] mt-3">温馨提示：更新源为GitHub，国内可能会出现间歇性DNS污染，如果失败可以稍后重试。</p>
         </div>
       </div>
 
