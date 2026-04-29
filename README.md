@@ -117,17 +117,20 @@ certutil -hashfile 文件名 SHA256
 - **一键安全清理**：所有输出均已通过安全验证，默认全选，一键删除
 
 ### ️️ 右键菜单清理
-- **深度扫描注册表**：基于 Rust 高性能 winreg 扫描器，覆盖任意文件、文件夹、桌面背景、磁盘备山等所有场景
+- **深度扫描注册表**：基于 Rust 高性能 winreg 扫描器，覆盖任意文件、文件夹、桌面背景、磁盘驱动器等所有场景
+- **MUIVerb 间接字符串解析**：通过 `SHLoadIndirectString` FFI 调用 Windows API 解析 `@%SystemRoot%\System32\xxx.dll,-1234` 等原始字符串为人类可读的菜单名称
+- **系统级菜单项自动保护**：`shellex\ContextMenuHandlers` 下的系统级右键菜单条目自动禁止选中和删除，防止破坏系统右键功能
+- **风险三级徽标**：每个条目标注风险等级（安全/谨慎/危险），一目了然
 - **智能识别失效项**：自动检查菜单命令中引用的 exe 文件是否存在，默认勾选失效条目
-- **分组展示**：按作用范围展示，支持展开条目查看完整注册表路径和原始命令
+- **删除前自动备份**：清理前自动导出 .reg 备份文件，出问题可双击还原
 - **分权限操作**：用户级（HKCU）不需管理员即可删除；系统级（HKLM）标识需要管理员权限
 
 ### 📂 ProgramData 分析
 - **两层扫描策略**：一级目录全量扫描，超过 100MB 的目录自动下钻子目录
-- **规则引擎分析**：内置 20+ 条分类规则，自动识别 Windows Update、Defender、驱动缓存、Docker、Adobe 等目录
+- **规则引擎分析**：内置 14 条分类规则，5 种匹配模式（Exact/Prefix/Contains/Suffix/Regex），自动识别 Windows Update、Defender、驱动缓存、Docker、Adobe 等目录
 - **风险分级**：安全/谨慎/危险三级标识，安全项可一键清理，危险项自动保护
-- **增长对比**：基于快照系统追踪目录大小变化，找出“悄悄变大”的目录
-- **安全清理**：所有删除移动到回收站，多层安全校验，稳定性优先
+- **增长对比**：基于快照系统追踪目录大小变化，找出”悄悄变大”的目录；支持新旧快照格式自动兼容
+- **安全清理**：所有删除移动到回收站，路径组件边界精确匹配校验
 
 ### �🛡️ 安全保护
 - **系统路径保护**：自动识别并跳过关键系统文件和目录
@@ -198,17 +201,23 @@ certutil -hashfile 文件名 SHA256
 │  │  - leftovers        │  ┌─────────────────────┐                           │
 │  │  - registry         │  │   Logger Module     │                           │
 │  │  - context_menu     │  └─────────────────────┘                           │
-│  │  - programdata      │  ┌─────────────────────┐                           │
-│  │  - programdata_rules│  │ ProgramData Module  │                           │
-│  │                     │  │  - rules engine     │                           │
-│  │                     │  │  - snapshot system  │                           │
-│  │                     │  │  - growth analyzer  │                           │
-│  │                     │  │  - safe cleaner     │                           │
-│  └─────────────────────┘  └─────────────────────┘                           │
+│  │  - programdata/*    │  ┌─────────────────────┐                           │
+│  │  (scanner/analyzer/ │  │   Data Dir Module   │                           │
+│  │   cleaner/snapshot/ │  └─────────────────────┘                           │
+│  │   growth)           │                                                   │
+│  └─────────────────────┘                                                   │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                          Commands Layer (IPC)                            │ │
+│  │   commands/disk.rs   commands/scan.rs   commands/social.rs              │ │
+│  │   commands/delete.rs   commands/system.rs   commands/leftovers.rs       │ │
+│  │   commands/registry.rs   commands/hotspot.rs   commands/programdata.rs  │ │
+│  │   commands/tools.rs   commands/logger_cmd.rs   commands/data.rs         │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                           Tauri Plugins                                 │ │
-│  │   - updater (自动更新)   - process (进程管理)   - opener (文件打开)     │ │
+│  │   - process (进程管理)   - opener (文件打开)   - dialog (原生对话框)    │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
@@ -310,7 +319,20 @@ LightC/
 │   │   │   ├── enhanced_delete.rs    # 增强删除（所有权获取）
 │   │   │   └── permanent_delete.rs   # 永久删除（绕过回收站）
 │   │   ├── logger/                   # 日志模块
-│   │   ├── commands.rs               # Tauri 命令接口（含系统瘦身、ProgramData）
+│   │   ├── commands/                  # Tauri 命令层（按功能域拆分）
+│   │   │   ├── mod.rs                 #   模块入口 + 统一 re-export
+│   │   │   ├── disk.rs               #   磁盘信息
+│   │   │   ├── scan.rs               #   垃圾扫描 + 大文件扫描
+│   │   │   ├── social.rs             #   社交软件专清
+│   │   │   ├── delete.rs             #   文件删除（基础/增强/永久）
+│   │   │   ├── system.rs             #   系统瘦身 + 健康评分 + 系统信息
+│   │   │   ├── leftovers.rs          #   卸载残留
+│   │   │   ├── registry.rs           #   注册表 + 右键菜单清理
+│   │   │   ├── hotspot.rs            #   大目录分析 + 下钻
+│   │   │   ├── programdata.rs        #   ProgramData 全系列
+│   │   │   ├── tools.rs              #   系统工具
+│   │   │   ├── logger_cmd.rs         #   清理日志
+│   │   │   └── data.rs               #   数据目录管理
 │   │   ├── lib.rs                    # 应用库入口
 │   │   └── main.rs                   # 应用主入口
 │   ├── capabilities/

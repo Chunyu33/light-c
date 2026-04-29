@@ -23,7 +23,7 @@ const STORAGE_KEY = 'c-cleanup-settings';
 
 /** 默认设置 */
 const defaultSettings: AppSettings = {
-  showAnchorNav: false, // 默认关闭
+  showAnchorNav: true, // 默认打开
 };
 
 interface SettingsProviderProps {

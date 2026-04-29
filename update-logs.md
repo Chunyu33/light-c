@@ -1,5 +1,49 @@
 # 📋 更新日志
 
+## v2.4.0 (2026-04-29)
+
+### 🔧 右键菜单清理 — 全面升级
+
+- **MUIVerb 间接字符串解析**：通过 `SHLoadIndirectString` FFI 调用 Windows Shell32 API，将 `@%SystemRoot%\System32\xxx.dll,-1234` 等原始字符串解析为人类可读的菜单名称（如「使用画图编辑」「打印」等），彻底解决前端显示不可读问题
+- **系统级菜单项自动保护**：`shellex\ContextMenuHandlers` 下的系统级右键菜单条目标记为受保护（`is_system_protected`），前端 UI 禁止勾选+删除，避免破坏系统右键功能
+- **风险三级徽标**：每个条目独立标注风险等级——安全（safe）/ 谨慎（caution）/ 危险（danger），一目了然
+- **删除前自动备份**：清理前自动调用 `reg.exe export` 导出 .reg 备份文件，出问题可双击还原
+- **白名单精确匹配**：改用 `eq_ignore_ascii_case` 而非通配 `contains`，杜绝短词碰撞误匹配
+
+### 🔧 ProgramData 分析 — 关键缺陷修复
+
+- **[CRITICAL] 增长对比彻底修复**：修复快照路径标准化不一致问题——旧版快照仅存目录名（如 `Microsoft`），新代码使用完整路径（`c:/programdata/microsoft`），导致增长对比自上线以来全部判定为「新增」。现已统一标准化逻辑，并加入旧格式快照自动清理机制，删除旧格式快照后下次扫描即可正常对比
+- **Regex 匹配模式真正实现**：规则引擎的 Regex 匹配模式之前仅降级为 `contains`，现已通过 `regex::Regex::new()` 实现真正的正则匹配
+- **清理后本地增量更新**：单项/批量清理后仅在本地移除已清理条目，不再触发完整重扫
+- **合并扫描+分析命令**：新增 `scan_and_analyze_programdata` 合并命令，单次 IPC 完成扫描+分析，前端从 3 次 IPC 降为 2 次
+- **路径安全校验加固**：`validate_path` 改用 `starts_with("c:/programdata/")` 组件边界匹配，替换不安全的 `contains`
+- **快照数据目录统一**：快照存储纳入统一 `data_dir` 模块管理，不再使用独立目录
+- **首次扫描兼容处理**：检测到新旧快照格式不兼容时自动返回优雅提示，不再显示错误的「全部新增」
+
+### 🧱 后端架构 — 命令模块化重构
+
+- **commands.rs 全面拆分**：将 ~1500 行的单文件命令模块拆分为 12 个功能域子模块，按大企业生产级标准组织：
+  - `disk.rs` — 磁盘信息
+  - `scan.rs` — 垃圾扫描 + 大文件扫描
+  - `social.rs` — 社交软件专清
+  - `delete.rs` — 文件删除 + 增强删除 + 永久删除
+  - `system.rs` — 系统瘦身 + 健康评分 + 系统信息
+  - `leftovers.rs` — 卸载残留
+  - `registry.rs` — 注册表 + 右键菜单清理
+  - `hotspot.rs` — 大目录分析 + 下钻
+  - `programdata.rs` — ProgramData 全系列
+  - `tools.rs` — 系统工具
+  - `logger_cmd.rs` — 清理日志
+  - `data.rs` — 数据目录管理
+- 所有公开 API 签名保持不变，`lib.rs` 无需任何改动，`cargo check` 零新增警告
+
+### 📝 文档更新
+
+- 新增 [右键菜单清理模块](docs/dev/右键菜单清理模块.md) 技术文档（完整链路 + 问题分析 + 修复记录）
+- 新增 [ProgramData 分析模块](docs/dev/ProgramData分析模块.md) 技术文档（完整链路 + Critical Bug 分析 + 优化记录）
+- 更新前后端模块说明文档
+
+
 ## v2.3.0 (2026-04-24)
 
 ### 🆕 新增功能
