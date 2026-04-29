@@ -98,27 +98,40 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     setStatus('checking');
     setErrorMessage('');
 
+    // 手动触发时立即打开弹窗显示 loading，给用户即时反馈
+    if (source === 'manual') {
+      setIsOpen(true);
+      requestAnimationFrame(() => setIsVisible(true));
+    }
+
     try {
       const updateResult = await check();
 
       if (updateResult) {
         setUpdate(updateResult);
         setStatus('available');
-        setIsOpen(true);
-        requestAnimationFrame(() => setIsVisible(true));
+        // auto 模式下需要打开弹窗；manual 模式弹窗已打开，仅切换状态
+        if (source === 'auto') {
+          setIsOpen(true);
+          requestAnimationFrame(() => setIsVisible(true));
+        }
       } else if (source === 'manual') {
+        // 已是最新版本：关闭弹窗 + toast 提示
+        setIsVisible(false);
+        setTimeout(() => setIsOpen(false), 200);
         showToast({
           type: 'success',
           title: '已是最新版本',
           description: `当前版本 v${currentVersion} 已是最新`,
         });
       }
+      // auto 模式无更新：静默（不弹窗）
     } catch (error) {
       console.error('检查更新失败:', error);
-      // 始终记录错误状态，避免卡在 checking
       setErrorMessage(getErrorMessage(error));
       setStatus('error');
-      if (source === 'manual') {
+      // manual 模式弹窗已打开，仅切换为错误状态；auto 模式需要打开弹窗
+      if (source === 'auto') {
         setIsOpen(true);
         requestAnimationFrame(() => setIsVisible(true));
       }
