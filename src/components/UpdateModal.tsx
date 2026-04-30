@@ -128,12 +128,11 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
       // auto 模式无更新：静默（不弹窗）
     } catch (error) {
       console.error('检查更新失败:', error);
-      setErrorMessage(getErrorMessage(error));
-      setStatus('error');
-      // manual 模式弹窗已打开，仅切换为错误状态；auto 模式需要打开弹窗
-      if (source === 'auto') {
-        setIsOpen(true);
-        requestAnimationFrame(() => setIsVisible(true));
+      // auto 模式：静默失败，不弹窗打扰用户
+      // manual 模式：弹窗已打开，切换为错误状态展示
+      if (source === 'manual') {
+        setErrorMessage(getErrorMessage(error));
+        setStatus('error');
       }
     }
   }, [autoCheck, currentVersion, showToast]);
