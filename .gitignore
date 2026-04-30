@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+/CLAUDE.*
+/.claude
 
 # Editor directories and files
 .vscode/*
@@ -35,5 +37,3 @@ update.md
 release.ps1
 /docs
 /dist_release
-/CLAUDE.md
-/.claude
