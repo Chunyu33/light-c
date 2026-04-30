@@ -1,6 +1,6 @@
 [package]
 name = "LightC"
-version = "2.4.1"
+version = "2.4.0"
 description = "Windows C盘智能清理工具"
 authors = ["Evan Lau"]
 edition = "2021"
