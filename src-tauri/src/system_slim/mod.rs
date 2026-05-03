@@ -3,7 +3,7 @@
 // 负责休眠文件管理、WinSxS 组件清理、虚拟内存迁移引导
 // ============================================================================
 
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, Window};
 
@@ -54,30 +54,26 @@ pub fn check_admin() -> bool {
 }
 
 // ============================================================================
-// 状态检测
+// 状态检测（异步：避免 DISM 阻塞主线程）
 // ============================================================================
 
-/// 获取系统瘦身状态
-pub fn get_status() -> SystemSlimStatus {
+/// 获取系统瘦身状态（并发检测，DISM 带 30s 超时）
+pub async fn get_status() -> SystemSlimStatus {
     let is_admin = check_admin();
-    let mut items = Vec::new();
-    let mut total_reclaimable: u64 = 0;
 
-    // 1. 休眠文件检测
-    let hibernation = get_hibernation_status();
-    if hibernation.enabled {
-        total_reclaimable += hibernation.size;
-    }
-    items.push(hibernation);
+    // 并发运行三项检测，互不阻塞
+    let (hibernation, winsxs, pagefile) = tokio::join!(
+        async { get_hibernation_status() },
+        get_winsxs_status(),
+        async { get_pagefile_status() },
+    );
 
-    // 2. WinSxS 组件存储
-    let winsxs = get_winsxs_status();
-    total_reclaimable += winsxs.size;
-    items.push(winsxs);
-
-    // 3. 虚拟内存检测
-    let pagefile = get_pagefile_status();
-    items.push(pagefile);
+    let items = vec![hibernation, winsxs, pagefile];
+    let total_reclaimable = items
+        .iter()
+        .filter(|i| i.enabled)
+        .map(|i| i.size)
+        .sum();
 
     SystemSlimStatus {
         is_admin,
@@ -86,12 +82,11 @@ pub fn get_status() -> SystemSlimStatus {
     }
 }
 
-/// 获取休眠文件状态（通过 powercfg /a 检测实际休眠状态）
+/// 获取休眠文件状态（通过注册表检测，不依赖 powercfg 编码）
 fn get_hibernation_status() -> SlimItemStatus {
     let hibernation_enabled = check_hibernation_enabled();
     let hiberfil_path = std::path::Path::new("C:\\hiberfil.sys");
-    let exists = hiberfil_path.exists();
-    let size = if exists {
+    let size = if hiberfil_path.exists() {
         std::fs::metadata(hiberfil_path)
             .map(|m| m.len())
             .unwrap_or(0)
@@ -106,7 +101,7 @@ fn get_hibernation_status() -> SlimItemStatus {
         warning: "关闭休眠将导致快速启动功能失效，电脑无法进入休眠状态".to_string(),
         enabled: hibernation_enabled,
         size,
-        actionable: true, // 休眠始终可切换（开启/关闭）
+        actionable: true,
         action_text: if hibernation_enabled {
             "关闭休眠".to_string()
         } else {
@@ -115,36 +110,27 @@ fn get_hibernation_status() -> SlimItemStatus {
     }
 }
 
-/// 通过 powercfg /a 检测休眠功能是否已启用
+/// 通过注册表检测休眠功能是否启用（快速、编码无关、不依赖 powercfg）
 fn check_hibernation_enabled() -> bool {
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
+        use winreg::{enums::*, RegKey};
 
-        let output = Command::new("powercfg")
-            .args(["/a"])
-            .creation_flags(0x08000000)
-            .output();
-
-        match output {
-            Ok(o) => {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                // 休眠已禁用时会输出 "尚未启用休眠" 或 "Hibernation has not been enabled"
-                let has_disabled_msg = stdout.contains("尚未启用休眠")
-                    || stdout.contains("not been enabled")
-                    || stdout.contains("未启用");
-                // 休眠可用时会列出 "休眠" 或 "Hibernate"
-                let has_hibernate = stdout.contains("休眠")
-                    || stdout.lines().any(|l| l.contains("Hibernate"));
-
-                !has_disabled_msg && has_hibernate
-            }
-            Err(_) => {
-                // 回退到文件存在性检测
-                std::path::Path::new("C:\\hiberfil.sys").exists()
+        // 主检测：注册表 HibernateEnabled 值（powercfg -h 的权威来源）
+        if let Ok(hklm) = RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey_with_flags(
+                r"SYSTEM\CurrentControlSet\Control\Power",
+                KEY_READ,
+            )
+        {
+            let value: u32 = hklm.get_value("HibernateEnabled").unwrap_or(0);
+            if value == 1 {
+                return true;
             }
         }
+
+        // 回退：检查 hiberfil.sys 是否存在
+        std::path::Path::new("C:\\hiberfil.sys").exists()
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -153,9 +139,9 @@ fn check_hibernation_enabled() -> bool {
     }
 }
 
-/// 获取 WinSxS 组件存储状态（通过 dism /analyzecomponentstore 获取真实可回收大小）
-fn get_winsxs_status() -> SlimItemStatus {
-    let estimated_reclaimable = analyze_winsxs_reclaimable();
+/// 获取 WinSxS 组件存储状态（DISM 分析在 spawn_blocking 中运行，带超时）
+async fn get_winsxs_status() -> SlimItemStatus {
+    let estimated_reclaimable = analyze_winsxs_async().await;
 
     SlimItemStatus {
         id: "winsxs".to_string(),
@@ -174,8 +160,34 @@ fn get_winsxs_status() -> SlimItemStatus {
     }
 }
 
-/// 运行 dism /analyzecomponentstore 获取实际可回收大小
-fn analyze_winsxs_reclaimable() -> u64 {
+/// 异步运行 DISM 分析，包装 spawn_blocking + 30s 超时
+async fn analyze_winsxs_async() -> u64 {
+    #[cfg(target_os = "windows")]
+    {
+        let dism_result = tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            tokio::task::spawn_blocking(analyze_winsxs_sync),
+        )
+        .await;
+
+        // 双重 Result：外层 timeout，中层 spawn_blocking，内层 analyze_winsxs_sync
+        match dism_result {
+            Ok(Ok(Ok(size))) => size,
+            _ => {
+                warn!("DISM 分析失败或超时，跳过 WinSxS 大小估算");
+                0
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        0
+    }
+}
+
+/// 同步运行 dism /analyzecomponentstore（在 spawn_blocking 中调用）
+fn analyze_winsxs_sync() -> Result<u64, String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -189,36 +201,28 @@ fn analyze_winsxs_reclaimable() -> u64 {
                 "/quiet",
             ])
             .creation_flags(0x08000000)
-            .output();
+            .output()
+            .map_err(|e| format!("执行 DISM 命令失败: {}", e))?;
 
-        match output {
-            Ok(o) => {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                let combined = format!("{}\n{}", stdout, String::from_utf8_lossy(&o.stderr));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let combined = format!("{}\n{}", stdout, String::from_utf8_lossy(&output.stderr));
 
-                // 解析 "Recommended cleanup size" 或 "Recommended :" 行
-                // 格式示例: "推荐清理大小 : 3.50 GB" 或 "Recommended cleanup size : 3.50 GB"
-                // 也可能是 MB 单位
-                for line in combined.lines() {
-                    if line.contains("Recommended")
-                        || line.contains("推荐")
-                        || line.contains("cleanup")
-                    {
-                        if let Some(size_bytes) = parse_size_from_line(line) {
-                            return size_bytes;
-                        }
-                    }
+        for line in combined.lines() {
+            if line.contains("Recommended")
+                || line.contains("推荐")
+                || line.contains("cleanup")
+            {
+                if let Some(size_bytes) = parse_size_from_line(line) {
+                    return Ok(size_bytes);
                 }
-                // 无法解析时回退到保守估计
-                0
             }
-            Err(_) => 0,
         }
+        Ok(0)
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        0
+        Ok(0)
     }
 }
 

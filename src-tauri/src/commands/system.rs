@@ -20,10 +20,10 @@ pub fn check_admin_privilege() -> bool {
     crate::system_slim::check_admin()
 }
 
-/// 获取系统瘦身状态
+/// 获取系统瘦身状态（异步：避免 DISM 阻塞主线程）
 #[tauri::command]
-pub fn get_system_slim_status() -> SystemSlimStatus {
-    crate::system_slim::get_status()
+pub async fn get_system_slim_status() -> SystemSlimStatus {
+    crate::system_slim::get_status().await
 }
 
 /// 关闭休眠功能
