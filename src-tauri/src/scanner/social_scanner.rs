@@ -146,6 +146,17 @@ impl FileCategory {
         }
     }
 
+    /// 获取分类唯一标识符（用于前后端 key 匹配）
+    pub fn id(&self) -> &'static str {
+        match self {
+            FileCategory::ChatDatabase => "chatdatabase",
+            FileCategory::ImageVideo => "imagevideo",
+            FileCategory::FileTransfer => "filetransfer",
+            FileCategory::TempCache => "tempcache",
+            FileCategory::MomentsCache => "momentscache",
+        }
+    }
+
     /// 获取该分类的默认风险等级
     pub fn default_risk_level(&self) -> RiskLevel {
         match self {
@@ -1318,9 +1329,12 @@ impl SocialScanner {
     fn detect_wxwork_paths(&self) -> Option<Vec<SocialAppPath>> {
         let mut paths = Vec::new();
 
+        // 企业微信可能将数据存储在文档目录或 AppData 中
         let base_paths = vec![
             PathBuf::from(format!("{}\\WXWork", self.documents_dir)),
             PathBuf::from(format!("{}\\WXWork", self.default_documents)),
+            PathBuf::from(format!("{}\\WXWork", self.appdata)),       // Roaming
+            PathBuf::from(format!("{}\\WXWork", self.local_appdata)), // Local
         ];
 
         for base_path in base_paths {
@@ -1460,7 +1474,7 @@ impl SocialScanner {
             category_map.insert(
                 *cat,
                 SocialCategoryStats {
-                    id: format!("{:?}", cat).to_lowercase(),
+                    id: cat.id().to_string(),
                     name: cat.display_name().to_string(),
                     description: cat.description().to_string(),
                     file_count: 0,
@@ -1658,7 +1672,10 @@ impl SocialScanner {
         }
 
         // ================================================================
-        // 规则 2: 临时缓存 (NONE) - 优先于图片视频判断
+        // 规则 2: 临时缓存 (NONE)
+        // 仅当 base_category 本身是 TempCache 时，才允许 cache 路径匹配生效；
+        // 若 base_category 是 ImageVideo / FileTransfer / MomentsCache，
+        // 则信任 base_category，不因路径含 "cache" 而被拦截
         // ================================================================
 
         let cache_path_patterns = [
@@ -1684,7 +1701,8 @@ impl SocialScanner {
             .iter()
             .any(|pattern| path_str.contains(pattern));
 
-        if is_cache_dir || base_category == FileCategory::TempCache {
+        // 仅当调用方明确给了 TempCache 分类时才按 cache 路径归类
+        if base_category == FileCategory::TempCache {
             return (FileCategory::TempCache, RiskLevel::None);
         }
 
@@ -1750,6 +1768,8 @@ impl SocialScanner {
             "/moments/",
             "\\fav\\",
             "/fav/",
+            "\\filestorage\\sns",  // 微信朋友圈完整路径
+            "/filestorage/sns",
         ];
 
         let is_moments_dir = moments_path_patterns
@@ -1783,6 +1803,15 @@ impl SocialScanner {
 
         if is_file_transfer_dir || base_category == FileCategory::FileTransfer {
             return (FileCategory::FileTransfer, RiskLevel::Medium);
+        }
+
+        // ================================================================
+        // 规则 6: 兜底 cache 匹配（移到末尾）
+        // 走到这里说明 base_category 不是 TempCache，
+        // 但路径确实含 cache 特征（如企业微信 Cache\File 下的子目录）
+        // ================================================================
+        if is_cache_dir {
+            return (FileCategory::TempCache, RiskLevel::None);
         }
 
         // ================================================================
