@@ -53,23 +53,9 @@ jobs:
           releaseName: 'LightC v__VERSION__'
           releaseBody: |
             ## 更新内容
+              修复了一些已知问题
+              请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
 
-            请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
-
-            ### 下载
-
-            | 版本 | 说明 |
-            |------|------|
-            | **LightC_x64_Setup.exe** | NSIS 安装版（推荐），自动创建桌面快捷方式 |
-            | **LightC_x64_Installer.msi** | MSI 安装版，适合企业批量部署 |
-            | **LightC_portable_x64.zip** | 绿色便携版，解压即用，无需安装 |
-
-            ### 安装提示
-
-            - Windows 可能弹出「已保护你的电脑」警告，这是新应用代码签名策略导致的**正常现象**
-            - 请点击 **「更多信息」** → **「仍要运行」** 即可继续
-            - 部分功能需要**管理员权限**，建议右键选择「以管理员身份运行」
-            - 绿色版不包含自动更新功能，推荐使用安装版以获取自动更新
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
