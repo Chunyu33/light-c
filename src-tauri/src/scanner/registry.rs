@@ -260,8 +260,13 @@ impl RegistryBackup {
             return Ok(());
         }
 
-        let content = fs::read_to_string(&temp_file)
+        // reg.exe 在不同语言 Windows 上输出编码不同：
+        // - 中文/日文/韩文 Windows → UTF-16 LE + BOM (\xFF\xFE)
+        // - 英文 Windows → UTF-8 (无 BOM) 或 ANSI
+        // 直接读 bytes 按 BOM 判断，兼容所有情况
+        let raw_bytes = fs::read(&temp_file)
             .map_err(|e| format!("读取临时导出文件失败: {}", e))?;
+        let content = decode_reg_export(&raw_bytes)?;
 
         // 跳过 .reg 文件头，追加内容
         let mut started = false;
@@ -340,6 +345,30 @@ fn parse_registry_path_components(path: &str) -> Result<(RegKey, &str), String> 
 fn split_last_component(path: &str) -> Result<(&str, &str), String> {
     path.rsplit_once('\\')
         .ok_or_else(|| format!("无法分割路径: {}", path))
+}
+
+/// 解码 reg.exe 导出的 .reg 文件内容
+///
+/// reg.exe 输出编码随系统语言变化：
+/// - 中日韩 Windows → UTF-16 LE + BOM (0xFF 0xFE)
+/// - 英文/其他 Windows → UTF-8 (有/无 BOM)
+/// 按前导 BOM 判断编码，无 BOM 则按 UTF-8/lossy 兜底
+fn decode_reg_export(raw: &[u8]) -> Result<String, String> {
+    if raw.len() >= 2 && raw[0] == 0xFF && raw[1] == 0xFE {
+        // UTF-16 LE with BOM — 中文/日文/韩文 Windows 的默认输出
+        let utf16: Vec<u16> = raw[2..]
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .collect();
+        String::from_utf16(&utf16).map_err(|e| format!("UTF-16 解码失败: {}", e))
+    } else if raw.len() >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF {
+        // UTF-8 with BOM
+        String::from_utf8(raw[3..].to_vec()).map_err(|e| format!("UTF-8 解码失败: {}", e))
+    } else {
+        // 无 BOM，按 UTF-8 尝试，失败则 lossy 兜底（兼容英文 Windows 的 ANSI 输出）
+        Ok(String::from_utf8(raw.to_vec())
+            .unwrap_or_else(|_| String::from_utf8_lossy(raw).into_owned()))
+    }
 }
 
 // ============================================================================
