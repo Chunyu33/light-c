@@ -431,7 +431,7 @@ export function LeftoversModule() {
       <ModuleCard
         id="leftovers"
         title="卸载残留"
-        description="支持模拟器、残留驱动深度检测"
+        description="深度检索多路径残留特征，基于置信度模型精准识别"
         icon={<Package className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}

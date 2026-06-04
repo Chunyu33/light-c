@@ -53,8 +53,9 @@ jobs:
           releaseName: 'LightC v__VERSION__'
           releaseBody: |
             ## 更新内容
-              修复了一些已知问题
-              请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
+            - 修复了卸载残留扫描的误报问题（WSL2 虚拟磁盘、剪映工作区数据不再被误判）
+            - 设置-存储位置-新增一键打开数据目录按钮
+            请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
 
           releaseDraft: false
           prerelease: false

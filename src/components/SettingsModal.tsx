@@ -14,7 +14,7 @@ import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSize
 import { useToast } from './Toast';
 import { Type } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
-import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, clearLocalData, pickFolderDialog } from '../api/commands';
+import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, clearLocalData, pickFolderDialog, openInFolder } from '../api/commands';
 import { formatSize } from '../utils/format';
 
 type SettingsTab = 'general' | 'features' | 'guide' | 'feedback' | 'about';
@@ -291,9 +291,17 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
           <div className="p-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-[var(--text-muted)]">存储位置</span>
-              <span className="text-[10px] text-[var(--text-faint)] max-w-[250px] truncate" title={dataDir}>
-                {dataDir || '加载中...'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[var(--text-faint)] max-w-[250px] truncate" title={dataDir}>
+                  {dataDir || '加载中...'}
+                </span>
+                <button
+                  onClick={() => openInFolder(dataDir).catch(console.error)}
+                  className="text-[10px] text-[var(--brand-green)] hover:opacity-80 transition shrink-0"
+                >
+                  前往
+                </button>
+              </div>
             </div>
           </div>
           {/* 更改数据目录 */}
@@ -1097,7 +1105,7 @@ function AboutSettings() {
             <span className="text-sm text-[var(--text-secondary)]">作者</span>
             <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
           </div>
-          <div className="flex items-center justify-between">
+          {/* <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">官方网站</span>
             <a
               href="https://evanspace.icu/lightc"
@@ -1108,7 +1116,7 @@ function AboutSettings() {
               LightC
               <ExternalLink className="w-3 h-3" />
             </a>
-          </div>
+          </div> */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">开源地址</span>
             <a

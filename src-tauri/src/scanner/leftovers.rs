@@ -357,8 +357,22 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("7-zip".into()),
         WhitelistRule::Exact("winrar".into()),
         WhitelistRule::Exact("bandizip".into()),
+        // ==================== 视频编辑软件（精确匹配） ====================
+        WhitelistRule::Exact("jianyingpro".into()),
+        WhitelistRule::Prefix("jianyingpro".into()),
+        WhitelistRule::Exact("jianying".into()),
+        WhitelistRule::Prefix("jianying".into()),
+        WhitelistRule::Exact("capcut".into()),
+        WhitelistRule::Prefix("capcut".into()),
         // ==================== 隐藏文件夹（通配符） ====================
         WhitelistRule::Pattern(".*".into()),
+        // 视频/创意工具
+        WhitelistRule::Exact("davinci resolve".into()),
+        WhitelistRule::Exact("blackmagic design".into()),
+        WhitelistRule::Exact("obs-studio".into()),
+        WhitelistRule::Exact("obs studio".into()),
+        WhitelistRule::Exact("figma".into()),
+        WhitelistRule::Exact("comfyui".into()),
     ]
 }
 
@@ -1083,6 +1097,35 @@ impl LeftoverScanner {
         self.whitelist.iter().any(|rule| rule.matches(&name_lower))
     }
 
+    /// 检查文件路径中是否有任何一级祖先目录在白名单内
+    ///
+    /// 从文件的父目录开始，逐级向上（到 base_dir 为止），
+    /// 如果某级目录名命中白名单则返回 true。
+    /// 用于 scan_virtual_disk_files 中防止 WSL2（\wsl\<GUID>\ext4.vhdx）等
+    /// 深层嵌套虚拟磁盘被误判——直接父目录是 GUID，但上级 "wsl" 在名单中。
+    fn is_path_in_whitelist(&self, file_path: &Path, base_dir: &Path) -> bool {
+        // 从文件的父目录开始，逐级向上检查
+        let mut current = match file_path.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return false,
+        };
+
+        while current.starts_with(base_dir) && current != base_dir {
+            if let Some(name) = current.file_name() {
+                let name_lower = name.to_string_lossy().to_lowercase();
+                if self.is_whitelisted(&name_lower) {
+                    return true;
+                }
+            }
+            // 继续向上一级
+            current = match current.parent() {
+                Some(p) => p.to_path_buf(),
+                None => break,
+            };
+        }
+        false
+    }
+
     /// 模拟器检测（精确/前缀匹配，非全局 contains）
     /// 返回匹配到的模拟器名称（如有）
     fn detect_emulator(&self, folder_name: &str) -> Option<String> {
@@ -1146,6 +1189,17 @@ impl LeftoverScanner {
 
                     // 虚拟磁盘文件通常很大，忽略小于 100MB 的
                     if size < 100 * 1024 * 1024 {
+                        continue;
+                    }
+
+                    // 检查路径中是否有上级目录在白名单内
+                    // WSL2 等场景：文件在 \wsl\<GUID>\ext4.vhdx，直接父目录是 GUID，
+                    // 但上级目录 "wsl" 在白名单中，应跳过
+                    if self.is_path_in_whitelist(path, base_dir) {
+                        log::info!(
+                            "虚拟磁盘文件路径命中白名单，跳过: {}",
+                            path.display()
+                        );
                         continue;
                     }
 
@@ -1625,5 +1679,103 @@ mod tests {
                 folder
             );
         }
+    }
+
+    // ========================================================================
+    // v2.4.3 修复：白名单覆盖 WSL2 虚拟磁盘 & 剪映工作区
+    // ========================================================================
+
+    #[test]
+    fn test_whitelist_wsl_and_jianying() {
+        let rules = build_whitelist_rules();
+
+        // === WSL2 场景 ===
+        // Microsoft Store 版 WSL（Ubuntu 等发行版）
+        let store_path = Path::new(
+            r"C:\Users\test_user\AppData\Local\Packages\CanonicalGroupLimited.Ubuntu_79rhkp1fndgsc\LocalState\ext4.vhdx",
+        );
+        // 非 Store 版 WSL
+        let legacy_wsl_path = Path::new(
+            r"C:\Users\test_user\AppData\Local\wsl\a1b2c3d4-e5f6-7890-abcd-ef1234567890\ext4.vhdx",
+        );
+
+        // === 剪映场景 ===
+        let jianying_pro_path = Path::new(
+            r"C:\Users\test_user\AppData\Local\JianyingPro\User Data\Projects",
+        );
+        let jianying_drafts_path = Path::new(
+            r"C:\Users\test_user\AppData\Local\JianyingPro Drafts\xxx",
+        );
+        let capcut_path = Path::new(
+            r"C:\Users\test_user\AppData\Roaming\CapCut\User Data",
+        );
+
+        // === 真实残留场景 ===
+        let real_leftover_path = Path::new(
+            r"C:\Users\test_user\AppData\Local\SomeRandomUninstalledApp\cache",
+        );
+
+        // 验证：白名单包含关键目录名
+        assert!(
+            rules.iter().any(|r| r.matches("wsl")),
+            "wsl 应在白名单中"
+        );
+        assert!(
+            rules.iter().any(|r| r.matches("packages")),
+            "packages 应在白名单中"
+        );
+        assert!(
+            rules.iter().any(|r| r.matches("jianyingpro")),
+            "jianyingpro 应在白名单中"
+        );
+        assert!(
+            rules.iter().any(|r| r.matches("jianyingpro drafts")),
+            "jianyingpro drafts 应在白名单中（Prefix 匹配）"
+        );
+        assert!(
+            rules.iter().any(|r| r.matches("jianying")),
+            "jianying 应在白名单中"
+        );
+        assert!(
+            rules.iter().any(|r| r.matches("capcut")),
+            "capcut 应在白名单中"
+        );
+
+        // 验证：is_path_in_whitelist 正确识别受保护路径
+        let scanner = LeftoverScanner::new();
+        // mock 路径基目录必须与测试路径前缀一致才能 strip_prefix 成功
+        let mock_local = PathBuf::from(r"C:\Users\test_user\AppData\Local");
+        let mock_roaming = PathBuf::from(r"C:\Users\test_user\AppData\Roaming");
+
+        // Store 版 WSL: Packages 在白名单 → 应跳过
+        assert!(
+            scanner.is_path_in_whitelist(store_path, &mock_local),
+            "Microsoft Store WSL 路径应命中白名单 (Packages)"
+        );
+        // 非 Store 版 WSL: wsl 在白名单 → 应跳过
+        assert!(
+            scanner.is_path_in_whitelist(legacy_wsl_path, &mock_local),
+            "传统 WSL 路径应命中白名单 (wsl)"
+        );
+        // 剪映专业版
+        assert!(
+            scanner.is_path_in_whitelist(jianying_pro_path, &mock_local),
+            "剪映专业版路径应命中白名单 (JianyingPro)"
+        );
+        // 剪映草稿目录
+        assert!(
+            scanner.is_path_in_whitelist(jianying_drafts_path, &mock_local),
+            "剪映草稿目录应命中白名单 (JianyingPro Drafts)"
+        );
+        // CapCut 国际版
+        assert!(
+            scanner.is_path_in_whitelist(capcut_path, &mock_roaming),
+            "CapCut 路径应命中白名单 (CapCut)"
+        );
+        // 真实残留：SomeRandomUninstalledApp 不在白名单 → 不应跳过
+        assert!(
+            !scanner.is_path_in_whitelist(real_leftover_path, &mock_local),
+            "真实残留路径不应命中白名单"
+        );
     }
 }
