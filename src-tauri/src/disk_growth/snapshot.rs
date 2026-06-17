@@ -1,15 +1,15 @@
 // ============================================================================
 // C 盘全盘快照
 //
-// 全盘分析的数据量比 ProgramData 大得多，因此快照只保存目录聚合结果，不保存
-// 单文件明细；这样既能对比空间变化，也不会让本地数据无限膨胀。
+// 全盘分析的数据量比 ProgramData 大得多，目录对比走聚合快照；文件级明细只保存轻量字段，
+// 并通过懒加载命令按目录查询，避免主扫描响应携带几十万条文件记录。
 // ============================================================================
 
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::mft_scan::{normalize_path, DirSizeEntry, FullDiskScanResult};
+use super::mft_scan::{normalize_path, DirSizeEntry, FileSnapshotEntry, FullDiskScanResult};
 
 const SNAPSHOT_DIR: &str = "disk_growth_snapshots";
 const SNAPSHOT_PREFIX: &str = "disk_growth_";
@@ -31,6 +31,8 @@ pub struct DiskSnapshot {
     pub total_files_scanned: usize,
     pub root_path: String,
     pub entries: Vec<DiskSnapshotEntry>,
+    #[serde(default)]
+    pub file_entries: Vec<FileSnapshotEntry>,
     pub version: u8,
 }
 
@@ -68,6 +70,21 @@ impl DiskSnapshotManager {
             return Ok(None);
         };
         self.load_snapshot(path)
+    }
+
+    pub fn load_latest_two_snapshots(&self) -> Result<Option<(DiskSnapshot, DiskSnapshot)>, String> {
+        let snapshots = self.list_snapshots()?;
+        if snapshots.len() < 2 {
+            return Ok(None);
+        }
+
+        let Some(current) = self.load_snapshot(&snapshots[0])? else {
+            return Ok(None);
+        };
+        let Some(previous) = self.load_snapshot(&snapshots[1])? else {
+            return Ok(None);
+        };
+        Ok(Some((previous, current)))
     }
 
     fn list_snapshots(&self) -> Result<Vec<PathBuf>, String> {
@@ -130,7 +147,8 @@ pub fn build_snapshot(scan: &FullDiskScanResult) -> DiskSnapshot {
             .iter()
             .map(snapshot_entry_from_dir)
             .collect(),
-        version: 1,
+        file_entries: scan.file_entries.clone(),
+        version: 2,
     }
 }
 

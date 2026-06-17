@@ -578,6 +578,43 @@ function FeatureSettings() {
           <p className="text-[11px] text-[var(--text-faint)]">
             边界范围：50 - 1000 项。首次扫描或无变化时仍显示占用基线列表，不受此项影响。
           </p>
+          <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">变化明细</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                点击变化量可打开明细弹窗，左侧展示当前目录的下一级变化目录，右侧展示当前目录内变化文件。明细通过后端接口按需分页加载，每次最多 200 条，并使用虚拟列表渲染，避免大目录一次性渲染造成卡顿。
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">颜色指标</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-2 text-xs text-[var(--text-muted)]">
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  蓝色：新增，上次快照不存在、本次出现
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  红色：显著增长，增加 1GB 及以上
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                  橙色：快速增长，增加 300MB 及以上
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  黄色：轻微增长，增加 1B 及以上
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                  绿色：相比上次快照减少
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
+                  灰色：基本稳定，无明显变化
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

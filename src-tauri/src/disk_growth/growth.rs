@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use super::mft_scan::{
-    scan_system_drive_with_progress, DirSizeEntry, DiskGrowthPhaseDuration, DiskGrowthScanProgress,
+    normalize_path, scan_system_drive_with_progress, DirSizeEntry, DiskGrowthPhaseDuration,
+    DiskGrowthScanProgress, FileSnapshotEntry,
 };
 use super::snapshot::{build_snapshot, DiskSnapshot, DiskSnapshotEntry, DiskSnapshotManager};
 
@@ -20,6 +21,9 @@ const MINOR_THRESHOLD: i64 = 1;
 const DEFAULT_MAX_CHANGE_ENTRIES: usize = 300;
 const MIN_CHANGE_ENTRIES: usize = 50;
 const MAX_CHANGE_ENTRIES: usize = 1000;
+const MAX_DETAIL_ENTRIES: usize = 50;
+const DEFAULT_DETAIL_PAGE_SIZE: usize = 200;
+const MAX_DETAIL_PAGE_SIZE: usize = 1000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -33,6 +37,16 @@ pub enum DiskGrowthLevel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskGrowthDetailEntry {
+    pub path: String,
+    pub name: String,
+    pub old_size: u64,
+    pub new_size: u64,
+    pub diff: i64,
+    pub level: DiskGrowthLevel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskGrowthEntry {
     pub path: String,
     pub old_size: u64,
@@ -42,6 +56,7 @@ pub struct DiskGrowthEntry {
     pub level: DiskGrowthLevel,
     pub explanation: String,
     pub suggestion: String,
+    pub details: Vec<DiskGrowthDetailEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +103,40 @@ pub struct DiskScanAndAnalyzeResponse {
     pub metadata_fallback_count: usize,
     pub analyze: DiskAnalyzeResult,
     pub growth: DiskGrowthReport,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskGrowthFileDetailEntry {
+    pub path: String,
+    pub name: String,
+    pub old_size: u64,
+    pub new_size: u64,
+    pub diff: i64,
+    pub level: DiskGrowthLevel,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskGrowthFileDetailsResponse {
+    pub path: String,
+    pub previous_scan_time: String,
+    pub current_scan_time: String,
+    pub entries: Vec<DiskGrowthFileDetailEntry>,
+    pub total_changed_files: usize,
+    pub returned_files: usize,
+    pub offset: usize,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskGrowthDirectoryDetailsResponse {
+    pub path: String,
+    pub previous_scan_time: String,
+    pub current_scan_time: String,
+    pub entries: Vec<DiskGrowthDetailEntry>,
+    pub total_changed_dirs: usize,
+    pub returned_dirs: usize,
+    pub offset: usize,
+    pub has_more: bool,
 }
 
 pub fn scan_and_analyze_system_drive_with_progress<F>(
@@ -141,6 +190,106 @@ where
     })
 }
 
+pub fn get_file_change_details(
+    path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<DiskGrowthFileDetailsResponse, String> {
+    let manager = DiskSnapshotManager::new()?;
+    let Some((previous, current)) = manager.load_latest_two_snapshots()? else {
+        return Err("至少完成两次 C 盘全盘扫描后，才能查看文件级变化明细".to_string());
+    };
+
+    if previous.file_entries.is_empty() || current.file_entries.is_empty() {
+        return Err("最近快照不包含文件级明细，请再完成一次全盘扫描后重试".to_string());
+    }
+
+    let normalized_path = normalize_query_path(&path);
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(DEFAULT_DETAIL_PAGE_SIZE).clamp(1, MAX_DETAIL_PAGE_SIZE);
+    let previous_map = file_snapshot_map(&previous.file_entries, &normalized_path);
+    let current_map = file_snapshot_map(&current.file_entries, &normalized_path);
+    let mut all_paths: HashSet<String> = previous_map.keys().cloned().collect();
+    all_paths.extend(current_map.keys().cloned());
+
+    let mut entries: Vec<DiskGrowthFileDetailEntry> = all_paths
+        .into_iter()
+        .filter_map(|file_path| {
+            let old_size = previous_map.get(&file_path).copied().unwrap_or(0);
+            let new_size = current_map.get(&file_path).copied().unwrap_or(0);
+            let diff = new_size as i64 - old_size as i64;
+            if diff == 0 {
+                return None;
+            }
+
+            Some(DiskGrowthFileDetailEntry {
+                name: display_name_from_path(&file_path),
+                path: file_path,
+                old_size,
+                new_size,
+                diff,
+                level: determine_level(diff, old_size),
+            })
+        })
+        .collect();
+
+    entries.sort_by(|left, right| {
+        right
+            .diff
+            .abs()
+            .cmp(&left.diff.abs())
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    let total_changed_files = entries.len();
+    let paged_entries: Vec<DiskGrowthFileDetailEntry> =
+        entries.into_iter().skip(offset).take(limit).collect();
+    let returned_files = paged_entries.len();
+
+    Ok(DiskGrowthFileDetailsResponse {
+        path: normalized_path,
+        previous_scan_time: previous.date,
+        current_scan_time: current.date,
+        returned_files,
+        total_changed_files,
+        has_more: offset + returned_files < total_changed_files,
+        offset,
+        entries: paged_entries,
+    })
+}
+
+pub fn get_directory_change_details(
+    path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+) -> Result<DiskGrowthDirectoryDetailsResponse, String> {
+    let manager = DiskSnapshotManager::new()?;
+    let Some((previous, current)) = manager.load_latest_two_snapshots()? else {
+        return Err("至少完成两次 C 盘全盘扫描后，才能查看目录变化明细".to_string());
+    };
+
+    let normalized_path = normalize_query_path(&path);
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(DEFAULT_DETAIL_PAGE_SIZE).clamp(1, MAX_DETAIL_PAGE_SIZE);
+    let previous_children = direct_child_map(&previous.entries);
+    let current_children = direct_child_map(&current.entries);
+    let details = build_detail_entries_unlimited(&normalized_path, &previous_children, &current_children);
+    let total_changed_dirs = details.len();
+    let paged_entries: Vec<DiskGrowthDetailEntry> =
+        details.into_iter().skip(offset).take(limit).collect();
+    let returned_dirs = paged_entries.len();
+
+    Ok(DiskGrowthDirectoryDetailsResponse {
+        path: normalized_path,
+        previous_scan_time: previous.date,
+        current_scan_time: current.date,
+        returned_dirs,
+        total_changed_dirs,
+        has_more: offset + returned_dirs < total_changed_dirs,
+        offset,
+        entries: paged_entries,
+    })
+}
+
 pub fn compare_snapshots(
     current: &DiskSnapshot,
     previous: Option<&DiskSnapshot>,
@@ -152,6 +301,8 @@ pub fn compare_snapshots(
 
     let current_map = snapshot_map(&current.entries);
     let previous_map = snapshot_map(&previous.entries);
+    let current_children = direct_child_map(&current.entries);
+    let previous_children = direct_child_map(&previous.entries);
     let mut all_paths: HashSet<String> = current_map.keys().cloned().collect();
     all_paths.extend(previous_map.keys().cloned());
 
@@ -160,10 +311,12 @@ pub fn compare_snapshots(
         .filter_map(|path| {
             let old_size = previous_map.get(&path).copied().unwrap_or(0);
             let new_size = current_map.get(&path).copied().unwrap_or(0);
-            create_growth_entry(path, old_size, new_size)
+            let details = build_detail_entries(&path, &previous_children, &current_children);
+            create_growth_entry(path, old_size, new_size, details)
         })
         .collect();
 
+    remove_redundant_parent_entries(&mut entries);
     entries.sort_by(|left, right| {
         right
             .diff
@@ -232,7 +385,139 @@ fn snapshot_map(entries: &[DiskSnapshotEntry]) -> HashMap<String, u64> {
         .collect()
 }
 
-fn create_growth_entry(path: String, old_size: u64, new_size: u64) -> Option<DiskGrowthEntry> {
+fn file_snapshot_map(entries: &[FileSnapshotEntry], parent_path: &str) -> HashMap<String, u64> {
+    entries
+        .iter()
+        .filter(|entry| is_same_or_child_path(&entry.path, parent_path))
+        .map(|entry| (entry.path.clone(), entry.size))
+        .collect()
+}
+
+fn normalize_query_path(path: &str) -> String {
+    normalize_path(path).trim_end_matches('/').to_string()
+}
+
+fn is_same_or_child_path(path: &str, parent_path: &str) -> bool {
+    if path == parent_path {
+        return true;
+    }
+    let prefix = format!("{}/", parent_path.trim_end_matches('/'));
+    // 文件级明细只在用户点击的目录范围内比较，避免全盘文件快照一次性进入排序。
+    path.starts_with(&prefix)
+}
+
+fn remove_redundant_parent_entries(entries: &mut Vec<DiskGrowthEntry>) {
+    let diff_by_path: HashMap<String, i64> = entries
+        .iter()
+        .map(|entry| (entry.path.clone(), entry.diff))
+        .collect();
+
+    entries.retain(|entry| {
+        // 只有父目录变化量与某个直接子目录完全一致时才折叠父级，避免多个子目录共同变化时误删有效汇总。
+        !entry.details.iter().any(|detail| {
+            detail.diff == entry.diff
+                && detail.diff.signum() == entry.diff.signum()
+                && diff_by_path.get(&detail.path).copied() == Some(detail.diff)
+        })
+    });
+}
+
+fn direct_child_map(entries: &[DiskSnapshotEntry]) -> HashMap<String, HashMap<String, u64>> {
+    let mut child_map: HashMap<String, HashMap<String, u64>> = HashMap::new();
+    for entry in entries {
+        let Some(parent) = parent_path(&entry.path) else {
+            continue;
+        };
+        // 变化明细只展示直接子目录，避免把所有后代目录重复摊开造成列表噪音。
+        child_map
+            .entry(parent)
+            .or_default()
+            .insert(entry.path.clone(), entry.size);
+    }
+    child_map
+}
+
+fn build_detail_entries(
+    parent: &str,
+    previous_children: &HashMap<String, HashMap<String, u64>>,
+    current_children: &HashMap<String, HashMap<String, u64>>,
+) -> Vec<DiskGrowthDetailEntry> {
+    let mut details = build_detail_entries_unlimited(parent, previous_children, current_children);
+    details.truncate(MAX_DETAIL_ENTRIES);
+    details
+}
+
+fn build_detail_entries_unlimited(
+    parent: &str,
+    previous_children: &HashMap<String, HashMap<String, u64>>,
+    current_children: &HashMap<String, HashMap<String, u64>>,
+) -> Vec<DiskGrowthDetailEntry> {
+    let previous = previous_children.get(parent);
+    let current = current_children.get(parent);
+    let mut all_paths = HashSet::new();
+
+    if let Some(previous) = previous {
+        all_paths.extend(previous.keys().cloned());
+    }
+    if let Some(current) = current {
+        all_paths.extend(current.keys().cloned());
+    }
+
+    let mut details: Vec<DiskGrowthDetailEntry> = all_paths
+        .into_iter()
+        .filter_map(|path| {
+            let old_size = previous.and_then(|map| map.get(&path)).copied().unwrap_or(0);
+            let new_size = current.and_then(|map| map.get(&path)).copied().unwrap_or(0);
+            let diff = new_size as i64 - old_size as i64;
+            if diff == 0 {
+                return None;
+            }
+
+            Some(DiskGrowthDetailEntry {
+                name: display_name_from_path(&path),
+                path,
+                old_size,
+                new_size,
+                diff,
+                level: determine_level(diff, old_size),
+            })
+        })
+        .collect();
+
+    details.sort_by(|left, right| {
+        right
+            .diff
+            .abs()
+            .cmp(&left.diff.abs())
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    details
+}
+
+fn parent_path(path: &str) -> Option<String> {
+    let normalized = path.trim_end_matches('/');
+    let separator_index = normalized.rfind('/')?;
+    if separator_index <= 2 {
+        return Some(format!("{}/", &normalized[..separator_index]));
+    }
+    Some(normalized[..separator_index].to_string())
+}
+
+fn display_name_from_path(path: &str) -> String {
+    path.trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(path)
+        .to_string()
+}
+
+fn create_growth_entry(
+    path: String,
+    old_size: u64,
+    new_size: u64,
+    details: Vec<DiskGrowthDetailEntry>,
+) -> Option<DiskGrowthEntry> {
     let diff = new_size as i64 - old_size as i64;
     if diff == 0 {
         return None;
@@ -259,6 +544,7 @@ fn create_growth_entry(path: String, old_size: u64, new_size: u64) -> Option<Dis
         level,
         explanation,
         suggestion,
+        details,
     })
 }
 

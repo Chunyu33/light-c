@@ -85,6 +85,7 @@ struct FileRecord {
 #[derive(Debug, Clone)]
 struct FileSizeRecord {
     parent_id: u64,
+    path: String,
     size: u64,
 }
 
@@ -123,6 +124,12 @@ pub struct DirSizeEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileSnapshotEntry {
+    pub path: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskGrowthPhaseDuration {
     pub stage: String,
     pub duration_ms: u64,
@@ -140,6 +147,7 @@ pub struct DiskGrowthScanProgress {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullDiskScanResult {
     pub entries: Vec<DirSizeEntry>,
+    pub file_entries: Vec<FileSnapshotEntry>,
     pub total_size: u64,
     pub total_files_scanned: usize,
     pub scan_duration_ms: u64,
@@ -239,6 +247,14 @@ where
 
     Ok(FullDiskScanResult {
         entries,
+        file_entries: file_size_collection
+            .records
+            .iter()
+            .map(|record| FileSnapshotEntry {
+                path: record.path.clone(),
+                size: record.size,
+            })
+            .collect(),
         total_size,
         total_files_scanned: file_size_collection.records.len(),
         scan_duration_ms: start.elapsed().as_millis() as u64,
@@ -569,6 +585,7 @@ where
                 }
                 Some(FileSizeRecord {
                     parent_id: record.parent_id,
+                    path: normalize_path(&record.path),
                     size,
                 })
             })

@@ -943,6 +943,74 @@ export async function openStorageSettings(): Promise<void> {
 // ============================================================================
 
 /** 全盘变化条目 */
+export interface DiskGrowthDetailEntry {
+  /** 发生变化的直接子目录路径 */
+  path: string;
+  /** 子目录名称，用于弹窗列表展示 */
+  name: string;
+  /** 上次快照大小 */
+  old_size: number;
+  /** 本次快照大小 */
+  new_size: number;
+  /** 与上次快照相比的变化量，正数为新增，负数为减少 */
+  diff: number;
+  /** 明细变化级别 */
+  level: 'significant' | 'fast' | 'minor' | 'stable' | 'decreased' | 'new';
+}
+
+export interface DiskGrowthFileDetailEntry {
+  /** 发生变化的文件路径 */
+  path: string;
+  /** 文件名，用于弹窗列表展示 */
+  name: string;
+  /** 上次快照大小 */
+  old_size: number;
+  /** 本次快照大小 */
+  new_size: number;
+  /** 与上次快照相比的变化量，正数为新增，负数为减少 */
+  diff: number;
+  /** 文件变化级别 */
+  level: 'significant' | 'fast' | 'minor' | 'stable' | 'decreased' | 'new';
+}
+
+export interface DiskGrowthFileDetailsResponse {
+  /** 查询目录 */
+  path: string;
+  /** 上次扫描时间 */
+  previous_scan_time: string;
+  /** 本次扫描时间 */
+  current_scan_time: string;
+  /** 文件级变化明细 */
+  entries: DiskGrowthFileDetailEntry[];
+  /** 实际变化文件数量 */
+  total_changed_files: number;
+  /** 本次返回文件数量 */
+  returned_files: number;
+  /** 分页偏移 */
+  offset: number;
+  /** 是否还有更多文件 */
+  has_more: boolean;
+}
+
+export interface DiskGrowthDirectoryDetailsResponse {
+  /** 查询目录 */
+  path: string;
+  /** 上次扫描时间 */
+  previous_scan_time: string;
+  /** 本次扫描时间 */
+  current_scan_time: string;
+  /** 目录级变化明细 */
+  entries: DiskGrowthDetailEntry[];
+  /** 实际变化目录数量 */
+  total_changed_dirs: number;
+  /** 本次返回目录数量 */
+  returned_dirs: number;
+  /** 分页偏移 */
+  offset: number;
+  /** 是否还有更多目录 */
+  has_more: boolean;
+}
+
 export interface DiskGrowthEntry {
   /** 目录路径 */
   path: string;
@@ -960,6 +1028,8 @@ export interface DiskGrowthEntry {
   explanation: string;
   /** 排查建议，不代表该目录可以直接清理 */
   suggestion: string;
+  /** 该目录下一级子目录的变化明细，后端默认最多返回 50 条 */
+  details: DiskGrowthDetailEntry[];
 }
 
 /** 全盘变化报告 */
@@ -1078,6 +1148,22 @@ export async function scanDiskGrowth(maxChangeEntries?: number): Promise<DiskGro
 
 export async function cancelDiskGrowthScan(): Promise<void> {
   return invoke<void>('cancel_disk_growth_scan');
+}
+
+export async function getDiskGrowthFileDetails(
+  path: string,
+  offset?: number,
+  limit?: number
+): Promise<DiskGrowthFileDetailsResponse> {
+  return invoke<DiskGrowthFileDetailsResponse>('get_disk_growth_file_details', { path, offset, limit });
+}
+
+export async function getDiskGrowthDirectoryDetails(
+  path: string,
+  offset?: number,
+  limit?: number
+): Promise<DiskGrowthDirectoryDetailsResponse> {
+  return invoke<DiskGrowthDirectoryDetailsResponse>('get_disk_growth_directory_details', { path, offset, limit });
 }
 
 // ============================================================================
