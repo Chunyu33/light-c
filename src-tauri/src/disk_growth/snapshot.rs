@@ -3,7 +3,9 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
-use super::mft_scan::{normalize_path, DirSizeEntry, FileSnapshotEntry, FullDiskScanResult};
+use super::mft_scan::{
+    normalize_path, DirSizeEntry, FileSizeRecord, FileSnapshotEntry, FullDiskScanResult,
+};
 
 const SNAPSHOT_DIR: &str = "disk_growth_snapshots";
 const SNAPSHOT_PREFIX: &str = "disk_growth_";
@@ -12,7 +14,7 @@ const SNAPSHOT_SUFFIX: &str = ".json";
 const FILE_SHARD_SUFFIX: &str = "files";
 // 256 个桶能让百万级文件分散到较小 JSONL 文件，同时不会产生过多目录项。
 const FILE_SHARD_BUCKETS: u64 = 256;
-const MAX_SNAPSHOTS: usize = 5;
+const MAX_SNAPSHOTS: usize = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskSnapshotEntry {
@@ -75,11 +77,15 @@ impl DiskSnapshotManager {
         Ok(path)
     }
 
-    pub fn save_scan_snapshot(&self, scan: &FullDiskScanResult) -> Result<PathBuf, String> {
+    pub fn save_scan_snapshot(
+        &self,
+        scan: &FullDiskScanResult,
+        file_records: Vec<FileSizeRecord>,
+    ) -> Result<PathBuf, String> {
         let snapshot = build_snapshot(scan);
         let path = self.save_snapshot(&snapshot)?;
         // 文件级明细单独按目录分片保存，避免主 JSON 在百万文件场景下膨胀到数百 MB。
-        if let Err(error) = self.save_file_shards(&path, &scan.file_entries) {
+        if let Err(error) = self.save_file_shards(&path, file_records) {
             // 主快照和文件分片必须成对成功，否则明细查询会拿到不完整的新快照。
             let _ = fs::remove_file(&path);
             let _ = fs::remove_dir_all(self.file_shard_dir(&path));
@@ -219,7 +225,7 @@ impl DiskSnapshotManager {
     fn save_file_shards(
         &self,
         snapshot_path: &Path,
-        entries: &[FileSnapshotEntry],
+        entries: Vec<FileSizeRecord>,
     ) -> Result<(), String> {
         let dir = self.file_shard_dir(snapshot_path);
         if dir.exists() {

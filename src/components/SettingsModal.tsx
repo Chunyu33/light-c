@@ -553,7 +553,7 @@ function FeatureSettings() {
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">最多展示变化目录</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                限制与上次快照对比后返回的变化目录数量。数值越大，前端渲染和排序压力越高，建议保持 300 以内。
+                限制与上次快照对比后返回的变化目录数量。数值越大，软件界面渲染和排序压力越高，建议保持 300 以内。
               </p>
             </div>
             <span className="text-sm font-semibold text-[var(--brand-green)] shrink-0">
@@ -583,6 +583,9 @@ function FeatureSettings() {
               <p className="text-sm font-medium text-[var(--text-primary)]">变化明细</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
                 点击变化量可打开明细弹窗，左侧展示当前目录的下一级变化目录，右侧展示当前目录内变化文件。明细通过后端接口按需分页加载，每次最多 200 条，并使用虚拟列表渲染，避免大目录一次性渲染造成卡顿。
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                快照最多保留 3 组；最近两组用于变化对比，额外一组用于异常排查和兜底，超过后会自动清理旧快照及对应文件分片。
               </p>
             </div>
             <div>

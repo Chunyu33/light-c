@@ -150,10 +150,12 @@ where
     let manager = DiskSnapshotManager::new()?;
     let previous = manager.load_latest_snapshot()?;
     let previous_scan_time = previous.as_ref().map(|snapshot| snapshot.date.clone());
-    let scan = scan_system_drive_with_progress(progress)?;
+    let mut scan = scan_system_drive_with_progress(progress)?;
     let current_snapshot = build_snapshot(&scan);
     let growth = compare_snapshots(&current_snapshot, previous.as_ref(), max_change_entries);
-    manager.save_scan_snapshot(&scan)?;
+    // 文件级明细只用于写入旁路分片，移动出去可以避免超大盘下再复制一份完整文件列表。
+    let file_records = std::mem::take(&mut scan.file_records);
+    manager.save_scan_snapshot(&scan, file_records)?;
 
     let analyze_entries = build_analyze_entries(&scan.entries, &growth);
     let increased_size = growth

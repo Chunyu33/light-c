@@ -83,10 +83,10 @@ struct FileRecord {
 }
 
 #[derive(Debug, Clone)]
-struct FileSizeRecord {
-    parent_id: u64,
-    path: String,
-    size: u64,
+pub(crate) struct FileSizeRecord {
+    pub(crate) parent_id: u64,
+    pub(crate) path: String,
+    pub(crate) size: u64,
 }
 
 struct FileSizeCollection {
@@ -144,10 +144,11 @@ pub struct DiskGrowthScanProgress {
     pub elapsed_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct FullDiskScanResult {
     pub entries: Vec<DirSizeEntry>,
-    pub file_entries: Vec<FileSnapshotEntry>,
+    // 文件级明细只在后端写快照分片时使用，不进入前端响应，避免超大盘下复制出第二份路径列表。
+    pub(crate) file_records: Vec<FileSizeRecord>,
     pub total_size: u64,
     pub total_files_scanned: usize,
     pub scan_duration_ms: u64,
@@ -245,19 +246,10 @@ where
         .sum();
     push_phase_duration(&mut phase_durations, "aggregate", phase_start);
     let total_files_scanned = file_size_collection.records.len();
-    // 这里消费原始记录生成文件级快照，避免在超大磁盘下 clone 出第二份完整路径列表。
-    let file_entries = file_size_collection
-        .records
-        .into_iter()
-        .map(|record| FileSnapshotEntry {
-            path: record.path,
-            size: record.size,
-        })
-        .collect();
 
     Ok(FullDiskScanResult {
         entries,
-        file_entries,
+        file_records: file_size_collection.records,
         total_size,
         total_files_scanned,
         scan_duration_ms: start.elapsed().as_millis() as u64,
