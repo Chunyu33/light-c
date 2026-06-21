@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import {
@@ -216,13 +217,11 @@ export function SystemSlimModule({ layoutMode = 'cards' }: { layoutMode?: 'cards
 
         {/* 空状态 */}
         {moduleState.status === 'idle' && !status && (
-          <div className="py-8 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-2">
-              <Rocket className="w-6 h-6 text-[var(--fg-faint)]" />
-            </div>
-            <p className="text-sm font-medium text-[var(--fg-secondary)]">等待检测</p>
-            <p className="text-xs text-[var(--fg-muted)] mt-1">点击检测按钮查看可优化项</p>
-          </div>
+          <EmptyState
+            icon={Rocket}
+            title="尚未检测系统状态"
+            description="点击检测状态，查看休眠、组件存储、虚拟内存等可优化项。"
+          />
         )}
 
         {/* 瘦身项列表 */}

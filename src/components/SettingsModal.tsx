@@ -48,8 +48,8 @@ const fontSizeOptions: { level: FontSizeLevel; label: string }[] = [
 ];
 
 const layoutModeOptions = [
-  { mode: 'cards' as const, label: '卡片', icon: LayoutGrid, description: '所有功能集中在同一页，适合快速总览' },
-  { mode: 'pages' as const, label: '页面', icon: PanelLeft, description: '左侧菜单切换单功能页，更接近传统 PC 软件' },
+  { mode: 'cards' as const, label: '卡片模式', icon: LayoutGrid, description: '所有功能集中在同一页，适合快速总览' },
+  { mode: 'pages' as const, label: '页面模式', icon: PanelLeft, description: '左侧菜单切换单功能页，更接近传统 PC 软件' },
 ];
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -276,7 +276,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 布局设置
               </p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                卡片模式用于总览，页面模式通过左侧菜单切换单个功能模块
+                卡片模式用于总览，页面模式通过左侧菜单切换单个功能
               </p>
             </div>
             <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
@@ -284,15 +284,14 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 <button
                   key={mode}
                   onClick={() => updateSettings({ layoutMode: mode })}
-                  title={description}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                  title={`${label}：${description}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 ${
                     settings.layoutMode === mode
-                      ? 'bg-[var(--brand-green)] text-white'
+                      ? 'bg-[var(--brand-green)] text-white shadow-sm'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  {label}
+                  <Icon className="w-4 h-4" />
                 </button>
               ))}
             </div>

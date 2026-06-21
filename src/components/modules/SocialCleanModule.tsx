@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import {
@@ -395,12 +396,12 @@ export function SocialCleanModule({ layoutMode = 'cards' }: { layoutMode?: 'card
 
           {/* 空状态 */}
           {moduleState.status === 'idle' && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-3">
-                <MessageCircle className="w-7 h-7 text-[var(--fg-faint)]" />
-              </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">等待扫描</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">点击扫描按钮开始检测社交软件缓存</p>
+            <div className="p-4">
+              <EmptyState
+                icon={MessageCircle}
+                title="尚未检测社交缓存"
+                description="点击开始扫描，检测微信、QQ、钉钉、飞书等软件缓存。"
+              />
             </div>
           )}
 
@@ -417,12 +418,13 @@ export function SocialCleanModule({ layoutMode = 'cards' }: { layoutMode?: 'card
 
           {/* 无结果状态 */}
           {moduleState.status === 'done' && scanResult && scanResult.total_files === 0 && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-3">
-                <CheckCircle2 className="w-7 h-7 text-emerald-500" />
-              </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">太棒了！</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">没有发现需要清理的社交软件缓存</p>
+            <div className="p-4">
+              <EmptyState
+                icon={CheckCircle2}
+                tone="success"
+                title="太棒了"
+                description="没有发现需要清理的社交软件缓存。"
+              />
             </div>
           )}
 

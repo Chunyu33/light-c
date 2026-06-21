@@ -10,6 +10,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useDashboard, useSettings } from '../../contexts';
 import { scanHotspot, cancelHotspotScan, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry, type HotspotScanProgress } from '../../api/commands';
@@ -795,8 +796,13 @@ export function HotspotModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' |
 
           {/* 空状态 */}
           {scanResult.entries.length === 0 && (
-            <div className="text-center py-8 text-[var(--text-muted)]">
-              <p className="text-sm">未发现大型目录</p>
+            <div className="p-4">
+              <EmptyState
+                icon={Flame}
+                tone="success"
+                title="未发现大型目录"
+                description="当前阈值下没有需要特别关注的大目录。"
+              />
             </div>
           )}
         </div>
@@ -804,9 +810,12 @@ export function HotspotModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' |
 
       {/* 初始状态 */}
       {moduleState.status === 'idle' && !scanResult && (
-        <div className="text-center py-8 text-[var(--text-muted)]">
-          <Flame className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">点击"开始扫描"分析 AppData 目录空间占用</p>
+        <div className="p-4">
+          <EmptyState
+            icon={Flame}
+            title="尚未分析大目录"
+            description="点击开始扫描，定位占用空间较大的目录。"
+          />
         </div>
       )}
 

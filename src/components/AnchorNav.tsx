@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Navigation } from 'lucide-react';
+import { Navigation, PanelLeft } from 'lucide-react';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { useSettings } from '../contexts';
 
@@ -22,6 +22,7 @@ export function AnchorNav({ scrollContainerRef }: AnchorNavProps) {
   const clickLockRef = useRef<{ id: AppModuleId; timeout: number } | null>(null);
   const isPageMode = settings.layoutMode === 'pages';
   const activeId = isPageMode ? settings.activeModuleId : activeAnchorId;
+  const TriggerIcon = isPageMode ? PanelLeft : Navigation;
 
   const handleNavigate = useCallback((moduleId: AppModuleId) => {
     if (isPageMode) {
@@ -132,7 +133,7 @@ export function AnchorNav({ scrollContainerRef }: AnchorNavProps) {
           ${isHovered ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100'}
         `}
       >
-        <Navigation className="w-4 h-4 text-[var(--text-muted)]" />
+        <TriggerIcon className="w-4 h-4 text-[var(--text-muted)]" />
       </div>
 
       <div
