@@ -241,28 +241,25 @@ export interface SocialScanResult {
 }
 
 /**
- * 鎵弿绀句氦杞欢缂撳瓨锛堝甫椋庨櫓鍒嗙骇锛? *
- * 鏀寔鏅鸿兘璺緞婧簮鍜屾枃浠剁被鍨嬫繁搴﹀垎绫伙細
- * - 寰俊锛氶€氳繃娉ㄥ唽琛ㄨ鍙栬嚜瀹氫箟璺緞锛岃瘑鍒亰澶╄褰曟暟鎹簱
- * - QQ/NTQQ锛氬畾浣?nt_data 鐩綍锛岃瘑鍒秷鎭暟鎹簱
- * - 閽夐拤锛氬畾浣?storage 鍜?cache 鐩綍
- * - 椋炰功锛氭壂鎻?LarkShell锛屽畾浣?sdk_storage 鍜?file_storage
+ * 扫描社交软件缓存（带风险分级）。
+ *
+ * 这里保留中文说明，是为了让前端风险标签和后端分类语义保持一致，避免后续维护时误改删除策略。
  */
 export async function scanSocialCache(): Promise<SocialScanResult> {
   return invoke<SocialScanResult>('scan_social_cache');
 }
 
-/** 鑾峰彇椋庨櫓绛夌骇鐨勪腑鏂囨弿杩?*/
+/** 获取风险等级的中文描述，用于社交专清列表里的风险标签展示。 */
 export function getRiskLevelDescription(level: RiskLevel): string {
   switch (level) {
-    case 'critical': return '鍗遍櫓锛堣亰澶╄褰曪級';
-    case 'medium': return '璋ㄦ厧娓呯悊';
-    case 'low': return '寤鸿娓呯悊';
-    case 'none': return '瀹夊叏娓呯悊';
+    case 'critical': return '危险（聊天记录）';
+    case 'medium': return '谨慎清理';
+    case 'low': return '建议清理';
+    case 'none': return '安全清理';
   }
 }
 
-/** 鑾峰彇椋庨櫓绛夌骇鐨勬彁绀轰俊鎭?*/
+/** 获取风险等级的提示信息，用于 hover 时解释为什么这样分级。 */
 export function getRiskLevelTooltip(level: RiskLevel): string {
   switch (level) {
     case 'critical': return '聊天记录数据库，删除后会永久丢失，强烈建议保留';

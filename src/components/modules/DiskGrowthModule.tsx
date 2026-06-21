@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -509,7 +510,8 @@ function DiskGrowthDetailsModal({
       setDirectoryLoading(false);
     }
   };
-  return (
+  // 弹窗必须挂到 body 下，避免被页面模式外层 motion transform 改写 fixed 定位的参照物。
+  return createPortal(
     <motion.div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm"
       initial={{ opacity: 0 }}
@@ -712,11 +714,12 @@ function DiskGrowthDetailsModal({
           </p>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }
 
-export function DiskGrowthModule() {
+export function DiskGrowthModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useDashboard();
   const { settings } = useSettings();
   const moduleState = modules.diskGrowth;
@@ -905,6 +908,8 @@ export function DiskGrowthModule() {
 
   return (
     <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
       id="disk-growth"
       title="C 盘全盘分析"
       description="基于 MFT 快速扫描 C 盘，对比上次快照定位空间变化来源"

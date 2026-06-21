@@ -10,6 +10,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useDashboard, useSettings } from '../../contexts';
 import { scanHotspot, cancelHotspotScan, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry, type HotspotScanProgress } from '../../api/commands';
@@ -402,7 +403,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
 // 主组件
 // ============================================================================
 
-export function HotspotModule() {
+export function HotspotModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useDashboard();
   const moduleState = modules.hotspot;
   const { showToast } = useToast();
@@ -650,6 +651,8 @@ export function HotspotModule() {
 
   return (
     <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
       id="hotspot"
       title="大目录分析"
       description={fullScanEnabled ? "全盘深度扫描 C 盘，定位空间占用元凶" : "深度分析 AppData 目录，定位占用空间的元凶"}
@@ -793,8 +796,13 @@ export function HotspotModule() {
 
           {/* 空状态 */}
           {scanResult.entries.length === 0 && (
-            <div className="text-center py-8 text-[var(--text-muted)]">
-              <p className="text-sm">未发现大型目录</p>
+            <div className="p-4">
+              <EmptyState
+                icon={Flame}
+                tone="success"
+                title="未发现大型目录"
+                description="当前阈值下没有需要特别关注的大目录。"
+              />
             </div>
           )}
         </div>
@@ -802,9 +810,12 @@ export function HotspotModule() {
 
       {/* 初始状态 */}
       {moduleState.status === 'idle' && !scanResult && (
-        <div className="text-center py-8 text-[var(--text-muted)]">
-          <Flame className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">点击"开始扫描"分析 AppData 目录空间占用</p>
+        <div className="p-4">
+          <EmptyState
+            icon={Flame}
+            title="尚未分析大目录"
+            description="点击开始扫描，定位占用空间较大的目录。"
+          />
         </div>
       )}
 

@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "LightC"
-version = "2.8.1"
+version = "2.9.0"
 dependencies = [
  "chrono",
  "dirs",

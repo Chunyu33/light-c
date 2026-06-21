@@ -27,7 +27,7 @@ import {
 // 主组件
 // ============================================================================
 
-export function RegistryModule() {
+export function RegistryModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.registry;
 
@@ -192,6 +192,8 @@ export function RegistryModule() {
       )}
 
       <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
         id="registry"
         title="注册表冗余"
         description="检测已卸载程序遗留的孤立注册表引用"

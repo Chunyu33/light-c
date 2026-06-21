@@ -6,8 +6,9 @@
 import { useState, useCallback, useRef, memo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { 
-  MessageCircle, 
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  MessageCircle,
   Trash2, 
   Loader2, 
   Image, 
@@ -27,7 +28,7 @@ import {
   Clock
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
-import { ConfirmDialog } from '../ConfirmDialog';
+import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import {
@@ -103,7 +104,7 @@ const riskLevelConfig: Record<RiskLevel, {
 // 组件实现
 // ============================================================================
 
-export function SocialCleanModule() {
+export function SocialCleanModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.social;
   const { showToast } = useToast();
@@ -119,23 +120,6 @@ export function SocialCleanModule() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [fileModalData, setFileModalData] = useState<{ name: string; files: SocialFileEntry[] } | null>(null);
   const [showTip, setShowTip] = useState(true);
-
-  // 删除遮罩动画状态 - 使用 CSS keyframe 动画类
-  const [isDeletingVisible, setIsDeletingVisible] = useState(false);
-  const [isDeletingAnimating, setIsDeletingAnimating] = useState(false);
-  const deletingEnteredRef = useRef(false);
-  if (isDeletingVisible) deletingEnteredRef.current = true;
-  
-  useEffect(() => {
-    if (isDeleting) {
-      setIsDeletingAnimating(true);
-      setIsDeletingVisible(true);
-    } else {
-      setIsDeletingVisible(false);
-      const timer = setTimeout(() => setIsDeletingAnimating(false), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isDeleting]);
 
   // 开始扫描
   const handleScan = useCallback(async () => {
@@ -297,41 +281,55 @@ export function SocialCleanModule() {
   return (
     <>
       {/* 删除进度遮罩 */}
-      {isDeletingAnimating && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4 ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
-            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--fg-primary)]">正在清理缓存</h3>
-              <p className="text-sm text-[var(--fg-muted)] mt-1">
-                正在清理 {selectedStats.files} 个文件，请稍候...
-              </p>
-            </div>
-          </div>
-        </div>,
+      {createPortal(
+        <AnimatePresence>
+          {isDeleting && (
+            <motion.div
+              className="fixed inset-0 z-[9999] flex items-center justify-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+              <motion.div
+                className="relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4"
+                initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 10 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-[var(--fg-primary)]">正在清理缓存</h3>
+                  <p className="text-sm text-[var(--fg-muted)] mt-1">
+                    正在清理 {selectedStats.files} 个文件，请稍候...
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
         document.body
       )}
 
       {/* 删除确认弹窗 */}
-      <ConfirmDialog
+      <SocialDeleteConfirmModal
         isOpen={showDeleteConfirm}
-        title="确认清理社交软件缓存"
-        description={`您即将清理 ${selectedStats.files.toLocaleString()} 个文件，共 ${formatSize(selectedStats.size)}。此操作不可撤销。`}
-        warning="注意：清理后可能需要重新下载聊天中的图片和文件。建议先备份重要数据。"
-        confirmText="确认清理"
-        cancelText="取消"
         onConfirm={() => {
           setShowDeleteConfirm(false);
           handleDelete();
         }}
         onCancel={() => setShowDeleteConfirm(false)}
-        isDanger
+        selectedFiles={selectedStats.files}
+        selectedSize={selectedStats.size}
       />
 
       <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
         id="social"
         title="社交软件专清"
         description="清理微信、QQ、钉钉、飞书等软件的缓存文件"
@@ -393,12 +391,12 @@ export function SocialCleanModule() {
 
           {/* 空状态 */}
           {moduleState.status === 'idle' && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-3">
-                <MessageCircle className="w-7 h-7 text-[var(--fg-faint)]" />
-              </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">等待扫描</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">点击扫描按钮开始检测社交软件缓存</p>
+            <div className="p-4">
+              <EmptyState
+                icon={MessageCircle}
+                title="尚未检测社交缓存"
+                description="点击开始扫描，检测微信、QQ、钉钉、飞书等软件缓存。"
+              />
             </div>
           )}
 
@@ -415,12 +413,13 @@ export function SocialCleanModule() {
 
           {/* 无结果状态 */}
           {moduleState.status === 'done' && scanResult && scanResult.total_files === 0 && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-3">
-                <CheckCircle2 className="w-7 h-7 text-emerald-500" />
-              </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">太棒了！</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">没有发现需要清理的社交软件缓存</p>
+            <div className="p-4">
+              <EmptyState
+                icon={CheckCircle2}
+                tone="success"
+                title="太棒了"
+                description="没有发现需要清理的社交软件缓存。"
+              />
             </div>
           )}
 
@@ -506,29 +505,38 @@ export function SocialCleanModule() {
                 </div>
 
                 {/* 展开的文件列表 */}
-                {isCategoryExpanded && hasFiles && (
-                  <div className="bg-[var(--bg-base)] border-t border-[var(--border-default)]">
-                    <div className="max-h-48 overflow-auto">
-                      {category.files.slice(0, 20).map((file, index) => (
-                        <FileRow
-                          key={file.path}
-                          index={index}
-                          file={file}
-                          isSelected={selectedPaths.has(file.path)}
-                          onToggle={() => toggleFile(file)}
-                        />
-                      ))}
-                    </div>
-                    {category.files.length > 20 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setFileModalData({ name: category.name, files: category.files }); }}
-                        className="w-full px-4 py-2 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 border-t border-[var(--border-default)] transition"
-                      >
-                        查看全部 {category.files.length.toLocaleString()} 个文件 →
-                      </button>
-                    )}
-                  </div>
-                )}
+                <AnimatePresence initial={false}>
+                  {isCategoryExpanded && hasFiles && (
+                    <motion.div
+                      key={`${category.id}-files`}
+                      className="overflow-hidden bg-[var(--bg-base)] border-t border-[var(--border-default)]"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      <div className="max-h-48 overflow-auto">
+                        {category.files.slice(0, 20).map((file, index) => (
+                          <FileRow
+                            key={file.path}
+                            index={index}
+                            file={file}
+                            isSelected={selectedPaths.has(file.path)}
+                            onToggle={() => toggleFile(file)}
+                          />
+                        ))}
+                      </div>
+                      {category.files.length > 20 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setFileModalData({ name: category.name, files: category.files }); }}
+                          className="w-full px-4 py-2 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 border-t border-[var(--border-default)] transition"
+                        >
+                          查看全部 {category.files.length.toLocaleString()} 个文件 →
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}
@@ -551,6 +559,90 @@ export function SocialCleanModule() {
 // ============================================================================
 // 文件行组件
 // ============================================================================
+
+interface SocialDeleteConfirmModalProps {
+  isOpen: boolean;
+  selectedFiles: number;
+  selectedSize: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function SocialDeleteConfirmModal({
+  isOpen,
+  selectedFiles,
+  selectedSize,
+  onConfirm,
+  onCancel,
+}: SocialDeleteConfirmModalProps) {
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[10050] flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+          <motion.div
+            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden"
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <h3 className="text-base font-semibold text-[var(--fg-primary)]">
+                  确认清理社交软件缓存
+                </h3>
+              </div>
+              <button
+                onClick={onCancel}
+                className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
+                您即将清理 {selectedFiles.toLocaleString()} 个文件，共 {formatSize(selectedSize)}。此操作不可撤销。
+              </p>
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                  注意：清理后可能需要重新下载聊天中的图片和文件。建议先备份重要数据。
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[var(--border-default)] bg-[var(--bg-card)]">
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25"
+              >
+                确认清理
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+}
 
 interface FileRowProps {
   index: number;
@@ -658,8 +750,6 @@ interface FileListModalProps {
 
 function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onClose }: FileListModalProps) {
   const parentRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -668,72 +758,76 @@ function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onCl
     overscan: 20,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      setIsAnimating(true);
-      requestAnimationFrame(() => setIsVisible(true));
-    } else {
-      setIsVisible(false);
-      const timer = setTimeout(() => setIsAnimating(false), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  if (!isOpen && !isAnimating) return null;
-
   return createPortal(
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100' : 'scale-95'}`}>
-        <div className="px-6 py-4 border-b border-[var(--border-default)] flex items-center justify-between shrink-0">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{title}</h3>
-            <p className="text-xs text-[var(--fg-muted)] mt-0.5">
-              共 {files.length.toLocaleString()} 个文件，总计 {formatSize(files.reduce((sum, f) => sum + f.size, 0))}
-              <span className="mx-2">|</span>
-              可删除 {files.filter(f => f.deletable).length} 个
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition">
-            <X className="w-5 h-5 text-[var(--fg-muted)]" />
-          </button>
-        </div>
-        <div className="px-6 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-4 text-xs font-medium text-[var(--fg-muted)] shrink-0">
-          <span className="w-8"></span>
-          <span className="w-8 text-center">#</span>
-          <span className="w-6"></span>
-          <span className="w-16">来源</span>
-          <span className="flex-1">文件路径</span>
-          <span className="w-20">风险</span>
-          <span className="w-20 text-right">大小</span>
-          <span className="w-16"></span>
-        </div>
-        <div ref={parentRef} className="flex-1 overflow-auto">
-          <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const file = files[virtualRow.index];
-              return (
-                <VirtualFileRow
-                  key={file.path}
-                  index={virtualRow.index}
-                  file={file}
-                  isSelected={selectedPaths.has(file.path)}
-                  onToggle={() => onToggleFile(file)}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                />
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>,
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+          <motion.div
+            className="relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden"
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[var(--border-default)] flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{title}</h3>
+                <p className="text-xs text-[var(--fg-muted)] mt-0.5">
+                  共 {files.length.toLocaleString()} 个文件，总计 {formatSize(files.reduce((sum, f) => sum + f.size, 0))}
+                  <span className="mx-2">|</span>
+                  可删除 {files.filter(f => f.deletable).length} 个
+                </p>
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition">
+                <X className="w-5 h-5 text-[var(--fg-muted)]" />
+              </button>
+            </div>
+            <div className="px-6 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-4 text-xs font-medium text-[var(--fg-muted)] shrink-0">
+              <span className="w-8"></span>
+              <span className="w-8 text-center">#</span>
+              <span className="w-6"></span>
+              <span className="w-16">来源</span>
+              <span className="flex-1">文件路径</span>
+              <span className="w-20">风险</span>
+              <span className="w-20 text-right">大小</span>
+              <span className="w-16"></span>
+            </div>
+            <div ref={parentRef} className="flex-1 overflow-auto">
+              <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const file = files[virtualRow.index];
+                  return (
+                    <VirtualFileRow
+                      key={file.path}
+                      index={virtualRow.index}
+                      file={file}
+                      isSelected={selectedPaths.has(file.path)}
+                      onToggle={() => onToggleFile(file)}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body
   );
 }

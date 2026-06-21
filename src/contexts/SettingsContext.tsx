@@ -3,11 +3,14 @@
 // ============================================================================
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { APP_MODULE_META, DEFAULT_ACTIVE_MODULE_ID, type AppModuleId, type LayoutMode } from '../config/moduleMeta';
 
 /** 应用设置 */
 interface AppSettings {
-  /** 是否显示锚点导航 */
-  showAnchorNav: boolean;
+  /** 首页布局模式：卡片式适合快速总览，页面式适合传统 PC 软件用户。 */
+  layoutMode: LayoutMode;
+  /** 页面式布局下当前激活的功能模块，保存在全局设置里用于切换后保持位置。 */
+  activeModuleId: AppModuleId;
   /** 大目录分析深度 (2-4，默认 3) */
   hotspotDepth: number;
   /** 大目录大小阈值 MB (10-500，默认 50) */
@@ -28,10 +31,12 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 const STORAGE_KEY = 'c-cleanup-settings';
+const moduleIds = APP_MODULE_META.map(module => module.id);
 
 /** 默认设置 */
 const defaultSettings: AppSettings = {
-  showAnchorNav: true, // 默认打开
+  layoutMode: 'cards',
+  activeModuleId: DEFAULT_ACTIVE_MODULE_ID,
   hotspotDepth: 3,     // 默认分析深度 3 层
   hotspotSizeThreshold: 50, // 默认 50MB
   hotspotIgnoreSystemDirs: true, // 默认忽略系统目录
@@ -39,8 +44,16 @@ const defaultSettings: AppSettings = {
 };
 
 function normalizeSettings(settings: AppSettings): AppSettings {
+  const layoutMode: LayoutMode = settings.layoutMode === 'pages' ? 'pages' : 'cards';
+  const activeModuleId = moduleIds.includes(settings.activeModuleId)
+    ? settings.activeModuleId
+    : DEFAULT_ACTIVE_MODULE_ID;
+
   return {
     ...settings,
+    // 布局设置来自本地缓存，读取时收敛到已注册模块，避免旧缓存或手动篡改导致空页面。
+    layoutMode,
+    activeModuleId,
     // 这些设置会直接影响扫描结果数量，读取本地缓存时做边界收敛，避免手动篡改导致 UI 或后端压力异常。
     hotspotDepth: Math.min(4, Math.max(2, Number(settings.hotspotDepth) || defaultSettings.hotspotDepth)),
     hotspotSizeThreshold: Math.min(500, Math.max(10, Number(settings.hotspotSizeThreshold) || defaultSettings.hotspotSizeThreshold)),

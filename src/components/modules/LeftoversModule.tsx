@@ -28,7 +28,7 @@ import { formatSize } from '../../utils/format';
 // 组件实现
 // ============================================================================
 
-export function LeftoversModule() {
+export function LeftoversModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.leftovers;
 
@@ -430,6 +430,8 @@ export function LeftoversModule() {
       )}
 
       <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
         id="leftovers"
         title="卸载残留"
         description="深度检索多路径残留特征，基于置信度模型精准识别"

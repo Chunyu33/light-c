@@ -92,13 +92,15 @@ interface DashboardHeaderProps {
   onOneClickScan: () => void;
   /** 显示欢迎弹窗回调（彩蛋） */
   onShowWelcome?: () => void;
+  /** 页面模式聚焦单模块，隐藏一键扫描可以避免用户误以为只扫描当前页。 */
+  hideOneClickScan?: boolean;
 }
 
 // ============================================================================
 // 组件实现
 // ============================================================================
 
-export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHeaderProps) {
+export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickScan = false }: DashboardHeaderProps) {
   const { diskInfo, healthData, isLoadingHealth, isAnyScanning, stopAllScans } = useDashboard();
   
   // 动画数字
@@ -212,30 +214,34 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome }: DashboardHead
           </div>
         </div>
 
-        {/* 分隔线 */}
-        <div className="w-px h-9 bg-[var(--border-color)]" />
+        {!hideOneClickScan && (
+          <>
+            {/* 分隔线 */}
+            <div className="w-px h-9 bg-[var(--border-color)]" />
 
-        {/* 一键扫描按钮区域 */}
-        <div className="flex items-center gap-2">
-          {isAnyScanning ? (
-            <button
-              onClick={stopAllScans}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
-              title="停止扫描"
-            >
-              <Square className="w-4 h-4" />
-              停止扫描
-            </button>
-          ) : (
-            <button
-              onClick={onOneClickScan}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] active:scale-[0.98]"
-            >
-              <Zap className="w-4 h-4" />
-              一键扫描
-            </button>
-          )}
-        </div>
+            {/* 一键扫描按钮区域 */}
+            <div className="flex items-center gap-2">
+              {isAnyScanning ? (
+                <button
+                  onClick={stopAllScans}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
+                  title="停止扫描"
+                >
+                  <Square className="w-4 h-4" />
+                  停止扫描
+                </button>
+              ) : (
+                <button
+                  onClick={onOneClickScan}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] active:scale-[0.98]"
+                >
+                  <Zap className="w-4 h-4" />
+                  一键扫描
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -258,7 +258,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
 // 主组件
 // ============================================================================
 
-export function ContextMenuModule() {
+export function ContextMenuModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const {
     modules,
     expandedModule,
@@ -529,6 +529,8 @@ export function ContextMenuModule() {
       )}
 
       <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
         id="contextMenu"
         title="右键菜单清理"
         description="扫描并清理注册表中失效的右键菜单项"

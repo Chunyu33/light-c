@@ -28,24 +28,27 @@ export function EmptyState({
   const Icon = icon ?? (tone === 'success' ? CheckCircle2 : Sparkles);
   const iconClassName = tone === 'success'
     ? 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
-    : 'bg-[var(--bg-hover)] text-[var(--text-muted)]';
+    : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]';
 
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-6 text-center ${
-        compact ? 'py-8' : 'py-12'
+      className={`relative overflow-hidden flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-color)] bg-[linear-gradient(135deg,var(--bg-main),var(--brand-green-10))] px-6 text-center ${
+        compact ? 'min-h-[160px] py-8' : 'min-h-[220px] py-14'
       } ${className}`}
     >
-      <div className={`mb-3 flex h-12 w-12 items-center justify-center rounded-2xl ${iconClassName}`}>
+      {/* 用低对比度背景层增加空状态质感，避免纯灰色占位在页面模式下显得空。 */}
+      <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-[var(--brand-green)]/5" />
+      <div className="pointer-events-none absolute -right-12 bottom-4 h-28 w-28 rounded-full bg-[var(--brand-green)]/5" />
+      <div className={`relative mb-3 flex h-14 w-14 items-center justify-center rounded-2xl shadow-sm ${iconClassName}`}>
         <Icon className="h-6 w-6" />
       </div>
-      <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
+      <p className="relative text-sm font-semibold text-[var(--text-primary)]">{title}</p>
       {description && (
-        <p className="mt-1 max-w-sm text-xs leading-relaxed text-[var(--text-muted)]">
+        <p className="relative mt-1 max-w-sm text-xs leading-relaxed text-[var(--text-muted)]">
           {description}
         </p>
       )}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="relative mt-4">{action}</div>}
     </div>
   );
 }

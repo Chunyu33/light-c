@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Navigation, Trash2, SlidersHorizontal, Download } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Trash2, SlidersHorizontal, Download, LayoutGrid, PanelLeft } from 'lucide-react';
 import { Select, type SelectOption } from './ui/Select';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -45,6 +45,11 @@ const fontSizeOptions: { level: FontSizeLevel; label: string }[] = [
   { level: 'standard', label: '标准' },
   { level: 'medium', label: '适中' },
   { level: 'large', label: '较大' },
+];
+
+const layoutModeOptions = [
+  { mode: 'cards' as const, label: '卡片模式', icon: LayoutGrid, description: '所有功能集中在同一页，适合快速总览' },
+  { mode: 'pages' as const, label: '页面模式', icon: PanelLeft, description: '左侧菜单切换单功能页，更接近传统 PC 软件' },
 ];
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -263,28 +268,33 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
             </div>
           </div>
 
-          {/* 锚点导航开关 */}
+          {/* 布局设置 */}
           <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-                <Navigation className="w-4 h-4 text-[var(--text-muted)]" />
-                锚点导航
+                <LayoutGrid className="w-4 h-4 text-[var(--text-muted)]" />
+                布局设置
               </p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">在页面左侧显示悬浮导航，快速定位功能模块</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                卡片模式用于总览，页面模式通过左侧菜单切换单个功能
+              </p>
             </div>
-            {/* Switch 开关 */}
-            <button
-              onClick={() => updateSettings({ showAnchorNav: !settings.showAnchorNav })}
-              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-                settings.showAnchorNav ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-switch)]'
-              }`}
-            >
-              <span
-                className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${
-                  settings.showAnchorNav ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
+            <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+              {layoutModeOptions.map(({ mode, label, icon: Icon, description }) => (
+                <button
+                  key={mode}
+                  onClick={() => updateSettings({ layoutMode: mode })}
+                  title={`${label}：${description}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 ${
+                    settings.layoutMode === mode
+                      ? 'bg-[var(--brand-green)] text-white shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

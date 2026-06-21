@@ -10,6 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
 import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
@@ -20,7 +21,7 @@ import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
 // 组件实现
 // ============================================================================
 
-export function BigFilesModule() {
+export function BigFilesModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.bigFiles;
   const { showToast } = useToast();
@@ -311,6 +312,8 @@ export function BigFilesModule() {
       />
 
       <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
         id="bigFiles"
         title="大文件清理"
         description="扫描系统盘体积最大的文件，快速释放存储空间"
@@ -389,12 +392,12 @@ export function BigFilesModule() {
 
           {/* 空状态 */}
           {moduleState.status === 'idle' && files.length === 0 && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-[var(--bg-hover)] rounded-2xl flex items-center justify-center mb-3">
-                <FileBox className="w-7 h-7 text-[var(--fg-faint)]" />
-              </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">等待扫描</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">点击扫描按钮开始查找大文件</p>
+            <div className="p-4">
+              <EmptyState
+                icon={FileBox}
+                title="尚未扫描大文件"
+                description="点击开始扫描，快速找出占用空间较大的文件。"
+              />
             </div>
           )}
 

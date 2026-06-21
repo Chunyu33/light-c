@@ -47,6 +47,10 @@ export interface ModuleCardProps {
   headerExtra?: ReactNode;
   /** 错误信息 */
   error?: string | null;
+  /** 展示模式：卡片模式保持手风琴，页面模式用于传统 PC 功能页。 */
+  variant?: 'card' | 'page';
+  /** 页面模式下强制展示内容，避免切换模块后还要再次展开。 */
+  forceExpanded?: boolean;
 }
 
 // ============================================================================
@@ -73,10 +77,14 @@ export function ModuleCard({
   children,
   headerExtra,
   error,
+  variant = 'card',
+  forceExpanded = false,
 }: ModuleCardProps) {
   const isScanning = status === 'scanning';
   const isDone = status === 'done';
   const hasError = status === 'error' || !!error;
+  const isPageVariant = variant === 'page';
+  const contentExpanded = forceExpanded || expanded;
 
   // 获取状态标签 - 使用微信绿色系
   const getStatusBadge = () => {
@@ -128,9 +136,11 @@ export function ModuleCard({
         /* 微信风格卡片：纯白背景 + 极淡阴影 + 大圆角 */
         bg-[var(--bg-card)] rounded-2xl overflow-hidden
         transition-all duration-300 ease-out
-        ${expanded 
-          ? 'shadow-sm ring-1 ring-[var(--brand-green-20)]' 
-          : 'shadow-sm hover:shadow-md'
+        ${isPageVariant
+          ? 'shadow-sm ring-1 ring-[var(--border-color)]'
+          : expanded
+            ? 'shadow-sm ring-1 ring-[var(--brand-green-20)]'
+            : 'shadow-sm hover:shadow-md'
         }
       `}
     >
@@ -138,16 +148,18 @@ export function ModuleCard({
       <div className="p-6">
         <div className="flex items-center gap-4">
           {/* 展开/收起按钮 */}
-          <button
-            onClick={onToggleExpand}
-            className={`
-              text-[var(--text-muted)] transition-transform duration-200 p-1 -ml-1
-              hover:text-[var(--text-secondary)]
-              ${expanded ? 'rotate-0' : '-rotate-90'}
-            `}
-          >
-            <ChevronDown className="w-5 h-5" />
-          </button>
+          {!isPageVariant && (
+            <button
+              onClick={onToggleExpand}
+              className={`
+                text-[var(--text-muted)] transition-transform duration-200 p-1 -ml-1
+                hover:text-[var(--text-secondary)]
+                ${expanded ? 'rotate-0' : '-rotate-90'}
+              `}
+            >
+              <ChevronDown className="w-5 h-5" />
+            </button>
+          )}
 
           {/* 模块图标 - 微信绿 10% 透明度圆角容器 */}
           <div className={`w-14 h-14 rounded-2xl ${iconBgClass} flex items-center justify-center shrink-0`}>
@@ -155,7 +167,10 @@ export function ModuleCard({
           </div>
 
           {/* 模块信息 - 清晰的文字层次 */}
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleExpand}>
+          <div
+            className={`flex-1 min-w-0 ${isPageVariant ? '' : 'cursor-pointer'}`}
+            onClick={isPageVariant ? undefined : onToggleExpand}
+          >
             <div className="flex items-center gap-2.5">
               <h3 className="text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
               {getStatusBadge()}
@@ -226,7 +241,7 @@ export function ModuleCard({
       </div>
 
       {/* 展开内容 - 手风琴动画 */}
-      <AccordionContent expanded={expanded}>
+      <AccordionContent expanded={contentExpanded} animated={!isPageVariant}>
         <div className="border-t border-[var(--border-color)] pb-2">
           {children}
         </div>
@@ -242,9 +257,10 @@ export function ModuleCard({
 interface AccordionContentProps {
   expanded: boolean;
   children: ReactNode;
+  animated?: boolean;
 }
 
-function AccordionContent({ expanded, children }: AccordionContentProps) {
+function AccordionContent({ expanded, children, animated = true }: AccordionContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>(expanded ? 'auto' : 0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -294,6 +310,11 @@ function AccordionContent({ expanded, children }: AccordionContentProps) {
   const shouldRender = expanded || height !== 0 || isAnimating;
 
   if (!shouldRender) return null;
+
+  if (!animated) {
+    // 页面模式下模块内容始终可见，不需要手风琴高度计算，避免隐藏页面切换时产生无意义动画。
+    return <div ref={contentRef}>{children}</div>;
+  }
 
   return (
     <div

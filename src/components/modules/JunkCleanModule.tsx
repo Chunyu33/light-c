@@ -21,7 +21,7 @@ import type { ScanResult, FileInfo } from '../../types';
 // 组件实现
 // ============================================================================
 
-export function JunkCleanModule() {
+export function JunkCleanModule({ layoutMode = 'cards' }: { layoutMode?: 'cards' | 'pages' }) {
   const { modules, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useDashboard();
   const moduleState = modules.junk;
   const { showToast } = useToast();
@@ -290,6 +290,8 @@ export function JunkCleanModule() {
       />
 
       <ModuleCard
+        variant={layoutMode === 'pages' ? 'page' : 'card'}
+        forceExpanded={layoutMode === 'pages'}
         id="junk"
         title="垃圾清理"
         description="清理系统缓存、临时文件、日志等垃圾文件"

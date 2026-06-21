@@ -50,13 +50,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v__VERSION__'
+          releaseName: 'LightC v2.9.0'
           releaseBody: |
             ## 更新内容
-            - 文件明细改为同名 .files 分片目录存储，主快照保持轻量，超大磁盘下明细懒加载更稳
-            - 历史快照最多保留 3 组，并减少扫描结果中的文件级大数组复制，降低长期磁盘占用和峰值内存
-            - C 盘全盘分析过滤无意义根目录，并为深层目录变化增加流式明细兜底，避免有变化量但弹窗为空
-            - 清空本地数据增加二次确认，并同步清理 C 盘全盘分析快照；清理后下一次扫描会重新建立基线
+            - 新增自定义布局：支持默认卡片总览和传统 PC 软件式页面模式，可在设置页切换
+            - 页面模式下左侧导航自动切换为功能页导航，模块状态、扫描结果和展开状态会在切换中保留
+            - 优化页面切换动画：使用轻量入场动画和顶部绿色扫描光带，减少大结果页切换卡顿
+            - 修复 C 盘全盘分析变化明细弹窗在页面模式下被容器裁切的问题
+            - 优化社交软件专清弹窗和分类展开动画，并修复风险等级中文乱码
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
 
