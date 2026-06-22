@@ -9,15 +9,15 @@
 //   3. WhitelistRule     — 结构化白名单（Exact / Prefix / Pattern），禁止全局 contains
 //   4. FileSystemProbe   — 有限深度文件探测（.exe / .dll / uninstall*.exe）
 //
-// 【评分信号】（基线 0.0，纯正向驱动）
+// 【评分信号】（基线 0.0，正向识别 + 保护性降权）
 //   正向（累加）：
-//     +0.45  文件夹名精确匹配已知卸载应用 DisplayName（规范化后）
 //     +0.35  文件夹内发现 uninstall*.exe / uninst*.exe
 //     +0.25  文件夹名匹配 InstallLocation 末级目录（且应用已不在注册表中）
 //     +0.20  包含 .exe 或 .dll 文件
 //     +0.10  超过 min_days_old 天未修改
 //     +0.10  匹配已知模拟器特征
 //   负向（扣分）：
+//     -0.45  文件夹名精确匹配当前已安装应用 DisplayName（规范化后）
 //     -0.60  文件夹名精确匹配已安装应用 InstallLocation 末级目录
 //     -0.40  通用目录名（cache, logs, temp, data）
 //     -0.30  位于 ProgramData
@@ -27,8 +27,8 @@
 //     -0.50  已知共享厂商目录（Adobe, Microsoft 等）
 //
 // 【分类阈值】
-//   score >= 0.65 → HighConfidenceLeftover（前端默认勾选）
-//   0.40 <= score < 0.65 → Suspicious（前端不勾选，仅展示）
+//   score >= 0.75 → HighConfidenceLeftover（前端默认勾选）
+//   0.40 <= score < 0.75 → Suspicious（前端不勾选，仅展示）
 //   score < 0.40 → 不输出
 //
 // 【扫描路径】
@@ -195,9 +195,9 @@ impl LeftoverSource {
 /// 检测分类（置信度分级）
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DetectionCategory {
-    /// 高置信度残留（score >= 0.7）
+    /// 高置信度残留（score >= 0.75）
     HighConfidenceLeftover,
-    /// 可疑（0.4 <= score < 0.7）
+    /// 可疑（0.4 <= score < 0.75）
     Suspicious,
     /// 可能是正在使用的应用数据
     LikelyAppData,
@@ -739,7 +739,7 @@ impl ScoringContext {
 
     /// 根据最终分数确定检测分类
     fn category(&self) -> DetectionCategory {
-        if self.score >= 0.65 {
+        if self.score >= 0.75 {
             DetectionCategory::HighConfidenceLeftover
         } else if self.score >= 0.40 {
             DetectionCategory::Suspicious
@@ -933,11 +933,6 @@ impl LeftoverScanner {
                     } else {
                         // ---- 正向信号 ----
 
-                        // +0.45 文件夹名精确匹配已知卸载应用的 DisplayName（规范化后）
-                        if self.app_map.matches_display_name(&folder_lower) {
-                            ctx.add(0.45, format!("匹配已知应用 DisplayName: {}", folder_name));
-                        }
-
                         // +0.35 文件夹内发现 uninstall*.exe / uninst*.exe
                         if probe.has_uninstaller {
                             ctx.add(0.35, "包含卸载程序残留 (uninstall*.exe)".into());
@@ -970,6 +965,12 @@ impl LeftoverScanner {
                         }
 
                         // ---- 负向信号 ----
+
+                        // -0.45 文件夹名精确匹配当前已安装应用 DisplayName。
+                        // DisplayName 来源于当前注册表，代表软件仍有安装记录；把它作为保护信号能降低误伤正在使用软件数据的概率。
+                        if self.app_map.matches_display_name(&folder_lower) {
+                            ctx.add(-0.45, format!("匹配当前已安装应用 DisplayName: {}", folder_name));
+                        }
 
                         // -0.60 文件夹名精确匹配已安装应用的 InstallLocation 末级目录
                         if let Some(owner) = self.app_map.find_owner(&folder_lower) {
@@ -1522,10 +1523,10 @@ mod tests {
         // 基线 0.0
         assert!((ctx.score - 0.0).abs() < f32::EPSILON);
 
-        ctx.add(0.45, "测试正向信号".into());
+        ctx.add(0.40, "测试正向信号".into());
         ctx.add(0.35, "卸载程序残留".into());
         ctx.finalize();
-        assert!((ctx.score - 0.80).abs() < 0.01);
+        assert!((ctx.score - 0.75).abs() < 0.01);
         assert_eq!(ctx.category(), DetectionCategory::HighConfidenceLeftover);
     }
 
@@ -1544,12 +1545,12 @@ mod tests {
 
     #[test]
     fn test_detection_category_thresholds() {
-        // score >= 0.65 → HighConfidenceLeftover
+        // score >= 0.75 → HighConfidenceLeftover
         let mut ctx = ScoringContext::new();
-        ctx.score = 0.70;
+        ctx.score = 0.75;
         assert_eq!(ctx.category(), DetectionCategory::HighConfidenceLeftover);
 
-        // 0.40 <= score < 0.65 → Suspicious
+        // 0.40 <= score < 0.75 → Suspicious
         ctx.score = 0.50;
         assert_eq!(ctx.category(), DetectionCategory::Suspicious);
 
@@ -1627,20 +1628,20 @@ mod tests {
 
     #[test]
     fn test_high_confidence_threshold() {
-        // 验证阈值 >= 0.65 分类为 HighConfidenceLeftover
+        // 验证阈值 >= 0.75 分类为 HighConfidenceLeftover
         let mut ctx = ScoringContext::new();
-        ctx.score = 0.65;
+        ctx.score = 0.75;
         assert_eq!(
             ctx.category(),
             DetectionCategory::HighConfidenceLeftover,
-            "score = 0.65 应为 HighConfidenceLeftover"
+            "score = 0.75 应为 HighConfidenceLeftover"
         );
 
-        ctx.score = 0.64;
+        ctx.score = 0.74;
         assert_eq!(
             ctx.category(),
             DetectionCategory::Suspicious,
-            "score = 0.64 应为 Suspicious"
+            "score = 0.74 应为 Suspicious"
         );
 
         ctx.score = 0.40;

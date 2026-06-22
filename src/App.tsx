@@ -15,8 +15,9 @@ import {
   UpdateModal,
   DashboardHeader,
   SplashScreen,
-  Footer,
+  // Footer,
   AnchorNav,
+  BackToTopButton,
 } from './components';
 import { DashboardProvider, useDashboard, FontSizeProvider, SettingsProvider, useSettings } from './contexts';
 import { APP_MODULES } from './config/modules';
@@ -117,6 +118,7 @@ function DashboardContent() {
 
       {/* 侧边导航：卡片模式滚动到锚点，页面模式切换当前模块。 */}
       <AnchorNav scrollContainerRef={scrollContainerRef} />
+      <BackToTopButton scrollContainerRef={scrollContainerRef} />
 
       {/* 主内容区 - 模块始终挂在同一个父容器内，布局模式只改变展示方式，避免切换模式时丢失本地状态。 */}
       <main className="flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)]">
@@ -165,7 +167,7 @@ function DashboardContent() {
           </div>
 
           {/* Footer 不放进滚动区，短页面不会因为版权区参与滚动而出现额外空白。 */}
-          <Footer />
+          {/* <Footer /> */}
         </div>
       </main>
     </div>

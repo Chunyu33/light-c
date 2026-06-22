@@ -25,7 +25,10 @@ import { formatSize } from '../../utils/format';
 
 function formatDateTime(timestamp: number): string {
   if (!timestamp) return '-';
-  const d = new Date(timestamp);
+  // 大目录 MFT 引擎使用 Unix 秒，降级扫描使用毫秒；展示层统一归一化，兼容两种来源。
+  const normalizedTimestamp = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  const d = new Date(normalizedTimestamp);
+  if (Number.isNaN(d.getTime())) return '-';
   const Y = d.getFullYear();
   const M = String(d.getMonth() + 1).padStart(2, '0');
   const D = String(d.getDate()).padStart(2, '0');

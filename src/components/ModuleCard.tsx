@@ -189,7 +189,7 @@ export function ModuleCard({
           {/* 额外内容 */}
           {headerExtra}
 
-          {/* 扫描按钮 - 微信风格：主按钮实心微信绿，次按钮幽灵风格 */}
+          {/* 扫描按钮：完成态也保留按钮边界，避免“重新扫描/检测”在列表里看起来像普通文字。 */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -197,12 +197,13 @@ export function ModuleCard({
             }}
             disabled={isScanning || scanDisabled}
             className={`
-              flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 shrink-0
+              flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 shrink-0
+              border shadow-sm active:scale-[0.98]
               ${isScanning || scanDisabled
-                ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
+                ? 'border-[var(--border-color)] bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed shadow-none'
                 : isDone
-                  ? 'bg-transparent text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]'  /* Ghost Button 风格 */
-                  : 'bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)]'  /* 实心微信绿按钮 */
+                  ? 'border-[var(--brand-green-20)] bg-[var(--brand-green-10)] text-[var(--brand-green)] hover:bg-[var(--brand-green)] hover:text-white hover:border-[var(--brand-green)] hover:shadow-[0_6px_18px_rgba(7,193,96,0.18)]'
+                  : 'border-[var(--brand-green)] bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] hover:border-[var(--brand-green-hover)] hover:shadow-[0_6px_18px_rgba(7,193,96,0.22)]'
               }
             `}
           >

@@ -26,7 +26,10 @@ import { DrillDownModal } from './DrillDownModal';
  */
 function formatDateTime(timestamp: number): string {
   if (!timestamp) return '-';
-  const date = new Date(timestamp);
+  // MFT 引擎返回 Unix 秒，常规遍历返回毫秒；这里做兼容，避免秒级时间戳被解析到 1970 年。
+  const normalizedTimestamp = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  const date = new Date(normalizedTimestamp);
+  if (Number.isNaN(date.getTime())) return '-';
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');

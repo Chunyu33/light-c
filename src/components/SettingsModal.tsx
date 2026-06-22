@@ -737,7 +737,7 @@ function GuideSettings() {
               卸载残留
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              基于<span className="text-[var(--brand-green)] font-medium">置信度评分引擎</span>（7项正向信号 + 7项负向信号），智能识别 AppData 和 ProgramData 中已卸载软件的残留文件夹。
+              基于<span className="text-[var(--brand-green)] font-medium">置信度评分引擎</span>（卸载特征 + 保护信号），智能识别 AppData 和 ProgramData 中已卸载软件的残留文件夹。
               系统会自动读取注册表构建已安装应用映射，结合<span className="text-[var(--brand-green)] font-medium">安装历史缓存</span>检测"曾经安装现已卸载"的残留。
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
@@ -855,10 +855,14 @@ function GuideSettings() {
               置信度评分引擎
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              卸载残留模块采用加权评分模型（0.0~1.0），综合<span className="font-medium">7项正向信号</span>（如文件夹名匹配已知应用、含卸载程序残留）
-              和<span className="font-medium">7项负向信号</span>（如通用目录名、已安装应用映射、共享厂商目录）。
-              <span className="text-[var(--brand-green)] font-medium">≥0.65 高置信度</span>的条目默认勾选，
-              <span className="text-[var(--color-warning)] font-medium">0.40~0.65 可疑项</span>供手动判断，&lt;0.40 的条目不输出。
+              卸载残留模块采用加权评分模型（0.0~1.0），综合<span className="font-medium">卸载程序残留、历史安装路径、可执行文件、长时间未修改</span>等正向信号，
+              以及<span className="font-medium">当前已安装应用映射、DisplayName 命中、通用目录名、共享厂商目录</span>等保护信号。
+              <span className="text-[var(--brand-green)] font-medium">≥0.75 高置信度</span>的条目默认勾选，
+              <span className="text-[var(--color-warning)] font-medium">0.40~0.75 可疑项</span>供手动判断，&lt;0.40 的条目不输出。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              <span className="text-[var(--color-warning)] font-medium">准确性说明：</span>
+              卸载后的目录归属无法做到 100% 权威判断，本模块只做高置信推断；可疑项不会默认勾选，清理前建议结合路径、大小和软件使用情况确认。
             </p>
           </div>
           <div>

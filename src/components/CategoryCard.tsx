@@ -5,6 +5,7 @@
 
 import { useState, useRef, useMemo, memo, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronDown,
   Folder,
@@ -158,44 +159,52 @@ export function CategoryCard({
         </div>
       </div>
 
-      {/* 文件列表 - 虚拟滚动 */}
-      {expanded && (
-        <div className="border-t border-[var(--border-color)]">
-          {/* 风险提示 - 微信风格柔和橙 */}
-          {category.risk_level >= 3 && (
-            <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[13px] text-[var(--color-warning)]">
-              <AlertTriangle className="w-4 h-4" />
-              <span>此分类风险等级较高，请谨慎选择删除</span>
-            </div>
-          )}
+      {/* 文件列表 - 虚拟滚动。用高度动画包住列表，展开/折叠时不会再硬切。 */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            className="overflow-hidden border-t border-[var(--border-color)]"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {/* 风险提示 - 微信风格柔和橙 */}
+            {category.risk_level >= 3 && (
+              <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[13px] text-[var(--color-warning)]">
+                <AlertTriangle className="w-4 h-4" />
+                <span>此分类风险等级较高，请谨慎选择删除</span>
+              </div>
+            )}
 
-          {/* 虚拟列表容器 */}
-          <div ref={parentRef} className="h-64 overflow-auto bg-[var(--bg-main)]">
-            <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-              {virtualizer.getVirtualItems().map((virtualRow) => {
-                const file = category.files[virtualRow.index];
-                const isSelected = selectedPaths.has(file.path);
-                return (
-                  <VirtualFileItem
-                    key={file.path}
-                    file={file}
-                    selected={isSelected}
-                    onToggle={() => onToggleFile(file.path)}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  />
-                );
-              })}
+            {/* 虚拟列表容器 */}
+            <div ref={parentRef} className="h-64 overflow-auto bg-[var(--bg-main)]">
+              <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const file = category.files[virtualRow.index];
+                  const isSelected = selectedPaths.has(file.path);
+                  return (
+                    <VirtualFileItem
+                      key={file.path}
+                      file={file}
+                      selected={isSelected}
+                      onToggle={() => onToggleFile(file.path)}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

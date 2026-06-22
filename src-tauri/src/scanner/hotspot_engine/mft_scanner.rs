@@ -291,8 +291,10 @@ fn add_file_to_directory(
     let stats = stats_by_dir.entry(directory_id).or_default();
     stats.total_size = stats.total_size.saturating_add(metadata.size);
     stats.file_count += 1;
-    if metadata.modified > stats.last_modified {
-        stats.last_modified = metadata.modified;
+    // MFT 核心解析出的时间戳是 Unix 秒，而 HotspotEntry 对外约定为毫秒；在聚合入口统一转换，避免前端显示到 1970 年。
+    let modified_millis = metadata.modified.saturating_mul(1000);
+    if modified_millis > stats.last_modified {
+        stats.last_modified = modified_millis;
     }
 }
 

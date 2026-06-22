@@ -454,6 +454,53 @@ export function LeftoversModule({ layoutMode = 'cards' }: { layoutMode?: 'cards'
           </div>
         )}
 
+        {moduleState.status === 'scanning' && !scanResult && (
+          <div className="p-5">
+            {/* 页面模式下扫描耗时会更明显，这里补充过程状态，避免内容区长时间空白。 */}
+            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/80 p-5 shadow-sm">
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-green)]/10">
+                  <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
+                </div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">正在扫描卸载残留...</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--text-muted)]">
+                  正在检索 AppData、ProgramData、LocalLow 等常见残留位置，并结合安装记录、目录特征和置信度模型识别可疑目录。
+                </p>
+              </div>
+
+              {/* <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: '多路径检索', detail: '覆盖用户与公共数据目录', icon: FolderOpen },
+                  { label: '安装记录匹配', detail: '排除仍在使用的软件', icon: Package },
+                  { label: '置信度评分', detail: '优先识别高可信残留', icon: CheckCircle2 },
+                  { label: '特殊目录识别', detail: '标记模拟器与虚拟磁盘', icon: HardDrive },
+                ].map((step) => {
+                  const StepIcon = step.icon;
+                  return (
+                    <div
+                      key={step.label}
+                      className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)]/70 p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-green)]/10">
+                          <StepIcon className="h-4 w-4 text-[var(--brand-green)]" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-[var(--text-primary)]">{step.label}</p>
+                          <p className="truncate text-[11px] text-[var(--text-muted)]">{step.detail}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-hover)]">
+                        <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--brand-green)]/70" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div> */}
+            </div>
+          </div>
+        )}
+
         {/* 扫描结果内容 */}
         {scanResult && scanResult.leftovers.length > 0 && (
           <div className="p-5 space-y-4">
