@@ -15,6 +15,16 @@ import type {
   LargeFileEntry,
 } from '../types';
 
+export type DistributionChannel = 'installer' | 'portable';
+
+/**
+ * 获取当前发行渠道。
+ * 便携版由 exe 同目录的 LightC.portable 标记文件识别，前端据此禁用自动更新安装流程。
+ */
+export async function getDistributionChannel(): Promise<DistributionChannel> {
+  return invoke<DistributionChannel>('get_distribution_channel');
+}
+
 /**
  * 鑾峰彇C鐩樼鐩樹俊鎭? */
 export async function getDiskInfo(): Promise<DiskInfo> {

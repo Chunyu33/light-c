@@ -440,6 +440,13 @@ npm run tauri build
    - `LightC_x.x.x_x64-setup.nsis.zip`
    - `LightC_x.x.x_x64-setup.nsis.zip.sig`
    - `latest.json`（构建时自动生成）
+   - `LightC_portable_x64.zip`（便携包内包含 `LightC.portable` 标记文件，用于禁用安装器式自动更新）
+
+### 便携版更新策略
+
+- 安装版保留 Tauri 自动更新，继续使用 `latest.json` 和签名包完成更新。
+- 便携版由发布流程写入 `LightC.portable` 标记文件，运行时识别后不会自动弹出更新安装器。
+- 便携版“检查更新”入口会优先打开网盘下载页，用户下载新版 zip 后覆盖当前目录即可；GitHub Releases 保留为备用官方渠道。
 
 ---
 

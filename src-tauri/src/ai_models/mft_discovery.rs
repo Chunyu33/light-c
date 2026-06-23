@@ -1,7 +1,7 @@
 #![cfg(target_os = "windows")]
 
-use crate::ai_models::types::{AiModelPhaseDuration, AiModelScanProgress, AssetSource, ModelItem};
 use crate::ai_models::model_file_rules::mft_model_min_size;
+use crate::ai_models::types::{AiModelPhaseDuration, AiModelScanProgress, AssetSource, ModelItem};
 use crate::scanner::big_files_engine::mft_core;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

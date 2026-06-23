@@ -57,6 +57,7 @@ jobs:
             - 支持配置优先识别与可选 MFT 深度发现，按模型文件类型和体积阈值补充未知来源候选
             - AI 模型空间新增平台占用饼图、模型类型柱状图、模型列表筛选、打开目录和 Bing 搜索模型能力
             - 设置页新增 AI 模型空间说明，并将清空本地数据升级为可勾选的数据项清理
+            - 便携版新增运行时标记文件，自动禁用安装器式更新提示，手动更新入口优先打开网盘下载页
             - 优化清空本地数据弹窗动效，新增统一下拉组件与可复用轻量图表组件
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
@@ -86,6 +87,10 @@ jobs:
           }
           Copy-Item "$ReleaseDir\LightC.exe" $PortableDir -Force
           Write-Host "  Copied: LightC.exe" -ForegroundColor White
+
+          # 便携版与安装版复用同一个 exe，通过 marker 让运行时禁用安装器式自动更新。
+          Set-Content -Path "$PortableDir\LightC.portable" -Value "portable" -Encoding UTF8
+          Write-Host "  Created: LightC.portable" -ForegroundColor White
 
           # DLL 文件
           $DllFiles = Get-ChildItem -Path $ReleaseDir -Filter "*.dll" -ErrorAction SilentlyContinue

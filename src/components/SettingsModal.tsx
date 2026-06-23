@@ -17,7 +17,7 @@ import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSize
 import { useToast } from './Toast';
 import { Type } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
-import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, listClearableDataItems, clearSelectedLocalData, pickFolderDialog, openInFolder, type ClearableDataItem } from '../api/commands';
+import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, listClearableDataItems, clearSelectedLocalData, pickFolderDialog, openInFolder, getDistributionChannel, type ClearableDataItem, type DistributionChannel } from '../api/commands';
 import { formatSize } from '../utils/format';
 
 type SettingsTab = 'general' | 'features' | 'guide' | 'feedback' | 'about';
@@ -1230,6 +1230,7 @@ function AboutSettings() {
   const [appVersion, setAppVersion] = useState('');
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loadingSystemInfo, setLoadingSystemInfo] = useState(true);
+  const [distributionChannel, setDistributionChannel] = useState<DistributionChannel>('installer');
 
   // 获取应用版本号和系统信息
   useEffect(() => {
@@ -1240,6 +1241,11 @@ function AboutSettings() {
       .then(setSystemInfo)
       .catch(err => console.error('获取系统信息失败:', err))
       .finally(() => setLoadingSystemInfo(false));
+
+    // 便携版使用 zip 覆盖更新，关于页需要把入口文案改成网盘下载，避免误导用户走安装器更新。
+    getDistributionChannel()
+      .then(setDistributionChannel)
+      .catch(err => console.error('获取发行渠道失败:', err));
   }, []);
 
   return (
@@ -1257,7 +1263,9 @@ function AboutSettings() {
             <div>
               <h3 className="text-lg font-semibold text-[var(--text-primary)]">LightC</h3>
               <p className="text-sm text-[var(--text-muted)]">Windows C盘智能清理工具</p>
-              <p className="text-xs text-[var(--text-faint)] mt-1">版本 {appVersion || '...'}</p>
+              <p className="text-xs text-[var(--text-faint)] mt-1">
+                版本 {appVersion || '...'} · {distributionChannel === 'portable' ? '便携版' : '安装版'}
+              </p>
             </div>
           </div>
           {/* 检查更新按钮 */}
@@ -1266,9 +1274,13 @@ function AboutSettings() {
             className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--brand-green)] bg-[var(--brand-green)]/10 rounded-xl hover:bg-[var(--brand-green)]/20 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            检查更新
+            {distributionChannel === 'portable' ? '网盘下载新版' : '检查更新'}
           </button>
-          <p className="text-xs text-[var(--text-faint)] mt-3">温馨提示：更新源为GitHub，国内可能会出现间歇性DNS污染，如果失败可以稍后重试。</p>
+          <p className="text-xs text-[var(--text-faint)] mt-3">
+            {distributionChannel === 'portable'
+              ? '便携版不会自动安装更新，推荐从网盘下载新版 zip 后覆盖当前目录，GitHub 作为备用渠道。'
+              : '温馨提示：更新源为GitHub，国内可能会出现间歇性DNS污染，如果失败可以稍后重试。'}
+          </p>
         </div>
       </div>
 

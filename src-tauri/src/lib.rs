@@ -94,6 +94,7 @@ pub fn run() {
             check_leftover_safety,
             // 系统信息
             get_system_info,
+            get_distribution_channel,
             // 清理日志
             record_cleanup_action,
             open_logs_folder,

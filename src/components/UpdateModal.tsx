@@ -8,8 +8,10 @@ import { createPortal } from 'react-dom';
 import { X, Download, RefreshCw, CheckCircle, AlertCircle, Sparkles, FileText, AlertTriangle } from 'lucide-react';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { getVersion } from '@tauri-apps/api/app';
 import { useToast } from './Toast';
+import { getDistributionChannel, type DistributionChannel } from '../api/commands';
 
 // ============================================================================
 // 类型定义
@@ -26,6 +28,10 @@ interface UpdateModalProps {
   /** 是否在启动时自动检查 */
   autoCheck?: boolean;
 }
+
+// 网盘更新（推荐）
+const NET_DISK_URL = 'https://pan.quark.cn/s/bce8f722bf33';
+const RELEASES_URL = 'https://github.com/Chunyu33/light-c/releases';
 
 // ============================================================================
 // 错误信息映射
@@ -84,6 +90,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
+  const [distributionChannel, setDistributionChannel] = useState<DistributionChannel | null>(null);
   const { showToast } = useToast();
   const sourceRef = useRef<'auto' | 'manual'>('auto');
 
@@ -92,9 +99,54 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     getVersion().then(setCurrentVersion).catch(() => setCurrentVersion('未知'));
   }, []);
 
+  // 便携版不能走安装器式自动更新，否则会误导用户下载并安装 NSIS 包。
+  useEffect(() => {
+    getDistributionChannel()
+      .then(setDistributionChannel)
+      .catch((error) => {
+        console.error('获取发行渠道失败:', error);
+        setDistributionChannel('installer');
+      });
+  }, []);
+
   // 检查更新（source: 'auto' 启动自动检查 / 'manual' 用户手动触发）
   const checkForUpdate = useCallback(async (source: 'auto' | 'manual' = 'auto') => {
     sourceRef.current = source;
+    let currentDistributionChannel = distributionChannel;
+
+    if (!currentDistributionChannel) {
+      try {
+        // 手动检查可能早于初始化完成，按需补取一次渠道，避免按钮点击后没有反馈。
+        currentDistributionChannel = await getDistributionChannel();
+        setDistributionChannel(currentDistributionChannel);
+      } catch (error) {
+        console.error('获取发行渠道失败:', error);
+        currentDistributionChannel = 'installer';
+        setDistributionChannel(currentDistributionChannel);
+      }
+    }
+
+    if (currentDistributionChannel === 'portable') {
+      if (source === 'manual') {
+        try {
+          await openUrl(NET_DISK_URL);
+          showToast({
+            type: 'info',
+            title: '已打开网盘下载页',
+            description: '便携版推荐从网盘下载新版 zip 后覆盖当前目录；GitHub Releases 可作为备用渠道。',
+          });
+        } catch (error) {
+          console.error('打开网盘下载页失败:', error);
+          showToast({
+            type: 'error',
+            title: '打开网盘失败',
+            description: `请手动访问网盘下载新版便携包，备用渠道：${RELEASES_URL}`,
+          });
+        }
+      }
+      return;
+    }
+
     setStatus('checking');
     setErrorMessage('');
 
@@ -135,15 +187,15 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
         setStatus('error');
       }
     }
-  }, [autoCheck, currentVersion, showToast]);
+  }, [currentVersion, distributionChannel, showToast]);
 
   // 启动时自动检查
   useEffect(() => {
-    if (autoCheck) {
+    if (autoCheck && distributionChannel === 'installer') {
       const timer = setTimeout(() => checkForUpdate('auto'), 2000);
       return () => clearTimeout(timer);
     }
-  }, [autoCheck, checkForUpdate]);
+  }, [autoCheck, checkForUpdate, distributionChannel]);
 
   // 监听手动触发事件（来自 SettingsModal 的"检查更新"按钮）
   useEffect(() => {

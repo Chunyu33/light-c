@@ -969,7 +969,10 @@ impl LeftoverScanner {
                         // -0.45 文件夹名精确匹配当前已安装应用 DisplayName。
                         // DisplayName 来源于当前注册表，代表软件仍有安装记录；把它作为保护信号能降低误伤正在使用软件数据的概率。
                         if self.app_map.matches_display_name(&folder_lower) {
-                            ctx.add(-0.45, format!("匹配当前已安装应用 DisplayName: {}", folder_name));
+                            ctx.add(
+                                -0.45,
+                                format!("匹配当前已安装应用 DisplayName: {}", folder_name),
+                            );
                         }
 
                         // -0.60 文件夹名精确匹配已安装应用的 InstallLocation 末级目录

@@ -7,6 +7,7 @@
 // ============================================================================
 
 mod ai_models;
+mod app;
 mod data;
 mod delete;
 mod disk;
@@ -22,6 +23,7 @@ mod tools;
 
 // 公共类型（供前端和其他模块使用）
 pub use ai_models::*;
+pub use app::*;
 pub use data::*;
 pub use delete::*;
 pub use disk::*;

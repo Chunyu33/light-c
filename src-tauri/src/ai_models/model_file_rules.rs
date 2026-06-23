@@ -79,10 +79,10 @@ fn model_file_rule(path: &Path) -> Option<ModelFileRule> {
             confidence: ModelFileConfidence::Medium,
         },
         // 推理运行时/跨平台模型格式，扩展名比较明确，适合在自定义目录和 MFT 兜底中直接识别。
-        "onnx" | "ort" | "tflite" | "pb" | "h5" | "hdf5" | "keras" | "mlmodel"
-        | "mnn" | "rknn" | "mindir" | "om" | "engine" | "plan" | "trt" | "uff"
-        | "pdmodel" | "pdiparams" | "pdparams" | "caffemodel" | "dlc" | "hef"
-        | "xmodel" | "bmodel" | "pte" | "task" | "mar" | "nemo" => ModelFileRule {
+        "onnx" | "ort" | "tflite" | "pb" | "h5" | "hdf5" | "keras" | "mlmodel" | "mnn" | "rknn"
+        | "mindir" | "om" | "engine" | "plan" | "trt" | "uff" | "pdmodel" | "pdiparams"
+        | "pdparams" | "caffemodel" | "dlc" | "hef" | "xmodel" | "bmodel" | "pte" | "task"
+        | "mar" | "nemo" => ModelFileRule {
             min_size_for_mft: MODEL_RUNTIME_MIN_SIZE,
             confidence: ModelFileConfidence::Medium,
         },
@@ -92,12 +92,10 @@ fn model_file_rule(path: &Path) -> Option<ModelFileRule> {
             confidence: ModelFileConfidence::Medium,
         },
         // 这些扩展名在 Python/开发环境里太常见，只在体积很大或平台目录中才认为是模型候选。
-        "bin" | "pt" | "pth" | "pkl" | "pickle" | "joblib" | "npz" | "params" => {
-            ModelFileRule {
-                min_size_for_mft: NOISY_MODEL_MIN_SIZE,
-                confidence: ModelFileConfidence::Noisy,
-            }
-        }
+        "bin" | "pt" | "pth" | "pkl" | "pickle" | "joblib" | "npz" | "params" => ModelFileRule {
+            min_size_for_mft: NOISY_MODEL_MIN_SIZE,
+            confidence: ModelFileConfidence::Noisy,
+        },
         _ => return None,
     };
 

@@ -351,7 +351,9 @@ fn clear_file(path: &Path) -> Result<(usize, u64), String> {
         return Err(format!("清理项不是文件: {}", path.display()));
     }
 
-    let size = fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+    let size = fs::metadata(path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
     fs::remove_file(path).map_err(|e| format!("删除文件 {} 失败: {}", path.display(), e))?;
     Ok((1, size))
 }
@@ -361,7 +363,9 @@ fn file_usage(path: &Path) -> (usize, u64) {
         return (0, 0);
     }
 
-    let size = fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+    let size = fs::metadata(path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
     (1, size)
 }
 
