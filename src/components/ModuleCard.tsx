@@ -29,6 +29,10 @@ export interface ModuleCardProps {
   fileCount: number;
   /** 可清理的总大小（字节） */
   totalSize: number;
+  /** 完成且有结果时的状态文案，分析类模块不应默认显示“可清理”。 */
+  doneBadgeText?: string;
+  /** 完成但没有结果时的状态文案，避免非清理模块显示“已清理”。 */
+  emptyDoneBadgeText?: string;
   /** fileCount 的单位标签，默认"个文件"。大目录模块可传"个大目录" */
   countLabel?: string;
   /** 是否展开 */
@@ -68,6 +72,8 @@ export function ModuleCard({
   status,
   fileCount,
   totalSize,
+  doneBadgeText = '可清理',
+  emptyDoneBadgeText = '已清理',
   countLabel = '个文件',
   expanded,
   onToggleExpand,
@@ -107,7 +113,7 @@ export function ModuleCard({
     if (isDone && fileCount > 0) {
       return (
         <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
-          可清理
+          {doneBadgeText}
         </span>
       );
     }
@@ -115,7 +121,7 @@ export function ModuleCard({
       return (
         <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)]">
           <CheckCircle2 className="w-3 h-3" />
-          已清理
+          {emptyDoneBadgeText}
         </span>
       );
     }

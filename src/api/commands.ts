@@ -1164,6 +1164,44 @@ export async function getDiskGrowthDirectoryDetails(
 }
 
 // ============================================================================
+// AI资产分析 API
+// ============================================================================
+
+/** AI资产中的单个模型或缓存条目 */
+export interface AiModelItem {
+  name: string;
+  size: number;
+  path: string;
+}
+
+/** 按平台或自定义目录聚合后的 AI资产来源 */
+export interface AiAssetSource {
+  name: string;
+  path: string;
+  total_size: number;
+  model_count: number;
+  models: AiModelItem[];
+}
+
+/** AI资产扫描结果，前端基于它派生首页洞察和列表 */
+export interface AiModelScanResult {
+  total_size: number;
+  total_model_count: number;
+  source_count: number;
+  sources: AiAssetSource[];
+  warnings: string[];
+  scan_duration_ms: number;
+}
+
+/**
+ * 快速扫描已知 AI 平台目录和用户自定义目录。
+ * 后端只扫描明确目录，避免启动全盘扫描造成 IO 压力。
+ */
+export async function scanAiModelAssets(customPaths: string[]): Promise<AiModelScanResult> {
+  return invoke<AiModelScanResult>('scan_ai_model_assets', { customPaths });
+}
+
+// ============================================================================
 // 鏁版嵁鐩綍绠＄悊 API
 // ============================================================================
 

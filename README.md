@@ -119,6 +119,14 @@
 - **超大磁盘适配**：文件级明细按分片懒加载，几个 TB 的 C 盘也不会因为打开明细而一次性读取超大快照；实际扫描耗时主要取决于文件数量、`$MFT` 体积、硬盘类型和安全软件实时扫描，应用启动后的首次 MFT 扫描可能因系统缓存预热而更慢
 - **模块化实现**：全盘扫描、快照和增长分析代码已迁移到 `src-tauri/src/disk_growth/`，命令入口统一为 `scan_disk_growth`
 
+### 🤖 AI资产分析
+- **功能说明**：快速分析本机 AI 模型、LoRA、Embedding 和模型缓存占用，首页优先展示 AI 资产总占用与最大模型，帮助用户 3 秒内定位空间大户
+- **平台识别优先**：首版支持 Ollama、LM Studio、ComfyUI、HuggingFace Cache；Ollama 会解析 manifest 并映射共享 blob，展示真实模型名而不是 `sha256-*` 文件名
+- **配置与结构优先**：ComfyUI 会识别 Python 版 `extra_model_paths.yaml`、桌面版 `%APPDATA%\ComfyUI\config.json` 的 `basePath`、`extra_models_config.yaml`、默认 `models` 目录和 `diffusion_models`、`text_encoders`、`controlnet` 等现代模型目录；LM Studio 仅识别明确的 `.lmstudio` 路径，避免把普通 `models` 目录误判为 LM Studio
+- **使用方式**：点击“AI资产分析”模块中的“开始分析”手动触发扫描；可通过“添加目录”补充非默认模型目录，模块只扫描已知平台目录和用户指定目录，不会启动全盘扫描
+- **结果展示**：提供总占用、最大模型、超过 20GB 的模型数量、Top 大模型列表、平台占用排行、打开目录和复制路径能力；同一路径命中多个来源时按平台优先级去重，避免重复计数
+- **变更点**：新增 Rust `ai_models` 扫描模块、`scan_ai_model_assets` Tauri 命令和前端 `AiModelsModule`，MVP 仅做可视化分析与定位，不提供删除或自动清理
+
 ### �🛡️ 安全保护
 - **系统路径保护**：自动识别并跳过关键系统文件和目录
 - **多层安全验证**：删除前进行路径合法性、权限、范围等多重校验

@@ -57,6 +57,8 @@ export interface ModulesState {
   contextMenu: ModuleState;
   /** C 盘全盘变化分析模块 */
   diskGrowth: ModuleState;
+  /** AI资产分析模块 */
+  aiModels: ModuleState;
 }
 
 /** 仪表盘 Context 值类型 */
@@ -120,6 +122,7 @@ const initialModulesState: ModulesState = {
   hotspot: { ...initialModuleState },
   contextMenu: { ...initialModuleState },
   diskGrowth: { ...initialModuleState },
+  aiModels: { ...initialModuleState },
 };
 
 // ============================================================================

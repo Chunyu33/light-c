@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import {
+  AiModelsModule,
   BigFilesModule,
   ContextMenuModule,
   DiskGrowthModule,
@@ -28,6 +29,7 @@ const moduleComponents: Record<AppModuleId, ComponentType<{ layoutMode?: LayoutM
   'context-menu': ContextMenuModule,
   hotspot: HotspotModule,
   'disk-growth': DiskGrowthModule,
+  'ai-models': AiModelsModule,
 };
 
 export const APP_MODULES: AppModuleConfig[] = APP_MODULE_META.map(moduleMeta => ({

@@ -6,6 +6,7 @@
 // lib.rs 只需 `use commands::*` 即可注册全部命令。
 // ============================================================================
 
+mod ai_models;
 mod data;
 mod delete;
 mod disk;
@@ -20,6 +21,7 @@ mod system;
 mod tools;
 
 // 公共类型（供前端和其他模块使用）
+pub use ai_models::*;
 pub use data::*;
 pub use delete::*;
 pub use disk::*;

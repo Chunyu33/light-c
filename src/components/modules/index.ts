@@ -11,3 +11,4 @@ export { RegistryModule } from './RegistryModule';
 export { HotspotModule } from './HotspotModule';
 export { ContextMenuModule } from './ContextMenuModule';
 export { DiskGrowthModule } from './DiskGrowthModule';
+export { AiModelsModule } from './AiModelsModule';

@@ -4,6 +4,7 @@
 // ============================================================================
 
 import {
+  BrainCircuit,
   Database,
   FileBox,
   Flame,
@@ -27,7 +28,8 @@ export type AppModuleId =
   | 'registry'
   | 'context-menu'
   | 'hotspot'
-  | 'disk-growth';
+  | 'disk-growth'
+  | 'ai-models';
 
 export interface AppModuleMeta {
   /** 模块在页面和导航里的稳定 ID，必须和 data-module-id 保持一致。 */
@@ -46,6 +48,8 @@ export const APP_MODULE_META: AppModuleMeta[] = [
   { id: 'context-menu', label: '右键菜单清理', icon: MousePointerClick },
   { id: 'hotspot', label: '大目录分析', icon: Flame },
   { id: 'disk-growth', label: 'C 盘全盘分析', icon: HardDrive },
+  // AI资产覆盖模型、LoRA、Embedding 和缓存，避免后续扩展时重新命名模块。
+  { id: 'ai-models', label: 'AI资产分析', icon: BrainCircuit },
 ];
 
 export const DEFAULT_ACTIVE_MODULE_ID: AppModuleId = 'junk-clean';
