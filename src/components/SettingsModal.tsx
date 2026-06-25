@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Trash2, SlidersHorizontal, Download, LayoutGrid, PanelLeft } from 'lucide-react';
+import { X, Settings, MessageSquare, Info, Sun, Moon, Monitor, ExternalLink, RefreshCw, CheckCircle, BookOpen, Shield, AlertTriangle, Cpu, HardDrive, Monitor as MonitorIcon, User, Clock, Zap, FileBox, MessageCircle, Layers, Package, Database, Code2, FolderOpen, History, ChevronRight, MonitorCog, Coffee, Copy, MousePointerClick, ShieldCheck, Rocket, HelpCircle, ClipboardList, ShieldAlert, Trash2, SlidersHorizontal, Download, LayoutGrid, PanelLeft, Search } from 'lucide-react';
 import { Select, type SelectOption } from './ui/Select';
 
 // 赞赏码图片
@@ -19,6 +19,13 @@ import { Type } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { getSystemInfo, type SystemInfo, openLogsFolder, openStartupManager, openStorageSettings, getDataDirectory, setDataDirectory, listClearableDataItems, clearSelectedLocalData, pickFolderDialog, openInFolder, getDistributionChannel, type ClearableDataItem, type DistributionChannel } from '../api/commands';
 import { formatSize } from '../utils/format';
+import {
+  getStoredSearchEngine,
+  SEARCH_ENGINE_CHANGED_EVENT,
+  SEARCH_ENGINE_OPTIONS,
+  setStoredSearchEngine,
+  type SearchEngine,
+} from '../utils/searchEngine';
 
 type SettingsTab = 'general' | 'features' | 'guide' | 'feedback' | 'about';
 
@@ -323,6 +330,8 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               ))}
             </div>
           </div>
+
+          <SearchEngineSettings />
         </div>
       </div>
 
@@ -462,6 +471,45 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SearchEngineSettings() {
+  const [searchEngine, setSearchEngine] = useState<SearchEngine>(() => getStoredSearchEngine());
+
+  useEffect(() => {
+    const handleSearchEngineChange = (event: Event) => {
+      const nextEngine = (event as CustomEvent<SearchEngine>).detail;
+      setSearchEngine(nextEngine);
+    };
+
+    window.addEventListener(SEARCH_ENGINE_CHANGED_EVENT, handleSearchEngineChange);
+    return () => window.removeEventListener(SEARCH_ENGINE_CHANGED_EVENT, handleSearchEngineChange);
+  }, []);
+
+  const handleChange = (engine: SearchEngine) => {
+    setSearchEngine(engine);
+    setStoredSearchEngine(engine);
+  };
+
+  return (
+    <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+      <div>
+        <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+          <Search className="w-4 h-4 text-[var(--text-muted)]" />
+          搜索引擎
+        </p>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          设置各模块搜索按钮打开的默认搜索引擎
+        </p>
+      </div>
+      <Select<SearchEngine>
+        value={searchEngine}
+        options={SEARCH_ENGINE_OPTIONS}
+        onChange={handleChange}
+        widthClass="w-32"
+      />
     </div>
   );
 }

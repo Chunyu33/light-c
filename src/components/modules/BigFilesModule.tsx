@@ -7,7 +7,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, ExternalLink, StopCircle, Search } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
@@ -15,6 +14,7 @@ import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelText } from '../../utils/format';
+import { openSearchUrl } from '../../utils/searchEngine';
 import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 
@@ -143,8 +143,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const handleSearchFile = useCallback(async (path: string) => {
     try {
       // 搜索时带上完整路径，帮助用户在删除前确认文件来源和风险。
-      const query = encodeURIComponent(`Windows 文件 ${path} 可以删除吗`);
-      await openUrl(`https://www.bing.com/search?q=${query}`);
+      await openSearchUrl(`Windows 文件 ${path} 可以删除吗`);
     } catch (err) {
       console.error('搜索文件用途失败:', err);
       showToast({

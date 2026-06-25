@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { ModuleCard } from '../ModuleCard';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -27,6 +26,7 @@ import {
   type AiModelScanResult,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import { openSearchUrl } from '../../utils/searchEngine';
 
 const DEEP_DISCOVERY_STORAGE_KEY = 'lightc.aiModels.deepDiscovery';
 const LARGE_MODEL_THRESHOLD = 20 * 1024 * 1024 * 1024;
@@ -144,8 +144,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
     try {
       const displayName = splitDisplayModelName(modelName);
       // 搜索使用用户能理解的模型文件名，避免把 ComfyUI 内部类型目录带进查询词降低结果相关性。
-      const query = encodeURIComponent(`${displayName.title} AI model`);
-      await openUrl(`https://www.bing.com/search?q=${query}`);
+      await openSearchUrl(`${displayName.title} AI model`);
     } catch (error) {
       showToast({ type: 'error', title: '打开搜索失败', description: String(error) });
     }

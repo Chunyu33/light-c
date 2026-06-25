@@ -10,7 +10,6 @@ import {
   X, Loader2, FolderOpen, Clock, HardDrive, ChevronRight,
   CornerLeftUp, Search, Shield, Trash2, ChevronDown,
 } from 'lucide-react';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
 import {
@@ -18,6 +17,7 @@ import {
   type HotspotScanResult, type HotspotEntry,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import { openSearchUrl } from '../../utils/searchEngine';
 
 // ============================================================================
 // 工具函数（与 HotspotModule 共享逻辑）
@@ -432,8 +432,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
   // ====== 搜索 ======
   const handleSearch = useCallback(async (path: string) => {
     try {
-      const query = encodeURIComponent(`Windows 文件夹 ${path} 可以删除吗`);
-      await openUrl(`https://www.bing.com/search?q=${query}`);
+      await openSearchUrl(`Windows 文件夹 ${path} 可以删除吗`);
     } catch (err) {
       console.error('打开搜索链接失败:', err);
     }
