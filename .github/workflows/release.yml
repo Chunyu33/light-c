@@ -1,14 +1,43 @@
 # ============================================================================
 # LightC 自动发布工作流
-# 当推送 tag (v*) 时自动构建并发布到 GitHub Releases
+# 两种触发方式：
+# 1. 推送 v* 标签自动构建发布
+# 2. 仓库 Actions 页面手动运行，自定义版本与更新日志
 # ============================================================================
-
 name: Release
 
 on:
+  # 标签推送自动发布
   push:
     tags:
       - 'v*'
+  # 手动触发入口
+  workflow_dispatch:
+    inputs:
+      tag_version:
+        description: '发布版本号（格式 vx.y.z，例 v2.10.3）'
+        required: true
+        default: 'v2.10.3'
+      release_body:
+        description: 'Release 更新内容'
+        required: true
+        default: |
+          ## 更新内容
+          - 自 v2.10.3 起，LightC 采用 LightC Source Available License v1.0
+          - 源码继续公开用于安全审计、学习、非商业开发和向官方仓库提交贡献
+          - 明确禁止改名二次发布、独立修改版发布、商业销售、商业产品捆绑再分发和删除版权/许可证信息
+
+          请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
+      is_draft:
+        description: 是否设为草稿 Release
+        type: boolean
+        required: false
+        default: false
+      is_prerelease:
+        description: 是否标记为预发布版本
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   release:
@@ -24,6 +53,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # 区分触发源：tag推送 / 手动输入版本
+      - name: Resolve tag & release info
+        id: resolve_vars
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'push' -and '${{ github.ref_type }}' -eq 'tag') {
+            # tag推送触发
+            $tagName = '${{ github.ref_name }}'
+            $releaseBody = '${{ github.event.inputs.release_body }}'
+            $draft = 'false'
+            $pre = 'false'
+          } else {
+            # 手动 workflow_dispatch 触发
+            $tagName = '${{ github.event.inputs.tag_version }}'
+            $releaseBody = '${{ github.event.inputs.release_body }}'
+            $draft = '${{ github.event.inputs.is_draft }}'
+            $pre = '${{ github.event.inputs.is_prerelease }}'
+          }
+          # 输出变量供后续步骤读取
+          echo "tag_name=$tagName" >> $env:GITHUB_OUTPUT
+          echo "release_body=$releaseBody" >> $env:GITHUB_OUTPUT
+          echo "is_draft=$draft" >> $env:GITHUB_OUTPUT
+          echo "is_prerelease=$pre" >> $env:GITHUB_OUTPUT
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -42,30 +95,23 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build the app
+      - name: Build the app & Create GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.10.3'
-          releaseBody: |
-            ## 更新内容
-            - 自 v2.10.3 起，LightC 采用 LightC Source Available License v1.0
-            - 源码继续公开用于安全审计、学习、非商业开发和向官方仓库提交贡献
-            - 明确禁止改名二次发布、独立修改版发布、商业销售、商业产品捆绑再分发和删除版权/许可证信息
-
-            请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
-          releaseDraft: false
-          prerelease: false
+          tagName: ${{ steps.resolve_vars.outputs.tag_name }}
+          releaseName: 'LightC ${{ steps.resolve_vars.outputs.tag_name }}'
+          releaseBody: ${{ steps.resolve_vars.outputs.release_body }}
+          releaseDraft: ${{ steps.resolve_vars.outputs.is_draft }}
+          prerelease: ${{ steps.resolve_vars.outputs.is_prerelease }}
           includeUpdaterJson: true
 
-      # tauri-action 已创建 Release 并上传了 MSI + NSIS 安装包
-      # 以下额外打包绿色便携版并上传到同一个 Release
-
+      # 构建绿色便携压缩包、签名、下载配置文件
       - name: Create portable package
+        id: portable
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -89,11 +135,11 @@ jobs:
           Copy-Item "$ReleaseDir\LightC.exe" $PortableDir -Force
           Write-Host "  Copied: LightC.exe" -ForegroundColor White
 
-          # 便携版与安装版复用同一个 exe，通过 marker 让运行时禁用安装器式自动更新。
+          # 便携标记文件，禁用自动更新弹窗
           Set-Content -Path "$PortableDir\LightC.portable" -Value "portable" -Encoding UTF8
           Write-Host "  Created: LightC.portable" -ForegroundColor White
 
-          # DLL 文件
+          # 复制所有dll依赖
           $DllFiles = Get-ChildItem -Path $ReleaseDir -Filter "*.dll" -ErrorAction SilentlyContinue
           if ($DllFiles) {
             foreach ($dll in $DllFiles) {
@@ -102,13 +148,13 @@ jobs:
             }
           }
 
-          # resources 目录
+          # 前端资源目录
           if (Test-Path "$ReleaseDir\resources") {
             Copy-Item "$ReleaseDir\resources" "$PortableDir\resources" -Recurse -Force
             Write-Host "  Copied: resources/" -ForegroundColor White
           }
 
-          # 官方下载渠道不写死在前端，随 Release 上传 download.json，便于后续调整网盘地址。
+          # 渠道下载配置 json
           $DownloadConfig = [ordered]@{
             githubReleasesUrl = "https://github.com/Chunyu33/light-c/releases"
             netDiskUrl = "https://pan.quark.cn/s/bce8f722bf33"
@@ -118,56 +164,61 @@ jobs:
           $DownloadConfig | ConvertTo-Json | Out-File -FilePath "download.json" -Encoding utf8
           Write-Host "  Created: download.json" -ForegroundColor Green
 
-          # 压缩
+          # 打包便携压缩包
           Compress-Archive -Path "$PortableDir\*" -DestinationPath $ZipName -Force
           Write-Host "  Created: $ZipName" -ForegroundColor Green
 
-          # 安装版和便携版复用同一个 LightC.exe；运行时校验当前 exe 字节，因此为 exe 单独生成签名资产。
+          # 对exe生成minisign签名
           $SignatureOutput = npx tauri signer sign "$PortableDir\LightC.exe"
           $GeneratedSigPath = "$PortableDir\LightC.exe.sig"
+          $SignatureBase64 = ""
+
           if (Test-Path $GeneratedSigPath) {
             $SignatureText = Get-Content -Raw -Path $GeneratedSigPath
             if ($SignatureText.TrimStart().StartsWith("untrusted comment:")) {
-              # 原始 minisign 文本需要转成 Tauri updater 风格的 Public signature 字符串。
               $SignatureBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($SignatureText))
             } else {
-              # 有些 CLI 版本会直接写入 Public signature，直接复用可避免双重 base64。
               $SignatureBase64 = $SignatureText.Trim()
             }
           } else {
-            # CLI 正常会生成 .sig 文件；这里兜底解析 stdout 中的 Public signature，避免把说明文字写进签名资产。
             $SignatureBase64 = ($SignatureOutput -split "`r?`n" | Where-Object { $_ -match '^[A-Za-z0-9+/=]+$' } | Select-Object -Last 1)
             if (-not $SignatureBase64) {
               Write-Host "Error: signature output not found" -ForegroundColor Red
               exit 1
             }
           }
+          # 输出两份签名文件（安装版/便携版共用同一份exe签名）
           $SignatureBase64 | Out-File -FilePath "LightC_installer_exe.sig" -Encoding utf8 -NoNewline
           $SignatureBase64 | Out-File -FilePath "LightC_portable_exe.sig" -Encoding utf8 -NoNewline
           Write-Host "  Created: LightC_installer_exe.sig" -ForegroundColor Green
           Write-Host "  Created: LightC_portable_exe.sig" -ForegroundColor Green
 
-          # 清理临时目录
+          # 清理临时文件夹
           Remove-Item $PortableDir -Recurse -Force
 
-          # 输出文件名供后续步骤使用
+          # 输出压缩包名称给上传步骤
           echo "portable_zip=$ZipName" >> $env:GITHUB_OUTPUT
-        id: portable
 
-      - name: Upload portable to release
+      # 将便携包、签名、下载配置上传到当前Release
+      - name: Upload portable assets to release
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $ZipPath = "LightC_portable_x64.zip"
+          $ZipPath = ${{ steps.portable.outputs.portable_zip }}
           $InstallerSigPath = "LightC_installer_exe.sig"
           $PortableSigPath = "LightC_portable_exe.sig"
           $DownloadConfigPath = "download.json"
-          if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath)) {
-            Write-Host "Uploading portable assets to release..." -ForegroundColor Cyan
-            gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $PortableSigPath $DownloadConfigPath --clobber
-            Write-Host "Upload done!" -ForegroundColor Green
-          } else {
-            Write-Host "Error: portable zip, exe signatures or download config not found" -ForegroundColor Red
-            exit 1
+          $TargetTag = ${{ steps.resolve_vars.outputs.tag_name }}
+
+          $allFiles = @($ZipPath, $InstallerSigPath, $PortableSigPath, $DownloadConfigPath)
+          foreach ($f in $allFiles) {
+            if (-not (Test-Path $f)) {
+              Write-Host "Missing asset file: $f" -ForegroundColor Red
+              exit 1
+            }
           }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          Write-Host "Uploading portable assets to Release $TargetTag ..." -ForegroundColor Cyan
+          gh release upload $TargetTag $allFiles --clobber
+          Write-Host "All extra assets uploaded successfully!" -ForegroundColor Green
