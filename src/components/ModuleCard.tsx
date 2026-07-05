@@ -47,6 +47,8 @@ export interface ModuleCardProps {
   scanDisabled?: boolean;
   /** 展开后的内容 */
   children: ReactNode;
+  /** 标题旁额外内容，适合放轻量筛选器或模式切换。 */
+  titleExtra?: ReactNode;
   /** 头部右侧额外内容 */
   headerExtra?: ReactNode;
   /** 错误信息 */
@@ -81,6 +83,7 @@ export function ModuleCard({
   scanButtonText,
   scanDisabled = false,
   children,
+  titleExtra,
   headerExtra,
   error,
   variant = 'card',
@@ -177,8 +180,9 @@ export function ModuleCard({
             className={`flex-1 min-w-0 ${isPageVariant ? '' : 'cursor-pointer'}`}
             onClick={isPageVariant ? undefined : onToggleExpand}
           >
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
               <h3 className="text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
+              {titleExtra}
               {getStatusBadge()}
             </div>
             <p className="text-[13px] text-[var(--text-muted)] mt-1 truncate">{description}</p>

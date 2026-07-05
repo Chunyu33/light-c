@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use super::mft_scan::{
-    normalize_path, scan_system_drive_with_progress, DirSizeEntry, DiskGrowthPhaseDuration,
+    normalize_path, scan_drive_with_progress, DirSizeEntry, DiskGrowthPhaseDuration,
     DiskGrowthScanProgress, FileSnapshotEntry,
 };
 use super::snapshot::{build_snapshot, DiskSnapshot, DiskSnapshotEntry, DiskSnapshotManager};
@@ -92,6 +92,7 @@ pub struct DiskAnalyzeResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskScanAndAnalyzeResponse {
+    pub drive_letter: String,
     pub total_size: u64,
     pub total_files_scanned: usize,
     pub scan_duration_ms: u64,
@@ -140,20 +141,28 @@ pub struct DiskGrowthDirectoryDetailsResponse {
     pub has_more: bool,
 }
 
-pub fn scan_and_analyze_system_drive_with_progress<F>(
+pub fn scan_and_analyze_drive_with_progress<F>(
     progress: &F,
     max_change_entries: Option<usize>,
+    drive_letter: Option<String>,
 ) -> Result<DiskScanAndAnalyzeResponse, String>
 where
     F: Fn(DiskGrowthScanProgress) + Sync,
 {
+    let drive_letter = normalize_growth_drive_letter(drive_letter.as_deref())?;
+    let drive_label = format!("{} 盘", drive_letter);
     let max_change_entries = normalize_max_change_entries(max_change_entries);
-    let manager = DiskSnapshotManager::new()?;
+    let manager = DiskSnapshotManager::for_drive(&drive_letter)?;
     let previous = manager.load_latest_snapshot()?;
     let previous_scan_time = previous.as_ref().map(|snapshot| snapshot.date.clone());
-    let mut scan = scan_system_drive_with_progress(progress)?;
+    let mut scan = scan_drive_with_progress(&drive_letter, progress)?;
     let current_snapshot = build_snapshot(&scan);
-    let growth = compare_snapshots(&current_snapshot, previous.as_ref(), max_change_entries);
+    let growth = compare_snapshots(
+        &current_snapshot,
+        previous.as_ref(),
+        max_change_entries,
+        &drive_label,
+    );
     // 文件级明细只用于写入旁路分片，移动出去可以避免超大盘下再复制一份完整文件列表。
     let file_records = std::mem::take(&mut scan.file_records);
     manager.save_scan_snapshot(&scan, file_records)?;
@@ -173,6 +182,7 @@ where
         .sum();
 
     Ok(DiskScanAndAnalyzeResponse {
+        drive_letter: format!("{}:", drive_letter),
         total_size: scan.total_size,
         total_files_scanned: scan.total_files_scanned,
         scan_duration_ms: scan.scan_duration_ms,
@@ -197,11 +207,16 @@ pub fn get_file_change_details(
     path: String,
     offset: Option<usize>,
     limit: Option<usize>,
+    drive_letter: Option<String>,
 ) -> Result<DiskGrowthFileDetailsResponse, String> {
-    let manager = DiskSnapshotManager::new()?;
+    let drive_letter = normalize_growth_drive_letter(drive_letter.as_deref())?;
+    let manager = DiskSnapshotManager::for_drive(&drive_letter)?;
     let Some((previous_handle, current_handle)) = manager.load_latest_two_snapshot_handles()?
     else {
-        return Err("至少完成两次 C 盘全盘扫描后，才能查看文件级变化明细".to_string());
+        return Err(format!(
+            "至少完成两次 {} 盘全盘扫描后，才能查看文件级变化明细",
+            drive_letter
+        ));
     };
     if !manager.has_file_detail_storage(&previous_handle.path, &previous_handle.snapshot)
         || !manager.has_file_detail_storage(&current_handle.path, &current_handle.snapshot)
@@ -315,10 +330,15 @@ pub fn get_directory_change_details(
     path: String,
     offset: Option<usize>,
     limit: Option<usize>,
+    drive_letter: Option<String>,
 ) -> Result<DiskGrowthDirectoryDetailsResponse, String> {
-    let manager = DiskSnapshotManager::new()?;
+    let drive_letter = normalize_growth_drive_letter(drive_letter.as_deref())?;
+    let manager = DiskSnapshotManager::for_drive(&drive_letter)?;
     let Some((previous, current)) = manager.load_latest_two_snapshots()? else {
-        return Err("至少完成两次 C 盘全盘扫描后，才能查看目录变化明细".to_string());
+        return Err(format!(
+            "至少完成两次 {} 盘全盘扫描后，才能查看目录变化明细",
+            drive_letter
+        ));
     };
 
     let normalized_path = normalize_query_path(&path);
@@ -351,9 +371,10 @@ pub fn compare_snapshots(
     current: &DiskSnapshot,
     previous: Option<&DiskSnapshot>,
     max_change_entries: usize,
+    drive_label: &str,
 ) -> DiskGrowthReport {
     let Some(previous) = previous else {
-        return first_scan_report(current);
+        return first_scan_report(current, drive_label);
     };
 
     let current_map = snapshot_map(&current.entries);
@@ -403,7 +424,13 @@ pub fn compare_snapshots(
         .count();
 
     DiskGrowthReport {
-        summary: build_summary(total_growth, significant_count, fast_count, decreased_count),
+        summary: build_summary(
+            total_growth,
+            significant_count,
+            fast_count,
+            decreased_count,
+            drive_label,
+        ),
         entries,
         total_growth,
         significant_count,
@@ -420,7 +447,22 @@ fn normalize_max_change_entries(value: Option<usize>) -> usize {
         .clamp(MIN_CHANGE_ENTRIES, MAX_CHANGE_ENTRIES)
 }
 
-fn first_scan_report(current: &DiskSnapshot) -> DiskGrowthReport {
+fn normalize_growth_drive_letter(value: Option<&str>) -> Result<String, String> {
+    let raw_value = value
+        .map(str::to_string)
+        .or_else(|| std::env::var("SystemDrive").ok())
+        .unwrap_or_else(|| "C:".to_string());
+    let Some(letter) = raw_value
+        .chars()
+        .find(|character| character.is_ascii_alphabetic())
+    else {
+        return Err("无效的磁盘盘符".to_string());
+    };
+    // 盘符在快照、扫描和摘要中统一为大写，避免 D / d / D: 产生多组数据。
+    Ok(letter.to_ascii_uppercase().to_string())
+}
+
+fn first_scan_report(current: &DiskSnapshot, drive_label: &str) -> DiskGrowthReport {
     DiskGrowthReport {
         entries: Vec::new(),
         total_growth: 0,
@@ -430,8 +472,8 @@ fn first_scan_report(current: &DiskSnapshot) -> DiskGrowthReport {
         decreased_count: 0,
         time_span: "暂无历史快照".to_string(),
         summary: format!(
-            "首次完成 C 盘快照，已记录 {} 个文件。下次扫描后会展示空间新增和减少的目录。",
-            current.total_files_scanned
+            "首次完成 {} 快照，已记录 {} 个文件。下次扫描后会展示空间新增和减少的目录。",
+            drive_label, current.total_files_scanned
         ),
     }
 }
@@ -730,22 +772,25 @@ fn build_summary(
     significant_count: usize,
     fast_count: usize,
     decreased_count: usize,
+    drive_label: &str,
 ) -> String {
     if total_growth > 0 {
         format!(
-            "相比上次扫描，C 盘净增加 {}。发现 {} 个显著增长目录、{} 个快速增长目录。",
+            "相比上次扫描，{}净增加 {}。发现 {} 个显著增长目录、{} 个快速增长目录。",
+            drive_label,
             format_size(total_growth as u64),
             significant_count,
             fast_count
         )
     } else if total_growth < 0 {
         format!(
-            "相比上次扫描，C 盘净减少 {}，其中 {} 个目录释放了明显空间。",
+            "相比上次扫描，{}净减少 {}，其中 {} 个目录释放了明显空间。",
+            drive_label,
             format_size(total_growth.unsigned_abs()),
             decreased_count
         )
     } else {
-        "相比上次扫描，C 盘总占用基本没有变化。".to_string()
+        format!("相比上次扫描，{}总占用基本没有变化。", drive_label)
     }
 }
 

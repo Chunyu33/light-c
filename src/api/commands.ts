@@ -54,6 +54,35 @@ export async function getDiskInfo(): Promise<DiskInfo> {
   return invoke<DiskInfo>('get_disk_info');
 }
 
+/** 本机固定磁盘分区信息，供多盘分析模块复用。 */
+export interface LocalDriveInfo {
+  /** 磁盘盘符，例如 C: */
+  drive_letter: string;
+  /** 根路径，例如 C:\ */
+  root_path: string;
+  /** 卷标，可能为空 */
+  volume_name: string;
+  /** 文件系统，例如 NTFS */
+  file_system: string;
+  /** 磁盘总容量 */
+  total_space: number;
+  /** 已用空间 */
+  used_space: number;
+  /** 可用空间 */
+  free_space: number;
+  /** 使用率百分比 */
+  usage_percent: number;
+  /** 是否为系统盘 */
+  is_system: boolean;
+  /** MFT 扫描当前仅支持 NTFS */
+  is_ntfs: boolean;
+}
+
+/** 获取本机固定磁盘分区列表。 */
+export async function getLocalDrives(): Promise<LocalDriveInfo[]> {
+  return invoke<LocalDriveInfo[]>('get_local_drives');
+}
+
 /**
  * 鎵ц鍨冨溇鏂囦欢鎵弿
  * @param request 鎵弿璇锋眰鍙傛暟锛堝彲閫夛級
@@ -101,11 +130,12 @@ export async function openDiskCleanup(): Promise<void> {
 }
 
 /**
- * 鎵弿C鐩樺ぇ鏂囦欢
- * @param topN 杩斿洖鍓?N 涓渶澶ф枃浠?(10-200锛岄粯璁?50)
+ * 扫描指定磁盘的大文件
+ * @param topN 返回前 N 个最大文件（10-500，默认 50）
+ * @param driveLetter 目标盘符，如 C: / D:
  */
-export async function scanLargeFiles(topN?: number): Promise<LargeFileEntry[]> {
-  return invoke<LargeFileEntry[]>('scan_large_files', { topN });
+export async function scanLargeFiles(topN?: number, driveLetter?: string): Promise<LargeFileEntry[]> {
+  return invoke<LargeFileEntry[]>('scan_large_files', { topN, driveLetter });
 }
 
 /**
@@ -815,9 +845,9 @@ export async function scanHotspot(
   maxDepth?: number,
   sizeThresholdMb?: number,
   ignoreSystemDirs?: boolean,
+  driveLetter?: string,
 ): Promise<HotspotScanResult> {
-  console.log('[scanHotspot] JS 璋冪敤鍙傛暟:', { topN, fullScan, maxDepth, sizeThresholdMb, ignoreSystemDirs });
-  return invoke<HotspotScanResult>('scan_hotspot', { topN, fullScan, maxDepth, sizeThresholdMb, ignoreSystemDirs });
+  return invoke<HotspotScanResult>('scan_hotspot', { topN, fullScan, maxDepth, sizeThresholdMb, ignoreSystemDirs, driveLetter });
 }
 
 /**
@@ -969,7 +999,7 @@ export async function openStorageSettings(): Promise<void> {
 }
 
 // ============================================================================
-// C 盘全盘变化分析 API
+// 多盘全盘变化分析 API
 // ============================================================================
 
 /** 全盘变化条目 */
@@ -1066,7 +1096,7 @@ export interface DiskGrowthEntry {
 export interface DiskGrowthReport {
   /** 变化目录按绝对变化量排序，后端最多返回 300 项 */
   entries: DiskGrowthEntry[];
-  /** C 盘净变化量，正数为新增，负数为减少 */
+  /** 所选磁盘净变化量，正数为新增，负数为减少 */
   total_growth: number;
   /** 显著增长目录数量 */
   significant_count: number;
@@ -1118,9 +1148,11 @@ export interface DiskGrowthAnalyzeResult {
   decreased_size: number;
 }
 
-/** C 盘全盘变化扫描响应 */
+/** 所选磁盘全盘变化扫描响应 */
 export interface DiskGrowthScanResponse {
-  /** 本次通过 MFT 聚合到的 C 盘文件总大小 */
+  /** 本次扫描的磁盘盘符 */
+  drive_letter: string;
+  /** 本次通过 MFT 聚合到的所选磁盘文件总大小 */
   total_size: number;
   /** 本次成功读取大小的文件数量 */
   total_files_scanned: number;
@@ -1169,11 +1201,14 @@ export interface DiskGrowthScanProgress {
 }
 
 /**
- * 扫描 C 盘并与上次快照对比。
+ * 扫描所选磁盘并与上次快照对比。
  * 这里只保留全盘变化分析入口，避免前端继续误用旧 ProgramData 清理命令。
  */
-export async function scanDiskGrowth(maxChangeEntries?: number): Promise<DiskGrowthScanResponse> {
-  return invoke<DiskGrowthScanResponse>('scan_disk_growth', { maxChangeEntries });
+export async function scanDiskGrowth(
+  maxChangeEntries?: number,
+  driveLetter?: string
+): Promise<DiskGrowthScanResponse> {
+  return invoke<DiskGrowthScanResponse>('scan_disk_growth', { maxChangeEntries, driveLetter });
 }
 
 export async function cancelDiskGrowthScan(): Promise<void> {
@@ -1183,17 +1218,19 @@ export async function cancelDiskGrowthScan(): Promise<void> {
 export async function getDiskGrowthFileDetails(
   path: string,
   offset?: number,
-  limit?: number
+  limit?: number,
+  driveLetter?: string
 ): Promise<DiskGrowthFileDetailsResponse> {
-  return invoke<DiskGrowthFileDetailsResponse>('get_disk_growth_file_details', { path, offset, limit });
+  return invoke<DiskGrowthFileDetailsResponse>('get_disk_growth_file_details', { path, offset, limit, driveLetter });
 }
 
 export async function getDiskGrowthDirectoryDetails(
   path: string,
   offset?: number,
-  limit?: number
+  limit?: number,
+  driveLetter?: string
 ): Promise<DiskGrowthDirectoryDetailsResponse> {
-  return invoke<DiskGrowthDirectoryDetailsResponse>('get_disk_growth_directory_details', { path, offset, limit });
+  return invoke<DiskGrowthDirectoryDetailsResponse>('get_disk_growth_directory_details', { path, offset, limit, driveLetter });
 }
 
 // ============================================================================

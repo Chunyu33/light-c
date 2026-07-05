@@ -233,7 +233,7 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     // 先通知支持取消的后端任务，避免 UI 已停止但 MFT/文件扫描仍在后台占用 IO。
     void cancelLargeFileScan().catch(error => console.error('停止大文件扫描失败:', error));
     void cancelHotspotScan().catch(error => console.error('停止大目录扫描失败:', error));
-    void cancelDiskGrowthScan().catch(error => console.error('停止 C 盘全盘分析失败:', error));
+    void cancelDiskGrowthScan().catch(error => console.error('停止磁盘变化分析失败:', error));
     setStopScanTrigger(n => n + 1);
 
     // 将所有正在扫描的模块状态重置为 idle

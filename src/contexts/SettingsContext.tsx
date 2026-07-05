@@ -17,7 +17,9 @@ interface AppSettings {
   hotspotSizeThreshold: number;
   /** 深度扫描时是否忽略系统目录（默认 true，保持现有行为） */
   hotspotIgnoreSystemDirs: boolean;
-  /** C 盘全盘分析最多展示变化目录数量（默认 300） */
+  /** 大文件清理返回的最大文件数（默认 50） */
+  bigFilesScanLimit: number;
+  /** 磁盘变化分析最多展示变化目录数量（默认 300） */
   diskGrowthMaxEntries: number;
 }
 
@@ -35,11 +37,12 @@ const moduleIds = APP_MODULE_META.map(module => module.id);
 
 /** 默认设置 */
 const defaultSettings: AppSettings = {
-  layoutMode: 'cards',
+  layoutMode: 'pages', // 布局设置 现已默认页面模式
   activeModuleId: DEFAULT_ACTIVE_MODULE_ID,
   hotspotDepth: 3,     // 默认分析深度 3 层
   hotspotSizeThreshold: 50, // 默认 50MB
   hotspotIgnoreSystemDirs: true, // 默认忽略系统目录
+  bigFilesScanLimit: 50, // 默认扫描 50 个大文件，避免初次结果列表过长
   diskGrowthMaxEntries: 300, // 默认最多展示 300 个变化目录
 };
 
@@ -57,6 +60,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
     // 这些设置会直接影响扫描结果数量，读取本地缓存时做边界收敛，避免手动篡改导致 UI 或后端压力异常。
     hotspotDepth: Math.min(4, Math.max(2, Number(settings.hotspotDepth) || defaultSettings.hotspotDepth)),
     hotspotSizeThreshold: Math.min(500, Math.max(10, Number(settings.hotspotSizeThreshold) || defaultSettings.hotspotSizeThreshold)),
+    bigFilesScanLimit: Math.min(500, Math.max(10, Math.floor(Number(settings.bigFilesScanLimit) || defaultSettings.bigFilesScanLimit))),
     diskGrowthMaxEntries: Math.min(1000, Math.max(50, Number(settings.diskGrowthMaxEntries) || defaultSettings.diskGrowthMaxEntries)),
   };
 }

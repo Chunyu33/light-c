@@ -96,7 +96,15 @@ enum ClearableDataType {
     DirectoryContents,
 }
 
-const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
+const DISK_GROWTH_SNAPSHOT_DIR: &str = "disk_growth_snapshots";
+const DISK_GROWTH_SNAPSHOT_ID_PREFIX: &str = "disk_growth_snapshots_";
+const DISK_GROWTH_SNAPSHOT_BASE_ID: &str = "disk_growth_snapshots";
+const DISK_GROWTH_SNAPSHOT_BASE_PREFIX: &str = "disk_growth_";
+const DISK_GROWTH_SNAPSHOT_JSON_SUFFIX: &str = ".json";
+const DISK_GROWTH_SNAPSHOT_SHARD_SUFFIX: &str = ".files";
+
+// 快照项按盘符动态展开，普通白名单只保留固定数据，避免“清空本地数据”误删所有磁盘基线。
+const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 3] = [
     ClearableDataDefinition {
         id: "install_history",
         label: "安装历史缓存",
@@ -120,14 +128,6 @@ const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
         relative_path: "reg_backups",
         item_type: ClearableDataType::DirectoryContents,
         warning: Some("删除后无法再通过这些备份回溯旧注册表清理操作。"),
-    },
-    ClearableDataDefinition {
-        id: "disk_growth_snapshots",
-        label: "全盘分析快照",
-        description: "用于 C 盘全盘分析的增长对比基线和分片明细。",
-        relative_path: "disk_growth_snapshots",
-        item_type: ClearableDataType::DirectoryContents,
-        warning: Some("可安全清理；下次全盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。"),
     },
 ];
 
@@ -454,10 +454,12 @@ pub fn set_data_dir(new_path: &Path) -> Result<(), String> {
 
 pub fn list_clearable_data_items() -> Result<Vec<ClearableDataItem>, String> {
     let data_dir = get_data_dir();
-    CLEARABLE_DATA_DEFINITIONS
+    let mut items = CLEARABLE_DATA_DEFINITIONS
         .iter()
         .map(|definition| build_clearable_data_item(&data_dir, definition))
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    items.extend(build_disk_growth_snapshot_items(&data_dir)?);
+    Ok(items)
 }
 
 pub fn clear_selected_local_data(item_ids: &[String]) -> Result<ClearLocalDataResult, String> {
@@ -466,6 +468,15 @@ pub fn clear_selected_local_data(item_ids: &[String]) -> Result<ClearLocalDataRe
     let mut total_size = 0u64;
 
     for item_id in item_ids {
+        if let Some(drive_letter) = parse_disk_growth_snapshot_item_id(item_id) {
+            let snapshot_dir = data_dir.join(DISK_GROWTH_SNAPSHOT_DIR);
+            let (deleted_files, deleted_bytes) =
+                clear_disk_growth_snapshots_for_drive(&snapshot_dir, drive_letter)?;
+            file_count += deleted_files;
+            total_size += deleted_bytes;
+            continue;
+        }
+
         let Some(definition) = CLEARABLE_DATA_DEFINITIONS
             .iter()
             .find(|definition| definition.id == item_id)
@@ -487,9 +498,9 @@ pub fn clear_selected_local_data(item_ids: &[String]) -> Result<ClearLocalDataRe
 
 /// 清空本地数据：保留旧命令兼容，一次性清理所有白名单项。
 pub fn clear_local_data() -> Result<(usize, u64), String> {
-    let item_ids = CLEARABLE_DATA_DEFINITIONS
-        .iter()
-        .map(|definition| definition.id.to_string())
+    let item_ids = list_clearable_data_items()?
+        .into_iter()
+        .map(|item| item.id)
         .collect::<Vec<_>>();
     let result = clear_selected_local_data(&item_ids)?;
     Ok((result.deleted_files, result.freed_bytes))
@@ -519,6 +530,77 @@ fn build_clearable_data_item(
         file_count,
         size,
         warning: definition.warning.map(str::to_string),
+    })
+}
+
+fn build_disk_growth_snapshot_items(data_dir: &Path) -> Result<Vec<ClearableDataItem>, String> {
+    let snapshot_dir = data_dir.join(DISK_GROWTH_SNAPSHOT_DIR);
+    if !snapshot_dir.is_dir() {
+        return Ok(vec![empty_disk_growth_snapshot_item(&snapshot_dir)]);
+    }
+
+    let mut drives = std::collections::BTreeSet::new();
+    for entry_res in fs::read_dir(&snapshot_dir)
+        .map_err(|e| format!("读取磁盘变化分析快照目录失败 {}: {}", snapshot_dir.display(), e))?
+    {
+        let entry = entry_res
+            .map_err(|e| format!("读取磁盘变化分析快照条目失败 {}: {}", snapshot_dir.display(), e))?;
+        let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        if let Some(letter) = disk_growth_snapshot_drive_from_name(&name) {
+            drives.insert(letter);
+        }
+    }
+
+    if drives.is_empty() {
+        return Ok(vec![empty_disk_growth_snapshot_item(&snapshot_dir)]);
+    }
+
+    // 只展示真实存在快照的盘符，弹窗默认全选时不会凭空多出一批空盘符项。
+    drives
+        .into_iter()
+        .map(|drive_letter| build_disk_growth_snapshot_item(&snapshot_dir, drive_letter))
+        .collect()
+}
+
+fn empty_disk_growth_snapshot_item(snapshot_dir: &Path) -> ClearableDataItem {
+    ClearableDataItem {
+        id: format!("{}c", DISK_GROWTH_SNAPSHOT_ID_PREFIX),
+        label: "C 盘磁盘变化分析快照".to_string(),
+        description: "用于 C 盘磁盘变化分析的增长对比基线和分片明细。".to_string(),
+        path: snapshot_dir.to_string_lossy().to_string(),
+        item_type: "directory".to_string(),
+        exists: snapshot_dir.exists(),
+        file_count: 0,
+        size: 0,
+        warning: Some("可安全清理；下次对应磁盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。".to_string()),
+    }
+}
+
+fn build_disk_growth_snapshot_item(
+    snapshot_dir: &Path,
+    drive_letter: char,
+) -> Result<ClearableDataItem, String> {
+    let (file_count, size) = disk_growth_snapshot_usage_for_drive(snapshot_dir, drive_letter)?;
+    let drive_label = format!("{} 盘", drive_letter.to_ascii_uppercase());
+    Ok(ClearableDataItem {
+        id: format!(
+            "{}{}",
+            DISK_GROWTH_SNAPSHOT_ID_PREFIX,
+            drive_letter.to_ascii_lowercase()
+        ),
+        label: format!("{}磁盘变化分析快照", drive_label),
+        description: format!(
+            "用于 {}磁盘变化分析的增长对比基线和分片明细。",
+            drive_label
+        ),
+        path: snapshot_dir.to_string_lossy().to_string(),
+        item_type: "directory".to_string(),
+        exists: snapshot_dir.is_dir(),
+        file_count,
+        size,
+        warning: Some("可安全清理；下次对应磁盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。".to_string()),
     })
 }
 
@@ -556,6 +638,131 @@ fn clear_file(path: &Path) -> Result<(usize, u64), String> {
         .unwrap_or(0);
     fs::remove_file(path).map_err(|e| format!("删除文件 {} 失败: {}", path.display(), e))?;
     Ok((1, size))
+}
+
+fn clear_disk_growth_snapshots_for_drive(
+    snapshot_dir: &Path,
+    drive_letter: char,
+) -> Result<(usize, u64), String> {
+    if !snapshot_dir.is_dir() {
+        return Ok((0, 0));
+    }
+
+    let mut file_count = 0usize;
+    let mut total_size = 0u64;
+    for path in disk_growth_snapshot_paths_for_drive(snapshot_dir, drive_letter)? {
+        // 分片目录与主快照文件同名同盘符，必须成组删除，否则后续明细查询会看到残缺数据。
+        if path.is_dir() {
+            let (child_files, child_bytes) = directory_usage(&path)?;
+            file_count += child_files;
+            total_size += child_bytes;
+            fs::remove_dir_all(&path)
+                .map_err(|e| format!("删除快照分片目录 {} 失败: {}", path.display(), e))?;
+        } else if path.is_file() {
+            if let Ok(meta) = fs::metadata(&path) {
+                total_size += meta.len();
+            }
+            fs::remove_file(&path)
+                .map_err(|e| format!("删除快照文件 {} 失败: {}", path.display(), e))?;
+            file_count += 1;
+        }
+    }
+
+    log::info!(
+        "已清空 {} 盘磁盘变化分析快照",
+        drive_letter.to_ascii_uppercase()
+    );
+    Ok((file_count, total_size))
+}
+
+fn disk_growth_snapshot_usage_for_drive(
+    snapshot_dir: &Path,
+    drive_letter: char,
+) -> Result<(usize, u64), String> {
+    let mut file_count = 0usize;
+    let mut total_size = 0u64;
+    for path in disk_growth_snapshot_paths_for_drive(snapshot_dir, drive_letter)? {
+        if path.is_dir() {
+            let (child_files, child_bytes) = directory_usage(&path)?;
+            file_count += child_files;
+            total_size += child_bytes;
+        } else if path.is_file() {
+            if let Ok(meta) = fs::metadata(&path) {
+                total_size += meta.len();
+            }
+            file_count += 1;
+        }
+    }
+    Ok((file_count, total_size))
+}
+
+fn disk_growth_snapshot_paths_for_drive(
+    snapshot_dir: &Path,
+    drive_letter: char,
+) -> Result<Vec<PathBuf>, String> {
+    if !snapshot_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut paths = Vec::new();
+    for entry_res in fs::read_dir(snapshot_dir)
+        .map_err(|e| format!("读取磁盘变化分析快照目录失败 {}: {}", snapshot_dir.display(), e))?
+    {
+        let entry = entry_res
+            .map_err(|e| format!("读取磁盘变化分析快照条目失败 {}: {}", snapshot_dir.display(), e))?;
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if disk_growth_snapshot_drive_from_name(name)
+            == Some(drive_letter.to_ascii_uppercase())
+        {
+            paths.push(path);
+        }
+    }
+    Ok(paths)
+}
+
+fn disk_growth_snapshot_drive_from_name(name: &str) -> Option<char> {
+    let lower_name = name.to_ascii_lowercase();
+    // C 盘沿用历史文件名，不带盘符前缀；其他盘才使用 d_/e_ 这类前缀。
+    if lower_name.starts_with(DISK_GROWTH_SNAPSHOT_BASE_PREFIX)
+        && (lower_name.ends_with(DISK_GROWTH_SNAPSHOT_JSON_SUFFIX)
+            || lower_name.ends_with(DISK_GROWTH_SNAPSHOT_SHARD_SUFFIX))
+    {
+        return Some('C');
+    }
+
+    let mut chars = lower_name.chars();
+    let letter = chars.next()?;
+    if !letter.is_ascii_lowercase() || chars.next()? != '_' {
+        return None;
+    }
+
+    let rest = &lower_name[2..];
+    if rest.starts_with(DISK_GROWTH_SNAPSHOT_BASE_PREFIX)
+        && (rest.ends_with(DISK_GROWTH_SNAPSHOT_JSON_SUFFIX)
+            || rest.ends_with(DISK_GROWTH_SNAPSHOT_SHARD_SUFFIX))
+    {
+        Some(letter.to_ascii_uppercase())
+    } else {
+        None
+    }
+}
+
+fn parse_disk_growth_snapshot_item_id(item_id: &str) -> Option<char> {
+    if item_id == DISK_GROWTH_SNAPSHOT_BASE_ID {
+        return Some('C');
+    }
+
+    let suffix = item_id.strip_prefix(DISK_GROWTH_SNAPSHOT_ID_PREFIX)?;
+    let mut chars = suffix.chars();
+    let letter = chars.next()?;
+    if chars.next().is_none() && letter.is_ascii_alphabetic() {
+        Some(letter.to_ascii_uppercase())
+    } else {
+        None
+    }
 }
 
 fn file_usage(path: &Path) -> (usize, u64) {

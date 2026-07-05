@@ -2,7 +2,7 @@
 // 大目录分析模块（原 C盘热点扫描）
 // 支持两种扫描模式：
 // 1. 默认模式：仅扫描 AppData 目录
-// 2. 深度扫描模式：全盘扫描 C 盘（顺序 IO + 深度限制 + 巨型目录跳过）
+// 2. 深度扫描模式：扫描指定磁盘（顺序 IO + 深度限制 + 巨型目录跳过）
 // ============================================================================
 
 use serde::{Deserialize, Serialize};
@@ -59,7 +59,7 @@ pub struct HotspotScanResult {
     pub total_folders_scanned: usize,
     /// 扫描耗时（毫秒）
     pub scan_duration_ms: u64,
-    /// 扫描范围总大小（AppData 或 C 盘总计）
+    /// 扫描范围总大小（AppData 或所选磁盘总计）
     pub scanned_total_size: u64,
     /// 是否为深度扫描模式
     pub is_full_scan: bool,
@@ -370,6 +370,8 @@ pub struct HotspotScanner {
     /// 深度扫描时是否忽略系统保护目录（默认 true）
     /// 关闭后 Windows/Program Files/ProgramData 等目录的子目录也会纳入结果
     ignore_system_dirs: bool,
+    /// 深度扫描目标盘符；AppData 模式仍按当前用户目录扫描，不受此字段影响。
+    drive_letter: char,
 }
 
 impl HotspotScanner {
@@ -387,6 +389,7 @@ impl HotspotScanner {
             scan_depth: 6, // Fast 模式固定 6 层，覆盖 AppData/Local/App/Cache 深度
             size_threshold: MIN_SIZE_THRESHOLD,
             ignore_system_dirs: true, // 默认忽略系统目录，保持现有行为
+            drive_letter: 'C',
         }
     }
 
@@ -417,6 +420,12 @@ impl HotspotScanner {
     /// 关闭后可发现藏在 Windows/Program Files/ProgramData 下的异常大文件
     pub fn with_ignore_system_dirs(mut self, ignore: bool) -> Self {
         self.ignore_system_dirs = ignore;
+        self
+    }
+
+    /// 设置深度扫描目标盘符，避免多盘模式下仍固定扫系统盘。
+    pub fn with_drive_letter(mut self, drive_letter: char) -> Self {
+        self.drive_letter = drive_letter.to_ascii_uppercase();
         self
     }
 
@@ -522,7 +531,7 @@ impl HotspotScanner {
     // 全盘深度扫描（单次遍历 + 祖先聚合）
     // ========================================================================
 
-    /// 全盘扫描 C 盘（顺序 IO + 深度限制 + 祖先聚合 + 巨型目录跳过）
+    /// 全盘扫描指定磁盘（顺序 IO + 深度限制 + 祖先聚合 + 巨型目录跳过）
     ///
     /// v2.4.5 新增 MFT 直读引擎：管理员 + NTFS 时秒级全盘扫描，非管理员自动降级到 jwalk
     fn scan_full_disk(
@@ -533,15 +542,20 @@ impl HotspotScanner {
 
         let start_time = std::time::Instant::now();
 
-        let c_drive = PathBuf::from("C:\\");
-        let first_level_dirs: Vec<PathBuf> = match std::fs::read_dir(&c_drive) {
+        let scan_root = PathBuf::from(format!("{}:\\", self.drive_letter));
+        let first_level_dirs: Vec<PathBuf> = match std::fs::read_dir(&scan_root) {
             Ok(entries) => entries
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
                 .filter(|p| p.is_dir())
                 .filter(|p| !Self::should_skip_scan(p))
                 .collect(),
-            Err(e) => return Err(format!("无法读取 C 盘根目录: {}", e)),
+            Err(e) => {
+                return Err(format!(
+                    "无法读取 {} 盘根目录: {}",
+                    self.drive_letter, e
+                ))
+            }
         };
 
         let total_first_level = first_level_dirs.len();
@@ -559,11 +573,14 @@ impl HotspotScanner {
         // ========================================================================
         // 尝试 MFT 直读引擎（管理员 + NTFS）
         // ========================================================================
-        let backend = engine_selector::detect_backend('C');
+        let backend = engine_selector::detect_backend(self.drive_letter);
 
         match backend {
             HotspotBackend::Mft => {
-                log::info!("[全盘扫描] 使用 MFT 直读引擎");
+                log::info!(
+                    "[全盘扫描] 使用 MFT 直读引擎扫描 {} 盘",
+                    self.drive_letter
+                );
                 if let Some(app) = app_handle {
                     let _ = app.emit(
                         "hotspot-scan:progress",
@@ -582,8 +599,8 @@ impl HotspotScanner {
                 }
 
                 let (mft_map, actual_backend) = engine_selector::scan_full_drive(
-                    'C',
-                    &c_drive,
+                    self.drive_letter,
+                    &scan_root,
                     max_depth,
                     track_modified,
                     cancel_flag,
@@ -617,7 +634,7 @@ impl HotspotScanner {
                     ancestor_cache.len()
                 );
 
-                if let Some(root_stats) = ancestor_cache.get(&c_drive) {
+                if let Some(root_stats) = ancestor_cache.get(&scan_root) {
                     // MFT 聚合后的每个目录都包含全部后代，不能把列表项大小再次相加，否则会重复计算祖先目录。
                     total_size.store(root_stats.total_size, Ordering::Relaxed);
                 }
@@ -625,7 +642,7 @@ impl HotspotScanner {
                 // 从 ancestor_cache 构建 all_entries（与 Walkdir 路径一致的逻辑）
                 for (path, stats) in &ancestor_cache {
                     if stats.total_size >= self.size_threshold {
-                        let depth = calculate_relative_depth(&c_drive, path);
+                        let depth = calculate_relative_depth(&scan_root, path);
                         if depth > 0 && depth <= self.max_display_depth {
                             total_scanned.fetch_add(1, Ordering::Relaxed);
                             all_entries.push(Self::build_entry(path, stats, depth as u8, true));
@@ -637,7 +654,7 @@ impl HotspotScanner {
                 for dir in &first_level_dirs {
                     if let Some(root_stats) = ancestor_cache.get(dir) {
                         if root_stats.total_size >= self.size_threshold {
-                            let dir_depth = calculate_relative_depth(&c_drive, dir);
+                            let dir_depth = calculate_relative_depth(&scan_root, dir);
                             all_entries.push(Self::build_entry(
                                 dir,
                                 root_stats,
@@ -653,7 +670,10 @@ impl HotspotScanner {
             // 降级：jwalk 逐目录遍历
             // ========================================================================
             HotspotBackend::Walkdir => {
-                log::info!("[全盘扫描] 使用 jwalk 常规遍历");
+                log::info!(
+                    "[全盘扫描] 使用 jwalk 常规遍历扫描 {} 盘",
+                    self.drive_letter
+                );
 
                 // 顺序扫描每个一级目录（IO 密集型任务，避免 SSD 随机 IO 风暴）
                 for dir in &first_level_dirs {
@@ -662,7 +682,7 @@ impl HotspotScanner {
                     }
 
                     let is_protected_root = Self::is_protected_directory(dir);
-                    let dir_depth = calculate_relative_depth(&c_drive, dir);
+                    let dir_depth = calculate_relative_depth(&scan_root, dir);
 
                     let (root_stats, ancestor_map) = aggregate_ancestor_stats(
                         dir,
@@ -704,7 +724,7 @@ impl HotspotScanner {
                     if !hide_ancestors {
                         for (path, stats) in &ancestor_map {
                             if stats.total_size >= self.size_threshold {
-                                let depth = calculate_relative_depth(&c_drive, path);
+                                let depth = calculate_relative_depth(&scan_root, path);
                                 if depth <= dir_depth + self.max_display_depth {
                                     total_scanned.fetch_add(1, Ordering::Relaxed);
                                     all_entries.push(Self::build_entry(
@@ -791,7 +811,7 @@ impl HotspotScanner {
         // 这样既能保持“展示深度”设置生效，也避免 result 阶段反复 read_dir 触发磁盘 IO。
         let child_index = build_child_index(
             &ancestor_cache,
-            &c_drive,
+            &scan_root,
             self.size_threshold,
             self.ignore_system_dirs,
         );

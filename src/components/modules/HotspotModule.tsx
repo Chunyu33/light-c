@@ -10,6 +10,13 @@ import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
+import {
+  defaultDriveLetter,
+  DriveSelect,
+  driveDisplayName,
+  normalizeDriveLetter,
+  useLocalDrives,
+} from '../ui/DriveSelect';
 import { useToast } from '../Toast';
 import { useModuleDashboard, useSettings } from '../../contexts';
 import { scanHotspot, cancelHotspotScan, openInFolder, cleanupDirectoryContents, type HotspotScanResult, type HotspotEntry, type HotspotScanProgress } from '../../api/commands';
@@ -411,6 +418,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('hotspot');
   const { showToast } = useToast();
   const { settings } = useSettings();
+  const { drives } = useLocalDrives();
 
   const lastScanTriggerRef = useRef(0);
   const scanningRef = useRef(false);
@@ -423,6 +431,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   const [showAll, setShowAll] = useState(false);
   // 深度扫描开关状态
   const [fullScanEnabled, setFullScanEnabled] = useState(false);
+  const [selectedDriveLetter, setSelectedDriveLetter] = useState('C:');
   // 清理确认对话框状态
   const [cleanupTarget, setCleanupTarget] = useState<HotspotEntry | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
@@ -438,6 +447,19 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
 
   // 是否展开
   const isExpanded = expandedModule === 'hotspot';
+  const selectedDrive = drives.find((drive) => drive.drive_letter === selectedDriveLetter) ?? null;
+  const selectedDriveLabel = driveDisplayName(selectedDriveLetter);
+
+  useEffect(() => {
+    if (drives.length > 0) {
+      setSelectedDriveLetter((current) => {
+        const normalized = normalizeDriveLetter(current);
+        return drives.some((drive) => drive.drive_letter === normalized)
+          ? normalized
+          : defaultDriveLetter(drives);
+      });
+    }
+  }, [drives]);
 
   /** 点击下钻按钮 → 打开模态框 */
   const handleDrillDown = useCallback((targetPath: string) => {
@@ -497,6 +519,12 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   // 执行扫描
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
+    if (fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs) {
+      const message = `${selectedDriveLabel}当前文件系统为 ${selectedDrive.file_system || '未知'}，MFT 深度扫描仅支持 NTFS 分区。`;
+      setError(message);
+      updateModuleState('hotspot', { status: 'error', error: message });
+      return;
+    }
     scanningRef.current = true;
     cancelRequestedRef.current = false;
     const scanRunId = ++scanRunIdRef.current;
@@ -512,7 +540,14 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     try {
       // 根据深度扫描开关决定扫描模式（全盘扫描条目更多）
       const topN = fullScanEnabled ? 80 : 50;
-      const result = await scanHotspot(topN, fullScanEnabled, settings.hotspotDepth, settings.hotspotSizeThreshold, settings.hotspotIgnoreSystemDirs);
+      const result = await scanHotspot(
+        topN,
+        fullScanEnabled,
+        settings.hotspotDepth,
+        settings.hotspotSizeThreshold,
+        settings.hotspotIgnoreSystemDirs,
+        selectedDriveLetter,
+      );
       if (cancelRequestedRef.current || scanRunId !== scanRunIdRef.current) {
         // 用户主动停止时不接收后端可能返回的半截结果，避免列表只剩一级目录造成误判。
         return;
@@ -539,7 +574,23 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         setScanProgress(null);
       }
     }
-  }, [updateModuleState, fullScanEnabled, settings]);
+  }, [updateModuleState, fullScanEnabled, settings, selectedDriveLetter, selectedDrive, selectedDriveLabel]);
+
+  const resetHotspotResult = useCallback(() => {
+    setScanResult(null);
+    setError(null);
+    setShowAll(false);
+    setSelectedPath(null);
+    setScanProgress(null);
+    setProgressLogs([]);
+    updateModuleState('hotspot', { status: 'idle', error: null, fileCount: 0, totalSize: 0, progress: 0 });
+  }, [updateModuleState]);
+
+  const handleDriveChange = useCallback((driveLetter: string) => {
+    if (scanningRef.current) return;
+    setSelectedDriveLetter(normalizeDriveLetter(driveLetter));
+    resetHotspotResult();
+  }, [resetHotspotResult]);
 
   // 取消扫描
   const handleStopScan = useCallback(async () => {
@@ -649,6 +700,16 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
 
   // 最大大小（用于计算占比条）
   const maxSize = scanResult?.entries[0]?.total_size || 0;
+  const driveSelector = (
+    <div className="flex items-center gap-2 shrink-0" onClick={(event) => event.stopPropagation()}>
+      <DriveSelect
+        value={selectedDriveLetter}
+        drives={drives}
+        onChange={handleDriveChange}
+        disabled={moduleState.status === 'scanning'}
+      />
+    </div>
+  );
 
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !cleanupTarget && !selectedPath) {
     return null;
@@ -660,7 +721,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         forceExpanded={layoutMode === 'pages'}
       id="hotspot"
       title="大目录分析"
-      description={fullScanEnabled ? "全盘深度扫描 C 盘，定位空间占用元凶" : "深度分析 AppData 目录，定位占用空间的元凶"}
+      description={fullScanEnabled ? `深度扫描 ${selectedDriveLabel}，定位空间占用元凶` : "深度分析 AppData 目录，定位占用空间的元凶"}
       icon={<Flame className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -670,7 +731,9 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'hotspot')}
       onScan={handleScan}
       scanButtonText="开始扫描"
+      scanDisabled={Boolean(fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs)}
       error={error}
+      titleExtra={fullScanEnabled ? driveSelector : null}
       headerExtra={
         // 深度扫描开关 - 参考卸载残留模块样式
         <div className="flex items-center gap-2">
@@ -694,7 +757,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
           <p className="text-sm flex items-center gap-2">
-            {fullScanEnabled ? '正在全盘扫描 C 盘...' : '正在扫描 AppData 目录...'}
+            {fullScanEnabled ? `正在深度扫描 ${selectedDriveLabel}...` : '正在扫描 AppData 目录...'}
             {/* 扫描引擎模式标签 — MFT 直读 vs 常规遍历 */}
             {fullScanEnabled && scanProgress && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
@@ -711,6 +774,9 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
           </p>
           {fullScanEnabled && !settings.hotspotIgnoreSystemDirs && (
             <p className="text-xs mt-1 text-amber-500">⚠ 已关闭系统目录过滤，扫描时间可能较长</p>
+          )}
+          {fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs && (
+            <p className="text-xs mt-1 text-amber-500">当前分区不是 NTFS，将无法使用 MFT 深度扫描</p>
           )}
 
           {/* 深度扫描进度：展示关键阶段和耗时，用于判断瓶颈在枚举、读大小还是聚合。 */}

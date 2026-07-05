@@ -60,6 +60,7 @@ struct SubtreeDiffCollector {
 
 pub struct DiskSnapshotManager {
     snapshot_dir: PathBuf,
+    snapshot_prefix: String,
 }
 
 #[derive(Debug, Clone)]
@@ -70,16 +71,19 @@ pub struct DiskSnapshotHandle {
 }
 
 impl DiskSnapshotManager {
-    pub fn new() -> Result<Self, String> {
+    pub fn for_drive(drive_letter: &str) -> Result<Self, String> {
         let snapshot_dir = crate::data_dir::get_data_dir().join(SNAPSHOT_DIR);
         fs::create_dir_all(&snapshot_dir).map_err(|e| format!("创建全盘快照目录失败: {}", e))?;
-        Ok(Self { snapshot_dir })
+        Ok(Self {
+            snapshot_dir,
+            snapshot_prefix: snapshot_prefix_for_drive(drive_letter)?,
+        })
     }
 
     pub fn save_snapshot(&self, snapshot: &DiskSnapshot) -> Result<PathBuf, String> {
         let filename = format!(
             "{}{}{}",
-            SNAPSHOT_PREFIX,
+            self.snapshot_prefix,
             chrono::Local::now().format("%Y%m%d_%H%M%S"),
             SNAPSHOT_SUFFIX
         );
@@ -153,7 +157,7 @@ impl DiskSnapshotManager {
             let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
                 continue;
             };
-            if name.starts_with(SNAPSHOT_PREFIX) && name.ends_with(SNAPSHOT_SUFFIX) {
+            if name.starts_with(&self.snapshot_prefix) && name.ends_with(SNAPSHOT_SUFFIX) {
                 snapshots.push(path);
             }
         }
@@ -552,4 +556,21 @@ fn shard_bucket(parent_path: &str) -> u64 {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     hash % FILE_SHARD_BUCKETS
+}
+
+fn snapshot_prefix_for_drive(drive_letter: &str) -> Result<String, String> {
+    let Some(letter) = drive_letter
+        .chars()
+        .find(|character| character.is_ascii_alphabetic())
+        .map(|character| character.to_ascii_lowercase())
+    else {
+        return Err("无效的磁盘盘符，无法创建全盘快照".to_string());
+    };
+
+    // C 盘沿用历史文件名前缀，确保已发布版本生成的快照无需迁移即可继续对比。
+    if letter == 'c' {
+        Ok(SNAPSHOT_PREFIX.to_string())
+    } else {
+        Ok(format!("{}_{}", letter, SNAPSHOT_PREFIX))
+    }
 }

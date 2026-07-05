@@ -539,12 +539,70 @@ const DEPTH_OPTIONS: SelectOption<string>[] = [
 
 const HOTSPOT_SIZE_OPTIONS = [10, 50, 100, 200, 500];
 const DISK_GROWTH_MAX_ENTRY_OPTIONS = [50, 100, 200, 300, 500, 1000];
+const BIG_FILES_SCAN_LIMIT_MIN = 10;
+const BIG_FILES_SCAN_LIMIT_MAX = 500;
+
+function clampBigFilesScanLimit(value: number): number {
+  // 该值会直接决定后端 TopN 和前端列表长度，设置页输入时先收敛一次，命令层还会再次兜底。
+  return Math.min(BIG_FILES_SCAN_LIMIT_MAX, Math.max(BIG_FILES_SCAN_LIMIT_MIN, Math.floor(value || 50)));
+}
 
 function FeatureSettings() {
   const { settings, updateSettings } = useSettings();
+  const [bigFilesScanLimitDraft, setBigFilesScanLimitDraft] = useState(String(settings.bigFilesScanLimit));
+
+  useEffect(() => {
+    setBigFilesScanLimitDraft(String(settings.bigFilesScanLimit));
+  }, [settings.bigFilesScanLimit]);
+
+  const commitBigFilesScanLimit = () => {
+    // 数字输入允许用户临时清空内容，提交时再归一化，避免输入 300 这类值时被中途强制改写。
+    const nextLimit = clampBigFilesScanLimit(Number(bigFilesScanLimitDraft));
+    updateSettings({ bigFilesScanLimit: nextLimit });
+    setBigFilesScanLimitDraft(String(nextLimit));
+  };
 
   return (
     <div className="flex flex-col w-0 min-w-full space-y-4 pb-2">
+      {/* 大文件清理 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <FileBox className="w-3.5 h-3.5" />
+          大文件清理
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">扫描文件数</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                控制每次扫描返回的最大文件数量。数量越大越容易发现更多候选文件，但列表渲染和确认成本也会增加。
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <input
+                type="number"
+                min={BIG_FILES_SCAN_LIMIT_MIN}
+                max={BIG_FILES_SCAN_LIMIT_MAX}
+                step={10}
+                value={bigFilesScanLimitDraft}
+                onBlur={commitBigFilesScanLimit}
+                onChange={(event) => setBigFilesScanLimitDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="h-9 w-24 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-right text-sm font-semibold text-[var(--brand-green)] outline-none transition focus:border-[var(--brand-green)]"
+              />
+              <span className="text-xs text-[var(--text-muted)]">个</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">
+            边界范围：{BIG_FILES_SCAN_LIMIT_MIN} - {BIG_FILES_SCAN_LIMIT_MAX} 个。切换磁盘后会清空旧结果，避免不同磁盘的文件混在同一份清理列表里。
+          </p>
+        </div>
+      </div>
+
       {/* 大目录分析 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
@@ -657,11 +715,11 @@ function FeatureSettings() {
         </div>
       </div>
 
-      {/* C 盘全盘分析 */}
+      {/* 磁盘变化分析 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <HardDrive className="w-3.5 h-3.5" />
-          C 盘全盘分析
+          磁盘变化分析
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div className="flex items-start justify-between gap-4">
@@ -700,13 +758,13 @@ function FeatureSettings() {
                 点击变化量可打开明细弹窗，左侧展示当前目录的下一级变化目录，右侧展示当前目录内变化文件。明细通过后端接口按需分页加载，每次最多 200 条，并使用虚拟列表渲染，避免大目录一次性渲染造成卡顿。
               </p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                快照最多保留 3 组；最近两组用于变化对比，额外一组用于异常排查和兜底，超过后会自动清理旧快照及对应文件分片。
+                快照按磁盘盘符独立保存：C 盘沿用旧的 disk_growth_* 文件名，其他盘使用 d_disk_growth_* 这类盘符前缀。每个磁盘最多保留 3 组；最近两组用于变化对比，额外一组用于异常排查和兜底，超过后会自动清理该磁盘的旧快照及对应文件分片。
               </p>
             </div>
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">扫描速度</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                全盘分析主要受文件数量、硬盘类型和系统负载影响。M.2 SSD 通常最快，SATA SSD 次之，机械硬盘会明显变慢；C 盘容量越大不一定越慢，真正决定耗时的是文件记录数量、$MFT 体积、metadata 回退数量和安全软件实时扫描。
+                磁盘变化分析主要受文件数量、硬盘类型和系统负载影响。M.2 SSD 通常最快，SATA SSD 次之，机械硬盘会明显变慢；磁盘容量越大不一定越慢，真正决定耗时的是文件记录数量、$MFT 体积、metadata 回退数量和安全软件实时扫描。
               </p>
             </div>
             <div>
@@ -819,7 +877,7 @@ function ClearLocalDataDialog({
             <div className="max-h-[58vh] overflow-y-auto px-5 py-4">
               <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
                 <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                  这些数据可以安全清理，不会删除应用配置。全盘分析快照被清理后，下次扫描会重新建立基线，第二次扫描后才会重新显示变化对比。
+                  这些数据可以安全清理，不会删除应用配置。磁盘变化分析快照已按盘符拆分，可单独保留某个磁盘的基线；被清理的磁盘下次扫描会重新建立基线，第二次扫描后才会重新显示变化对比。
                 </p>
               </div>
 
@@ -925,7 +983,7 @@ function GuideSettings() {
               大文件清理
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              扫描C盘中体积最大的50个文件。请仔细查看文件路径和类型，避免删除系统文件或重要数据。建议只删除您确认不再需要的文件。
+              可选择 C/D/E 等目标分区，扫描该分区中体积最大的文件；返回数量可在「功能设置 - 大文件清理」中调整。请仔细查看文件路径和类型，避免删除系统文件或重要数据。
             </p>
           </div>
           <div>
@@ -1000,7 +1058,7 @@ function GuideSettings() {
               大目录分析
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              默认分析 AppData 用户数据热点；深度扫描会覆盖 C 盘主要目录。管理员权限下优先使用
+              默认分析 AppData 用户数据热点；深度扫描可在模块标题旁选择目标磁盘。管理员权限下优先使用
               <span className="text-[var(--brand-green)] font-medium"> NTFS MFT</span>，失败时自动降级遍历。
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-2">
@@ -1010,14 +1068,14 @@ function GuideSettings() {
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
               <HardDrive className="w-4 h-4 text-[var(--brand-green)]" />
-              C 盘全盘分析
+              磁盘变化分析
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              使用<span className="text-[var(--brand-green)] font-medium">NTFS MFT</span> 枚举 C 盘文件记录，重建目录树并聚合目录大小。
-              该能力需要管理员权限；首次扫描会建立基准快照，第二次扫描开始展示新增、减少和明显变化的目录。
+              可选择本机固定磁盘分区，使用<span className="text-[var(--brand-green)] font-medium">NTFS MFT</span> 枚举文件记录，重建目录树并聚合目录大小。
+              该能力需要管理员权限且仅支持 NTFS；每个磁盘首次扫描会建立独立基准快照，第二次扫描开始展示新增、减少和明显变化的目录。
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-2">
-              它只做空间变化定位，不提供一键删除。扫描耗时主要取决于文件数量、$MFT 体积、硬盘类型和安全软件实时扫描。
+              它只做空间变化定位，不提供一键删除。快照按盘符隔离保存，清空本地数据时也可以单独勾选某个磁盘的快照；扫描耗时主要取决于文件数量、$MFT 体积、硬盘类型和安全软件实时扫描。
             </p>
           </div>
           <div>

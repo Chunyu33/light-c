@@ -43,7 +43,7 @@ pub fn reset_disk_growth_cancelled() {
 }
 
 pub fn cancel_disk_growth_scan() {
-    log::info!("收到取消 C 盘全盘分析请求");
+    log::info!("收到取消全盘分析请求");
     DISK_GROWTH_SCAN_CANCELLED.store(true, Ordering::SeqCst);
 }
 
@@ -159,12 +159,15 @@ pub struct FullDiskScanResult {
     pub metadata_fallback_count: usize,
 }
 
-pub fn scan_system_drive_with_progress<F>(progress: &F) -> Result<FullDiskScanResult, String>
+pub fn scan_drive_with_progress<F>(
+    drive_letter: &str,
+    progress: &F,
+) -> Result<FullDiskScanResult, String>
 where
     F: Fn(DiskGrowthScanProgress) + Sync,
 {
-    let drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
-    let root = format!("{}\\", drive.trim_end_matches('\\'));
+    let drive_letter = normalize_drive_letter(drive_letter)?;
+    let root = format!("{}:\\", drive_letter);
     scan_disk_with_progress(&root, DEFAULT_MAX_DEPTH, progress)
 }
 
@@ -268,6 +271,17 @@ fn ensure_fixed_drive(root: &str) -> Result<(), String> {
         return Err(format!("仅支持固定磁盘扫描: {}", root));
     }
     Ok(())
+}
+
+fn normalize_drive_letter(value: &str) -> Result<char, String> {
+    let Some(letter) = value
+        .chars()
+        .find(|character| character.is_ascii_alphabetic())
+    else {
+        return Err("无效的磁盘盘符".to_string());
+    };
+    // 前端可能传入 D、D: 或 D:\，这里只保留盘符，保证同一磁盘只对应一组快照。
+    Ok(letter.to_ascii_uppercase())
 }
 
 fn open_volume(drive_letter: char) -> Result<HANDLE, String> {

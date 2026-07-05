@@ -29,6 +29,7 @@ pub async fn scan_hotspot(
     max_depth: Option<usize>,
     size_threshold_mb: Option<u64>,
     ignore_system_dirs: Option<bool>,
+    drive_letter: Option<String>,
 ) -> Result<crate::scanner::HotspotScanResult, String> {
     use crate::scanner::HotspotScanner;
 
@@ -39,10 +40,12 @@ pub async fn scan_hotspot(
         .map(|mb| mb * 1024 * 1024)
         .unwrap_or(50 * 1024 * 1024);
     let ignore = ignore_system_dirs.unwrap_or(true);
+    let drive = normalize_hotspot_drive_letter(drive_letter.as_deref())?;
 
     if is_full_scan {
         info!(
-            "开始全盘深度扫描，Top {}，最大深度 {}，阈值 {}MB，忽略系统目录: {}",
+            "开始 {} 盘深度扫描，Top {}，最大深度 {}，阈值 {}MB，忽略系统目录: {}",
+            drive,
             n,
             depth,
             threshold / 1024 / 1024,
@@ -62,7 +65,8 @@ pub async fn scan_hotspot(
         let scanner = HotspotScanner::new(is_full_scan, n)
             .with_display_depth(depth)
             .with_size_threshold(threshold)
-            .with_ignore_system_dirs(ignore);
+            .with_ignore_system_dirs(ignore)
+            .with_drive_letter(drive);
         scanner.scan_with_ui(&app)
     })
     .await
@@ -84,6 +88,18 @@ pub async fn scan_hotspot(
     }
 
     result
+}
+
+fn normalize_hotspot_drive_letter(value: Option<&str>) -> Result<char, String> {
+    let raw_value = value
+        .map(str::to_string)
+        .or_else(|| std::env::var("SystemDrive").ok())
+        .unwrap_or_else(|| "C:".to_string());
+    let Some(letter) = raw_value.chars().find(|character| character.is_ascii_alphabetic()) else {
+        return Err("无效的磁盘盘符".to_string());
+    };
+    // 大目录深度扫描只需要盘符，统一转大写可避免 d/D 触发不同扫描根。
+    Ok(letter.to_ascii_uppercase())
 }
 
 /// 单层路径钻取扫描

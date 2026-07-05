@@ -56,6 +56,7 @@ pub fn run() {
             close_splashscreen,
             // 磁盘信息
             get_disk_info,
+            get_local_drives,
             // 扫描相关
             scan_junk_files,
             scan_category,

@@ -50,13 +50,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.10.4'
+          releaseName: 'LightC v2.11.0'
           releaseBody: |
             ## 更新内容
-            - AI 模型空间深度发现收紧 `.bin/.dlc` 识别规则，降低 Steam、3DMark 等大型资源包误报
-            - 更改数据目录增加空目录、父子目录和白名单迁移保护，修复误选后递归复制嵌套目录的问题
-            - 配置与运行数据分离，旧版 `config.json` 会自动兼容迁移到新的配置目录
-            - Release 额外提供内置 WebView2 离线安装器的安装包，适合 WebView2 环境异常或安装时网络受限的用户（体积较大，普通用户优先使用常规安装包）
+            - “C 盘全盘分析”升级为“磁盘变化分析”，支持选择 C/D/E 等目标磁盘并按盘符独立保存快照
+            - 大文件清理、大目录分析接入统一盘符选择器，大文件清理新增可配置扫描文件数（10-500）
+            - 修复自定义标题栏双击最大化/还原后窗口内容偏移、无边框错位等问题
+            - 优化垃圾清理删除遮罩动画，移除高成本背景模糊并保留轻量旋转反馈，降低高刷新率屏幕下的 WebView2 GPU 压力
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false

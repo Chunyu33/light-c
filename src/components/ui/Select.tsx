@@ -8,6 +8,8 @@ import { ChevronDown } from 'lucide-react';
 export interface SelectOption<T extends string = string> {
   value: T;
   label: string;
+  /** 完整提示文本；下拉项需要短标签时，用 title 保留完整信息。 */
+  title?: string;
 }
 
 interface SelectProps<T extends string = string> {
@@ -83,7 +85,7 @@ export function Select<T extends string = string>({
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
           ${open ? 'border-[var(--brand-green)] ring-2 ring-[var(--brand-green)]/20' : ''}`}
       >
-        <span className="min-w-0 truncate" title={selectedOption?.label ?? value}>
+        <span className="min-w-0 truncate" title={selectedOption?.title ?? selectedOption?.label ?? value}>
           {selectedOption?.label ?? value}
         </span>
         <ChevronDown
@@ -119,7 +121,7 @@ export function Select<T extends string = string>({
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   }`}
               >
-                <span className="min-w-0 truncate" title={option.label}>{option.label}</span>
+                <span className="min-w-0 truncate" title={option.title ?? option.label}>{option.label}</span>
                 {isSelected && (
                   <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-[var(--brand-green)]" />
                 )}

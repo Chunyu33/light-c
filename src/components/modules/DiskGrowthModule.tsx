@@ -1,5 +1,5 @@
 // ============================================================================
-// C 盘全盘变化分析模块
+// 多盘全盘变化分析模块
 //
 // 全盘变化只负责定位空间增减来源，不提供删除能力，避免把“变化目录”误当成“可清理目录”。
 // ============================================================================
@@ -26,6 +26,14 @@ import {
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { EmptyState } from '../EmptyState';
+import {
+  defaultDriveLetter,
+  DriveSelect,
+  driveDisplayName,
+  driveOptionTitle,
+  normalizeDriveLetter,
+  useLocalDrives,
+} from '../ui/DriveSelect';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { useSettings } from '../../contexts';
 import { openSearchUrl } from '../../utils/searchEngine';
@@ -136,9 +144,11 @@ function getGrowthStyle(level: DiskGrowthEntry['level']) {
 function SummaryCards({
   scanSummary,
   growthReport,
+  driveLabel,
 }: {
   scanSummary: DiskGrowthScanResponse;
   growthReport: DiskGrowthReport;
+  driveLabel: string;
 }) {
   const totalGrowth = growthReport.total_growth;
   const indexedSizeText = formatSize(scanSummary.total_size);
@@ -149,7 +159,9 @@ function SummaryCards({
   return (
     <div className="grid grid-cols-4 gap-3">
       <div className="min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title="C 盘已索引占用">C 盘已占用</p>
+        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={`${driveLabel}已索引占用`}>
+          {driveLabel}已占用
+        </p>
         <p className="text-base font-bold text-[var(--text-primary)] tabular-nums truncate" title={indexedSizeText}>
           {indexedSizeText}
         </p>
@@ -372,10 +384,12 @@ function ChangeRow({
 
 function DiskGrowthDetailsModal({
   entry,
+  driveLetter,
   onClose,
   onOpenFolder,
 }: {
   entry: DiskGrowthEntry | null;
+  driveLetter: string;
   onClose: () => void;
   onOpenFolder: (path: string) => void;
 }) {
@@ -412,7 +426,7 @@ function DiskGrowthDetailsModal({
     setDirectoryLoading(true);
 
     // 文件级明细按需懒加载，避免主扫描结果一次性携带几十万文件记录。
-    getDiskGrowthFileDetails(currentEntry.path, 0, detailPageSize)
+    getDiskGrowthFileDetails(currentEntry.path, 0, detailPageSize, driveLetter)
       .then((result) => {
         if (!cancelled) {
           setFileDetails(result);
@@ -427,7 +441,7 @@ function DiskGrowthDetailsModal({
       });
 
     // 目录明细也按当前目录懒加载，避免主结果只带少量 details 时无法继续分页。
-    getDiskGrowthDirectoryDetails(currentEntry.path, 0, detailPageSize)
+    getDiskGrowthDirectoryDetails(currentEntry.path, 0, detailPageSize, driveLetter)
       .then((result) => {
         if (!cancelled) {
           setDirectoryDetails(result);
@@ -444,7 +458,7 @@ function DiskGrowthDetailsModal({
     return () => {
       cancelled = true;
     };
-  }, [currentEntry]);
+  }, [currentEntry, driveLetter]);
 
   const fileVirtualizer = useVirtualizer({
     count: fileRows.length,
@@ -489,7 +503,7 @@ function DiskGrowthDetailsModal({
     if (!currentEntry || fileLoading || !fileDetails?.has_more) return;
     setFileLoading(true);
     try {
-      const result = await getDiskGrowthFileDetails(currentEntry.path, fileRows.length, detailPageSize);
+      const result = await getDiskGrowthFileDetails(currentEntry.path, fileRows.length, detailPageSize, driveLetter);
       setFileDetails(result);
       setFileRows((rows) => [...rows, ...result.entries]);
     } catch (err) {
@@ -502,7 +516,7 @@ function DiskGrowthDetailsModal({
     if (!currentEntry || directoryLoading || !directoryDetails?.has_more) return;
     setDirectoryLoading(true);
     try {
-      const result = await getDiskGrowthDirectoryDetails(currentEntry.path, directoryRows.length, detailPageSize);
+      const result = await getDiskGrowthDirectoryDetails(currentEntry.path, directoryRows.length, detailPageSize, driveLetter);
       setDirectoryDetails(result);
       setDirectoryRows((rows) => [...rows, ...result.entries]);
     } catch (err) {
@@ -736,8 +750,22 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const [scanElapsed, setScanElapsed] = useState(0);
   const [scanProgress, setScanProgress] = useState<DiskGrowthScanProgress | null>(null);
   const [detailEntry, setDetailEntry] = useState<DiskGrowthEntry | null>(null);
+  const { drives, error: drivesError } = useLocalDrives();
+  const [selectedDriveLetter, setSelectedDriveLetter] = useState('C:');
 
   const isExpanded = expandedModule === 'disk-growth';
+  const selectedDrive = drives.find((drive) => drive.drive_letter === selectedDriveLetter) ?? null;
+  const selectedDriveLabel = driveDisplayName(selectedDriveLetter);
+
+  const resetCurrentDriveResult = useCallback(() => {
+    setScanSummary(null);
+    setGrowthReport(null);
+    setScanProgress(null);
+    setShowAll(false);
+    setDetailEntry(null);
+    setError(null);
+    updateModuleState('diskGrowth', { status: 'idle', error: null, fileCount: 0, totalSize: 0, progress: 0 });
+  }, [updateModuleState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -752,6 +780,17 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (drives.length > 0) {
+      setSelectedDriveLetter((current) => {
+        const normalized = normalizeDriveLetter(current);
+        return drives.some((drive) => drive.drive_letter === normalized)
+          ? normalized
+          : defaultDriveLetter(drives);
+      });
+    }
+  }, [drives]);
 
   useEffect(() => {
     if (moduleState.status !== 'scanning') {
@@ -790,7 +829,13 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
     if (isAdmin === false) {
-      const message = 'C 盘全盘分析需要管理员权限读取 MFT，请以管理员身份启动应用后再扫描。';
+      const message = `${selectedDriveLabel}全盘分析需要管理员权限读取 MFT，请以管理员身份启动应用后再扫描。`;
+      setError(message);
+      updateModuleState('diskGrowth', { status: 'error', error: message });
+      return;
+    }
+    if (selectedDrive && !selectedDrive.is_ntfs) {
+      const message = `${selectedDriveLabel}当前文件系统为 ${selectedDrive.file_system || '未知'}，MFT 全盘分析仅支持 NTFS 分区。`;
       setError(message);
       updateModuleState('diskGrowth', { status: 'error', error: message });
       return;
@@ -808,7 +853,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
     setDetailEntry(null);
 
     try {
-      const result = await scanDiskGrowth(settings.diskGrowthMaxEntries);
+      const result = await scanDiskGrowth(settings.diskGrowthMaxEntries, selectedDriveLetter);
       if (cancelRequestedRef.current || scanRunId !== scanRunIdRef.current) {
         // 用户取消后不接收可能已经返回的旧结果，避免把被中断的扫描写成正常完成。
         return;
@@ -833,7 +878,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         scanningRef.current = false;
       }
     }
-  }, [isAdmin, settings.diskGrowthMaxEntries, updateModuleState]);
+  }, [isAdmin, selectedDrive, selectedDriveLabel, selectedDriveLetter, settings.diskGrowthMaxEntries, updateModuleState]);
 
   const handleStopScan = useCallback(async () => {
     cancelRequestedRef.current = true;
@@ -844,9 +889,15 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
     try {
       await cancelDiskGrowthScan();
     } catch (err) {
-      console.error('停止 C 盘全盘分析失败:', err);
+      console.error('停止全盘分析失败:', err);
     }
   }, [updateModuleState]);
+
+  const handleDriveChange = useCallback((driveLetter: string) => {
+    if (scanningRef.current) return;
+    setSelectedDriveLetter(normalizeDriveLetter(driveLetter));
+    resetCurrentDriveResult();
+  }, [resetCurrentDriveResult]);
 
   useEffect(() => {
     if (oneClickScanTrigger > 0 && oneClickScanTrigger !== lastScanTriggerRef.current) {
@@ -904,6 +955,16 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const resultMode = growthReport?.entries.length ? 'change' : 'usage';
   const displayedEntries = showAll ? entries : entries.slice(0, 20);
   const hasMore = entries.length > displayedEntries.length;
+  const driveSelector = (
+    <div className="flex items-center gap-2 shrink-0" onClick={(event) => event.stopPropagation()}>
+      <DriveSelect
+        value={selectedDriveLetter}
+        drives={drives}
+        onChange={handleDriveChange}
+        disabled={moduleState.status === 'scanning'}
+      />
+    </div>
+  );
 
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !detailEntry) {
     return null;
@@ -914,8 +975,8 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
       id="disk-growth"
-      title="C 盘全盘分析"
-      description="基于 MFT 快速扫描 C 盘，对比上次快照定位空间变化来源"
+      title="磁盘变化分析"
+      description={`基于 MFT 快速扫描 ${selectedDriveLabel}，对比上次快照定位空间变化来源`}
       icon={<HardDrive className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -925,13 +986,38 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'disk-growth')}
       onScan={handleScan}
       scanButtonText="开始扫描"
-      scanDisabled={isAdmin === false}
+      scanDisabled={isAdmin === false || Boolean(selectedDrive && !selectedDrive.is_ntfs)}
+      titleExtra={driveSelector}
       error={error}
     >
+      <div className="mx-4 mt-4 flex flex-col gap-2 rounded-xl bg-[var(--bg-main)] px-4 py-3 text-[12px] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
+        <span title={selectedDrive ? driveOptionTitle(selectedDrive) : selectedDriveLabel}>
+          当前分析：{selectedDriveLabel}
+          {selectedDrive?.volume_name ? ` · ${selectedDrive.volume_name}` : ''}
+          {selectedDrive?.file_system ? ` · ${selectedDrive.file_system}` : ''}
+        </span>
+        {selectedDrive ? (
+          <span className="tabular-nums">
+            可用 {formatSize(selectedDrive.free_space)} / 总计 {formatSize(selectedDrive.total_space)}
+          </span>
+        ) : drivesError ? (
+          <span className="text-amber-600 dark:text-amber-400">分区列表读取失败，已回退默认 C 盘</span>
+        ) : (
+          <span>正在读取分区列表...</span>
+        )}
+      </div>
+
       {isAdmin === false && (
         <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>当前未检测到管理员权限。MFT 全盘分析需要管理员权限，请以管理员身份启动 LightC 或运行开发命令。</span>
+          <span>当前未检测到管理员权限。MFT 全盘分析需要管理员权限，请以管理员身份启动 LightC 或运行开发命令。</span>
+        </div>
+      )}
+
+      {selectedDrive && !selectedDrive.is_ntfs && (
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>当前分区不是 NTFS，暂不支持 MFT 快速全盘分析，请切换到 NTFS 分区。</span>
         </div>
       )}
 
@@ -939,8 +1025,8 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         <div className="p-4">
           <EmptyState
             icon={HardDrive}
-            title="尚未扫描 C 盘变化"
-            description="点击开始扫描，建立 C 盘快照；再次扫描后会对比新增、减少和明显变化的目录。"
+            title={`尚未扫描 ${selectedDriveLabel} 变化`}
+            description={`点击开始扫描，建立 ${selectedDriveLabel} 快照；再次扫描后会对比新增、减少和明显变化的目录。`}
           />
         </div>
       )}
@@ -948,7 +1034,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       {moduleState.status === 'scanning' && (
         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
-          <p className="text-sm">{scanProgress?.message ?? '正在通过 MFT 扫描 C 盘...'}</p>
+          <p className="text-sm">{scanProgress?.message ?? `正在通过 MFT 扫描 ${selectedDriveLabel}...`}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
             已用时 {scanElapsed}s
           </p>
@@ -974,7 +1060,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
 
       {moduleState.status === 'done' && scanSummary && growthReport && (
         <div className="p-4 space-y-4">
-          <SummaryCards scanSummary={scanSummary} growthReport={growthReport} />
+          <SummaryCards scanSummary={scanSummary} growthReport={growthReport} driveLabel={driveDisplayName(scanSummary.drive_letter)} />
           <DiagnosticBanner report={growthReport} />
 
           <div className="flex items-center justify-between">
@@ -1038,8 +1124,9 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       <AnimatePresence>
         {detailEntry && (
           <DiskGrowthDetailsModal
-            key={detailEntry.path}
+            key={`${selectedDriveLetter}-${detailEntry.path}`}
             entry={detailEntry}
+            driveLetter={selectedDriveLetter}
             onClose={handleCloseDetails}
             onOpenFolder={handleOpenFolder}
           />
