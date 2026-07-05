@@ -37,7 +37,7 @@ const moduleIds = APP_MODULE_META.map(module => module.id);
 
 /** 默认设置 */
 const defaultSettings: AppSettings = {
-  layoutMode: 'cards',
+  layoutMode: 'pages', // 布局设置 现已默认页面模式
   activeModuleId: DEFAULT_ACTIVE_MODULE_ID,
   hotspotDepth: 3,     // 默认分析深度 3 层
   hotspotSizeThreshold: 50, // 默认 50MB
