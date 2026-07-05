@@ -122,7 +122,7 @@
 - **功能说明**：快速分析本机 AI 模型、LoRA、Embedding 和模型缓存占用，首页优先展示 AI 资产总占用与最大模型，帮助用户 3 秒内定位空间大户
 - **平台识别优先**：首版支持 Ollama、LM Studio、ComfyUI、HuggingFace Cache；Ollama 会读取 `OLLAMA_MODELS` 并解析 manifest 映射共享 blob，展示真实模型名而不是 `sha256-*` 文件名
 - **配置与结构优先**：HuggingFace 会优先读取 `HF_HOME`；ComfyUI 会识别 Python 版 `extra_model_paths.yaml`、桌面版 `%APPDATA%\ComfyUI\config.json` 的 `basePath`、`extra_models_config.yaml`、默认 `models` 目录和 `diffusion_models`、`text_encoders`、`controlnet` 等现代模型目录；LM Studio 仅识别明确的 `.lmstudio` 路径，避免把普通 `models` 目录误判为 LM Studio
-- **深度发现开关**：默认快速扫描只读取配置和平台目录；开启“深度发现”后才会追加 MFT 兜底扫描本地 NTFS 盘，按 `.safetensors`、`.gguf`、`.ggml`、`.ckpt`、`.onnx`、`.ort`、`.tflite`、`.pb`、`.h5`、`.hdf5`、`.keras`、`.mlmodel`、`.mlpackage`、`.engine`、`.plan`、`.trt`、`.mnn`、`.rknn`、`.mindir`、`.om`、`.pdmodel`、`.pdiparams`、`.caffemodel`、`.dlc`、`.hef`、`.xmodel`、`.bmodel`、`.pte`、`.task`、`.nemo`、`.bin`、`.pt`、`.pth` 等格式分层过滤大模型候选；`.bin/.pt/.pth` 等高误判扩展名必须达到更高体积阈值，并跳过已由配置层覆盖的路径
+- **深度发现开关**：默认快速扫描只读取配置和平台目录；开启“深度发现”后才会追加 MFT 兜底扫描本地 NTFS 盘，按 `.safetensors`、`.gguf`、`.ggml`、`.ckpt`、`.onnx`、`.ort`、`.tflite`、`.pb`、`.h5`、`.hdf5`、`.keras`、`.mlmodel`、`.mlpackage`、`.engine`、`.plan`、`.trt`、`.mnn`、`.rknn`、`.mindir`、`.om`、`.pdmodel`、`.pdiparams`、`.caffemodel`、`.dlc`、`.hef`、`.xmodel`、`.bmodel`、`.pte`、`.task`、`.nemo`、`.bin`、`.pt`、`.pth` 等格式分层过滤大模型候选；`.bin/.pt/.pth` 等高误判扩展名必须达到更高体积阈值，并跳过已由配置层覆盖的路径；其中 `.bin/.dlc` 在 MFT 兜底中还会结合 AI/模型目录或强模型文件名特征确认，并排除 Steam、3DMark 等游戏/跑分资源目录，避免把大型资源包误报为模型
 - **使用方式**：点击“AI 模型空间”模块中的“开始分析”手动触发扫描；如果模型由绿色版 llama.cpp、Pinokio、AI Toolkit 或自建目录管理，不确定模型放在哪个盘时再开启“深度发现”
 - **结果展示**：提供总占用、最大模型、超过 20GB 的模型数量、概览图表、模型列表筛选、关键词搜索、一键清空搜索、打开目录和一键搜索模型能力；平台标签使用主色实心样式，类型标签统一展示文件扩展名，“未归类”用暖色提醒，长路径采用中间省略以尽量保留模型文件名；同一路径命中多个来源时按平台优先级去重，避免重复计数
 - **视图收敛**：概览视图用平台占用饼图、模型类型柱状图和未归类提示展示空间结构，类型柱状图保留平台模型类别并用扩展名兜底，长尾类型会汇总为“其他类型”避免截断总量；模型列表视图承载完整结果，并使用统一主题下拉框支持按平台和类型筛选，表头支持按名称/大小升降序排序，避免多个视图重复堆列表
@@ -131,7 +131,9 @@
 
 ### ⚙️ 设置与本地数据
 - **使用说明收敛**：设置页使用说明补充“AI 模型空间”，并压缩大目录分析、C 盘全盘分析说明，保留核心使用边界
-- **可选本地数据清理**：清空本地数据前会列出安装历史缓存、清理日志、注册表备份、全盘分析快照等白名单项，显示路径、文件数、大小和影响说明；用户可按项勾选清理，`config.json` 不会被删除
+- **配置与数据分离**：应用配置固定保存在 `%LOCALAPPDATA%/LightC/config/config.json`，默认运行数据保存在 `%LOCALAPPDATA%/LightC/data/`；更改数据目录只迁移日志、备份、快照和安装历史缓存，不把配置文件混入用户选择的数据目录
+- **数据目录迁移保护**：更改数据目录时必须选择独立空文件夹，禁止选择当前数据目录、父目录或子目录；迁移只复制 LightC 明确拥有的日志、备份、快照和安装历史缓存，避免误选磁盘根目录后把无关文件继续迁移
+- **可选本地数据清理**：清空本地数据前会列出安装历史缓存、清理日志、注册表备份、全盘分析快照等白名单项，显示路径、文件数、大小和影响说明；用户可按项勾选清理，应用配置不会被删除
 
 ### �🛡️ 安全保护
 - **系统路径保护**：自动识别并跳过关键系统文件和目录
@@ -441,6 +443,7 @@ npm run tauri build
    - `LightC_x.x.x_x64-setup.nsis.zip`
    - `LightC_x.x.x_x64-setup.nsis.zip.sig`
    - `latest.json`（构建时自动生成）
+   - `LightC_webview2_offline_x64.exe`（内置 WebView2 离线安装器，适合 WebView2 环境异常或安装时网络受限的用户）
    - `LightC_portable_x64.zip`（便携包内包含 `LightC.portable` 标记文件，用于禁用安装器式自动更新）
    - `LightC_installer_exe.sig`（安装版用于校验当前 `LightC.exe` 的官方签名，格式与 updater 的 base64 签名字符串一致）
    - `LightC_portable_exe.sig`（便携版解压后用于校验当前 `LightC.exe` 的官方签名，格式与 updater 的 base64 签名字符串一致）
@@ -448,7 +451,7 @@ npm run tauri build
 
 ### 便携版更新策略
 
-- 安装版保留 Tauri 自动更新，继续使用 `latest.json` 和签名包完成更新。
+- 安装版保留 Tauri 自动更新，继续使用 `latest.json` 和签名包完成更新；WebView2 异常或安装时网络受限的用户可改用 `LightC_webview2_offline_x64.exe`。
 - 完整性校验不复用更新包签名，而是读取当前版本 Release 中的 exe 专用签名资产，避免把 zip/updater 包签名误用于运行中 exe。
 - 便携版由发布流程写入 `LightC.portable` 标记文件，运行时识别后不会自动弹出更新安装器。
 - 便携版“检查更新”入口会优先读取 Release 的 `download.json` 并打开作者网盘下载页，用户下载新版 zip 后覆盖当前目录即可；读取失败时降级到 GitHub Releases。

@@ -50,20 +50,64 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.10.3'
+          releaseName: 'LightC v2.10.4'
           releaseBody: |
             ## 更新内容
-            - 自 v2.10.3 起，LightC 采用 LightC Source Available License v1.0
-            - 源码继续公开用于安全审计、学习、非商业开发和向官方仓库提交贡献
-            - 明确禁止改名二次发布、独立修改版发布、商业销售、商业产品捆绑再分发和删除版权/许可证信息
+            - AI 模型空间深度发现收紧 `.bin/.dlc` 识别规则，降低 Steam、3DMark 等大型资源包误报
+            - 更改数据目录增加空目录、父子目录和白名单迁移保护，修复误选后递归复制嵌套目录的问题
+            - 配置与运行数据分离，旧版 `config.json` 会自动兼容迁移到新的配置目录
+            - Release 额外提供内置 WebView2 离线安装器的安装包，适合 WebView2 环境异常或安装时网络受限的用户（体积较大，普通用户优先使用常规安装包）
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
 
-      # tauri-action 已创建 Release 并上传了 MSI + NSIS 安装包
-      # 以下额外打包绿色便携版并上传到同一个 Release
+      # tauri-action 已创建 Release 并上传了 NSIS 安装包
+      # 以下额外打包 WebView2 离线安装包和绿色便携版并上传到同一个 Release
+
+      - name: Create WebView2 offline installer
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $ConfigPath = "tauri.webview2-offline.conf.json"
+          $OutputName = "LightC_webview2_offline_x64.exe"
+
+          Write-Host "Creating WebView2 offline installer..." -ForegroundColor Cyan
+
+          $OfflineConfig = @{
+            bundle = @{
+              createUpdaterArtifacts = $false
+              windows = @{
+                webviewInstallMode = @{
+                  type = "offlineInstaller"
+                  silent = $true
+                }
+              }
+            }
+          }
+          $OfflineConfig | ConvertTo-Json -Depth 8 | Out-File -FilePath $ConfigPath -Encoding utf8
+
+          npx tauri build --bundles nsis --config $ConfigPath
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error: WebView2 offline installer build failed" -ForegroundColor Red
+            exit $LASTEXITCODE
+          }
+
+          $Installer = Get-ChildItem -Path "src-tauri\target\release\bundle\nsis" -Filter "*.exe" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $Installer) {
+            Write-Host "Error: NSIS installer not found" -ForegroundColor Red
+            exit 1
+          }
+
+          Copy-Item $Installer.FullName $OutputName -Force
+          Write-Host "  Created: $OutputName" -ForegroundColor Green
+          echo "webview2_offline_installer=$OutputName" >> $env:GITHUB_OUTPUT
+        id: webview2_offline
 
       - name: Create portable package
         shell: pwsh
@@ -154,19 +198,20 @@ jobs:
           echo "portable_zip=$ZipName" >> $env:GITHUB_OUTPUT
         id: portable
 
-      - name: Upload portable to release
+      - name: Upload extra assets to release
         shell: pwsh
         run: |
           $ZipPath = "LightC_portable_x64.zip"
           $InstallerSigPath = "LightC_installer_exe.sig"
           $PortableSigPath = "LightC_portable_exe.sig"
           $DownloadConfigPath = "download.json"
-          if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath)) {
-            Write-Host "Uploading portable assets to release..." -ForegroundColor Cyan
-            gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $PortableSigPath $DownloadConfigPath --clobber
+          $WebView2OfflineInstallerPath = "LightC_webview2_offline_x64.exe"
+          if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath) -and (Test-Path $WebView2OfflineInstallerPath)) {
+            Write-Host "Uploading extra assets to release..." -ForegroundColor Cyan
+            gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $PortableSigPath $DownloadConfigPath $WebView2OfflineInstallerPath --clobber
             Write-Host "Upload done!" -ForegroundColor Green
           } else {
-            Write-Host "Error: portable zip, exe signatures or download config not found" -ForegroundColor Red
+            Write-Host "Error: portable zip, exe signatures, download config or WebView2 offline installer not found" -ForegroundColor Red
             exit 1
           }
         env:

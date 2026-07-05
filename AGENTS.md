@@ -1,5 +1,19 @@
 # AGENTS.md
 
+# Windows Environment
+
+Always use UTF-8.
+
+Before executing any PowerShell command, run:
+
+chcp 65001
+[Console]::InputEncoding = [System.Text.UTF8Encoding]::new()
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+
+Never retry because of garbled console output.
+If output contains unreadable characters, inspect the exit code first.
+
 ## 1. 基本原则
 
 - 只做用户明确要求的事情，不主动扩展需求

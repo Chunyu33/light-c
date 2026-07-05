@@ -186,8 +186,18 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
       const msg = await setDataDirectory(folder);
       setDataDir(folder);
       console.log(msg);
+      showToast({
+        type: 'success',
+        title: '数据目录已更改',
+        description: folder,
+      });
     } catch (error) {
       console.error('更改数据目录失败:', error);
+      showToast({
+        type: 'error',
+        title: '更改数据目录失败',
+        description: String(error),
+      });
     } finally {
       setIsChangingDir(false);
     }
@@ -378,7 +388,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               </div>
               <div className="text-left">
                 <p className="text-sm font-medium text-[var(--text-primary)]">更改数据目录</p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">选择存储清理日志和缓存数据的位置，已有数据将自动迁移</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">选择独立空文件夹存储清理日志和缓存数据，已有 LightC 数据将自动迁移</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
@@ -795,7 +805,7 @@ function ClearLocalDataDialog({
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-[var(--text-primary)]">清理本地数据</h3>
-                  <p className="text-xs text-[var(--text-muted)]">只清理下列白名单数据，保留 config.json 和数据目录本身</p>
+                  <p className="text-xs text-[var(--text-muted)]">只清理下列白名单数据，应用配置独立保留</p>
                 </div>
               </div>
               <button

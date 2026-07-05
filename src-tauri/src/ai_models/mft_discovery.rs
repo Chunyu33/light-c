@@ -167,6 +167,10 @@ where
             continue;
         }
 
+        if !is_plausible_mft_model_candidate(&path) {
+            continue;
+        }
+
         if is_covered_by_config_layer(&path, covered_roots) {
             continue;
         }
@@ -313,10 +317,110 @@ fn should_skip_path(path: &Path) -> bool {
         || lower_path.contains("\\.git\\")
         || lower_path.contains("\\$recycle.bin\\")
         || lower_path.contains("\\system volume information\\")
-        // TODO: 浏览器本地AI要排除吗？
+        || is_game_or_benchmark_path(&lower_path)
         // Chromium 系浏览器会把本地 AI/推理缓存放进用户数据目录，这些文件不是用户主动管理的模型资产，直接跳过更符合产品语义。
-        // || lower_path.contains("\\user data\\optguideondevicemodel\\")
-        // || lower_path.contains("\\user data\\provenancedata\\")
+        || lower_path.contains("\\user data\\optguideondevicemodel\\")
+        || lower_path.contains("\\user data\\provenancedata\\")
+}
+
+fn is_game_or_benchmark_path(lower_path: &str) -> bool {
+    // 游戏资源常用超大 .bin/.dlc 分块，深度发现里直接排除这些目录，避免把 Steam 游戏和 3DMark DLC 误报为模型资产。
+    lower_path.contains("\\steamapps\\")
+        || lower_path.contains("\\steam library\\")
+        || lower_path.contains("\\steamlibrary\\")
+        || lower_path.contains("\\epic games\\")
+        || lower_path.contains("\\ea games\\")
+        || lower_path.contains("\\ubisoft\\")
+        || lower_path.contains("\\gog galaxy\\")
+        || lower_path.contains("\\xboxgames\\")
+        || lower_path.contains("\\3dmark\\")
+        || lower_path.contains("\\3dmark ")
+}
+
+fn is_plausible_mft_model_candidate(path: &Path) -> bool {
+    // .bin/.dlc 在全盘 MFT 中误判率最高，必须再结合文件名或目录语义确认；平台配置层扫描不受这个兜底规则影响。
+    if !requires_ai_context_for_mft(path) {
+        return true;
+    }
+
+    has_ai_model_context(path)
+}
+
+fn requires_ai_context_for_mft(path: &Path) -> bool {
+    let Some(extension) = path.extension().and_then(|value| value.to_str()) else {
+        return false;
+    };
+
+    matches!(extension.to_ascii_lowercase().as_str(), "bin" | "dlc")
+}
+
+fn has_ai_model_context(path: &Path) -> bool {
+    let lower_path = path
+        .to_string_lossy()
+        .replace('/', "\\")
+        .to_ascii_lowercase();
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    // 目录语义比单个扩展名可靠：用户主动放在模型/推理框架目录下的 .bin/.dlc 才进入未归类结果。
+    let path_hints = [
+        "\\models\\",
+        "\\model\\",
+        "\\checkpoints\\",
+        "\\diffusion_models\\",
+        "\\loras\\",
+        "\\text_encoders\\",
+        "\\controlnet\\",
+        "\\vae\\",
+        "\\unet\\",
+        "\\clip\\",
+        "\\llm\\",
+        "\\llama\\",
+        "\\ollama\\",
+        "\\huggingface\\",
+        "\\transformers\\",
+        "\\sentence-transformers\\",
+        "\\comfyui\\",
+        "\\stable-diffusion\\",
+        "\\stable_diffusion\\",
+        "\\sd-webui\\",
+        "\\kohya\\",
+        "\\ai\\",
+        "\\ml\\",
+    ];
+    if path_hints.iter().any(|hint| lower_path.contains(hint)) {
+        return true;
+    }
+
+    // 文件名只接受较强模型命名特征，避免 model.bin 这类普通资源名再次放大误判。
+    [
+        "pytorch_model",
+        "tf_model",
+        "adapter_model",
+        "diffusion_pytorch_model",
+        "consolidated.",
+        "consolidated-",
+        "model-",
+        "model_",
+        "weights",
+        "qwen",
+        "deepseek",
+        "chatglm",
+        "baichuan",
+        "mistral",
+        "mixtral",
+        "gemma",
+        "llama",
+        "stable-diffusion",
+        "stable_diffusion",
+        "text_encoder",
+        "image_encoder",
+    ]
+    .iter()
+    .any(|hint| file_name.contains(hint))
 }
 
 fn common_parent_path(models: &[ModelItem]) -> Option<PathBuf> {
@@ -356,6 +460,32 @@ mod tests {
         )));
         assert!(should_skip_path(Path::new(
             r"C:\Users\chunyu\AppData\Local\Microsoft\Edge\User Data\ProvenanceData\2025.10.7.5\vti-b-p32-visual.quant.ort"
+        )));
+    }
+
+    #[test]
+    fn skips_game_and_benchmark_deep_discovery_noise() {
+        assert!(should_skip_path(Path::new(
+            r"D:\likesteam\steamapps\common\Monster Hunter World\chunk\chunkG0.bin"
+        )));
+        assert!(should_skip_path(Path::new(
+            r"E:\3dmark\3DMark v2.27\3DMark v2.27\3dmark-v2-27-0-time-spy-test-v1-2-5-3.dlc"
+        )));
+    }
+
+    #[test]
+    fn requires_ai_context_for_noisy_mft_extensions() {
+        assert!(!is_plausible_mft_model_candidate(Path::new(
+            r"D:\assets\chunks\chunkG0.bin"
+        )));
+        assert!(!is_plausible_mft_model_candidate(Path::new(
+            r"E:\downloads\3dmark-v2-27-0-speed-way-test-v1-0-7-1.dlc"
+        )));
+        assert!(is_plausible_mft_model_candidate(Path::new(
+            r"D:\ai\models\Qwen\pytorch_model-00001-of-00002.bin"
+        )));
+        assert!(is_plausible_mft_model_candidate(Path::new(
+            r"D:\ml\models\vision\model_quantized.dlc"
         )));
     }
 }
