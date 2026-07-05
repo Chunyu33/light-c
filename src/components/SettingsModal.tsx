@@ -539,12 +539,70 @@ const DEPTH_OPTIONS: SelectOption<string>[] = [
 
 const HOTSPOT_SIZE_OPTIONS = [10, 50, 100, 200, 500];
 const DISK_GROWTH_MAX_ENTRY_OPTIONS = [50, 100, 200, 300, 500, 1000];
+const BIG_FILES_SCAN_LIMIT_MIN = 10;
+const BIG_FILES_SCAN_LIMIT_MAX = 500;
+
+function clampBigFilesScanLimit(value: number): number {
+  // 该值会直接决定后端 TopN 和前端列表长度，设置页输入时先收敛一次，命令层还会再次兜底。
+  return Math.min(BIG_FILES_SCAN_LIMIT_MAX, Math.max(BIG_FILES_SCAN_LIMIT_MIN, Math.floor(value || 50)));
+}
 
 function FeatureSettings() {
   const { settings, updateSettings } = useSettings();
+  const [bigFilesScanLimitDraft, setBigFilesScanLimitDraft] = useState(String(settings.bigFilesScanLimit));
+
+  useEffect(() => {
+    setBigFilesScanLimitDraft(String(settings.bigFilesScanLimit));
+  }, [settings.bigFilesScanLimit]);
+
+  const commitBigFilesScanLimit = () => {
+    // 数字输入允许用户临时清空内容，提交时再归一化，避免输入 300 这类值时被中途强制改写。
+    const nextLimit = clampBigFilesScanLimit(Number(bigFilesScanLimitDraft));
+    updateSettings({ bigFilesScanLimit: nextLimit });
+    setBigFilesScanLimitDraft(String(nextLimit));
+  };
 
   return (
     <div className="flex flex-col w-0 min-w-full space-y-4 pb-2">
+      {/* 大文件清理 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <FileBox className="w-3.5 h-3.5" />
+          大文件清理
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">扫描文件数</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                控制每次扫描返回的最大文件数量。数量越大越容易发现更多候选文件，但列表渲染和确认成本也会增加。
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <input
+                type="number"
+                min={BIG_FILES_SCAN_LIMIT_MIN}
+                max={BIG_FILES_SCAN_LIMIT_MAX}
+                step={10}
+                value={bigFilesScanLimitDraft}
+                onBlur={commitBigFilesScanLimit}
+                onChange={(event) => setBigFilesScanLimitDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="h-9 w-24 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-right text-sm font-semibold text-[var(--brand-green)] outline-none transition focus:border-[var(--brand-green)]"
+              />
+              <span className="text-xs text-[var(--text-muted)]">个</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">
+            边界范围：{BIG_FILES_SCAN_LIMIT_MIN} - {BIG_FILES_SCAN_LIMIT_MAX} 个。切换磁盘后会清空旧结果，避免不同磁盘的文件混在同一份清理列表里。
+          </p>
+        </div>
+      </div>
+
       {/* 大目录分析 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
@@ -925,7 +983,7 @@ function GuideSettings() {
               大文件清理
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              扫描C盘中体积最大的50个文件。请仔细查看文件路径和类型，避免删除系统文件或重要数据。建议只删除您确认不再需要的文件。
+              可选择 C/D/E 等目标分区，扫描该分区中体积最大的文件；返回数量可在「功能设置 - 大文件清理」中调整。请仔细查看文件路径和类型，避免删除系统文件或重要数据。
             </p>
           </div>
           <div>

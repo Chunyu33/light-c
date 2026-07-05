@@ -130,11 +130,12 @@ export async function openDiskCleanup(): Promise<void> {
 }
 
 /**
- * 鎵弿C鐩樺ぇ鏂囦欢
- * @param topN 杩斿洖鍓?N 涓渶澶ф枃浠?(10-200锛岄粯璁?50)
+ * 扫描指定磁盘的大文件
+ * @param topN 返回前 N 个最大文件（10-500，默认 50）
+ * @param driveLetter 目标盘符，如 C: / D:
  */
-export async function scanLargeFiles(topN?: number): Promise<LargeFileEntry[]> {
-  return invoke<LargeFileEntry[]>('scan_large_files', { topN });
+export async function scanLargeFiles(topN?: number, driveLetter?: string): Promise<LargeFileEntry[]> {
+  return invoke<LargeFileEntry[]>('scan_large_files', { topN, driveLetter });
 }
 
 /**

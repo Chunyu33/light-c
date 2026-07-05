@@ -97,11 +97,14 @@ pub fn get_categories() -> Vec<CategoryInfo> {
 pub async fn scan_large_files(
     window: Window,
     top_n: Option<usize>,
+    drive_letter: Option<String>,
 ) -> Result<Vec<big_files::LargeFileEntry>, String> {
     big_files::reset_cancelled();
     let window = window.clone();
-    let top_n = top_n.unwrap_or(50).clamp(10, 200);
-    tokio::task::spawn_blocking(move || big_files::scan(&window, top_n))
+    // 大文件列表会直接渲染到前端，命令层收敛数量，避免异常配置造成界面和扫描压力失控。
+    let top_n = top_n.unwrap_or(50).clamp(10, 500);
+    let drive_letter = normalize_large_file_drive_letter(drive_letter.as_deref())?;
+    tokio::task::spawn_blocking(move || big_files::scan(&window, top_n, drive_letter))
         .await
         .map_err(|e| format!("扫描任务异常: {}", e))?
 }
@@ -110,4 +113,24 @@ pub async fn scan_large_files(
 #[tauri::command]
 pub fn cancel_large_file_scan() {
     big_files::cancel();
+}
+
+fn normalize_large_file_drive_letter(value: Option<&str>) -> Result<char, String> {
+    // 前端只传盘符，但这里仍做兜底校验，避免手动调用命令时传入路径或特殊字符。
+    let raw = value
+        .and_then(|text| text.chars().find(|ch| ch.is_ascii_alphabetic()))
+        .unwrap_or_else(|| {
+            std::env::var("SYSTEMDRIVE")
+                .ok()
+                .and_then(|drive| drive.chars().find(|ch| ch.is_ascii_alphabetic()))
+                .unwrap_or('C')
+        })
+        .to_ascii_uppercase();
+
+    let root = format!("{}:\\", raw);
+    if !std::path::Path::new(&root).is_dir() {
+        return Err(format!("磁盘不存在或不可访问: {}", root));
+    }
+
+    Ok(raw)
 }

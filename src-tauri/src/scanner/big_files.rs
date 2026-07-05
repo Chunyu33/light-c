@@ -1,6 +1,6 @@
 // ============================================================================
 // 大文件扫描模块
-// 负责遍历系统盘，用最小堆收集 Top N 最大文件
+// 负责遍历用户选择的磁盘，用最小堆收集 Top N 最大文件
 // ============================================================================
 
 use serde::{Deserialize, Serialize};
@@ -80,13 +80,14 @@ pub(crate) fn is_cancelled() -> bool {
 }
 
 /// 执行大文件扫描（阻塞，应在 spawn_blocking 中调用）
-pub fn scan(window: &Window, top_n: usize) -> Result<Vec<LargeFileEntry>, String> {
+pub fn scan(window: &Window, top_n: usize, drive_letter: char) -> Result<Vec<LargeFileEntry>, String> {
     #[cfg(target_os = "windows")]
     {
         use std::time::Instant;
 
-        let system_drive = std::env::var("SYSTEMDRIVE").unwrap_or_else(|_| "C:".to_string());
-        let root = format!("{}\\", system_drive);
+        let drive_letter = drive_letter.to_ascii_uppercase();
+        // 所有扫描引擎共享同一个盘符根路径，避免前端切盘后 MFT 与 WalkDir 扫描目标不一致。
+        let root = format!("{}:\\", drive_letter);
 
         log::info!("开始扫描大文件: {} (Top {})", root, top_n);
 
@@ -95,7 +96,6 @@ pub fn scan(window: &Window, top_n: usize) -> Result<Vec<LargeFileEntry>, String
         // ========================================================================
         {
             use crate::scanner::big_files_engine::mft_core;
-            let drive_letter = system_drive.chars().next().unwrap_or('C');
             let is_admin = mft_core::is_elevated();
             let is_ntfs_drive = mft_core::is_ntfs(drive_letter);
 
@@ -142,6 +142,7 @@ pub fn scan(window: &Window, top_n: usize) -> Result<Vec<LargeFileEntry>, String
 
                 match crate::scanner::big_files_engine::mft_bigfiles::scan_top_files_via_mft(
                     top_n,
+                    drive_letter,
                     |progress| {
                         let _ = window.emit(
                             "large-file-scan:progress",
@@ -261,7 +262,7 @@ pub fn scan(window: &Window, top_n: usize) -> Result<Vec<LargeFileEntry>, String
                         found_count: heap.len(),
                         backend: "walkdir".into(),
                         stage: "walkdir".into(),
-                        message: "正在遍历系统盘文件".into(),
+                        message: format!("正在遍历 {} 盘文件", drive_letter),
                         elapsed_ms: 0,
                     };
                     let _ = window.emit("large-file-scan:progress", &progress);

@@ -11,7 +11,15 @@ import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
+import {
+  defaultDriveLetter,
+  DriveSelect,
+  driveDisplayName,
+  normalizeDriveLetter,
+  useLocalDrives,
+} from '../ui/DriveSelect';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
+import { useSettings } from '../../contexts';
 import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelText } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
@@ -25,6 +33,8 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('bigFiles');
   const { showToast } = useToast();
+  const { settings } = useSettings();
+  const { drives } = useLocalDrives();
 
   // 防止重复扫描
   const scanningRef = useRef(false);
@@ -45,6 +55,38 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [scanElapsed, setScanElapsed] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedDriveLetter, setSelectedDriveLetter] = useState('C:');
+  const selectedDriveLabel = driveDisplayName(selectedDriveLetter);
+
+  useEffect(() => {
+    if (drives.length > 0) {
+      setSelectedDriveLetter((current) => {
+        const normalized = normalizeDriveLetter(current);
+        return drives.some((drive) => drive.drive_letter === normalized)
+          ? normalized
+          : defaultDriveLetter(drives);
+      });
+    }
+  }, [drives]);
+
+  const resetBigFilesResult = useCallback(() => {
+    // 切换磁盘后旧结果已经不再对应当前目标盘，必须清空避免用户误删其他盘文件。
+    setFiles([]);
+    setSelectedFiles(new Set());
+    setCurrentPath('');
+    setScanBackend('');
+    setScanStage('');
+    setScanMessage('');
+    setBackendElapsedMs(0);
+    setScannedCount(0);
+    updateModuleState('bigFiles', { status: 'idle', error: null, fileCount: 0, totalSize: 0, progress: 0 });
+  }, [updateModuleState]);
+
+  const handleDriveChange = useCallback((driveLetter: string) => {
+    if (scanningRef.current) return;
+    setSelectedDriveLetter(normalizeDriveLetter(driveLetter));
+    resetBigFilesResult();
+  }, [resetBigFilesResult]);
 
   // 监听扫描进度事件
   useEffect(() => {
@@ -102,7 +144,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
     setSelectedFiles(new Set());
 
     try {
-      const results = await scanLargeFiles();
+      const results = await scanLargeFiles(settings.bigFilesScanLimit, selectedDriveLetter);
       setFiles(results);
 
       const totalSize = results.reduce((sum, f) => sum + f.size, 0);
@@ -119,7 +161,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
     } finally {
       scanningRef.current = false;
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [updateModuleState, setExpandedModule, settings.bigFilesScanLimit, selectedDriveLetter]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -273,6 +315,16 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const displayElapsedSeconds = isScanning
     ? scanElapsed
     : Math.round(backendElapsedMs / 1000);
+  const driveSelector = (
+    <div className="flex items-center gap-2 shrink-0" onClick={(event) => event.stopPropagation()}>
+      <DriveSelect
+        value={selectedDriveLetter}
+        drives={drives}
+        onChange={handleDriveChange}
+        disabled={isScanning}
+      />
+    </div>
+  );
 
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
     return null;
@@ -319,7 +371,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
         forceExpanded={layoutMode === 'pages'}
         id="bigFiles"
         title="大文件清理"
-        description="扫描系统盘体积最大的文件，快速释放存储空间"
+        description={`扫描 ${selectedDriveLabel} 体积最大的文件，快速释放存储空间`}
         icon={<FileBox className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -328,6 +380,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'bigFiles')}
         onScan={handleScan}
         error={moduleState.error}
+        titleExtra={driveSelector}
         headerExtra={
           <>
             {isScanning && (
@@ -417,8 +470,8 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 </span>
               )}
               <p className="text-sm font-medium text-[var(--fg-secondary)]">
-                {scanBackend === 'mft' ? 'MFT全量模式扫描系统盘...'
-                  : scanBackend === 'walkdir' ? '正在遍历系统盘文件...'
+                {scanBackend === 'mft' ? `MFT全量模式扫描${selectedDriveLabel}...`
+                  : scanBackend === 'walkdir' ? `正在遍历${selectedDriveLabel}文件...`
                   : '正在扫描中...'}
               </p>
               <p className="text-xs text-[var(--fg-muted)] mt-1">
