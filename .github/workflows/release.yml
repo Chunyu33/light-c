@@ -50,11 +50,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.11.1'
+          releaseName: 'LightC v2.11.2'
           releaseBody: |
             ## 更新内容
-            - 修复新增 WebView2 离线安装包后，常规安装版完整性校验可能误报签名不一致的问题
-            - 安装版完整性校验同时兼容常规安装包与 WebView2 离线安装包的 exe 签名资产
+            - 磁盘变化分析功能新增 '变化时间' 字段显示
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false

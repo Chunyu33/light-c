@@ -103,6 +103,30 @@ function formatPreviousScanTime(scanSummary: DiskGrowthScanResponse): string {
   return scanSummary.previous_scan_time || '暂无历史快照';
 }
 
+function formatModifiedTime(timestamp?: number | null, compact = false): string {
+  if (!timestamp) return '-';
+  const normalizedTimestamp = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
+  const date = new Date(normalizedTimestamp);
+  if (Number.isNaN(date.getTime())) return '-';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return compact ? `${month}-${day} ${hours}:${minutes}` : `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+function buildPathTitle(path: string, modified?: number | null, extraLine?: string): string {
+  const lines = [path];
+  if (extraLine) lines.push(extraLine);
+  const modifiedText = formatModifiedTime(modified);
+  if (modifiedText !== '-') {
+    // title 支持换行，路径很长时把真实修改时间单独放一行，避免关键信息被长路径淹没。
+    lines.push(`变化时间：${modifiedText}`);
+  }
+  return lines.join('\n');
+}
+
 function normalizeDiskPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
 }
@@ -117,6 +141,7 @@ function buildChildGrowthEntry(parent: DiskGrowthEntry, path: string): DiskGrowt
     new_size: detail.new_size,
     diff: detail.diff,
     diff_percent: detail.old_size > 0 ? (detail.diff / detail.old_size) * 100 : 100,
+    modified: detail.modified,
     level: detail.level,
     explanation: `${style.label}，空间${detail.diff > 0 ? '增加' : '减少'} ${formatSize(Math.abs(detail.diff))}`,
     suggestion: '建议继续查看文件级变化或打开目录确认来源',
@@ -291,6 +316,7 @@ function entryFromGrowth(growth: DiskGrowthEntry): DiskGrowthAnalyzeEntry {
     path: growth.path,
     size: growth.new_size,
     category: '变化目录',
+    modified: growth.modified,
     risk: 'safe',
     action: 'ignore',
     reason: growth.explanation,
@@ -316,6 +342,10 @@ function ChangeRow({
   const style = growth ? getGrowthStyle(growth.level) : getGrowthStyle('stable');
   const Icon = style.icon;
   const diff = growth?.diff ?? 0;
+  const modified = growth?.modified ?? entry.modified;
+  const modifiedTimeLabel = formatModifiedTime(modified, true);
+  const modifiedTimeTitle = formatModifiedTime(modified);
+  const rowTitle = buildPathTitle(entry.path, modified, growth?.explanation ?? entry.reason);
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors group">
@@ -328,7 +358,7 @@ function ChangeRow({
       <div className="flex-1 min-w-0">
         <p
           className="text-[13px] text-[var(--text-primary)] truncate cursor-pointer hover:text-[var(--brand-green)] transition-colors"
-          title={entry.path}
+          title={rowTitle}
           onClick={() => onOpenFolder(entry.path)}
         >
           {simplifyPath(entry.path)}
@@ -338,8 +368,11 @@ function ChangeRow({
         </p>
       </div>
 
-      <span className="px-2 py-0.5 rounded text-[11px] bg-[var(--bg-hover)] text-[var(--text-muted)] shrink-0">
-        {entry.category}
+      <span
+        className="w-20 text-center text-[11px] text-[var(--text-muted)] tabular-nums shrink-0"
+        title={modifiedTimeTitle === '-' ? '旧快照未记录变化时间' : `变化时间：${modifiedTimeTitle}`}
+      >
+        {modifiedTimeLabel}
       </span>
 
       <span className={`flex items-center gap-1 w-24 justify-end text-[12px] shrink-0 ${style.color}`}>
@@ -622,8 +655,8 @@ function DiskGrowthDetailsModal({
                           style={{ transform: `translateY(${virtualItem.start}px)`, height: `${virtualItem.size}px` }}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] text-[var(--text-primary)] truncate" title={detail.path}>{detail.name}</p>
-                            <p className="text-[11px] text-[var(--text-faint)] truncate" title={detail.path}>{detail.path}</p>
+                            <p className="text-[13px] text-[var(--text-primary)] truncate" title={buildPathTitle(detail.path, detail.modified)}>{detail.name}</p>
+                            <p className="text-[11px] text-[var(--text-faint)] truncate" title={buildPathTitle(detail.path, detail.modified)}>{detail.path}</p>
                           </div>
                           <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(detail.new_size)}</span>
                           <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${detailStyle.color}`}>{formatDiff(detail.diff)}</span>
@@ -688,8 +721,8 @@ function DiskGrowthDetailsModal({
                           style={{ transform: `translateY(${virtualItem.start}px)`, height: `${virtualItem.size}px` }}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] text-[var(--text-primary)] truncate" title={file.path}>{file.name}</p>
-                            <p className="text-[11px] text-[var(--text-faint)] truncate" title={file.path}>{file.path}</p>
+                            <p className="text-[13px] text-[var(--text-primary)] truncate" title={buildPathTitle(file.path, file.modified)}>{file.name}</p>
+                            <p className="text-[11px] text-[var(--text-faint)] truncate" title={buildPathTitle(file.path, file.modified)}>{file.path}</p>
                           </div>
                           <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(file.new_size)}</span>
                           <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${fileStyle.color}`}>{formatDiff(file.diff)}</span>
@@ -1077,7 +1110,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
             <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] uppercase tracking-wider">
               <div className="w-1.5 shrink-0" />
               <div className="flex-1">路径</div>
-              <div className="w-16 shrink-0 text-center">分类</div>
+              <div className="w-20 shrink-0 text-center">变化时间</div>
               <div className="w-24 shrink-0 text-right">变化级别</div>
               <div className="w-20 shrink-0 text-right">当前大小</div>
               <div className="w-24 shrink-0 text-right">变化量</div>

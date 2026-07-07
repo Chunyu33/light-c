@@ -196,6 +196,11 @@ body {
   -webkit-user-select: none;
 }
 
+::selection {
+  background-color: var(--brand-green);
+  color: #ffffff;
+}
+
 /* 平滑过渡 */
 * {
   transition-property: background-color, border-color, color, fill, stroke, font-size;

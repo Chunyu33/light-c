@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::os::windows::fs::{FileExt, OpenOptionsExt};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::time::Instant;
+use std::time::{Instant, UNIX_EPOCH};
 
 use winapi::shared::minwindef::{DWORD, LPVOID};
 use winapi::shared::ntdef::HANDLE;
@@ -35,6 +35,7 @@ const MFT_METADATA_MAX: u64 = 25;
 const DEFAULT_MAX_DEPTH: u8 = 4;
 const METADATA_PROGRESS_STEP: usize = 10_000;
 const MFT_SIZE_READ_CHUNK: usize = 16 * 1024 * 1024;
+const WINDOWS_TO_UNIX_SECONDS: i64 = 11_644_473_600;
 
 static DISK_GROWTH_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 
@@ -87,12 +88,19 @@ pub(crate) struct FileSizeRecord {
     pub(crate) parent_id: u64,
     pub(crate) path: String,
     pub(crate) size: u64,
+    pub(crate) modified: i64,
 }
 
 struct FileSizeCollection {
     records: Vec<FileSizeRecord>,
     mft_size_count: usize,
     metadata_fallback_count: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FileRecordMetadata {
+    size: u64,
+    modified: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -121,12 +129,15 @@ pub struct DirSizeEntry {
     pub path: String,
     pub size: u64,
     pub depth: u8,
+    pub modified: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileSnapshotEntry {
     pub path: String,
     pub size: u64,
+    #[serde(default)]
+    pub modified: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -555,9 +566,9 @@ where
     let mft_size_count = AtomicUsize::new(0);
     let metadata_fallback_count = AtomicUsize::new(0);
     let wanted_mft_ids: HashSet<u64> = file_records.iter().map(|record| record.mft_id).collect();
-    let mft_size_map = NtfsFileSizeReader::open(drive_letter)
+    let mft_metadata_map = NtfsFileSizeReader::open(drive_letter)
         .ok()
-        .map(|reader| reader.read_file_size_map(&wanted_mft_ids, progress, scan_start))
+        .map(|reader| reader.read_file_metadata_map(&wanted_mft_ids, progress, scan_start))
         .unwrap_or_default();
     let threads = metadata_thread_count();
     let read_sizes = || {
@@ -579,23 +590,32 @@ where
                     );
                 }
 
-                // 优先使用顺序扫描 $MFT 得到的大小表，避免每个文件随机 seek 读取 FILE record。
+                // 优先使用顺序扫描 $MFT 得到的大小和修改时间，避免每个文件随机 seek 读取 FILE record。
                 // 少数解析不到的记录再回退 metadata，保证准确性和兼容性。
-                let size = if let Some(size) = mft_size_map.get(&record.mft_id).copied() {
+                let metadata = if let Some(metadata) = mft_metadata_map.get(&record.mft_id).copied()
+                {
                     mft_size_count.fetch_add(1, Ordering::Relaxed);
-                    size
+                    metadata
                 } else {
-                    let size = fs::metadata(&record.path).ok()?.len();
+                    let metadata = fs::metadata(&record.path).ok()?;
+                    let size = metadata.len();
+                    let modified = metadata
+                        .modified()
+                        .ok()
+                        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+                        .map(|duration| duration.as_secs() as i64)
+                        .unwrap_or(0);
                     metadata_fallback_count.fetch_add(1, Ordering::Relaxed);
-                    size
+                    FileRecordMetadata { size, modified }
                 };
-                if size == 0 {
+                if metadata.size == 0 {
                     return None;
                 }
                 Some(FileSizeRecord {
                     parent_id: record.parent_id,
                     path: normalize_path(&record.path),
-                    size,
+                    size: metadata.size,
+                    modified: metadata.modified,
                 })
             })
             .collect()
@@ -619,6 +639,7 @@ fn aggregate_directories(
     max_depth: u8,
 ) -> Vec<DirSizeEntry> {
     let mut size_by_dir: HashMap<u64, u64> = HashMap::new();
+    let mut modified_by_dir: HashMap<u64, i64> = HashMap::new();
 
     for record in file_sizes {
         let mut current_id = record.parent_id;
@@ -627,6 +648,11 @@ fn aggregate_directories(
         while let Some(directory) = directory_index.get(&current_id) {
             if directory.depth <= max_depth {
                 *size_by_dir.entry(current_id).or_insert(0) += record.size;
+                // 目录本身的 mtime 在 Windows 上不一定反映子文件变化；这里聚合子树内最新文件修改时间，更贴近用户关心的“变化时间”。
+                let modified = modified_by_dir.entry(current_id).or_insert(0);
+                if record.modified > *modified {
+                    *modified = record.modified;
+                }
             }
 
             if directory.parent_id == 0 || directory.parent_id == current_id {
@@ -650,6 +676,7 @@ fn aggregate_directories(
                 depth: directory.depth,
                 path: directory.path.clone(),
                 size,
+                modified: modified_by_dir.get(&directory_id).copied().unwrap_or(0),
             })
         })
         .collect();
@@ -730,16 +757,16 @@ impl NtfsFileSizeReader {
         parse_file_record_data_runs(&record)
     }
 
-    fn read_file_size_map<F>(
+    fn read_file_metadata_map<F>(
         &self,
         wanted_mft_ids: &HashSet<u64>,
         progress: &F,
         scan_start: &Instant,
-    ) -> HashMap<u64, u64>
+    ) -> HashMap<u64, FileRecordMetadata>
     where
         F: Fn(DiskGrowthScanProgress) + Sync,
     {
-        let mut size_by_mft_id = HashMap::with_capacity(wanted_mft_ids.len());
+        let mut metadata_by_mft_id = HashMap::with_capacity(wanted_mft_ids.len());
         let mut next_record_id = 0u64;
 
         for run in &self.mft_runs {
@@ -759,7 +786,7 @@ impl NtfsFileSizeReader {
 
             while bytes_read_in_run < run_bytes {
                 if is_disk_growth_cancelled() {
-                    return size_by_mft_id;
+                    return metadata_by_mft_id;
                 }
                 let remaining = (run_bytes - bytes_read_in_run) as usize;
                 let read_len = remaining.min(buffer.len());
@@ -783,8 +810,8 @@ impl NtfsFileSizeReader {
                     if wanted_mft_ids.contains(&next_record_id) {
                         let mut record = record_bytes.to_vec();
                         if self.apply_fixup(&mut record).is_some() {
-                            if let Some(size) = parse_file_record_data_size(&record) {
-                                size_by_mft_id.insert(next_record_id, size);
+                            if let Some(metadata) = parse_file_record_metadata(&record) {
+                                metadata_by_mft_id.insert(next_record_id, metadata);
                             }
                         }
                     }
@@ -801,8 +828,8 @@ impl NtfsFileSizeReader {
                         );
                     }
 
-                    if size_by_mft_id.len() >= wanted_mft_ids.len() {
-                        return size_by_mft_id;
+                    if metadata_by_mft_id.len() >= wanted_mft_ids.len() {
+                        return metadata_by_mft_id;
                     }
                 }
 
@@ -813,7 +840,7 @@ impl NtfsFileSizeReader {
                 records_in_run.saturating_sub(bytes_read_in_run / self.file_record_size as u64);
         }
 
-        size_by_mft_id
+        metadata_by_mft_id
     }
 
     fn apply_fixup(&self, record: &mut [u8]) -> Option<()> {
@@ -847,9 +874,12 @@ impl NtfsFileSizeReader {
     }
 }
 
-fn parse_file_record_data_size(record: &[u8]) -> Option<u64> {
+fn parse_file_record_metadata(record: &[u8]) -> Option<FileRecordMetadata> {
     let attributes_offset = read_u16(record, 20)? as usize;
     let mut offset = attributes_offset;
+    let mut modified = 0i64;
+    let mut unnamed_data_size = None;
+    let mut fallback_data_size = None;
 
     while offset + 16 <= record.len() {
         let attribute_type = read_u32(record, offset)?;
@@ -862,19 +892,43 @@ fn parse_file_record_data_size(record: &[u8]) -> Option<u64> {
             return None;
         }
 
+        if attribute_type == 0x10 && modified == 0 {
+            modified = parse_standard_info_modified(record, offset).unwrap_or(0);
+        }
+
         if attribute_type == 0x80 {
-            let non_resident = *record.get(offset + 8)?;
-            return if non_resident == 0 {
-                read_u32(record, offset + 16).map(|size| size as u64)
-            } else {
-                read_u64(record, offset + 48)
-            };
+            let name_length = *record.get(offset + 9)?;
+            let size = parse_data_attribute_size(record, offset);
+            if name_length == 0 {
+                unnamed_data_size = size;
+                break;
+            } else if fallback_data_size.is_none() {
+                // 没有主数据流时才使用备用数据流，避免 ADS 抢占普通文件大小。
+                fallback_data_size = size;
+            }
         }
 
         offset += attribute_length;
     }
 
-    None
+    let size = unnamed_data_size.or(fallback_data_size)?;
+    Some(FileRecordMetadata { size, modified })
+}
+
+fn parse_standard_info_modified(record: &[u8], attribute_offset: usize) -> Option<i64> {
+    let value_offset = read_u16(record, attribute_offset + 20)? as usize;
+    let value_start = attribute_offset + value_offset;
+    let modified_filetime = read_u64(record, value_start + 8)?;
+    Some(filetime_to_unix_seconds(modified_filetime))
+}
+
+fn parse_data_attribute_size(record: &[u8], attribute_offset: usize) -> Option<u64> {
+    let non_resident = *record.get(attribute_offset + 8)?;
+    if non_resident == 0 {
+        read_u32(record, attribute_offset + 16).map(|size| size as u64)
+    } else {
+        read_u64(record, attribute_offset + 48)
+    }
 }
 
 fn parse_file_record_data_runs(record: &[u8]) -> Option<Vec<DataRun>> {
@@ -956,6 +1010,11 @@ fn decode_file_record_size(raw: i8, cluster_size: u64) -> usize {
     } else {
         1usize << (-raw as usize)
     }
+}
+
+fn filetime_to_unix_seconds(filetime: u64) -> i64 {
+    let seconds = (filetime / 10_000_000) as i64 - WINDOWS_TO_UNIX_SECONDS;
+    seconds.max(0)
 }
 
 fn read_u16(buffer: &[u8], offset: usize) -> Option<u16> {
