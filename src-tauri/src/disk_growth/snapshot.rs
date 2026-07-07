@@ -22,6 +22,8 @@ pub struct DiskSnapshotEntry {
     pub path: String,
     pub size: u64,
     pub depth: u8,
+    #[serde(default)]
+    pub modified: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +45,8 @@ pub struct DiskFileShardEntry {
     pub parent: String,
     pub name: String,
     pub size: u64,
+    #[serde(default)]
+    pub modified: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +54,13 @@ pub struct FileSnapshotDiffEntry {
     pub path: String,
     pub old_size: u64,
     pub new_size: u64,
+    pub modified: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ShardSnapshotValue {
+    size: u64,
+    modified: i64,
 }
 
 struct SubtreeDiffCollector {
@@ -309,6 +320,7 @@ impl DiskSnapshotManager {
                 parent,
                 name,
                 size: entry.size,
+                modified: entry.modified,
             };
             serde_json::to_writer(&mut *writer, &row)
                 .map_err(|e| format!("写入文件级快照分片失败: {}", e))?;
@@ -348,6 +360,7 @@ impl DiskSnapshotManager {
                 entries.push(FileSnapshotEntry {
                     path: format!("{}/{}", row.parent.trim_end_matches('/'), row.name),
                     size: row.size,
+                    modified: row.modified,
                 });
             }
         }
@@ -369,13 +382,19 @@ impl DiskSnapshotManager {
             let current_shard_path = current_shard_dir.join(&shard_name);
             let mut previous_map = load_shard_prefix_map(&previous_shard_path, parent_prefix)?;
 
-            for (path, new_size) in load_shard_prefix_map(&current_shard_path, parent_prefix)? {
-                let old_size = previous_map.remove(&path).unwrap_or(0);
-                collector.push(path, old_size, new_size);
+            for (path, current_entry) in load_shard_prefix_map(&current_shard_path, parent_prefix)?
+            {
+                let previous_entry = previous_map.remove(&path);
+                collector.push(
+                    path,
+                    previous_entry.map(|entry| entry.size).unwrap_or(0),
+                    current_entry.size,
+                    current_entry.modified,
+                );
             }
 
-            for (path, old_size) in previous_map {
-                collector.push(path, old_size, 0);
+            for (path, previous_entry) in previous_map {
+                collector.push(path, previous_entry.size, 0, previous_entry.modified);
             }
         }
         Ok(collector.finish())
@@ -411,6 +430,7 @@ fn snapshot_entry_from_dir(entry: &DirSizeEntry) -> DiskSnapshotEntry {
         path: normalize_path(&entry.path),
         size: entry.size,
         depth: entry.depth,
+        modified: entry.modified,
     }
 }
 
@@ -439,7 +459,7 @@ impl SubtreeDiffCollector {
         }
     }
 
-    fn push(&mut self, path: String, old_size: u64, new_size: u64) {
+    fn push(&mut self, path: String, old_size: u64, new_size: u64, modified: i64) {
         if old_size == new_size {
             return;
         }
@@ -450,6 +470,7 @@ impl SubtreeDiffCollector {
             path,
             old_size,
             new_size,
+            modified,
         };
 
         if self.entries.len() < self.max_entries {
@@ -489,7 +510,7 @@ fn compare_diff_entry(
 fn load_shard_prefix_map(
     shard_path: &Path,
     parent_prefix: &str,
-) -> Result<HashMap<String, u64>, String> {
+) -> Result<HashMap<String, ShardSnapshotValue>, String> {
     let mut entries = HashMap::new();
     if !shard_path.exists() {
         return Ok(entries);
@@ -510,7 +531,10 @@ fn load_shard_prefix_map(
         if row.parent.starts_with(parent_prefix) {
             entries.insert(
                 format!("{}/{}", row.parent.trim_end_matches('/'), row.name),
-                row.size,
+                ShardSnapshotValue {
+                    size: row.size,
+                    modified: row.modified,
+                },
             );
         }
     }
@@ -524,11 +548,19 @@ fn collect_subtree_legacy_diffs(
     max_entries: usize,
 ) -> (Vec<FileSnapshotDiffEntry>, usize) {
     let mut collector = SubtreeDiffCollector::new(max_entries);
-    let mut previous_map: HashMap<String, u64> = previous_snapshot
+    let mut previous_map: HashMap<String, ShardSnapshotValue> = previous_snapshot
         .file_entries
         .iter()
         .filter(|entry| normalize_path(&entry.path).starts_with(parent_prefix))
-        .map(|entry| (normalize_path(&entry.path), entry.size))
+        .map(|entry| {
+            (
+                normalize_path(&entry.path),
+                ShardSnapshotValue {
+                    size: entry.size,
+                    modified: entry.modified,
+                },
+            )
+        })
         .collect();
 
     for entry in current_snapshot
@@ -537,12 +569,17 @@ fn collect_subtree_legacy_diffs(
         .filter(|entry| normalize_path(&entry.path).starts_with(parent_prefix))
     {
         let path = normalize_path(&entry.path);
-        let old_size = previous_map.remove(&path).unwrap_or(0);
-        collector.push(path, old_size, entry.size);
+        let previous_entry = previous_map.remove(&path);
+        collector.push(
+            path,
+            previous_entry.map(|entry| entry.size).unwrap_or(0),
+            entry.size,
+            entry.modified,
+        );
     }
 
-    for (path, old_size) in previous_map {
-        collector.push(path, old_size, 0);
+    for (path, previous_entry) in previous_map {
+        collector.push(path, previous_entry.size, 0, previous_entry.modified);
     }
 
     collector.finish()

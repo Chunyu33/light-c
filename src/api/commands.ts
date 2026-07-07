@@ -1014,6 +1014,8 @@ export interface DiskGrowthDetailEntry {
   new_size: number;
   /** 与上次快照相比的变化量，正数为新增，负数为减少 */
   diff: number;
+  /** 该目录子树内最新文件修改时间，Unix 秒；旧快照缺失时为 0 */
+  modified: number;
   /** 明细变化级别 */
   level: 'significant' | 'fast' | 'minor' | 'stable' | 'decreased' | 'new';
 }
@@ -1029,6 +1031,8 @@ export interface DiskGrowthFileDetailEntry {
   new_size: number;
   /** 与上次快照相比的变化量，正数为新增，负数为减少 */
   diff: number;
+  /** 文件最后修改时间，Unix 秒；旧快照缺失时为 0 */
+  modified: number;
   /** 文件变化级别 */
   level: 'significant' | 'fast' | 'minor' | 'stable' | 'decreased' | 'new';
 }
@@ -1080,6 +1084,8 @@ export interface DiskGrowthEntry {
   new_size: number;
   /** 与上次快照相比的变化量，正数为新增，负数为减少 */
   diff: number;
+  /** 该目录子树内最新文件修改时间，Unix 秒；旧快照缺失时为 0 */
+  modified: number;
   /** 相对上次快照的变化百分比 */
   diff_percent: number;
   /** 用于前端提示强弱，避免把小波动渲染成高风险 */
@@ -1122,6 +1128,8 @@ export interface DiskGrowthAnalyzeEntry {
   depth?: number;
   /** 目录分类，仅用于帮助用户定位来源 */
   category: string;
+  /** 该目录子树内最新文件修改时间，Unix 秒；旧快照缺失时为 0 */
+  modified: number;
   /** 变化或占用原因说明 */
   reason: string;
   /** 排查建议，不承诺可删除 */

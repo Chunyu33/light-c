@@ -37,6 +37,12 @@ pub enum DiskGrowthLevel {
     New,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SnapshotValue {
+    size: u64,
+    modified: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskGrowthDetailEntry {
     pub path: String,
@@ -44,6 +50,7 @@ pub struct DiskGrowthDetailEntry {
     pub old_size: u64,
     pub new_size: u64,
     pub diff: i64,
+    pub modified: i64,
     pub level: DiskGrowthLevel,
 }
 
@@ -54,6 +61,7 @@ pub struct DiskGrowthEntry {
     pub new_size: u64,
     pub diff: i64,
     pub diff_percent: f64,
+    pub modified: i64,
     pub level: DiskGrowthLevel,
     pub explanation: String,
     pub suggestion: String,
@@ -78,6 +86,7 @@ pub struct DiskAnalyzeEntry {
     pub size: u64,
     pub depth: u8,
     pub category: String,
+    pub modified: i64,
     pub reason: String,
     pub suggestion: String,
 }
@@ -114,6 +123,7 @@ pub struct DiskGrowthFileDetailEntry {
     pub old_size: u64,
     pub new_size: u64,
     pub diff: i64,
+    pub modified: i64,
     pub level: DiskGrowthLevel,
 }
 
@@ -266,6 +276,7 @@ pub fn get_file_change_details(
                     old_size: entry.old_size,
                     new_size: entry.new_size,
                     diff,
+                    modified: entry.modified,
                     level: determine_level(diff, entry.old_size),
                 }
             })
@@ -299,20 +310,27 @@ fn build_file_detail_entries(
     previous_entries: &[FileSnapshotEntry],
     current_entries: &[FileSnapshotEntry],
 ) -> Vec<DiskGrowthFileDetailEntry> {
-    let previous_map = file_snapshot_map(&previous_entries);
-    let current_map = file_snapshot_map(&current_entries);
+    let previous_map = file_snapshot_map(previous_entries);
+    let current_map = file_snapshot_map(current_entries);
     let mut all_paths: HashSet<String> = previous_map.keys().cloned().collect();
     all_paths.extend(current_map.keys().cloned());
 
     all_paths
         .into_iter()
         .filter_map(|file_path| {
-            let old_size = previous_map.get(&file_path).copied().unwrap_or(0);
-            let new_size = current_map.get(&file_path).copied().unwrap_or(0);
+            let previous_value = previous_map.get(&file_path).copied();
+            let current_value = current_map.get(&file_path).copied();
+            let old_size = previous_value.map(|value| value.size).unwrap_or(0);
+            let new_size = current_value.map(|value| value.size).unwrap_or(0);
             let diff = new_size as i64 - old_size as i64;
             if diff == 0 {
                 return None;
             }
+            // 删除或减少时当前快照可能没有该文件，退回上次快照的最后已知修改时间。
+            let modified = current_value
+                .map(|value| value.modified)
+                .or_else(|| previous_value.map(|value| value.modified))
+                .unwrap_or(0);
 
             Some(DiskGrowthFileDetailEntry {
                 name: display_name_from_path(&file_path),
@@ -320,6 +338,7 @@ fn build_file_detail_entries(
                 old_size,
                 new_size,
                 diff,
+                modified,
                 level: determine_level(diff, old_size),
             })
         })
@@ -388,10 +407,16 @@ pub fn compare_snapshots(
         .into_iter()
         .filter(|path| !is_root_path(path))
         .filter_map(|path| {
-            let old_size = previous_map.get(&path).copied().unwrap_or(0);
-            let new_size = current_map.get(&path).copied().unwrap_or(0);
+            let previous_value = previous_map.get(&path).copied();
+            let current_value = current_map.get(&path).copied();
+            let old_size = previous_value.map(|value| value.size).unwrap_or(0);
+            let new_size = current_value.map(|value| value.size).unwrap_or(0);
+            let modified = current_value
+                .map(|value| value.modified)
+                .or_else(|| previous_value.map(|value| value.modified))
+                .unwrap_or(0);
             let details = build_detail_entries(&path, &previous_children, &current_children);
-            create_growth_entry(path, old_size, new_size, details)
+            create_growth_entry(path, old_size, new_size, modified, details)
         })
         .collect();
 
@@ -478,17 +503,33 @@ fn first_scan_report(current: &DiskSnapshot, drive_label: &str) -> DiskGrowthRep
     }
 }
 
-fn snapshot_map(entries: &[DiskSnapshotEntry]) -> HashMap<String, u64> {
+fn snapshot_map(entries: &[DiskSnapshotEntry]) -> HashMap<String, SnapshotValue> {
     entries
         .iter()
-        .map(|entry| (entry.path.clone(), entry.size))
+        .map(|entry| {
+            (
+                entry.path.clone(),
+                SnapshotValue {
+                    size: entry.size,
+                    modified: entry.modified,
+                },
+            )
+        })
         .collect()
 }
 
-fn file_snapshot_map(entries: &[FileSnapshotEntry]) -> HashMap<String, u64> {
+fn file_snapshot_map(entries: &[FileSnapshotEntry]) -> HashMap<String, SnapshotValue> {
     entries
         .iter()
-        .map(|entry| (entry.path.clone(), entry.size))
+        .map(|entry| {
+            (
+                entry.path.clone(),
+                SnapshotValue {
+                    size: entry.size,
+                    modified: entry.modified,
+                },
+            )
+        })
         .collect()
 }
 
@@ -526,25 +567,30 @@ fn remove_redundant_parent_entries(entries: &mut Vec<DiskGrowthEntry>) {
     });
 }
 
-fn direct_child_map(entries: &[DiskSnapshotEntry]) -> HashMap<String, HashMap<String, u64>> {
-    let mut child_map: HashMap<String, HashMap<String, u64>> = HashMap::new();
+fn direct_child_map(
+    entries: &[DiskSnapshotEntry],
+) -> HashMap<String, HashMap<String, SnapshotValue>> {
+    let mut child_map: HashMap<String, HashMap<String, SnapshotValue>> = HashMap::new();
     for entry in entries {
         let Some(parent) = parent_path(&entry.path) else {
             continue;
         };
         // 变化明细只展示直接子目录，避免把所有后代目录重复摊开造成列表噪音。
-        child_map
-            .entry(parent)
-            .or_default()
-            .insert(entry.path.clone(), entry.size);
+        child_map.entry(parent).or_default().insert(
+            entry.path.clone(),
+            SnapshotValue {
+                size: entry.size,
+                modified: entry.modified,
+            },
+        );
     }
     child_map
 }
 
 fn build_detail_entries(
     parent: &str,
-    previous_children: &HashMap<String, HashMap<String, u64>>,
-    current_children: &HashMap<String, HashMap<String, u64>>,
+    previous_children: &HashMap<String, HashMap<String, SnapshotValue>>,
+    current_children: &HashMap<String, HashMap<String, SnapshotValue>>,
 ) -> Vec<DiskGrowthDetailEntry> {
     let mut details = build_detail_entries_unlimited(parent, previous_children, current_children);
     details.truncate(MAX_DETAIL_ENTRIES);
@@ -553,8 +599,8 @@ fn build_detail_entries(
 
 fn build_detail_entries_unlimited(
     parent: &str,
-    previous_children: &HashMap<String, HashMap<String, u64>>,
-    current_children: &HashMap<String, HashMap<String, u64>>,
+    previous_children: &HashMap<String, HashMap<String, SnapshotValue>>,
+    current_children: &HashMap<String, HashMap<String, SnapshotValue>>,
 ) -> Vec<DiskGrowthDetailEntry> {
     let previous = previous_children.get(parent);
     let current = current_children.get(parent);
@@ -570,15 +616,18 @@ fn build_detail_entries_unlimited(
     let mut details: Vec<DiskGrowthDetailEntry> = all_paths
         .into_iter()
         .filter_map(|path| {
-            let old_size = previous
-                .and_then(|map| map.get(&path))
-                .copied()
-                .unwrap_or(0);
-            let new_size = current.and_then(|map| map.get(&path)).copied().unwrap_or(0);
+            let previous_value = previous.and_then(|map| map.get(&path)).copied();
+            let current_value = current.and_then(|map| map.get(&path)).copied();
+            let old_size = previous_value.map(|value| value.size).unwrap_or(0);
+            let new_size = current_value.map(|value| value.size).unwrap_or(0);
             let diff = new_size as i64 - old_size as i64;
             if diff == 0 {
                 return None;
             }
+            let modified = current_value
+                .map(|value| value.modified)
+                .or_else(|| previous_value.map(|value| value.modified))
+                .unwrap_or(0);
 
             Some(DiskGrowthDetailEntry {
                 name: display_name_from_path(&path),
@@ -586,6 +635,7 @@ fn build_detail_entries_unlimited(
                 old_size,
                 new_size,
                 diff,
+                modified,
                 level: determine_level(diff, old_size),
             })
         })
@@ -623,6 +673,7 @@ fn create_growth_entry(
     path: String,
     old_size: u64,
     new_size: u64,
+    modified: i64,
     details: Vec<DiskGrowthDetailEntry>,
 ) -> Option<DiskGrowthEntry> {
     let diff = new_size as i64 - old_size as i64;
@@ -648,6 +699,7 @@ fn create_growth_entry(
         new_size,
         diff,
         diff_percent,
+        modified,
         level,
         explanation,
         suggestion,
@@ -684,6 +736,7 @@ fn build_analyze_entries(
                 size: entry.size,
                 depth: entry.depth,
                 category: classify_path(&entry.path),
+                modified: entry.modified,
                 reason: "当前占用较大的目录".to_string(),
                 suggestion: "下次扫描后会显示该目录的空间变化".to_string(),
             })
@@ -698,6 +751,7 @@ fn build_analyze_entries(
             size: entry.new_size,
             depth: path_depth(&entry.path),
             category: classify_path(&entry.path),
+            modified: entry.modified,
             reason: entry.explanation.clone(),
             suggestion: entry.suggestion.clone(),
         })
