@@ -454,7 +454,9 @@ npm run tauri build
 
 ### 便携版更新策略
 
-- 安装版保留 Tauri 自动更新，继续使用 `latest.json` 和签名包完成更新；WebView2 异常或安装时网络受限的用户可改用 `LightC_webview2_offline_x64.exe`。
+- 常规安装包不再联网自动下载 WebView2 Runtime；安装前会检测本机 WebView2，缺失时提示用户改用 `LightC_webview2_offline_x64.exe` 或先安装 WebView2 Runtime，避免微软 bootstrapper 在部分环境里创建额外 Edge 快捷方式。
+- 安装版保留 Tauri 自动更新，继续使用 `latest.json` 和签名包完成更新；自动更新或覆盖安装前会尝试关闭残留的 `LightC.exe`，降低目标 exe 被占用导致安装失败的概率。
+- WebView2 异常或安装时网络受限的用户可改用 `LightC_webview2_offline_x64.exe`。
 - 完整性校验不复用更新包签名，而是读取当前版本 Release 中的 exe 专用签名资产，避免把 zip/updater 包签名误用于运行中 exe。
 - 便携版由发布流程写入 `LightC.portable` 标记文件，运行时识别后不会自动弹出更新安装器。
 - 便携版“检查更新”入口会优先读取 Release 的 `download.json` 并打开作者网盘下载页，用户下载新版 zip 后覆盖当前目录即可；读取失败时降级到 GitHub Releases。

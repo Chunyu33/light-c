@@ -51,11 +51,15 @@
     ],
     "createUpdaterArtifacts": true,
     "windows": {
+      "webviewInstallMode": {
+        "type": "skip"
+      },
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "headerImage": "nsis/header.bmp",
         "sidebarImage": "nsis/wizard.bmp",
         "installMode": "currentUser",
+        "installerHooks": "nsis/installer-hooks.nsh",
         "languages": ["SimpChinese", "English"],
         "displayLanguageSelector": false
       }

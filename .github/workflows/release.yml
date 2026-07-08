@@ -53,7 +53,8 @@ jobs:
           releaseName: 'LightC v2.11.2'
           releaseBody: |
             ## 更新内容
-            - 磁盘变化分析功能新增 '变化时间' 字段显示
+            - 调整常规安装包 WebView2 策略：缺失时提示使用离线包，不再自动联网下载
+            - 安装前主动关闭残留 LightC.exe，降低自动更新覆盖安装时文件占用失败
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false
@@ -121,6 +122,9 @@ jobs:
                 webviewInstallMode = @{
                   type = "offlineInstaller"
                   silent = $true
+                }
+                nsis = @{
+                  installerHooks = "nsis/installer-hooks-webview2-offline.nsh"
                 }
               }
             }
