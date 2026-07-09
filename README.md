@@ -60,7 +60,7 @@
 
 ### 🚀 系统瘦身（需管理员权限）
 - **休眠文件管理**：一键关闭/开启休眠功能，释放与内存等量的空间（8-32GB）
-- **系统组件清理**：检查页对 DISM 组件存储分析使用短超时和 10 分钟缓存，避免每次打开都长时间等待；实际清理仍调用 DISM 清理 WinSxS 冗余文件
+- **系统组件清理**：使用 DISM 分析 WinSxS 可回收组件，普通清理执行官方 `StartComponentCleanup`，另提供需手动确认的 `ResetBase` 深度清理
 - **虚拟内存优化**：检测分页文件位置，引导迁移到非系统盘
 - **风险提示**：每项操作都有详细的功能说明和风险警告
 
@@ -136,6 +136,7 @@
 - **配置与数据分离**：应用配置固定保存在 `%LOCALAPPDATA%/LightC/config/config.json`，默认运行数据保存在 `%LOCALAPPDATA%/LightC/data/`；更改数据目录只迁移日志、备份、快照和安装历史缓存，不把配置文件混入用户选择的数据目录
 - **数据目录迁移保护**：更改数据目录时必须选择独立空文件夹，禁止选择当前数据目录、父目录或子目录；迁移只复制 LightC 明确拥有的日志、备份、快照和安装历史缓存，避免误选磁盘根目录后把无关文件继续迁移
 - **可选本地数据清理**：清空本地数据前会列出安装历史缓存、清理日志、注册表备份、按盘符拆分的磁盘变化分析快照等白名单项，显示路径、文件数、大小和影响说明；用户可按项勾选清理，应用配置不会被删除
+- **日志保留数量**：通用设置可自定义清理日志最多保留 1-100 条，超过上限后继续按最旧日志优先覆盖
 
 ### �🛡️ 安全保护
 - **系统路径保护**：自动识别并跳过关键系统文件和目录
@@ -487,7 +488,8 @@ npm run tauri build
 | 功能 | 预计释放空间 | 风险说明 |
 |------|-------------|----------|
 | **休眠文件** | 8-32GB（与内存等量） | 关闭休眠将导致快速启动功能失效，电脑无法进入休眠状态 |
-| **系统组件存储** | 1-5GB | 清理 WinSxS 中的旧版本组件，清理后无法卸载已安装的更新 |
+| **系统组件存储** | 视 DISM 分析结果而定 | 普通清理等同于 `StartComponentCleanup`，用于清理 WinSxS 中可回收旧组件 |
+| **组件基线压缩** | 视系统更新历史而定 | 深度清理会执行 `ResetBase`，完成后当前已安装的 Windows 更新无法卸载 |
 | **虚拟内存** | 取决于设置 | 仅提供迁移建议，不直接删除，需手动在系统设置中配置 |
 
 ### 使用方法
@@ -500,7 +502,8 @@ npm run tauri build
 ### 技术实现
 
 - **休眠文件**：调用 `powercfg -h off/on` 命令
-- **系统组件存储**：检查阶段调用 `dism.exe /online /cleanup-image /analyzecomponentstore /quiet` 做短超时估算并缓存结果；清理阶段调用 `dism.exe /online /cleanup-image /startcomponentcleanup /resetbase`
+- **系统组件存储**：检查阶段调用 `dism.exe /online /cleanup-image /analyzecomponentstore` 解析 `Backups and Disabled Features`、`Cache and Temporary Data` 等可回收项；普通清理调用 `dism.exe /online /cleanup-image /startcomponentcleanup`
+- **组件基线压缩**：高级操作单独调用 `dism.exe /online /cleanup-image /startcomponentcleanup /resetbase`，避免把不可回滚的深度清理混入默认清理
 - **虚拟内存**：读取注册表检测分页文件位置，打开系统属性高级设置
 
 ---

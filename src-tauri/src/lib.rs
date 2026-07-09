@@ -77,6 +77,7 @@ pub fn run() {
             disable_hibernation,
             enable_hibernation,
             cleanup_winsxs,
+            cleanup_winsxs_resetbase,
             open_virtual_memory_settings,
             // 健康评分
             get_health_score,

@@ -44,6 +44,12 @@ pub async fn cleanup_winsxs(window: Window) -> Result<String, String> {
     crate::system_slim::cleanup_winsxs(&window).await
 }
 
+/// 深度清理 WinSxS 组件基线
+#[tauri::command]
+pub async fn cleanup_winsxs_resetbase(window: Window) -> Result<String, String> {
+    crate::system_slim::cleanup_winsxs_resetbase(&window).await
+}
+
 /// 打开系统虚拟内存设置
 #[tauri::command]
 pub fn open_virtual_memory_settings() -> Result<(), String> {

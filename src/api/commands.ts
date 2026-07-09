@@ -167,6 +167,7 @@ export interface SlimItemStatus {
   name: string;
   description: string;
   warning: string;
+  status_text: string;
   enabled: boolean;
   size: number;
   actionable: boolean;
@@ -210,6 +211,13 @@ export async function enableHibernation(): Promise<string> {
  */
 export async function cleanupWinsxs(): Promise<string> {
   return invoke<string>('cleanup_winsxs');
+}
+
+/**
+ * 娣卞害娓呯悊 WinSxS 缁勪欢鍩虹嚎
+ */
+export async function cleanupWinsxsResetbase(): Promise<string> {
+  return invoke<string>('cleanup_winsxs_resetbase');
 }
 
 /**
@@ -737,11 +745,34 @@ export interface CleanupHistorySummary {
   total_freed_bytes: number;
 }
 
+const APP_SETTINGS_STORAGE_KEY = 'c-cleanup-settings';
+const DEFAULT_CLEANUP_LOG_RETENTION = 10;
+
+function getCleanupLogRetentionSetting(): number {
+  if (typeof window === 'undefined') {
+    return DEFAULT_CLEANUP_LOG_RETENTION;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_CLEANUP_LOG_RETENTION;
+    const parsed = JSON.parse(raw) as { cleanupLogRetention?: unknown };
+    const count = Math.floor(Number(parsed.cleanupLogRetention) || DEFAULT_CLEANUP_LOG_RETENTION);
+    // 前端读取本地设置时也做边界收敛，后端仍会二次校验，避免手动篡改 localStorage。
+    return Math.min(100, Math.max(1, count));
+  } catch {
+    return DEFAULT_CLEANUP_LOG_RETENTION;
+  }
+}
+
 /**
  * 璁板綍娓呯悊鎿嶄綔鍒版棩蹇楁枃浠? * @param entries 娓呯悊璁板綍鏁扮粍
  */
 export async function recordCleanupAction(entries: CleanupLogEntryInput[]): Promise<string> {
-  return invoke<string>('record_cleanup_action', { entries });
+  return invoke<string>('record_cleanup_action', {
+    entries,
+    maxLogFiles: getCleanupLogRetentionSetting(),
+  });
 }
 
 /**

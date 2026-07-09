@@ -22,6 +22,7 @@ pub struct SlimItemStatus {
     pub name: String,
     pub description: String,
     pub warning: String,
+    pub status_text: String,
     pub enabled: bool,
     pub size: u64,
     pub actionable: bool,
@@ -36,12 +37,20 @@ pub struct SystemSlimStatus {
     pub total_reclaimable: u64,
 }
 
-const WINSXS_ANALYZE_TIMEOUT_SECS: u64 = 5;
+const WINSXS_ANALYZE_TIMEOUT_SECS: u64 = 30;
 const WINSXS_CACHE_TTL_SECS: u64 = 10 * 60;
+
+#[derive(Debug, Clone, Copy, Default)]
+struct WinsxsAnalyzeResult {
+    reclaimable_size: u64,
+    cleanup_recommended: bool,
+    reclaimable_packages: u32,
+    analysis_succeeded: bool,
+}
 
 #[derive(Debug, Clone, Copy)]
 struct WinsxsAnalyzeCache {
-    size: u64,
+    result: WinsxsAnalyzeResult,
     cached_at: std::time::Instant,
 }
 
@@ -79,13 +88,15 @@ pub async fn get_status() -> SystemSlimStatus {
     let is_admin = check_admin();
 
     // 并发运行三项检测，互不阻塞
-    let (hibernation, winsxs, pagefile) = tokio::join!(
+    let (hibernation, winsxs_items, pagefile) = tokio::join!(
         async { get_hibernation_status() },
         get_winsxs_status(),
         async { get_pagefile_status() },
     );
 
-    let items = vec![hibernation, winsxs, pagefile];
+    let mut items = vec![hibernation];
+    items.extend(winsxs_items);
+    items.push(pagefile);
     let total_reclaimable = items.iter().filter(|i| i.enabled).map(|i| i.size).sum();
 
     SystemSlimStatus {
@@ -112,6 +123,11 @@ fn get_hibernation_status() -> SlimItemStatus {
         name: "休眠文件".to_string(),
         description: "Windows 休眠功能会在 C 盘创建与内存大小相当的 hiberfil.sys 文件".to_string(),
         warning: "关闭休眠将导致快速启动功能失效，电脑无法进入休眠状态".to_string(),
+        status_text: if hibernation_enabled {
+            "当前已启用休眠和快速启动相关能力".to_string()
+        } else {
+            "当前已关闭休眠，hiberfil.sys 不再占用系统盘空间".to_string()
+        },
         enabled: hibernation_enabled,
         size,
         actionable: true,
@@ -150,45 +166,83 @@ fn check_hibernation_enabled() -> bool {
 }
 
 /// 获取 WinSxS 组件存储状态（DISM 分析在 spawn_blocking 中运行，带超时）
-async fn get_winsxs_status() -> SlimItemStatus {
-    let estimated_reclaimable = analyze_winsxs_async().await;
+async fn get_winsxs_status() -> Vec<SlimItemStatus> {
+    let analyze_result = analyze_winsxs_async().await;
+    let can_estimate = analyze_result.analysis_succeeded;
+    let has_reclaimable = analyze_result.reclaimable_size > 0 || analyze_result.cleanup_recommended;
 
-    SlimItemStatus {
-        id: "winsxs".to_string(),
-        name: "系统组件存储".to_string(),
-        description: "Windows 组件存储 (WinSxS) 包含系统更新的旧版本文件，可安全清理冗余部分"
-            .to_string(),
-        warning: "清理过程可能需要 5-15 分钟，期间请勿关闭程序或电脑".to_string(),
-        enabled: true,
-        size: estimated_reclaimable,
-        actionable: estimated_reclaimable > 0,
-        action_text: if estimated_reclaimable > 0 {
-            "开始清理".to_string()
-        } else {
-            "无需清理".to_string()
+    let status_text = if !can_estimate {
+        "DISM 分析超时或输出不可解析，可尝试执行官方组件清理后再重新检测".to_string()
+    } else if has_reclaimable {
+        format!(
+            "DISM 建议清理，发现 {} 个可回收组件包",
+            analyze_result.reclaimable_packages
+        )
+    } else {
+        "DISM 未发现明确可回收的组件包，当前无需执行组件清理".to_string()
+    };
+    let winsxs_actionable = !can_estimate || has_reclaimable;
+
+    vec![
+        SlimItemStatus {
+            id: "winsxs".to_string(),
+            name: "系统组件存储".to_string(),
+            description: "执行 DISM 官方组件清理，释放 WinSxS 中已被替代的旧组件和临时组件数据"
+                .to_string(),
+            warning: "普通清理等同于 StartComponentCleanup，不会压缩系统更新基线，通常可安全执行"
+                .to_string(),
+            status_text,
+            enabled: has_reclaimable,
+            size: analyze_result.reclaimable_size,
+            // 检测明确无可回收内容时禁用按钮，避免用户反复执行幂等 DISM 清理产生“还能清”的错觉。
+            actionable: winsxs_actionable,
+            action_text: if has_reclaimable {
+                "开始清理".to_string()
+            } else if !can_estimate {
+                "执行清理".to_string()
+            } else {
+                "无需清理".to_string()
+            },
         },
-    }
+        SlimItemStatus {
+            id: "winsxs_resetbase".to_string(),
+            name: "组件基线压缩".to_string(),
+            description: "深度压缩 WinSxS 更新基线，进一步清理所有已被替代的组件版本".to_string(),
+            warning:
+                "执行 ResetBase 后，当前已安装的 Windows 更新将无法卸载；仅建议系统稳定后手动执行"
+                    .to_string(),
+            status_text: "高级操作：比普通组件清理更彻底，但会牺牲更新回滚能力".to_string(),
+            enabled: false,
+            size: 0,
+            actionable: winsxs_actionable,
+            action_text: if winsxs_actionable {
+                "深度清理".to_string()
+            } else {
+                "无需清理".to_string()
+            },
+        },
+    ]
 }
 
 /// 异步运行 DISM 分析：DISM 首次分析天然较慢，因此检查页只做短超时并复用短期缓存。
-async fn analyze_winsxs_async() -> u64 {
+async fn analyze_winsxs_async() -> WinsxsAnalyzeResult {
     #[cfg(target_os = "windows")]
     {
-        if let Some(size) = get_cached_winsxs_size() {
-            return size;
+        if let Some(result) = get_cached_winsxs_result() {
+            return result;
         }
 
         if WINSXS_ANALYZE_RUNNING.swap(true, Ordering::SeqCst) {
             warn!("DISM 分析仍在运行，跳过本次重复检查");
-            return 0;
+            return WinsxsAnalyzeResult::default();
         }
 
         let (sender, receiver) = tokio::sync::oneshot::channel();
         tokio::task::spawn_blocking(move || {
             let result = analyze_winsxs_sync();
-            if let Ok(size) = result {
-                set_cached_winsxs_size(size);
-                let _ = sender.send(Ok(size));
+            if let Ok(analyze_result) = result {
+                set_cached_winsxs_result(analyze_result);
+                let _ = sender.send(Ok(analyze_result));
             } else {
                 WINSXS_ANALYZE_RUNNING.store(false, Ordering::SeqCst);
                 let _ = sender.send(result);
@@ -206,35 +260,35 @@ async fn analyze_winsxs_async() -> u64 {
 
         // 双重 Result：外层 timeout，中层 spawn_blocking，内层 analyze_winsxs_sync
         match dism_result {
-            Ok(Ok(Ok(size))) => size,
+            Ok(Ok(Ok(result))) => result,
             _ => {
                 warn!("DISM 分析失败或超时，跳过 WinSxS 大小估算");
-                0
+                WinsxsAnalyzeResult::default()
             }
         }
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        0
+        WinsxsAnalyzeResult::default()
     }
 }
 
-fn get_cached_winsxs_size() -> Option<u64> {
+fn get_cached_winsxs_result() -> Option<WinsxsAnalyzeResult> {
     let cache = WINSXS_ANALYZE_CACHE.read().ok()?;
     let cached = cache.as_ref()?;
     // WinSxS 可回收大小短时间内不会频繁变化，缓存能避免页面重复打开时反复卡在 DISM 分析。
     if cached.cached_at.elapsed().as_secs() <= WINSXS_CACHE_TTL_SECS {
-        return Some(cached.size);
+        return Some(cached.result);
     }
     None
 }
 
-fn set_cached_winsxs_size(size: u64) {
+fn set_cached_winsxs_result(result: WinsxsAnalyzeResult) {
     if let Ok(mut cache) = WINSXS_ANALYZE_CACHE.write() {
         // 只缓存成功解析到的结果，失败和超时保持 0，避免把临时异常固化到检查结果里。
         *cache = Some(WinsxsAnalyzeCache {
-            size,
+            result,
             cached_at: std::time::Instant::now(),
         });
     }
@@ -248,48 +302,84 @@ fn clear_cached_winsxs_size() {
 }
 
 /// 同步运行 dism /analyzecomponentstore（在 spawn_blocking 中调用）
-fn analyze_winsxs_sync() -> Result<u64, String> {
+fn analyze_winsxs_sync() -> Result<WinsxsAnalyzeResult, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
+        let output = run_hidden_utf8_command(
+            "dism.exe",
+            &["/online", "/cleanup-image", "/analyzecomponentstore"],
+        )?;
 
-        let output = Command::new("dism.exe")
-            .args([
-                "/online",
-                "/cleanup-image",
-                "/analyzecomponentstore",
-                "/quiet",
-            ])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("执行 DISM 命令失败: {}", e))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let combined = format!("{}\n{}", stdout, String::from_utf8_lossy(&output.stderr));
-
-        for line in combined.lines() {
-            if line.contains("Recommended") || line.contains("推荐") || line.contains("cleanup") {
-                if let Some(size_bytes) = parse_size_from_line(line) {
-                    return Ok(size_bytes);
-                }
-            }
+        if !output.status.success() {
+            return Err(format!(
+                "DISM 分析失败: {}",
+                decode_command_output(&output.stderr)
+            ));
         }
-        Ok(0)
+
+        Ok(parse_winsxs_analyze_output(&decode_command_output(
+            &output.stdout,
+        )))
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        Ok(0)
+        Ok(WinsxsAnalyzeResult::default())
     }
 }
 
-/// 从大小字符串解析字节数，支持 "3.50 GB"、"500 MB"、"1.2 GB" 等格式
+fn parse_winsxs_analyze_output(output: &str) -> WinsxsAnalyzeResult {
+    let mut result = WinsxsAnalyzeResult {
+        analysis_succeeded: true,
+        ..WinsxsAnalyzeResult::default()
+    };
+
+    for line in output.lines() {
+        let normalized = line.trim().to_lowercase();
+
+        if is_winsxs_reclaimable_size_line(&normalized) {
+            if let Some(size_bytes) = parse_size_from_line(&normalized) {
+                result.reclaimable_size = result.reclaimable_size.saturating_add(size_bytes);
+            }
+        }
+
+        if normalized.contains("number of reclaimable packages")
+            || normalized.contains("可回收的程序包")
+            || normalized.contains("可回收程序包")
+        {
+            if let Some(count) = parse_first_integer(&normalized) {
+                result.reclaimable_packages = count;
+            }
+        }
+
+        if normalized.contains("component store cleanup recommended")
+            || normalized.contains("建议清理")
+            || normalized.contains("推荐清理")
+        {
+            result.cleanup_recommended = normalized.contains("yes")
+                || normalized.contains("是")
+                || normalized.contains("推荐");
+        }
+    }
+
+    result
+}
+
+fn is_winsxs_reclaimable_size_line(line: &str) -> bool {
+    // DISM 的可回收估算由“备份和已禁用功能”与“缓存和临时数据”组成；
+    // 不使用 WinSxS 总大小，避免把组件存储硬链接体积误算为可释放空间。
+    line.contains("backups and disabled features")
+        || line.contains("cache and temporary data")
+        || line.contains("备份")
+        || line.contains("已禁用")
+        || line.contains("缓存和临时")
+}
+
+/// 从大小字符串解析字节数，支持 "3.50 GB"、"500 MB"、"12 KB" 等格式
 fn parse_size_from_line(line: &str) -> Option<u64> {
     let line = line.to_lowercase();
-    // 找到类似 "3.50 gb" 或 "500 mb" 的模式
     let mut value: Option<f64> = None;
-    let mut is_gb = false;
+    let mut unit_multiplier = 1024.0 * 1024.0;
 
     let bytes_line = line.as_bytes();
     for (i, &b) in bytes_line.iter().enumerate() {
@@ -310,24 +400,37 @@ fn parse_size_from_line(line: &str) -> Option<u64> {
                 // 检查这个数字后面是否跟着 GB 或 MB
                 let rest = &line[end..];
                 if rest.trim_start().starts_with("gb") {
-                    is_gb = true;
+                    unit_multiplier = 1024.0 * 1024.0 * 1024.0;
                     break;
                 } else if rest.trim_start().starts_with("mb") {
-                    is_gb = false;
+                    unit_multiplier = 1024.0 * 1024.0;
+                    break;
+                } else if rest.trim_start().starts_with("kb") {
+                    unit_multiplier = 1024.0;
                     break;
                 }
             }
         }
     }
 
-    value.map(|v| {
-        let bytes = if is_gb {
-            v * 1024.0 * 1024.0 * 1024.0
-        } else {
-            v * 1024.0 * 1024.0
-        };
-        bytes as u64
-    })
+    value.map(|v| (v * unit_multiplier) as u64)
+}
+
+fn parse_first_integer(line: &str) -> Option<u32> {
+    let bytes = line.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        if b.is_ascii_digit() {
+            let mut end = i;
+            while end < bytes.len() && bytes[end].is_ascii_digit() {
+                end += 1;
+            }
+            return std::str::from_utf8(&bytes[i..end])
+                .ok()?
+                .parse::<u32>()
+                .ok();
+        }
+    }
+    None
 }
 
 /// 获取虚拟内存状态（支持多磁盘分页文件检测）
@@ -405,6 +508,13 @@ fn get_pagefile_status() -> SlimItemStatus {
         description,
         warning: "虚拟内存对系统稳定性至关重要，不建议直接删除，请通过系统设置迁移到其他磁盘"
             .to_string(),
+        status_text: if is_on_c_drive {
+            "检测到 C 盘分页文件，可按需迁移到其他磁盘".to_string()
+        } else if pagefile_configs.is_empty() {
+            "当前由系统自动管理，未读取到固定分页文件配置".to_string()
+        } else {
+            "C 盘未检测到分页文件，无需迁移".to_string()
+        },
         enabled: is_on_c_drive,
         size: total_size,
         actionable: is_on_c_drive,
@@ -522,6 +632,43 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn run_hidden_utf8_command(program: &str, args: &[&str]) -> Result<std::process::Output, String> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    let command_line = std::iter::once(program)
+        .chain(args.iter().copied())
+        .map(quote_cmd_arg)
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    // Windows 系统工具输出会跟随控制台代码页；先切到 UTF-8，避免中文系统下解析 DISM 文本时乱码。
+    Command::new("cmd")
+        .args(["/C", &format!("chcp 65001 >nul & {}", command_line)])
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("执行命令失败: {}", e))
+}
+
+#[cfg(target_os = "windows")]
+fn quote_cmd_arg(arg: &str) -> String {
+    if arg
+        .chars()
+        .any(|ch| ch.is_whitespace() || matches!(ch, '"' | '&' | '|' | '<' | '>' | '^'))
+    {
+        format!("\"{}\"", arg.replace('"', "\\\""))
+    } else {
+        arg.to_string()
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn decode_command_output(raw: &[u8]) -> String {
+    // run_hidden_utf8_command 已切换到 UTF-8；这里保留 lossy 回退，避免异常字节导致错误信息丢失。
+    String::from_utf8_lossy(raw).into_owned()
+}
+
 // ============================================================================
 // 操作执行
 // ============================================================================
@@ -534,23 +681,18 @@ pub fn disable_hibernation() -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
         info!("正在关闭休眠功能...");
 
-        let output = Command::new("powercfg")
-            .args(["-h", "off"])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("执行命令失败: {}", e))?;
+        let output = run_hidden_utf8_command("powercfg", &["-h", "off"])?;
 
         if output.status.success() {
             info!("休眠功能已关闭");
             Ok("休眠功能已成功关闭，hiberfil.sys 文件将被删除".to_string())
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("关闭休眠失败: {}", stderr))
+            Err(format!(
+                "关闭休眠失败: {}",
+                decode_command_output(&output.stderr)
+            ))
         }
     }
 
@@ -568,23 +710,18 @@ pub fn enable_hibernation() -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
         info!("正在开启休眠功能...");
 
-        let output = Command::new("powercfg")
-            .args(["-h", "on"])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("执行命令失败: {}", e))?;
+        let output = run_hidden_utf8_command("powercfg", &["-h", "on"])?;
 
         if output.status.success() {
             info!("休眠功能已开启");
             Ok("休眠功能已成功开启".to_string())
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("开启休眠失败: {}", stderr))
+            Err(format!(
+                "开启休眠失败: {}",
+                decode_command_output(&output.stderr)
+            ))
         }
     }
 
@@ -596,6 +733,15 @@ pub fn enable_hibernation() -> Result<String, String> {
 
 /// 清理 WinSxS 组件存储（异步执行，实时推送进度）
 pub async fn cleanup_winsxs(window: &Window) -> Result<String, String> {
+    run_winsxs_cleanup(window, false).await
+}
+
+/// 深度清理 WinSxS 组件存储（ResetBase 会移除更新回滚基线）
+pub async fn cleanup_winsxs_resetbase(window: &Window) -> Result<String, String> {
+    run_winsxs_cleanup(window, true).await
+}
+
+async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String, String> {
     if !check_admin() {
         return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
     }
@@ -606,13 +752,17 @@ pub async fn cleanup_winsxs(window: &Window) -> Result<String, String> {
         use std::os::windows::process::CommandExt;
         use std::process::{Command, Stdio};
 
-        info!("开始清理 WinSxS 组件存储...");
+        info!("开始清理 WinSxS 组件存储，ResetBase: {}", reset_base);
 
         let _ = window.emit(
             "winsxs-cleanup-progress",
             serde_json::json!({
                 "status": "running",
-                "message": "正在清理系统组件存储，请耐心等待...",
+                "message": if reset_base {
+                    "正在深度清理系统组件基线，请耐心等待..."
+                } else {
+                    "正在执行官方系统组件清理，请耐心等待..."
+                },
                 "progress": 0
             }),
         );
@@ -620,13 +770,13 @@ pub async fn cleanup_winsxs(window: &Window) -> Result<String, String> {
         let handle = window.app_handle().clone();
 
         let result = tokio::task::spawn_blocking(move || {
+            let mut dism_args = vec!["/online", "/cleanup-image", "/startcomponentcleanup"];
+            if reset_base {
+                dism_args.push("/resetbase");
+            }
+
             let mut child = Command::new("dism.exe")
-                .args([
-                    "/online",
-                    "/cleanup-image",
-                    "/startcomponentcleanup",
-                    "/resetbase",
-                ])
+                .args(&dism_args)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .creation_flags(0x08000000)
@@ -663,7 +813,7 @@ pub async fn cleanup_winsxs(window: &Window) -> Result<String, String> {
         .map_err(|e| format!("执行 DISM 命令失败: {}", e))?;
 
         if result.status.success() {
-            info!("WinSxS 清理完成");
+            info!("WinSxS 清理完成，ResetBase: {}", reset_base);
             clear_cached_winsxs_size();
             let _ = window.emit(
                 "winsxs-cleanup-progress",
@@ -673,10 +823,14 @@ pub async fn cleanup_winsxs(window: &Window) -> Result<String, String> {
                     "progress": 100
                 }),
             );
-            Ok("系统组件存储清理完成".to_string())
+            if reset_base {
+                Ok("组件基线压缩完成，当前已安装的 Windows 更新将无法卸载".to_string())
+            } else {
+                Ok("系统组件存储清理完成".to_string())
+            }
         } else {
-            let stderr = String::from_utf8_lossy(&result.stderr);
-            let stdout = String::from_utf8_lossy(&result.stdout);
+            let stderr = decode_command_output(&result.stderr);
+            let stdout = decode_command_output(&result.stdout);
             let _ = window.emit(
                 "winsxs-cleanup-progress",
                 serde_json::json!({
