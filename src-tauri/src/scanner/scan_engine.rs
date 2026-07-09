@@ -163,7 +163,10 @@ impl ScanEngine {
             .max_depth(self.max_depth)
             .follow_links(false)
             .into_iter()
-            .filter_entry(|e| !self.is_system_protected(e.path()));
+            .filter_entry(|e| {
+                !self.is_system_protected(e.path())
+                    && !self.is_persistent_app_profile_path(e.path())
+            });
 
         for entry in walker.filter_map(|e| e.ok()) {
             let entry_path = entry.path();
@@ -180,6 +183,11 @@ impl ScanEngine {
 
             // 检查是否匹配模式
             if !self.matches_patterns(entry_path, patterns) {
+                continue;
+            }
+
+            // 二次防线：即便未来新增扫描根，也不要把 WebView/Chromium 的持久化 Profile 数据当垃圾。
+            if self.is_persistent_app_profile_path(entry_path) {
                 continue;
             }
 
@@ -312,6 +320,42 @@ impl ScanEngine {
 
         false
     }
+
+    /// 检查是否为 WebView/Chromium 应用的持久化 Profile 数据。
+    ///
+    /// 中文说明：
+    /// MSIX/Tauri/Electron/WebView2 应用常把用户状态放在 LocalCache 下，例如 Claude 的
+    /// EBWebView\Default。这里面的 IndexedDB、Local Storage、各种 SQLite/LevelDB 文件
+    /// 不是纯缓存，删除后会导致会话列表、应用偏好或索引丢失。
+    fn is_persistent_app_profile_path(&self, path: &Path) -> bool {
+        let path_str = path.to_string_lossy().to_lowercase();
+        if !path_str.contains("\\appdata\\local\\packages\\")
+            && !path_str.contains("\\ebwebview\\")
+        {
+            return false;
+        }
+
+        let persistent_markers = [
+            "\\ebwebview\\default\\",
+            "\\local storage\\",
+            "\\indexeddb\\",
+            "\\session storage\\",
+            "\\databases\\",
+            "\\file system\\",
+            "\\shared_proto_db\\",
+            "\\shared dictionary\\",
+            "\\autofillaimodelcache\\",
+            "\\autofillstrikedatabase\\",
+            "\\budgetdatabase\\",
+            "\\browsingtopicssitedata",
+            "\\browsingtopicsstate",
+            "\\bookmarkmergedsurfaceordering",
+        ];
+
+        persistent_markers
+            .iter()
+            .any(|marker| path_str.contains(marker))
+    }
 }
 
 // 为并行扫描实现Send和Sync
@@ -336,5 +380,20 @@ mod tests {
         assert!(engine.matches_glob("test.LOG", "*.log"));
         assert!(!engine.matches_glob("test.txt", "*.log"));
         assert!(engine.matches_glob("thumbcache_256.db", "thumbcache_*.db"));
+    }
+
+    #[test]
+    fn test_webview_profile_data_is_protected() {
+        let engine = ScanEngine::new();
+
+        assert!(engine.is_persistent_app_profile_path(Path::new(
+            r"C:\Users\PC\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\app.formatif.desktop\EBWebView\Default\IndexedDB\index.leveldb\LOG"
+        )));
+        assert!(engine.is_persistent_app_profile_path(Path::new(
+            r"C:\Users\PC\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\app.formatif.desktop\EBWebView\Default\BrowsingTopicsSiteData"
+        )));
+        assert!(!engine.is_persistent_app_profile_path(Path::new(
+            r"C:\Users\PC\AppData\Local\Google\Chrome\User Data\Default\Code Cache\js\cache"
+        )));
     }
 }

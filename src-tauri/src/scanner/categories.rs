@@ -206,7 +206,8 @@ impl JunkCategory {
                 // INetCache\IE 与 BrowserCache 的 INetCache 路径重叠，
                 // 已在 SystemCache 中统一扫描，此处移除避免重复统计
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\WebCache")),
-                ScanPath::glob_path("LOCALAPPDATA", "Packages\\*\\LocalCache"),
+                // 不再泛扫 Packages\*\LocalCache：MSIX 桌面应用会把 WebView2 用户 Profile、
+                // 会话索引和应用状态放在这里，直接按 "*" 清理会误删 Claude 等应用的持久化数据。
             ],
             JunkCategory::FontCache => vec![ScanPath::fixed_path(
                 "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache",

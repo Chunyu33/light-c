@@ -57,6 +57,7 @@ jobs:
             - 安装前主动关闭残留 LightC.exe，降低自动更新覆盖安装时文件占用失败
             - WinSxS 检测修复：组件存储分析不再使用 /quiet 抑制输出，改为解析 DISM 的可回收组件、缓存和临时数据，避免误显示“无需清理”
             - 日志保留设置：新增清理日志保留数量，可在 1-100 条之间调整，超过上限仍按最旧日志优先删除
+            - 修复垃圾清理模块部分扫描路径问题
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false
