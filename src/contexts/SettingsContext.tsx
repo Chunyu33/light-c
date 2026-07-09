@@ -21,6 +21,8 @@ interface AppSettings {
   bigFilesScanLimit: number;
   /** 磁盘变化分析最多展示变化目录数量（默认 300） */
   diskGrowthMaxEntries: number;
+  /** 清理日志最多保留文件数（默认 10） */
+  cleanupLogRetention: number;
 }
 
 interface SettingsContextValue {
@@ -44,6 +46,7 @@ const defaultSettings: AppSettings = {
   hotspotIgnoreSystemDirs: true, // 默认忽略系统目录
   bigFilesScanLimit: 50, // 默认扫描 50 个大文件，避免初次结果列表过长
   diskGrowthMaxEntries: 300, // 默认最多展示 300 个变化目录
+  cleanupLogRetention: 10, // 默认保留 10 份清理日志，兼容历史行为
 };
 
 function normalizeSettings(settings: AppSettings): AppSettings {
@@ -62,6 +65,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
     hotspotSizeThreshold: Math.min(500, Math.max(10, Number(settings.hotspotSizeThreshold) || defaultSettings.hotspotSizeThreshold)),
     bigFilesScanLimit: Math.min(500, Math.max(10, Math.floor(Number(settings.bigFilesScanLimit) || defaultSettings.bigFilesScanLimit))),
     diskGrowthMaxEntries: Math.min(1000, Math.max(50, Number(settings.diskGrowthMaxEntries) || defaultSettings.diskGrowthMaxEntries)),
+    cleanupLogRetention: Math.min(100, Math.max(1, Math.floor(Number(settings.cleanupLogRetention) || defaultSettings.cleanupLogRetention))),
   };
 }
 

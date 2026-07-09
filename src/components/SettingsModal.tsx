@@ -345,6 +345,33 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
           </div>
 
           <SearchEngineSettings />
+
+          {/* 清理日志保留 */}
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+                <ClipboardList className="w-4 h-4 text-[var(--text-muted)]" />
+                清理日志保留
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">超过数量后自动删除最旧日志，范围 1-100 条</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={settings.cleanupLogRetention}
+                onChange={(event) => {
+                  const nextValue = Math.min(100, Math.max(1, Math.floor(Number(event.target.value) || 10)));
+                  updateSettings({ cleanupLogRetention: nextValue });
+                }}
+                className="h-9 w-20 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-right text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--brand-green)]"
+                title="清理日志最多保留条数"
+              />
+              <span className="text-xs text-[var(--text-muted)]">条</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1008,7 +1035,7 @@ function GuideSettings() {
               系统瘦身
             </p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
-              管理休眠文件、Windows组件存储等系统级功能。<span className="text-[var(--color-warning)] font-medium">此功能需要管理员权限</span>，操作前请确保了解各项功能的作用。
+              管理休眠文件、Windows 组件存储、组件基线压缩和虚拟内存迁移引导等系统级功能。<span className="text-[var(--color-warning)] font-medium">此功能需要管理员权限</span>，ResetBase 深度清理会影响系统更新回滚，操作前请确认风险。
             </p>
           </div>
           <div>
@@ -1182,7 +1209,7 @@ function GuideSettings() {
             • 关闭休眠功能后将无法使用快速启动和休眠模式
           </p>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-            • 清理Windows组件存储后可能无法卸载某些系统更新
+            • 普通 Windows 组件清理使用官方 StartComponentCleanup；仅 ResetBase 组件基线压缩会导致当前已安装更新无法卸载
           </p>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
             • <span className="text-[var(--color-danger)] font-medium">深度清理</span>会直接从磁盘永久删除文件，不经过回收站，无法恢复

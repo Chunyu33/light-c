@@ -4,7 +4,7 @@
 //
 // 功能说明：
 // 1. 使用 serde_json 序列化日志数据到 JSON 文件
-// 2. 通过 std::fs::read_dir 统计文件数量，实现日志轮转（只保留10份）
+// 2. 通过 std::fs::read_dir 统计文件数量，实现日志轮转（默认只保留10份）
 // 3. 异步写入日志，不阻塞主线程
 // 4. 即使日志写入失败，清理逻辑也能继续运行
 //
@@ -20,8 +20,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// 最大保留的日志文件数量
-const MAX_LOG_FILES: usize = 10;
+/// 默认最大保留的日志文件数量
+const DEFAULT_MAX_LOG_FILES: usize = 10;
+const MIN_LOG_FILES: usize = 1;
+const MAX_LOG_FILES_LIMIT: usize = 100;
+
+fn normalize_log_retention(max_log_files: Option<usize>) -> usize {
+    // 日志保留数来自前端本地设置，后端再次收敛边界，防止手动篡改 localStorage 导致无限保留或清空过多日志。
+    max_log_files
+        .unwrap_or(DEFAULT_MAX_LOG_FILES)
+        .clamp(MIN_LOG_FILES, MAX_LOG_FILES_LIMIT)
+}
 
 // ============================================================================
 // 日志数据结构
@@ -223,7 +232,9 @@ impl CleanupLogger {
                             // 执行日志轮转（在后台线程中执行，不阻塞）
                             let log_dir = self.log_dir.clone();
                             tokio::spawn(async move {
-                                if let Err(e) = rotate_logs(&log_dir).await {
+                                if let Err(e) =
+                                    rotate_logs(&log_dir, DEFAULT_MAX_LOG_FILES).await
+                                {
                                     warn!("日志轮转失败: {}", e);
                                 }
                             });
@@ -257,6 +268,7 @@ impl CleanupLogger {
     pub async fn save_cleanup_results(
         &self,
         entries: Vec<CleanupLogEntry>,
+        max_log_files: usize,
     ) -> Result<PathBuf, String> {
         if entries.is_empty() {
             return Err("没有清理记录".to_string());
@@ -283,7 +295,7 @@ impl CleanupLogger {
         // 执行日志轮转
         let log_dir = self.log_dir.clone();
         tokio::spawn(async move {
-            if let Err(e) = rotate_logs(&log_dir).await {
+            if let Err(e) = rotate_logs(&log_dir, max_log_files).await {
                 warn!("日志轮转失败: {}", e);
             }
         });
@@ -296,15 +308,16 @@ impl CleanupLogger {
 // 日志轮转逻辑
 // ============================================================================
 
-/// 日志轮转 - 只保留最近 MAX_LOG_FILES 份日志
+/// 日志轮转 - 只保留最近 max_log_files 份日志
 ///
 /// 实现逻辑：
 /// 1. 使用 std::fs::read_dir() 遍历日志目录
 /// 2. 过滤出 .json 文件并收集文件信息
 /// 3. 按创建时间排序（最旧的在前）
-/// 4. 如果文件数量超过 MAX_LOG_FILES，删除最旧的文件
-async fn rotate_logs(log_dir: &Path) -> Result<(), String> {
+/// 4. 如果文件数量超过 max_log_files，删除最旧的文件
+async fn rotate_logs(log_dir: &Path, max_log_files: usize) -> Result<(), String> {
     debug!("开始日志轮转检查，目录: {:?}", log_dir);
+    let max_log_files = max_log_files.clamp(MIN_LOG_FILES, MAX_LOG_FILES_LIMIT);
 
     // 使用 read_dir 遍历目录，收集所有 JSON 日志文件
     let entries: Vec<_> = match fs::read_dir(log_dir) {
@@ -333,7 +346,7 @@ async fn rotate_logs(log_dir: &Path) -> Result<(), String> {
     debug!("当前日志文件数量: {}", file_count);
 
     // 如果文件数量未超过限制，无需轮转
-    if file_count <= MAX_LOG_FILES {
+    if file_count <= max_log_files {
         return Ok(());
     }
 
@@ -342,7 +355,7 @@ async fn rotate_logs(log_dir: &Path) -> Result<(), String> {
     sorted_entries.sort_by(|a, b| a.1.cmp(&b.1));
 
     // 计算需要删除的文件数量
-    let files_to_delete = file_count - MAX_LOG_FILES;
+    let files_to_delete = file_count - max_log_files;
     info!("日志轮转: 需要删除 {} 个旧文件", files_to_delete);
 
     // 删除最旧的文件
@@ -364,7 +377,7 @@ async fn rotate_logs(log_dir: &Path) -> Result<(), String> {
 pub async fn cleanup_old_logs(app_data_dir: &Path) {
     let log_dir = app_data_dir.join("logs");
     if log_dir.exists() {
-        if let Err(e) = rotate_logs(&log_dir).await {
+        if let Err(e) = rotate_logs(&log_dir, DEFAULT_MAX_LOG_FILES).await {
             warn!("启动时日志轮转失败: {}", e);
         }
     }
@@ -400,6 +413,7 @@ pub struct CleanupHistorySummary {
 pub async fn record_cleanup_action(
     app_data_dir: &Path,
     entries: Vec<CleanupLogEntryInput>,
+    max_log_files: Option<usize>,
 ) -> Result<String, String> {
     use log::info;
 
@@ -410,6 +424,7 @@ pub async fn record_cleanup_action(
     }
 
     let logger = CleanupLogger::new(app_data_dir);
+    let max_log_files = normalize_log_retention(max_log_files);
 
     let log_entries: Vec<CleanupLogEntry> = entries
         .into_iter()
@@ -427,7 +442,10 @@ pub async fn record_cleanup_action(
         })
         .collect();
 
-    match logger.save_cleanup_results(log_entries).await {
+    match logger
+        .save_cleanup_results(log_entries, max_log_files)
+        .await
+    {
         Ok(path) => {
             info!("清理日志已保存: {:?}", path);
             Ok(format!("日志已保存: {}", path.display()))

@@ -6,9 +6,12 @@ pub use crate::logger::{CleanupHistorySummary, CleanupLogEntryInput};
 
 /// 记录清理操作到日志文件
 #[tauri::command]
-pub async fn record_cleanup_action(entries: Vec<CleanupLogEntryInput>) -> Result<String, String> {
+pub async fn record_cleanup_action(
+    entries: Vec<CleanupLogEntryInput>,
+    max_log_files: Option<usize>,
+) -> Result<String, String> {
     let app_data_dir = crate::data_dir::get_data_dir();
-    crate::logger::record_cleanup_action(&app_data_dir, entries).await
+    crate::logger::record_cleanup_action(&app_data_dir, entries, max_log_files).await
 }
 
 /// 打开日志文件夹
