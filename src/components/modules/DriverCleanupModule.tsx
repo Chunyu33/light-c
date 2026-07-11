@@ -390,10 +390,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 ref={toolbarRef}
                 className={`sticky top-2 z-20 mx-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2 py-1.5 shadow-sm transition-[width,box-shadow,background-color] duration-200 ease-out ${isToolbarSticky ? 'w-fit shadow-md' : 'w-full'}`}
               >
-                <span className="inline-flex items-center gap-1 px-1 text-[10px] text-[var(--fg-muted)]" title="删除前自动备份，软件不保留删除历史。">
+                <span className="inline-flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]" title="删除前自动备份，软件不保留删除历史。">
                   <Archive className="h-3.5 w-3.5 text-[var(--brand-green)]" />备份
                 </span>
-                <span className={`px-1 text-[10px] ${scanResult.device_match_data_available ? 'text-[var(--brand-green)]' : 'text-orange-600 dark:text-orange-400'}`} title={scanResult.device_match_data_available ? '高置信旧驱动来自设备匹配排名，其他候选仍需人工确认。' : '未取得设备驱动排名数据，当前结果仅供参考。'}>
+                <span className={`px-1 text-xs ${scanResult.device_match_data_available ? 'text-[var(--brand-green)]' : 'text-orange-600 dark:text-orange-400'}`} title={scanResult.device_match_data_available ? '高置信旧驱动来自设备匹配排名，其他候选仍需人工确认。' : '未取得设备驱动排名数据，当前结果仅供参考。'}>
                   {scanResult.device_match_data_available ? '排名已核验' : '排名未取得'}
                 </span>
                 <button
@@ -404,7 +404,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                     selectHighConfidenceDrivers();
                   }}
                   title={allHighConfidenceSelected ? '取消选中全部高置信旧驱动' : '选中全部高置信旧驱动'}
-                  className={`inline-flex items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${allHighConfidenceSelected
+                  className={`inline-flex items-center justify-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${allHighConfidenceSelected
                     ? 'border-[var(--brand-green)] bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)]'
                     : 'border-[var(--brand-green)] bg-[var(--brand-green)]/10 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20'
                   }`}
@@ -416,13 +416,13 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                     void openDriverBackupDir().catch((error) => {
                       showToast({ title: '打开备份目录失败', description: String(error), type: 'error' });
                     });
-                  }} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2 py-1 text-[11px] font-medium text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]">
+                  }} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2 py-1 text-xs font-medium text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]">
                   <FolderOpen className="h-3.5 w-3.5" />备份
                 </button>
-                <button title="恢复全部驱动备份" disabled={!scanResult.is_admin || deleting || restoring} onClick={() => setShowRestoreConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-400 bg-[var(--bg-card)] px-2 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950">
+                <button title="恢复全部驱动备份" disabled={!scanResult.is_admin || deleting || restoring} onClick={() => setShowRestoreConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-400 bg-[var(--bg-card)] px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950">
                   <RotateCcw className="h-3.5 w-3.5" />恢复
                 </button>
-                <button title={deleting ? '正在删除驱动' : `删除选中的 ${selectedNames.size} 个驱动`} disabled={selectedNames.size === 0 || !scanResult.is_admin || deleting || restoring} onClick={() => setShowConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <button title={deleting ? '正在删除驱动' : `删除选中的 ${selectedNames.size} 个驱动`} disabled={selectedNames.size === 0 || !scanResult.is_admin || deleting || restoring} onClick={() => setShowConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
                   {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   {deleting ? '删除中' : `删除 ${selectedNames.size}`}
                 </button>
@@ -456,9 +456,9 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 items-center gap-1.5">
                               <span className="min-w-0 truncate font-semibold text-sm text-[var(--fg-primary)]" title={packageInfo.original_name || '未知 INF 文件'}>{packageInfo.original_name || '未知 INF 文件'}</span>
-                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${getStatusClass(packageInfo)}`}>{getStatusLabel(packageInfo)}</span>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${getStatusClass(packageInfo)}`}>{getStatusLabel(packageInfo)}</span>
                             </div>
-                            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]">
+                            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-[var(--fg-secondary)]" title={packageInfo.published_name}>{packageInfo.published_name}</span>
                               <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || '未知厂商'}>{packageInfo.provider_name || '未知厂商'}</span>
                               <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || '版本未知'}>版本 {packageInfo.driver_version || '未知'}</span>
@@ -467,7 +467,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                                 {driverClassBadge.label}
                               </span>
                             </div>
-                            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px]">
+                            <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className={`max-w-full truncate rounded-full px-1.5 py-0.5 ${getReasonClass(packageInfo)}`} title={packageInfo.reason}>{getReasonLabel(packageInfo)}</span>
                               <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">设备 {packageInfo.device_count}</span>
                               <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">活动 {packageInfo.active_device_count}</span>

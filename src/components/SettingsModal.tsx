@@ -13,7 +13,7 @@ import wechatQr from '../assets/r_wechat_qr.jpg';
 import alipayQr from '../assets/r_alipay_qr.jpg';
 import binlockxIcon from '../assets/binlockx.svg';
 import viapIcon from '../assets/viap.svg';
-import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, type FontSizeLevel, useSettings } from '../contexts';
+import { useTheme, type ThemeMode, useFontSize, FONT_SIZE_CONFIGS, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, type FontSizeLevel, useSettings } from '../contexts';
 import { useToast } from './Toast';
 import { Type } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
@@ -54,6 +54,7 @@ const fontSizeOptions: { level: FontSizeLevel; label: string }[] = [
   { level: 'standard', label: '标准' },
   { level: 'medium', label: '适中' },
   { level: 'large', label: '较大' },
+  { level: 'custom', label: '自定义' },
 ];
 
 const layoutModeOptions = [
@@ -154,7 +155,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
 // 通用设置 - 微信风格主题切换器
 function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
-  const { level: fontSizeLevel, setLevel: setFontSizeLevel } = useFontSize();
+  const { level: fontSizeLevel, setLevel: setFontSizeLevel, customFontSize, setCustomFontSize } = useFontSize();
   const { settings, updateSettings } = useSettings();
   const { showToast } = useToast();
   const [dataDir, setDataDir] = useState('');
@@ -163,6 +164,11 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearableItems, setClearableItems] = useState<ClearableDataItem[]>([]);
   const [selectedClearItemIds, setSelectedClearItemIds] = useState<string[]>([]);
+  const [customFontSizeDraft, setCustomFontSizeDraft] = useState(String(customFontSize));
+
+  useEffect(() => {
+    setCustomFontSizeDraft(String(customFontSize));
+  }, [customFontSize]);
 
   // 加载当前数据目录
   useEffect(() => {
@@ -291,8 +297,9 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
           </div>
 
           {/* 字体大小 */}
-          <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
-            <div>
+          <div className="pt-4 border-t border-[var(--border-color)]">
+            <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-[140px] flex-1">
               <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
                 <Type className="w-4 h-4 text-[var(--text-muted)]" />
                 字体大小
@@ -300,13 +307,15 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
               <p className="text-xs text-[var(--text-muted)] mt-1">调整应用内文字大小</p>
             </div>
             {/* 字号分段控制器 */}
-            <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+            <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
               {fontSizeOptions.map(({ level, label }) => (
                 <button
                   key={level}
                   onClick={() => setFontSizeLevel(level)}
-                  title={`${label} (+${FONT_SIZE_CONFIGS[level].offset}px)`}
-                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${fontSizeLevel === level
+                  title={level === 'custom'
+                    ? `${label}（当前 ${customFontSize}px）`
+                    : `${label} (+${FONT_SIZE_CONFIGS[level].offset}px)`}
+                  className={`whitespace-nowrap px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${fontSizeLevel === level
                       ? 'bg-[var(--brand-green)] text-white'
                       : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                     }`}
@@ -315,6 +324,48 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 </button>
               ))}
             </div>
+            </div>
+
+            {/* 自定义字号单独展开，避免未选择时占用通用设置空间。 */}
+            <AnimatePresence initial={false}>
+              {fontSizeLevel === 'custom' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, y: -6 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-[var(--text-secondary)]">自定义字号</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">范围 {CUSTOM_FONT_SIZE_MIN}-{CUSTOM_FONT_SIZE_MAX}px</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <input
+                        type="number"
+                        min={CUSTOM_FONT_SIZE_MIN}
+                        max={CUSTOM_FONT_SIZE_MAX}
+                        step={1}
+                        value={customFontSizeDraft}
+                        onChange={(event) => setCustomFontSizeDraft(event.target.value)}
+                        onBlur={() => {
+                          const parsedValue = Number(customFontSizeDraft);
+                          const nextValue = Number.isFinite(parsedValue)
+                            ? Math.min(CUSTOM_FONT_SIZE_MAX, Math.max(CUSTOM_FONT_SIZE_MIN, Math.floor(parsedValue)))
+                            : customFontSize;
+                          setCustomFontSize(nextValue);
+                          setCustomFontSizeDraft(String(nextValue));
+                        }}
+                        className="h-9 w-20 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-right text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--brand-green)]"
+                        title={`自定义字号，范围 ${CUSTOM_FONT_SIZE_MIN}-${CUSTOM_FONT_SIZE_MAX}px`}
+                      />
+                      <span className="text-xs text-[var(--text-muted)]">px</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* 布局设置 */}
@@ -325,7 +376,7 @@ function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: T
                 布局设置
               </p>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                卡片模式用于总览，页面模式通过左侧菜单切换单个功能
+                调整页面布局模式
               </p>
             </div>
             <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
