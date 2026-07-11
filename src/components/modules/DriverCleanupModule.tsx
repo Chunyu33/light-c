@@ -113,7 +113,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       setSelectedNames(new Set());
       updateModuleState('driverCleanup', {
         status: 'done',
-        fileCount: result.candidate_count,
+        fileCount: result.total_count,
         totalSize: 0,
       });
       setExpandedModule('driver-cleanup');
@@ -216,7 +216,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         totalSize={moduleState.totalSize}
         countLabel="个驱动包"
         hideTotalSize
-        doneBadgeText="可选处理"
+        doneBadgeText="已检测"
         emptyDoneBadgeText="未发现可处理项"
         expanded={isExpanded}
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'driver-cleanup')}
@@ -228,9 +228,14 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         forceExpanded={layoutMode === 'pages'}
         allowStickyContent
         headerExtra={scanResult ? (
-          <span className={`text-xs px-2 py-1 rounded-full ${scanResult.is_admin ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
-            {scanResult.is_admin ? '管理员' : '可检测，删除需管理员'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-600">
+              可处理 {scanResult.candidate_count}
+            </span>
+            <span className={`text-xs px-2 py-1 rounded-full ${scanResult.is_admin ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
+              {scanResult.is_admin ? '管理员' : '可检测，删除需管理员'}
+            </span>
+          </div>
         ) : null}
       >
         <div className="p-4 space-y-3">
@@ -300,11 +305,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-semibold text-sm text-[var(--fg-primary)]">{packageInfo.provider_name || '未知厂商'}</span>
+                              <span className="font-semibold text-sm text-[var(--fg-primary)]">{packageInfo.original_name || '未知 INF 文件'}</span>
                               <span className={`rounded-full px-2 py-0.5 text-[10px] ${getStatusClass(packageInfo)}`}>{getStatusLabel(packageInfo)}</span>
                               <span className="text-[11px] text-[var(--fg-muted)]">{packageInfo.published_name}</span>
                             </div>
-                            <p className="mt-1 text-xs text-[var(--fg-secondary)]">{packageInfo.original_name} · {packageInfo.driver_version || '版本未知'} · {getDriverClassLabel(packageInfo.class_name || '类别未知')}</p>
+                            <p className="mt-1 text-xs text-[var(--fg-secondary)]">{packageInfo.provider_name || '未知厂商'} · {packageInfo.driver_version || '版本未知'} · {getDriverClassLabel(packageInfo.class_name || '类别未知')}</p>
                             <p className="mt-1 text-[11px] text-[var(--fg-muted)]">{packageInfo.reason}</p>
                             <p className="mt-1 text-[11px] text-[var(--fg-muted)]">关联设备 {packageInfo.device_count} 个 · 活动设备 {packageInfo.active_device_count} 个 · 驱动文件 {packageInfo.file_count} 个</p>
                           </div>

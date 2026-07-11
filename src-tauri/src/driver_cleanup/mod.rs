@@ -44,6 +44,7 @@ pub struct DriverPackageInfo {
 pub struct DriverScanResult {
     pub is_admin: bool,
     pub packages: Vec<DriverPackageInfo>,
+    pub total_count: usize,
     pub candidate_count: usize,
 }
 
@@ -100,6 +101,7 @@ pub fn scan() -> Result<DriverScanResult, String> {
 
     Ok(DriverScanResult {
         is_admin: crate::system_slim::check_admin(),
+        total_count: packages.len(),
         packages,
         candidate_count,
     })

@@ -251,6 +251,7 @@ export interface DriverPackageInfo {
 export interface DriverScanResult {
   is_admin: boolean;
   packages: DriverPackageInfo[];
+  total_count: number;
   candidate_count: number;
 }
 
