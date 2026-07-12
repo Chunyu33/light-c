@@ -73,7 +73,7 @@ If output contains unreadable characters, inspect the exit code first.
 
 ## 6. 文档同步（强制）
 
-- 任何功能改动必须同步更新 README.md
+- 任何功能改动必须同步更新 CHANGELOG.md、README.md（按需，不要写错，写在合适的位置）
 - 文档内容包括：
   - 功能说明
   - 使用方式（如有）
