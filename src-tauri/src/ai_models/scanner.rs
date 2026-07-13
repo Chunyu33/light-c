@@ -145,10 +145,7 @@ fn covered_roots_from_sources(sources: &[AssetSource]) -> Vec<CoveredRoot> {
     let mut covered_roots = Vec::new();
     let mut seen_paths = HashSet::new();
 
-    for source in sources
-        .iter()
-        .filter(|source| source.name != "未归类")
-    {
+    for source in sources.iter().filter(|source| source.name != "未归类") {
         // 平台 Detector 可能来自多个根目录，MFT 兜底需要把已识别模型的父目录也纳入覆盖范围，避免同一路径二次计数。
         push_covered_root(
             &mut covered_roots,

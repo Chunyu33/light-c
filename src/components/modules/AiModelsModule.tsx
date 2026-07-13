@@ -9,11 +9,13 @@ import {
   Loader2,
   Search,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { DonutChart, ColumnChart, CHART_PALETTE, type ChartItem } from '../ui/charts';
@@ -21,6 +23,8 @@ import { Select, type SelectOption } from '../ui/Select';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import {
+  deleteAiModel,
+  getFailureReasonMessage,
   openInFolder,
   scanAiModelAssets,
   type AiAssetSource,
@@ -61,6 +65,8 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [sortMode, setSortMode] = useState<AiModelSortMode>('size-desc');
   const [modelKeyword, setModelKeyword] = useState('');
   const [scanProgress, setScanProgress] = useState<AiModelScanProgress | null>(null);
+  const [modelPendingDeletion, setModelPendingDeletion] = useState<FlattenedModel | null>(null);
+  const [deletingModelPath, setDeletingModelPath] = useState<string | null>(null);
 
   const allModels = useMemo(() => flattenModels(scanResult), [scanResult]);
   const largestModel = allModels[0] ?? null;
@@ -155,6 +161,44 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
     }
   }, [showToast]);
 
+  const handleDeleteModel = useCallback(async () => {
+    if (!modelPendingDeletion) return;
+
+    const model = modelPendingDeletion;
+    setModelPendingDeletion(null);
+    setDeletingModelPath(model.path);
+    try {
+      const result = await deleteAiModel(model.path);
+      const detail = result.file_results[0];
+      if (!detail?.success) {
+        const reason = detail ? getFailureReasonMessage(detail.failure_reason) : result.summary_message;
+        showToast({
+          type: 'warning',
+          title: '模型删除未完成',
+          description: reason || result.summary_message || '文件未被删除，请检查文件占用情况。',
+        });
+        return;
+      }
+
+      const nextScanResult = removeDeletedModel(scanResult, model.path);
+      setScanResult(nextScanResult);
+      updateModuleState('aiModels', {
+        status: 'done',
+        fileCount: nextScanResult?.total_model_count ?? 0,
+        totalSize: nextScanResult?.total_size ?? 0,
+      });
+      showToast({
+        type: 'success',
+        title: '模型文件已删除',
+        description: `${model.name} · 已释放 ${formatSize(detail.logical_size)}`,
+      });
+    } catch (error) {
+      showToast({ type: 'error', title: '删除模型失败', description: String(error) });
+    } finally {
+      setDeletingModelPath(null);
+    }
+  }, [modelPendingDeletion, scanResult, showToast, updateModuleState]);
+
   const isExpanded = expandedModule === 'aiModels';
   const isScanning = moduleState.status === 'scanning';
 
@@ -163,7 +207,8 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
   }
 
   return (
-    <ModuleCard
+    <>
+      <ModuleCard
       variant={layoutMode === 'pages' ? 'page' : 'card'}
       forceExpanded={layoutMode === 'pages'}
       id="aiModels"
@@ -272,6 +317,8 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
                   onSortChange={setSortMode}
                   onOpenPath={openInFolder}
                   onSearchModel={handleSearchModel}
+                  onDeleteModel={setModelPendingDeletion}
+                  deletingModelPath={deletingModelPath}
                 />
               </>
             )}
@@ -289,7 +336,24 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
           </>
         )}
       </div>
-    </ModuleCard>
+      </ModuleCard>
+
+      <ConfirmDialog
+        isOpen={modelPendingDeletion !== null}
+        onCancel={() => setModelPendingDeletion(null)}
+        onConfirm={() => void handleDeleteModel()}
+        title="确认删除模型文件"
+        description={modelPendingDeletion
+          ? `将永久删除“${modelPendingDeletion.name}”，文件大小约 ${formatSize(modelPendingDeletion.size)}。`
+          : ''}
+        warning={modelPendingDeletion
+          ? `路径：${modelPendingDeletion.path}。删除后无法通过 LightC 恢复，请确认该文件不是正在使用的模型。`
+          : undefined}
+        confirmText="确认删除"
+        cancelText="取消"
+        isDanger
+      />
+    </>
   );
 }
 
@@ -686,6 +750,8 @@ function ModelTable({
   onSortChange,
   onOpenPath,
   onSearchModel,
+  onDeleteModel,
+  deletingModelPath,
 }: {
   title: string;
   models: FlattenedModel[];
@@ -695,6 +761,8 @@ function ModelTable({
   onSortChange: (value: AiModelSortMode) => void;
   onOpenPath: (path: string) => Promise<void>;
   onSearchModel: (modelName: string) => Promise<void>;
+  onDeleteModel: (model: FlattenedModel) => void;
+  deletingModelPath: string | null;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
@@ -727,6 +795,7 @@ function ModelTable({
         {models.map(model => {
           const displayName = splitDisplayModelName(model.name);
           const modelType = getModelType(model);
+          const canDeleteModel = !model.path.toLowerCase().endsWith('.mlpackage');
 
           return (
             <div key={`${model.sourceName}-${model.path}-${model.name}`} className={`flex items-center gap-3 px-4 hover:bg-[var(--bg-hover)] transition ${compact ? 'py-2.5' : 'py-3'}`}>
@@ -751,6 +820,16 @@ function ModelTable({
               <div className="flex shrink-0 items-center gap-1">
                 <IconButton title="打开目录" onClick={() => onOpenPath(model.path)} icon={<FolderOpen className="w-4 h-4" />} />
                 <IconButton title="搜索模型" onClick={() => onSearchModel(model.name)} icon={<Search className="w-4 h-4" />} />
+                {canDeleteModel && (
+                  <IconButton
+                    title="删除模型文件"
+                    onClick={() => onDeleteModel(model)}
+                    disabled={deletingModelPath !== null}
+                    icon={deletingModelPath === model.path
+                      ? <Loader2 className="h-4 w-4 animate-spin text-[var(--color-danger)]" />
+                      : <Trash2 className="h-4 w-4 text-[var(--color-danger)]" />}
+                  />
+                )}
               </div>
             </div>
           );
@@ -819,19 +898,45 @@ function TypeTag({ label }: { label: string }) {
   );
 }
 
-function IconButton({ title, icon, onClick }: { title: string; icon: ReactNode; onClick: () => void }) {
+function IconButton({ title, icon, onClick, disabled = false }: { title: string; icon: ReactNode; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       title={title}
       onClick={(event) => {
         event.stopPropagation();
+        if (disabled) return;
         onClick();
       }}
-      className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--brand-green)] transition"
+      disabled={disabled}
+      className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--brand-green)] transition disabled:cursor-not-allowed disabled:opacity-50"
     >
       {icon}
     </button>
   );
+}
+
+function removeDeletedModel(scanResult: AiModelScanResult | null, deletedPath: string): AiModelScanResult | null {
+  if (!scanResult) return scanResult;
+
+  const sources = scanResult.sources
+    .map((source) => {
+      const models = source.models.filter((model) => model.path !== deletedPath);
+      return {
+        ...source,
+        models,
+        model_count: models.length,
+        total_size: models.reduce((total, model) => total + model.size, 0),
+      };
+    })
+    .filter((source) => source.models.length > 0);
+
+  return {
+    ...scanResult,
+    sources,
+    source_count: sources.length,
+    total_model_count: sources.reduce((total, source) => total + source.model_count, 0),
+    total_size: sources.reduce((total, source) => total + source.total_size, 0),
+  };
 }
 
 function flattenModels(scanResult: AiModelScanResult | null): FlattenedModel[] {

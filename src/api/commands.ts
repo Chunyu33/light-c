@@ -83,6 +83,35 @@ export async function getLocalDrives(): Promise<LocalDriveInfo[]> {
   return invoke<LocalDriveInfo[]>('get_local_drives');
 }
 
+export interface DiskVolumeInfo {
+  drive_letter: string;
+  volume_name: string;
+  file_system: string;
+  total_space: number;
+  used_space: number;
+  free_space: number;
+  usage_percent: number;
+}
+
+export interface DiskHealthInfo {
+  number: number | null;
+  model: string;
+  serial_number: string;
+  firmware_version: string;
+  media_type: string;
+  bus_type: string;
+  health_status: 'Healthy' | 'Warning' | 'Unhealthy' | 'Unknown';
+  operational_status: string;
+  size: number;
+  drive_letters: string[];
+  volumes: DiskVolumeInfo[];
+}
+
+/** 获取物理磁盘基础信息和 Windows Storage 报告的健康状态。 */
+export async function getDiskHealth(): Promise<DiskHealthInfo[]> {
+  return invoke<DiskHealthInfo[]>('get_disk_health');
+}
+
 /**
  * 鎵ц鍨冨溇鏂囦欢鎵弿
  * @param request 鎵弿璇锋眰鍙傛暟锛堝彲閫夛級
@@ -225,6 +254,80 @@ export async function cleanupWinsxsResetbase(): Promise<string> {
  */
 export async function openVirtualMemorySettings(): Promise<void> {
   return invoke<void>('open_virtual_memory_settings');
+}
+
+// ============================================================================
+// 旧驱动清理 API
+// ============================================================================
+
+export interface DriverPackageInfo {
+  published_name: string;
+  original_name: string;
+  provider_name: string;
+  class_name: string;
+  driver_version: string;
+  family_id: string;
+  signer_name: string;
+  driver_store_path: string;
+  device_count: number;
+  active_device_count: number;
+  installed_device_count: number;
+  outranked_device_count: number;
+  file_count: number;
+  status: 'old_confirmed' | 'recommended' | 'in_use' | 'no_newer_version' | 'unknown';
+  actionable: boolean;
+  reason: string;
+}
+
+export interface DriverScanResult {
+  is_admin: boolean;
+  packages: DriverPackageInfo[];
+  total_count: number;
+  candidate_count: number;
+  high_confidence_count: number;
+  device_match_data_available: boolean;
+}
+
+export interface DriverDeleteDetail {
+  published_name: string;
+  success: boolean;
+  verified_removed: boolean;
+  error_message: string | null;
+}
+
+export interface DriverDeleteResult {
+  backup_directory: string;
+  success_count: number;
+  failed_count: number;
+  needs_reboot: boolean;
+  details: DriverDeleteDetail[];
+}
+
+export interface DriverRestoreResult {
+  backup_directory: string;
+  success: boolean;
+  needs_reboot: boolean;
+  message: string;
+}
+
+/** 检测第三方驱动包，后端只返回经过安全分类的结果。 */
+export async function scanOldDrivers(): Promise<DriverScanResult> {
+  return invoke<DriverScanResult>('scan_old_drivers');
+}
+
+/** 由后端重新校验、备份并删除选中的驱动包。 */
+export async function deleteOldDrivers(publishedNames: string[]): Promise<DriverDeleteResult> {
+  return invoke<DriverDeleteResult>('delete_old_drivers', { publishedNames });
+}
+
+/** 递归恢复当前数据目录中所有已保存的驱动包备份。 */
+export async function restoreAllDriverBackups(): Promise<DriverRestoreResult> {
+  return invoke<DriverRestoreResult>('restore_all_driver_backups');
+}
+
+/** 打开当前数据目录下的独立驱动备份目录。 */
+export async function openDriverBackupDir(): Promise<void> {
+  return invoke<void>('open_driver_backup_dir');
 }
 
 // ============================================================================
@@ -1325,6 +1428,11 @@ export interface AiModelScanProgress {
  */
 export async function scanAiModelAssets(enableDeepDiscovery: boolean): Promise<AiModelScanResult> {
   return invoke<AiModelScanResult>('scan_ai_model_assets', { enableDeepDiscovery });
+}
+
+/** 删除单个 AI 模型文件，后端会再次校验模型格式和文件安全边界。 */
+export async function deleteAiModel(path: string): Promise<EnhancedDeleteResult> {
+  return invoke<EnhancedDeleteResult>('delete_ai_model', { path });
 }
 
 // ============================================================================

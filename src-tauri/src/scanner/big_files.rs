@@ -80,7 +80,11 @@ pub(crate) fn is_cancelled() -> bool {
 }
 
 /// 执行大文件扫描（阻塞，应在 spawn_blocking 中调用）
-pub fn scan(window: &Window, top_n: usize, drive_letter: char) -> Result<Vec<LargeFileEntry>, String> {
+pub fn scan(
+    window: &Window,
+    top_n: usize,
+    drive_letter: char,
+) -> Result<Vec<LargeFileEntry>, String> {
     #[cfg(target_os = "windows")]
     {
         use std::time::Instant;

@@ -47,6 +47,8 @@ export interface ModulesState {
   social: ModuleState;
   /** 系统瘦身模块 */
   system: ModuleState;
+  /** 旧驱动清理模块 */
+  driverCleanup: ModuleState;
   /** 卸载残留模块 */
   leftovers: ModuleState;
   /** 注册表冗余模块 */
@@ -141,6 +143,7 @@ const initialModulesState: ModulesState = {
   bigFiles: { ...initialModuleState },
   social: { ...initialModuleState },
   system: { ...initialModuleState },
+  driverCleanup: { ...initialModuleState },
   leftovers: { ...initialModuleState },
   registry: { ...initialModuleState },
   hotspot: { ...initialModuleState },
@@ -163,6 +166,7 @@ const ModuleStateContexts: { [K in keyof ModulesState]: React.Context<ModuleStat
   bigFiles: createContext<ModuleState | null>(null),
   social: createContext<ModuleState | null>(null),
   system: createContext<ModuleState | null>(null),
+  driverCleanup: createContext<ModuleState | null>(null),
   leftovers: createContext<ModuleState | null>(null),
   registry: createContext<ModuleState | null>(null),
   hotspot: createContext<ModuleState | null>(null),
@@ -357,7 +361,8 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
               <ModuleStateContexts.bigFiles.Provider value={modules.bigFiles}>
                 <ModuleStateContexts.social.Provider value={modules.social}>
                   <ModuleStateContexts.system.Provider value={modules.system}>
-                    <ModuleStateContexts.leftovers.Provider value={modules.leftovers}>
+                    <ModuleStateContexts.driverCleanup.Provider value={modules.driverCleanup}>
+                      <ModuleStateContexts.leftovers.Provider value={modules.leftovers}>
                       <ModuleStateContexts.registry.Provider value={modules.registry}>
                         <ModuleStateContexts.hotspot.Provider value={modules.hotspot}>
                           <ModuleStateContexts.contextMenu.Provider value={modules.contextMenu}>
@@ -369,7 +374,8 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
                           </ModuleStateContexts.contextMenu.Provider>
                         </ModuleStateContexts.hotspot.Provider>
                       </ModuleStateContexts.registry.Provider>
-                    </ModuleStateContexts.leftovers.Provider>
+                      </ModuleStateContexts.leftovers.Provider>
+                    </ModuleStateContexts.driverCleanup.Provider>
                   </ModuleStateContexts.system.Provider>
                 </ModuleStateContexts.social.Provider>
               </ModuleStateContexts.bigFiles.Provider>

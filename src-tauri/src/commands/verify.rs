@@ -230,10 +230,7 @@ fn verify_exe_signature(exe_bytes: &[u8], signature_text: &str) -> Result<(), Ve
     public_key
         .verify(exe_bytes, &signature, true)
         .map_err(|error| {
-            VerifyError::InvalidSignature(format!(
-                "签名与当前 LightC.exe 不一致：{}",
-                error
-            ))
+            VerifyError::InvalidSignature(format!("签名与当前 LightC.exe 不一致：{}", error))
         })
 }
 

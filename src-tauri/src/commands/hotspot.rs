@@ -95,7 +95,10 @@ fn normalize_hotspot_drive_letter(value: Option<&str>) -> Result<char, String> {
         .map(str::to_string)
         .or_else(|| std::env::var("SystemDrive").ok())
         .unwrap_or_else(|| "C:".to_string());
-    let Some(letter) = raw_value.chars().find(|character| character.is_ascii_alphabetic()) else {
+    let Some(letter) = raw_value
+        .chars()
+        .find(|character| character.is_ascii_alphabetic())
+    else {
         return Err("无效的磁盘盘符".to_string());
     };
     // 大目录深度扫描只需要盘符，统一转大写可避免 d/D 触发不同扫描根。

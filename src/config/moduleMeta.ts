@@ -5,6 +5,7 @@
 
 import {
   BrainCircuit,
+  Cpu,
   Database,
   FileBox,
   Flame,
@@ -24,6 +25,7 @@ export type AppModuleId =
   | 'big-files'
   | 'social-clean'
   | 'system-slim'
+  | 'driver-cleanup'
   | 'leftovers'
   | 'registry'
   | 'context-menu'
@@ -43,6 +45,7 @@ export const APP_MODULE_META: AppModuleMeta[] = [
   { id: 'big-files', label: '大文件清理', icon: FileBox },
   { id: 'social-clean', label: '社交软件专清', icon: MessageCircle },
   { id: 'system-slim', label: '系统瘦身', icon: Layers },
+  { id: 'driver-cleanup', label: '旧驱动清理', icon: Cpu },
   { id: 'leftovers', label: '卸载残留', icon: Package },
   { id: 'registry', label: '注册表冗余', icon: Database },
   { id: 'context-menu', label: '右键菜单清理', icon: MousePointerClick },

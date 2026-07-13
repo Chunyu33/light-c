@@ -99,7 +99,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
           
           {warning && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-              <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+              <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed break-words whitespace-pre-wrap">
                 {warning}
               </p>
             </div>

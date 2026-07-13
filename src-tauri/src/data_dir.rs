@@ -36,11 +36,12 @@ const CONFIG_DIR_NAME: &str = "config";
 const CONFIG_FILE: &str = "config.json";
 
 /// 迁移数据目录时只复制 LightC 明确拥有的数据，避免用户误选磁盘根目录后把无关文件继续带到新位置。
-const MIGRATABLE_DATA_ENTRIES: [&str; 4] = [
+const MIGRATABLE_DATA_ENTRIES: [&str; 5] = [
     "install_history.json",
     "logs",
     "reg_backups",
     "disk_growth_snapshots",
+    "driver_backups",
 ];
 
 // ============================================================================
@@ -104,7 +105,7 @@ const DISK_GROWTH_SNAPSHOT_JSON_SUFFIX: &str = ".json";
 const DISK_GROWTH_SNAPSHOT_SHARD_SUFFIX: &str = ".files";
 
 // 快照项按盘符动态展开，普通白名单只保留固定数据，避免“清空本地数据”误删所有磁盘基线。
-const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 3] = [
+const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
     ClearableDataDefinition {
         id: "install_history",
         label: "安装历史缓存",
@@ -128,6 +129,14 @@ const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 3] = [
         relative_path: "reg_backups",
         item_type: ClearableDataType::DirectoryContents,
         warning: Some("删除后无法再通过这些备份回溯旧注册表清理操作。"),
+    },
+    ClearableDataDefinition {
+        id: "driver_backups",
+        label: "驱动备份",
+        description: "旧驱动清理前导出的驱动包备份，文件可能较大。",
+        relative_path: "driver_backups",
+        item_type: ClearableDataType::DirectoryContents,
+        warning: Some("删除后将无法使用这些备份手动恢复已清理的驱动包。默认不会勾选。"),
     },
 ];
 
@@ -540,11 +549,20 @@ fn build_disk_growth_snapshot_items(data_dir: &Path) -> Result<Vec<ClearableData
     }
 
     let mut drives = std::collections::BTreeSet::new();
-    for entry_res in fs::read_dir(&snapshot_dir)
-        .map_err(|e| format!("读取磁盘变化分析快照目录失败 {}: {}", snapshot_dir.display(), e))?
-    {
-        let entry = entry_res
-            .map_err(|e| format!("读取磁盘变化分析快照条目失败 {}: {}", snapshot_dir.display(), e))?;
+    for entry_res in fs::read_dir(&snapshot_dir).map_err(|e| {
+        format!(
+            "读取磁盘变化分析快照目录失败 {}: {}",
+            snapshot_dir.display(),
+            e
+        )
+    })? {
+        let entry = entry_res.map_err(|e| {
+            format!(
+                "读取磁盘变化分析快照条目失败 {}: {}",
+                snapshot_dir.display(),
+                e
+            )
+        })?;
         let Some(name) = entry.file_name().to_str().map(str::to_string) else {
             continue;
         };
@@ -574,7 +592,10 @@ fn empty_disk_growth_snapshot_item(snapshot_dir: &Path) -> ClearableDataItem {
         exists: snapshot_dir.exists(),
         file_count: 0,
         size: 0,
-        warning: Some("可安全清理；下次对应磁盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。".to_string()),
+        warning: Some(
+            "可安全清理；下次对应磁盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。"
+                .to_string(),
+        ),
     }
 }
 
@@ -591,16 +612,16 @@ fn build_disk_growth_snapshot_item(
             drive_letter.to_ascii_lowercase()
         ),
         label: format!("{}磁盘变化分析快照", drive_label),
-        description: format!(
-            "用于 {}磁盘变化分析的增长对比基线和分片明细。",
-            drive_label
-        ),
+        description: format!("用于 {}磁盘变化分析的增长对比基线和分片明细。", drive_label),
         path: snapshot_dir.to_string_lossy().to_string(),
         item_type: "directory".to_string(),
         exists: snapshot_dir.is_dir(),
         file_count,
         size,
-        warning: Some("可安全清理；下次对应磁盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。".to_string()),
+        warning: Some(
+            "可安全清理；下次对应磁盘分析会重新建立基线，第二次扫描后才会重新显示变化对比。"
+                .to_string(),
+        ),
     })
 }
 
@@ -705,18 +726,25 @@ fn disk_growth_snapshot_paths_for_drive(
     }
 
     let mut paths = Vec::new();
-    for entry_res in fs::read_dir(snapshot_dir)
-        .map_err(|e| format!("读取磁盘变化分析快照目录失败 {}: {}", snapshot_dir.display(), e))?
-    {
-        let entry = entry_res
-            .map_err(|e| format!("读取磁盘变化分析快照条目失败 {}: {}", snapshot_dir.display(), e))?;
+    for entry_res in fs::read_dir(snapshot_dir).map_err(|e| {
+        format!(
+            "读取磁盘变化分析快照目录失败 {}: {}",
+            snapshot_dir.display(),
+            e
+        )
+    })? {
+        let entry = entry_res.map_err(|e| {
+            format!(
+                "读取磁盘变化分析快照条目失败 {}: {}",
+                snapshot_dir.display(),
+                e
+            )
+        })?;
         let path = entry.path();
         let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
             continue;
         };
-        if disk_growth_snapshot_drive_from_name(name)
-            == Some(drive_letter.to_ascii_uppercase())
-        {
+        if disk_growth_snapshot_drive_from_name(name) == Some(drive_letter.to_ascii_uppercase()) {
             paths.push(path);
         }
     }

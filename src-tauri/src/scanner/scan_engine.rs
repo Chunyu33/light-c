@@ -329,8 +329,7 @@ impl ScanEngine {
     /// 不是纯缓存，删除后会导致会话列表、应用偏好或索引丢失。
     fn is_persistent_app_profile_path(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy().to_lowercase();
-        if !path_str.contains("\\appdata\\local\\packages\\")
-            && !path_str.contains("\\ebwebview\\")
+        if !path_str.contains("\\appdata\\local\\packages\\") && !path_str.contains("\\ebwebview\\")
         {
             return false;
         }

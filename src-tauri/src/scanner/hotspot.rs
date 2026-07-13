@@ -550,12 +550,7 @@ impl HotspotScanner {
                 .filter(|p| p.is_dir())
                 .filter(|p| !Self::should_skip_scan(p))
                 .collect(),
-            Err(e) => {
-                return Err(format!(
-                    "无法读取 {} 盘根目录: {}",
-                    self.drive_letter, e
-                ))
-            }
+            Err(e) => return Err(format!("无法读取 {} 盘根目录: {}", self.drive_letter, e)),
         };
 
         let total_first_level = first_level_dirs.len();
@@ -577,10 +572,7 @@ impl HotspotScanner {
 
         match backend {
             HotspotBackend::Mft => {
-                log::info!(
-                    "[全盘扫描] 使用 MFT 直读引擎扫描 {} 盘",
-                    self.drive_letter
-                );
+                log::info!("[全盘扫描] 使用 MFT 直读引擎扫描 {} 盘", self.drive_letter);
                 if let Some(app) = app_handle {
                     let _ = app.emit(
                         "hotspot-scan:progress",

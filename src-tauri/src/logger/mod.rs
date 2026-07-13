@@ -232,9 +232,7 @@ impl CleanupLogger {
                             // 执行日志轮转（在后台线程中执行，不阻塞）
                             let log_dir = self.log_dir.clone();
                             tokio::spawn(async move {
-                                if let Err(e) =
-                                    rotate_logs(&log_dir, DEFAULT_MAX_LOG_FILES).await
-                                {
+                                if let Err(e) = rotate_logs(&log_dir, DEFAULT_MAX_LOG_FILES).await {
                                     warn!("日志轮转失败: {}", e);
                                 }
                             });

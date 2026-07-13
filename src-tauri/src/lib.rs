@@ -8,7 +8,9 @@ mod ai_models;
 mod cleaner;
 mod commands;
 mod data_dir;
+mod disk_health;
 mod disk_growth;
+mod driver_cleanup;
 mod health_score;
 mod logger;
 mod scanner;
@@ -57,6 +59,7 @@ pub fn run() {
             // 磁盘信息
             get_disk_info,
             get_local_drives,
+            get_disk_health,
             // 扫描相关
             scan_junk_files,
             scan_category,
@@ -79,6 +82,11 @@ pub fn run() {
             cleanup_winsxs,
             cleanup_winsxs_resetbase,
             open_virtual_memory_settings,
+            // 旧驱动清理
+            scan_old_drivers,
+            delete_old_drivers,
+            restore_all_driver_backups,
+            open_driver_backup_dir,
             // 健康评分
             get_health_score,
             // 卸载残留和注册表清理
@@ -127,6 +135,7 @@ pub fn run() {
             pick_folder_dialog,
             // AI 资产分析
             scan_ai_model_assets,
+            delete_ai_model,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时发生错误");

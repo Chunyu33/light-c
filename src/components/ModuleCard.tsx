@@ -33,8 +33,12 @@ export interface ModuleCardProps {
   doneBadgeText?: string;
   /** 完成但没有结果时的状态文案，避免非清理模块显示“已清理”。 */
   emptyDoneBadgeText?: string;
+  /** 隐藏完成状态徽章，适合检测类模块避免显示无意义的“已检测”。 */
+  hideDoneBadge?: boolean;
   /** fileCount 的单位标签，默认"个文件"。大目录模块可传"个大目录" */
   countLabel?: string;
+  /** 仅展示数量，不展示不适用的空间统计。 */
+  hideTotalSize?: boolean;
   /** 是否展开 */
   expanded: boolean;
   /** 展开/收起回调 */
@@ -57,6 +61,8 @@ export interface ModuleCardProps {
   variant?: 'card' | 'page';
   /** 页面模式下强制展示内容，避免切换模块后还要再次展开。 */
   forceExpanded?: boolean;
+  /** 允许模块内容中的 sticky 元素跨越卡片内容滚动时保持可见。 */
+  allowStickyContent?: boolean;
 }
 
 // ============================================================================
@@ -76,7 +82,9 @@ export function ModuleCard({
   totalSize,
   doneBadgeText = '可清理',
   emptyDoneBadgeText = '已清理',
+  hideDoneBadge = false,
   countLabel = '个文件',
+  hideTotalSize = false,
   expanded,
   onToggleExpand,
   onScan,
@@ -88,6 +96,7 @@ export function ModuleCard({
   error,
   variant = 'card',
   forceExpanded = false,
+  allowStickyContent = false,
 }: ModuleCardProps) {
   const isScanning = status === 'scanning';
   const isDone = status === 'done';
@@ -114,6 +123,7 @@ export function ModuleCard({
       );
     }
     if (isDone && fileCount > 0) {
+      if (hideDoneBadge) return null;
       return (
         <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
           {doneBadgeText}
@@ -121,6 +131,7 @@ export function ModuleCard({
       );
     }
     if (isDone && fileCount === 0) {
+      if (hideDoneBadge) return null;
       return (
         <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)]">
           <CheckCircle2 className="w-3 h-3" />
@@ -143,7 +154,7 @@ export function ModuleCard({
     <div 
       className={`
         /* 微信风格卡片：纯白背景 + 极淡阴影 + 大圆角 */
-        bg-[var(--bg-card)] rounded-2xl overflow-hidden
+        bg-[var(--bg-card)] rounded-2xl ${allowStickyContent ? 'overflow-visible' : 'overflow-hidden'}
         transition-all duration-300 ease-out
         ${isPageVariant
           ? 'shadow-sm ring-1 ring-[var(--border-color)]'
@@ -191,7 +202,7 @@ export function ModuleCard({
           {/* 统计信息 - 使用 tabular-nums 确保数字稳定不抖动 */}
           {isDone && fileCount > 0 && (
             <div className="text-right shrink-0 mr-3">
-              <p className="text-xl font-bold text-[var(--brand-green)] tabular-nums">{formatSize(totalSize)}</p>
+              {!hideTotalSize && <p className="text-xl font-bold text-[var(--brand-green)] tabular-nums">{formatSize(totalSize)}</p>}
               <p className="text-[13px] text-[var(--text-muted)] tabular-nums">{fileCount.toLocaleString()} {countLabel}</p>
             </div>
           )}
@@ -252,7 +263,7 @@ export function ModuleCard({
       </div>
 
       {/* 展开内容 - 手风琴动画 */}
-      <AccordionContent expanded={contentExpanded} animated={!isPageVariant}>
+      <AccordionContent expanded={contentExpanded} animated={!isPageVariant && !allowStickyContent}>
         <div className="border-t border-[var(--border-color)] pb-2">
           {children}
         </div>
@@ -323,8 +334,8 @@ function AccordionContent({ expanded, children, animated = true }: AccordionCont
   if (!shouldRender) return null;
 
   if (!animated) {
-    // 页面模式下模块内容始终可见，不需要手风琴高度计算，避免隐藏页面切换时产生无意义动画。
-    return <div ref={contentRef}>{children}</div>;
+    // 页面模式或悬浮操作模块不做高度动画，避免 overflow 规则截断 sticky 子元素。
+    return expanded ? <div ref={contentRef}>{children}</div> : null;
   }
 
   return (

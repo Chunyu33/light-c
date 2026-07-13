@@ -55,7 +55,11 @@ pub fn scan_top_files_via_mft(
     // 大文件模块支持多盘选择，MFT 直读必须显式使用用户选择的盘符，不能再隐式绑定系统盘。
     let drive_letter = drive_letter.to_ascii_uppercase();
 
-    flog!("[MFT-BigFiles] ===== 扫描开始 drive={} top_n={} =====", drive_letter, top_n);
+    flog!(
+        "[MFT-BigFiles] ===== 扫描开始 drive={} top_n={} =====",
+        drive_letter,
+        top_n
+    );
 
     let progress = |stage: &str, message: &str, processed: usize, found_count: usize| {
         flog!("[MFT-BigFiles] {}: {}", message, processed);
