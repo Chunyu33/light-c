@@ -5,12 +5,13 @@
 // SMART 私有属性，避免在不同厂商和磁盘类型上产生误导性的“寿命百分比”。
 // ============================================================================
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use std::process::Command;
 
 const POWERSHELL_TIMEOUT_SECONDS: u64 = 12;
 #[cfg(target_os = "windows")]
-const HIDDEN_PROCESS_FLAGS: u32 = 0x08000000 | 0x00000008;
+const POWERSHELL_PROCESS_FLAGS: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DiskHealthInfo {
@@ -169,23 +170,27 @@ $partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -Cla
     usage_percent = $usagePercent
   }
 })
-[PSCustomObject]@{ physical_disks = $physical; partitions = $partitions } | ConvertTo-Json -Depth 6 -Compress
+    $json = [PSCustomObject]@{ physical_disks = $physical; partitions = $partitions } | ConvertTo-Json -Depth 6 -Compress
+    [Console]::Out.Write($json)
 "#;
 
+    // 使用 PowerShell 官方的 UTF-16LE 编码参数，避免生产包中长脚本经过命令行转义后丢失输出。
+    let encoded_script = encode_powershell_script(script);
     let mut child = Command::new("powershell.exe")
         .args([
+            "-NoLogo",
             "-NoProfile",
             "-NonInteractive",
             "-WindowStyle",
             "Hidden",
             "-ExecutionPolicy",
             "Bypass",
-            "-Command",
-            script,
+            "-EncodedCommand",
+            encoded_script.as_str(),
         ])
-        // release 包是 Windows GUI 子系统；DETACHED_PROCESS 强制脱离父控制台，
-        // CREATE_NO_WINDOW 继续兜底，避免管理员环境下 PowerShell 创建可见窗口。
-        .creation_flags(HIDDEN_PROCESS_FLAGS)
+        // PowerShell 需要依赖重定向管道返回 JSON；不使用 DETACHED_PROCESS，
+        // 避免部分 GUI/管理员环境下子进程 stdout 管道为空，同时保留无控制台标志。
+        .creation_flags(POWERSHELL_PROCESS_FLAGS)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -212,7 +217,13 @@ $partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -Cla
             }
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if stdout.is_empty() {
-                return Err("Windows 未返回磁盘信息".to_string());
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let exit_code = status.code().map_or_else(|| "未知".to_string(), |code| code.to_string());
+                return Err(if stderr.is_empty() {
+                    format!("Windows 未返回磁盘信息（PowerShell 退出码 {}，没有 JSON 输出）", exit_code)
+                } else {
+                    format!("Windows 未返回磁盘信息（PowerShell 退出码 {}）: {}", exit_code, stderr)
+                });
             }
             return Ok(stdout);
         }
@@ -224,6 +235,15 @@ $partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -Cla
         }
         std::thread::sleep(std::time::Duration::from_millis(40));
     }
+}
+
+#[cfg(target_os = "windows")]
+fn encode_powershell_script(script: &str) -> String {
+    let utf16_bytes = script
+        .encode_utf16()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect::<Vec<_>>();
+    BASE64_STANDARD.encode(utf16_bytes)
 }
 
 fn merge_storage_snapshot(snapshot: StorageSnapshot) -> Result<Vec<DiskHealthInfo>, String> {
