@@ -91,6 +91,26 @@ pub fn open_file(path: String) -> Result<(), String> {
     }
 }
 
+/// 打开 Windows 系统回收站视图，而不是物理 `$Recycle.Bin` 内部目录。
+#[tauri::command]
+pub fn open_recycle_bin() -> Result<(), String> {
+    info!("打开系统回收站");
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg("shell:RecycleBinFolder")
+            .spawn()
+            .map_err(|error| format!("无法打开系统回收站: {}", error))?;
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("此功能仅支持Windows系统".to_string())
+    }
+}
+
 /// 打开任务管理器的启动项管理页面
 #[tauri::command]
 pub fn open_startup_manager() -> Result<(), String> {

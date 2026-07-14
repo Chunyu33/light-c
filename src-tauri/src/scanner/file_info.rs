@@ -15,6 +15,8 @@ pub struct FileInfo {
     pub name: String,
     /// 文件大小（字节）
     pub size: u64,
+    /// 文件被删除前的原始路径（仅回收站条目有值）
+    pub original_path: Option<String>,
     /// 最后修改时间（Unix时间戳）
     pub modified_time: i64,
     /// 是否为目录
@@ -37,10 +39,17 @@ impl FileInfo {
             path,
             name,
             size,
+            original_path: None,
             modified_time,
             is_dir,
             category,
         }
+    }
+
+    /// 记录回收站元数据中的原始路径，供界面提示用户文件来源。
+    pub fn with_original_path(mut self, original_path: String) -> Self {
+        self.original_path = Some(original_path);
+        self
     }
 
     /// 获取人类可读的文件大小

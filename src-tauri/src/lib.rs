@@ -8,8 +8,8 @@ mod ai_models;
 mod cleaner;
 mod commands;
 mod data_dir;
-mod disk_health;
 mod disk_growth;
+mod disk_health;
 mod driver_cleanup;
 mod health_score;
 mod logger;
@@ -74,6 +74,7 @@ pub fn run() {
             open_disk_cleanup,
             open_in_folder,
             open_file,
+            open_recycle_bin,
             // 系统瘦身
             check_admin_privilege,
             get_system_slim_status,

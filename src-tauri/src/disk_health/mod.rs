@@ -218,11 +218,19 @@ $partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -Cla
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if stdout.is_empty() {
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                let exit_code = status.code().map_or_else(|| "未知".to_string(), |code| code.to_string());
+                let exit_code = status
+                    .code()
+                    .map_or_else(|| "未知".to_string(), |code| code.to_string());
                 return Err(if stderr.is_empty() {
-                    format!("Windows 未返回磁盘信息（PowerShell 退出码 {}，没有 JSON 输出）", exit_code)
+                    format!(
+                        "Windows 未返回磁盘信息（PowerShell 退出码 {}，没有 JSON 输出）",
+                        exit_code
+                    )
                 } else {
-                    format!("Windows 未返回磁盘信息（PowerShell 退出码 {}）: {}", exit_code, stderr)
+                    format!(
+                        "Windows 未返回磁盘信息（PowerShell 退出码 {}）: {}",
+                        exit_code, stderr
+                    )
                 });
             }
             return Ok(stdout);

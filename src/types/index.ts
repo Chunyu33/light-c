@@ -28,6 +28,8 @@ export interface FileInfo {
   name: string;
   /** 文件大小（字节） */
   size: number;
+  /** 文件被删除前的原始路径（仅回收站条目有值） */
+  original_path?: string | null;
   /** 最后修改时间（Unix时间戳） */
   modified_time: number;
   /** 是否为目录 */

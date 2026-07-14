@@ -126,7 +126,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
       if (result.success_count > 0) {
         const blockedText = result.failed_count > 0
-          ? `，${result.failed_count} 个文件因占用或权限问题跳过`
+          ? `，${result.failed_count} 个文件清理失败`
           : '';
         const rebootText = result.reboot_pending_count > 0
           ? `，${result.reboot_pending_count} 个文件将在重启后删除`
@@ -153,47 +153,73 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         });
       }
 
-      // 从扫描结果中移除已删除的文件
+      // Shell 清空回收站按盘符处理整组条目，清理后重新扫描才能同步未选中的条目状态。
       if (scanResult && result.success_count > 0) {
-        // 获取成功删除的路径（不包括失败和标记重启的）
         const deletedPaths = new Set(
           result.file_results
             .filter((f) => f.success)
             .map((f) => f.path)
         );
+        const hasRecycleBinSuccess = Array.from(deletedPaths).some((path) =>
+          path.toLowerCase().includes('\\$recycle.bin\\')
+        );
 
-        const updatedCategories = scanResult.categories.map((category) => {
-          const remainingFiles = category.files.filter((f) => !deletedPaths.has(f.path));
-          return {
-            ...category,
-            files: remainingFiles,
-            file_count: remainingFiles.length,
-            total_size: remainingFiles.reduce((sum, f) => sum + f.size, 0),
+        if (hasRecycleBinSuccess) {
+          try {
+            const refreshedResult = await scanJunkFiles();
+            const visiblePaths = new Set(
+              refreshedResult.categories.flatMap((category) => category.files.map((file) => file.path))
+            );
+            setScanResult(refreshedResult);
+            updateModuleState('junk', {
+              fileCount: refreshedResult.total_file_count,
+              totalSize: refreshedResult.total_size,
+            });
+            setSelectedPaths((previous) => new Set(
+              Array.from(previous).filter((path) => visiblePaths.has(path) && !deletedPaths.has(path))
+            ));
+            triggerHealthRefresh();
+          } catch (refreshError) {
+            // 清理已经完成时，重扫失败不应把成功结果改报为删除失败；保留当前结果并提示重试扫描。
+            console.warn('清理后刷新回收站扫描失败:', refreshError);
+            showToast({
+              type: 'warning',
+              title: '清理完成，但刷新扫描失败',
+              description: '请重新扫描以获取最新回收站状态',
+            });
+          }
+        } else {
+          const updatedCategories = scanResult.categories.map((category) => {
+            const remainingFiles = category.files.filter((f) => !deletedPaths.has(f.path));
+            return {
+              ...category,
+              files: remainingFiles,
+              file_count: remainingFiles.length,
+              total_size: remainingFiles.reduce((sum, f) => sum + f.size, 0),
+            };
+          });
+
+          const newResult = {
+            ...scanResult,
+            categories: updatedCategories,
+            total_file_count: updatedCategories.reduce((acc, c) => acc + c.file_count, 0),
+            total_size: updatedCategories.reduce((acc, c) => acc + c.total_size, 0),
           };
-        });
 
-        const newResult = {
-          ...scanResult,
-          categories: updatedCategories,
-          total_file_count: updatedCategories.reduce((acc, c) => acc + c.file_count, 0),
-          total_size: updatedCategories.reduce((acc, c) => acc + c.total_size, 0),
-        };
+          setScanResult(newResult);
+          updateModuleState('junk', {
+            fileCount: newResult.total_file_count,
+            totalSize: newResult.total_size,
+          });
 
-        setScanResult(newResult);
-        updateModuleState('junk', {
-          fileCount: newResult.total_file_count,
-          totalSize: newResult.total_size,
-        });
+          setSelectedPaths((previous) => {
+            const nextSelection = new Set(previous);
+            deletedPaths.forEach((path) => nextSelection.delete(path));
+            return nextSelection;
+          });
 
-        // 清除已删除文件的选中状态
-        setSelectedPaths((prev) => {
-          const newSet = new Set(prev);
-          deletedPaths.forEach((p) => newSet.delete(p));
-          return newSet;
-        });
-
-        // 触发健康评分刷新
-        triggerHealthRefresh();
+          triggerHealthRefresh();
+        }
       }
     } catch (err) {
       console.error('删除失败:', err);

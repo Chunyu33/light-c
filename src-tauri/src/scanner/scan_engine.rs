@@ -105,6 +105,13 @@ impl ScanEngine {
     /// 扫描单个分类
     pub fn scan_category(&self, category: &JunkCategory) -> CategoryScanResult {
         let mut result = CategoryScanResult::new(category.clone());
+
+        // 回收站的物理目录包含多用户 SID 和 Shell 元数据，必须使用专用扫描器保持与 Explorer 一致。
+        if matches!(category, JunkCategory::RecycleBin) {
+            super::recycle_bin::scan_current_user(category, &mut result);
+            return result;
+        }
+
         let scan_paths = category.get_scan_paths();
         let patterns = category.get_file_patterns();
 
@@ -255,32 +262,46 @@ impl ScanEngine {
 
     /// 简单的glob模式匹配
     fn matches_glob(&self, name: &str, pattern: &str) -> bool {
+        // Windows 文件名匹配不区分大小写，名称和模式必须使用同一规范化口径。
+        let name = name.to_lowercase();
         let pattern = pattern.to_lowercase();
 
         if pattern == "*" {
             return true;
         }
 
-        if pattern.starts_with('*') && pattern.ends_with('*') {
-            // *xxx* 模式
-            let middle = &pattern[1..pattern.len() - 1];
-            return name.contains(middle);
+        // 将单个星号视为任意长度字符串，支持前缀、后缀和中间通配符组合。
+        let starts_with_wildcard = pattern.starts_with('*');
+        let ends_with_wildcard = pattern.ends_with('*');
+        let parts: Vec<&str> = pattern.split('*').filter(|part| !part.is_empty()).collect();
+        if parts.is_empty() {
+            return true;
         }
 
-        if pattern.starts_with('*') {
-            // *.xxx 模式
-            let suffix = &pattern[1..];
-            return name.ends_with(suffix);
+        let mut cursor = 0usize;
+        for (index, part) in parts.iter().enumerate() {
+            let is_first = index == 0;
+            let is_last = index == parts.len() - 1;
+
+            if is_first && !starts_with_wildcard {
+                if !name[cursor..].starts_with(part) {
+                    return false;
+                }
+                cursor += part.len();
+                continue;
+            }
+
+            let Some(relative_position) = name[cursor..].find(part) else {
+                return false;
+            };
+            let match_start = cursor + relative_position;
+            if is_last && !ends_with_wildcard && !name[match_start..].ends_with(part) {
+                return false;
+            }
+            cursor = match_start + part.len();
         }
 
-        if pattern.ends_with('*') {
-            // xxx* 模式
-            let prefix = &pattern[..pattern.len() - 1];
-            return name.starts_with(prefix);
-        }
-
-        // 精确匹配
-        name == pattern
+        true
     }
 
     /// 检查是否为系统保护路径（不应扫描）

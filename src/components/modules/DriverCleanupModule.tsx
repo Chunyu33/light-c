@@ -410,7 +410,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                   }`}
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
-                  高置信 {selectedHighConfidenceCount}/{highConfidenceNames.length}
+                  旧驱动 {selectedHighConfidenceCount}/{highConfidenceNames.length}
                 </button>
                 <button title="打开驱动备份目录" onClick={() => {
                     void openDriverBackupDir().catch((error) => {

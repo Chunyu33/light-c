@@ -50,12 +50,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.12.0'
+          releaseName: 'LightC v2.12.1'
           releaseBody: |
             ## 更新内容
-            - 新增旧驱动清理：基于 pnputil 检测设备绑定和驱动排名，提供高置信判定、备份、删除、搜索、打开目录和一键恢复
-            - 设置页新增磁盘信息：手动读取物理磁盘基础信息、分区空间和 Windows 报告的健康状态，并缓存本次运行数据
-            - AI 模型空间支持删除模型文件：删除前二次确认，后端复核并复用增强删除引擎
+            - 修复回收站扫描与清理问题
+            - 修复扫描路径匹配问题
 
             请查看 [更新日志](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false

@@ -12,6 +12,7 @@
 // - 详细的删除结果反馈，包括跳过原因
 // ============================================================================
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 #[cfg(windows)]
@@ -350,12 +351,12 @@ impl EnhancedDeleteResult {
             }
         }
 
-        // 跳过部分
+        // 跳过部分不能统一描述为“系统占用”，回收站 Shell API 失败和权限问题也会进入这里。
         if self.skipped_size > 0 {
             if skipped_mb >= 1.0 {
-                parts.push(format!("{:.1} MB 因系统占用跳过", skipped_mb));
+                parts.push(format!("{:.1} MB 跳过", skipped_mb));
             } else {
-                parts.push(format!("{:.0} KB 因系统占用跳过", skipped_mb * 1024.0));
+                parts.push(format!("{:.0} KB 跳过", skipped_mb * 1024.0));
             }
         }
 
@@ -466,59 +467,79 @@ impl EnhancedDeleteEngine {
             .iter()
             .partition(|p| p.to_lowercase().contains("\\$recycle.bin"));
 
-        // 回收站文件无法逐文件删除——$Recycle.Bin 下的文件受 SYSTEM 权限保护。
-        // 正确方式是调用 Shell API SHEmptyRecycleBinW 一次性清空所有驱动器的回收站。
-        // 传入 NULL 清空全部驱动器，避免逐文件解析盘符的各种路径格式问题。
+        // 回收站文件无法逐文件删除，按盘符调用 Shell API，避免一个异常卷拖垮其他卷。
         if !recycle_paths.is_empty() {
             info!(
-                "检测到 {} 个回收站文件，调用 Shell API 清空全部回收站",
+                "检测到 {} 个回收站条目，按盘符调用 Shell API 清空",
                 recycle_paths.len()
             );
 
-            let shell_result =
-                windows_api::empty_recycle_bin(None /* 清空所有驱动器 */);
-
-            // 清空前先记录文件大小（Shell API 成功后文件即消失）
-            let mut path_sizes: Vec<(&String, u64, u64)> = Vec::new();
+            // 必须在 Shell API 运行前读取大小，否则成功清空后路径已不存在，只能得到 0 字节。
+            let mut recycle_by_drive: BTreeMap<String, Vec<(String, u64, u64)>> = BTreeMap::new();
             for path in &recycle_paths {
                 let logical_size = self.get_file_size(Path::new(path));
-                let physical_size = self.calculate_physical_size(logical_size);
-                path_sizes.push((path, logical_size, physical_size));
+                let Some(drive_root) = recycle_drive_root(path) else {
+                    let physical_size = self.calculate_physical_size(logical_size);
+                    result.failed_count += 1;
+                    result.skipped_size += physical_size;
+                    result.file_results.push(FileDeleteResult {
+                        path: (*path).clone(),
+                        success: false,
+                        logical_size,
+                        physical_size,
+                        failure_reason: Some(DeleteFailureReason::Other(
+                            "回收站路径缺少有效盘符".to_string(),
+                        )),
+                        marked_for_reboot: false,
+                    });
+                    continue;
+                };
+                // 回收站支持多盘，物理大小必须使用条目所在卷的簇大小而不是固定 C 盘值。
+                let physical_size = windows_api::get_cluster_size(&drive_root)
+                    .map(|cluster_size| align_physical_size(logical_size, cluster_size))
+                    .unwrap_or_else(|| self.calculate_physical_size(logical_size));
+                recycle_by_drive.entry(drive_root).or_default().push((
+                    (*path).clone(),
+                    logical_size,
+                    physical_size,
+                ));
             }
 
-            match shell_result {
-                Ok(_) => {
-                    info!("Shell API 清空回收站成功");
-                    for (path, logical_size, physical_size) in &path_sizes {
-                        result.success_count += 1;
-                        result.freed_logical_size += logical_size;
-                        result.freed_physical_size += physical_size;
-                        result.file_results.push(FileDeleteResult {
-                            path: (*path).clone(),
-                            success: true,
-                            logical_size: *logical_size,
-                            physical_size: *physical_size,
-                            failure_reason: None,
-                            marked_for_reboot: false,
-                        });
+            for (drive_root, entries) in recycle_by_drive {
+                match windows_api::empty_recycle_bin(Some(&drive_root)) {
+                    Ok(_) => {
+                        info!("Shell API 清空回收站成功: {}", drive_root);
+                        for (path, logical_size, physical_size) in entries {
+                            result.success_count += 1;
+                            result.freed_logical_size += logical_size;
+                            result.freed_physical_size += physical_size;
+                            result.file_results.push(FileDeleteResult {
+                                path,
+                                success: true,
+                                logical_size,
+                                physical_size,
+                                failure_reason: None,
+                                marked_for_reboot: false,
+                            });
+                        }
                     }
-                }
-                Err(e) => {
-                    warn!("Shell API 清空回收站失败: {}", e);
-                    for (path, logical_size, physical_size) in &path_sizes {
-                        result.failed_count += 1;
-                        result.skipped_size += physical_size;
-                        result.file_results.push(FileDeleteResult {
-                            path: (*path).clone(),
-                            success: false,
-                            logical_size: *logical_size,
-                            physical_size: *physical_size,
-                            failure_reason: Some(DeleteFailureReason::Other(format!(
-                                "清空回收站失败: {}",
-                                e
-                            ))),
-                            marked_for_reboot: false,
-                        });
+                    Err(error) => {
+                        warn!("Shell API 清空回收站失败 ({}): {}", drive_root, error);
+                        for (path, logical_size, physical_size) in entries {
+                            result.failed_count += 1;
+                            result.skipped_size += physical_size;
+                            result.file_results.push(FileDeleteResult {
+                                path,
+                                success: false,
+                                logical_size,
+                                physical_size,
+                                failure_reason: Some(DeleteFailureReason::Other(format!(
+                                    "清空回收站失败 ({}): {}",
+                                    drive_root, error
+                                ))),
+                                marked_for_reboot: false,
+                            });
+                        }
                     }
                 }
             }
@@ -606,11 +627,8 @@ impl EnhancedDeleteEngine {
                 }
             }
             Err(e) => {
-                // 判断错误类型
-                let is_locked = e.contains("正在使用")
-                    || e.contains("被另一个进程")
-                    || e.contains("sharing violation")
-                    || e.contains("access is denied");
+                // 只把 Windows 共享冲突视为“占用”，避免权限错误被错误安排到重启队列。
+                let is_locked = matches!(e.raw_os_error, Some(32 | 33));
 
                 if is_locked && self.enable_reboot_delete {
                     // 尝试标记为重启删除
@@ -641,7 +659,7 @@ impl EnhancedDeleteEngine {
                         failure_reason: Some(DeleteFailureReason::FileLocked),
                         marked_for_reboot: false,
                     }
-                } else if e.contains("权限") || e.contains("permission") {
+                } else if e.raw_os_error == Some(5) || e.message.contains("权限") {
                     FileDeleteResult {
                         path: path.to_string(),
                         success: false,
@@ -656,7 +674,7 @@ impl EnhancedDeleteEngine {
                         success: false,
                         logical_size,
                         physical_size,
-                        failure_reason: Some(DeleteFailureReason::Other(e)),
+                        failure_reason: Some(DeleteFailureReason::Other(e.message)),
                         marked_for_reboot: false,
                     }
                 }
@@ -665,11 +683,12 @@ impl EnhancedDeleteEngine {
     }
 
     /// 尝试删除文件（多策略）
-    fn try_delete(&self, path: &Path) -> Result<(), String> {
-        // 策略1：直接删除
-        if let Ok(_) = self.direct_delete(path) {
-            return Ok(());
-        }
+    fn try_delete(&self, path: &Path) -> Result<(), DeleteAttemptError> {
+        // 保留第一次删除的原始错误码，后续策略失败时仍能准确判断是否为共享冲突。
+        let first_error = match self.direct_delete(path) {
+            Ok(()) => return Ok(()),
+            Err(error) => error,
+        };
 
         // 策略2：移除保护属性后删除
         if let Ok(_) = self.delete_after_remove_attrs(path) {
@@ -684,7 +703,10 @@ impl EnhancedDeleteEngine {
         }
 
         // 所有策略都失败
-        Err(self.get_last_error_message(path))
+        Err(DeleteAttemptError {
+            message: format!("删除失败: {}", first_error),
+            raw_os_error: first_error.raw_os_error(),
+        })
     }
 
     /// 直接删除
@@ -797,6 +819,11 @@ impl EnhancedDeleteEngine {
 
     /// 获取文件大小
     fn get_file_size(&self, path: &Path) -> u64 {
+        // 回收站条目的展示大小来自 $I 元数据，目录不能只统计 $R 的直属子项。
+        if let Some(logical_size) = get_recycle_metadata_size(path) {
+            return logical_size;
+        }
+
         if path.is_file() {
             fs::metadata(path).map(|m| m.len()).unwrap_or(0)
         } else if path.is_dir() {
@@ -820,14 +847,49 @@ impl EnhancedDeleteEngine {
             })
             .unwrap_or(0)
     }
+}
 
-    /// 获取最后的错误信息
-    fn get_last_error_message(&self, path: &Path) -> String {
-        match fs::metadata(path) {
-            Ok(_) => "文件被锁定或正在使用".to_string(),
-            Err(e) => format!("{}", e),
-        }
+/// 读取回收站条目的原始逻辑大小，保证清理结果与扫描结果使用同一统计口径。
+fn get_recycle_metadata_size(path: &Path) -> Option<u64> {
+    let name = path.file_name()?.to_str()?;
+    if !name.starts_with("$R") || name.len() <= 2 {
+        return None;
     }
+
+    let metadata_path = path.parent()?.join(format!("$I{}", &name[2..]));
+    let bytes = fs::read(metadata_path).ok()?;
+    if bytes.len() < 16 {
+        return None;
+    }
+
+    Some(u64::from_le_bytes(bytes[8..16].try_into().ok()?))
+}
+
+/// 按指定卷的簇大小换算实际占用空间，避免跨盘回收站统计使用错误的簇大小。
+fn align_physical_size(logical_size: u64, cluster_size: u32) -> u64 {
+    if logical_size == 0 || cluster_size == 0 {
+        return 0;
+    }
+
+    let cluster_size = cluster_size as u64;
+    ((logical_size + cluster_size - 1) / cluster_size) * cluster_size
+}
+
+/// 删除尝试错误，保留原始系统错误码用于区分占用和权限问题。
+#[derive(Debug)]
+struct DeleteAttemptError {
+    message: String,
+    raw_os_error: Option<i32>,
+}
+
+/// 从回收站数据路径提取 Shell API 所需的驱动器根路径。
+fn recycle_drive_root(path: &str) -> Option<String> {
+    let bytes = path.as_bytes();
+    if bytes.len() < 2 || bytes[1] != b':' || !bytes[0].is_ascii_alphabetic() {
+        return None;
+    }
+
+    Some(format!("{}:\\", (bytes[0] as char).to_ascii_uppercase()))
 }
 
 impl Default for EnhancedDeleteEngine {
@@ -872,5 +934,15 @@ mod tests {
         assert!(engine.is_system_protected(Path::new("C:\\Windows\\System32\\ntdll.dll")));
         assert!(engine.is_system_protected(Path::new("C:\\pagefile.sys")));
         assert!(!engine.is_system_protected(Path::new("C:\\Temp\\test.tmp")));
+    }
+
+    #[test]
+    fn test_recycle_drive_root() {
+        // Shell API 按盘符清空，非法路径必须被拒绝而不能默认落到 C 盘。
+        assert_eq!(
+            recycle_drive_root(r"d:\$Recycle.Bin\item"),
+            Some("D:\\".to_string())
+        );
+        assert_eq!(recycle_drive_root(r"not-a-windows-path"), None);
     }
 }

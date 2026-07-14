@@ -60,7 +60,7 @@ export function SupportAuthor() {
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           {/* 文案说明 */}
           <p className="text-sm text-[var(--text-secondary)] text-center mb-4">
-            维护不易，如果软件对您有帮助，请我喝杯咖啡~（自愿原则）
+            维护不易，如果软件对您有帮助，请我吃个猪脚饭~（自愿原则）
           </p>
 
           {/* 赞赏码图片 - 可点击放大 */}

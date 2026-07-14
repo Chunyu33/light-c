@@ -14,7 +14,7 @@ import {
   FolderOpen,
   ExternalLink,
 } from 'lucide-react';
-import { openInFolder, openFile } from '../api/commands';
+import { openInFolder, openFile, openRecycleBin } from '../api/commands';
 import type { CategoryScanResult, FileInfo } from '../types';
 import { formatSize } from '../utils/format';
 
@@ -220,6 +220,12 @@ interface VirtualFileItemProps {
 }
 
 const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle, style }: VirtualFileItemProps) {
+  // 回收站的真实删除路径是隐藏的 $R 文件，界面展示元数据中的原始文件名，避免与 Explorer 看到的内容脱节。
+  const displayPath = file.category === 'RecycleBin' ? file.name : file.path;
+  const displayTitle = file.category === 'RecycleBin' && file.original_path
+    ? `原位置：${file.original_path}`
+    : displayPath;
+
   return (
     <div
       style={style}
@@ -244,8 +250,8 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
 
       {/* 文件路径 */}
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] text-[var(--text-secondary)] truncate" title={file.path}>
-          {file.path}
+        <p className="text-[13px] text-[var(--text-secondary)] truncate" title={displayTitle}>
+          {displayPath}
         </p>
       </div>
 
@@ -259,20 +265,28 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
         <button
           onClick={(e) => {
             e.stopPropagation();
-            openInFolder(file.path);
+            if (file.category === 'RecycleBin') {
+              openRecycleBin();
+            } else {
+              openInFolder(file.path);
+            }
           }}
           className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
-          title="打开所在文件夹"
+          title={file.category === 'RecycleBin' ? '打开系统回收站' : '打开所在文件夹'}
         >
           <FolderOpen className="w-4 h-4" />
         </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
-            openFile(file.path);
+            if (file.category === 'RecycleBin') {
+              openRecycleBin();
+            } else {
+              openFile(file.path);
+            }
           }}
           className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
-          title="打开文件"
+          title={file.category === 'RecycleBin' ? '打开系统回收站' : '打开文件'}
         >
           <ExternalLink className="w-4 h-4" />
         </button>

@@ -127,9 +127,14 @@ impl PathResolver {
     /// 检查是否像可执行文件路径（盘符 + exe/dll/sys 扩展名）
     fn looks_like_exe_path(&self, s: &str) -> bool {
         let lower = s.to_lowercase();
+        // 环境变量路径在展开前没有盘符，先允许合法的 %VAR% 前缀交给后续解析。
+        let starts_with_environment_variable = lower.starts_with('%')
+            && lower[1..]
+                .find('%')
+                .is_some_and(|end| lower[end + 1..].contains('\\'));
         (lower.ends_with(".exe") || lower.ends_with(".dll") || lower.ends_with(".sys"))
             && lower.len() > 4
-            && lower.chars().nth(1) == Some(':') // 盘符
+            && (lower.chars().nth(1) == Some(':') || starts_with_environment_variable)
     }
 
     /// 展开环境变量（如 %SystemRoot%）

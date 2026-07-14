@@ -1,6 +1,5 @@
 use crate::ai_models::{
-    is_supported_model_extension,
-    scan_ai_model_assets_with_progress as scan_ai_model_assets_impl,
+    is_supported_model_extension, scan_ai_model_assets_with_progress as scan_ai_model_assets_impl,
     AiModelScanResult,
 };
 use crate::cleaner::{EnhancedDeleteEngine, EnhancedDeleteResult};

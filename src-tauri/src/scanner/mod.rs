@@ -10,6 +10,7 @@ mod file_info;
 mod hotspot;
 pub(crate) mod hotspot_engine;
 mod leftovers;
+mod recycle_bin;
 mod registry;
 mod registry_scoring;
 mod scan_engine;

@@ -186,6 +186,11 @@ export async function openFile(path: string): Promise<void> {
   return invoke<void>('open_file', { path });
 }
 
+/** 打开 Windows 系统回收站视图，避免暴露内部 SID 目录。 */
+export async function openRecycleBin(): Promise<void> {
+  return invoke<void>('open_recycle_bin');
+}
+
 // ============================================================================
 // 绯荤粺鐦﹁韩鐩稿叧
 // ============================================================================
