@@ -293,7 +293,7 @@ pub fn backup_directory() -> Result<String, String> {
 fn enumerate_driver_packages() -> Result<Vec<RawDriverPackage>, String> {
     let xml_path = temporary_xml_path();
     let xml_path_text = xml_path.to_string_lossy().to_string();
-    let result = (|| {
+    let xml_result = (|| {
         let output = run_pnputil(&[
             "/enum-drivers",
             "/files",
@@ -304,14 +304,23 @@ fn enumerate_driver_packages() -> Result<Vec<RawDriverPackage>, String> {
             "/output-file",
             &xml_path_text,
         ])?;
-        if !output.status_success {
-            return Err(format!(
-                "枚举驱动包失败: {}",
-                format_command_output(&output.output)
-            ));
+        if !output.status_success || !xml_path.is_file() {
+            return Err(format_command_output(&output.output));
         }
         parse_driver_xml(&xml_path)
     })();
+
+    let result = match xml_result {
+        Ok(packages) if !packages.is_empty() => Ok(packages),
+        Ok(_) => {
+            warn!("pnputil XML 枚举未返回驱动包，回退到文本枚举");
+            enumerate_driver_packages_text()
+        }
+        Err(error) => {
+            warn!("pnputil XML 枚举不可用，将回退到文本枚举: {}", error);
+            enumerate_driver_packages_text()
+        }
+    };
 
     if let Err(error) = fs::remove_file(&xml_path) {
         if error.kind() != std::io::ErrorKind::NotFound {
@@ -319,6 +328,26 @@ fn enumerate_driver_packages() -> Result<Vec<RawDriverPackage>, String> {
         }
     }
     result
+}
+
+/// 使用旧版 pnputil 的纯文本输出枚举驱动包，兼容不支持 XML 参数的 Windows 版本。
+fn enumerate_driver_packages_text() -> Result<Vec<RawDriverPackage>, String> {
+    let output = run_pnputil(["/enum-drivers"])?;
+    if !output.status_success {
+        return Err(format!(
+            "枚举驱动包失败: {}",
+            format_command_output(&output.output)
+        ));
+    }
+
+    let packages = parse_driver_text(&output.output.stdout);
+    if packages.is_empty() {
+        return Err(format!(
+            "枚举驱动包失败：pnputil 未返回可识别的驱动包信息。{}",
+            format_command_output(&output.output)
+        ));
+    }
+    Ok(packages)
 }
 
 fn enumerate_device_matches() -> Result<Vec<RawDeviceMatch>, String> {
@@ -844,6 +873,68 @@ fn assign_driver_text(package: &mut RawDriverPackage, element: &str, text: &str)
     *target = text.trim().to_string();
 }
 
+/// 解析 pnputil 旧版文本格式，只提取基础包信息；设备匹配仍由 XML 能力决定。
+fn parse_driver_text(text: &str) -> Vec<RawDriverPackage> {
+    let mut packages = Vec::new();
+    let mut current: Option<RawDriverPackage> = None;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Some(value) = text_field_value(trimmed, "Published Name:") {
+            if let Some(package) = current.take() {
+                packages.push(package);
+            }
+            current = Some(RawDriverPackage {
+                published_name: value,
+                ..RawDriverPackage::default()
+            });
+            continue;
+        }
+
+        let Some(package) = current.as_mut() else {
+            continue;
+        };
+        if let Some(value) = text_field_value(trimmed, "Original Name:") {
+            package.original_name = value;
+        } else if let Some(value) = text_field_value(trimmed, "Provider Name:") {
+            package.provider_name = value;
+        } else if let Some(value) = text_field_value(trimmed, "Class Name:") {
+            package.class_name = value;
+        } else if let Some(value) = text_field_value(trimmed, "Driver Version:") {
+            package.driver_version = value;
+        } else if let Some(value) = text_field_value(trimmed, "Signer Name:") {
+            package.signer_name = value;
+        } else if let Some(value) = text_field_value(trimmed, "Driver Package ID:") {
+            package.driver_package_id = value;
+        } else if let Some(value) = text_field_value(trimmed, "Family ID:") {
+            package.family_id = value;
+        } else if trimmed.starts_with("Driver Files:") {
+            package.file_count = 0;
+        } else if !line.starts_with(' ') && !line.starts_with('\t') {
+            // 保留边界判断，避免把下一段非包标题文本误当作驱动文件。
+            continue;
+        } else if package.file_count > 0 || !trimmed.contains(':') {
+            package.file_count = package.file_count.saturating_add(1);
+        }
+    }
+
+    if let Some(package) = current {
+        packages.push(package);
+    }
+    packages
+}
+
+fn text_field_value(line: &str, field: &str) -> Option<String> {
+    line.strip_prefix(field)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
 fn build_driver_store_path(driver_package_id: &str) -> String {
     if driver_package_id.trim().is_empty() {
         return String::new();
@@ -939,8 +1030,8 @@ where
         return Ok(CommandResult {
             status_success: output.status.success(),
             output: PnputilOutput {
-                stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
-                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+                stdout: decode_windows_output(&output.stdout),
+                stderr: decode_windows_output(&output.stderr),
             },
         });
     }
@@ -965,15 +1056,96 @@ fn format_command_output(output: &PnputilOutput) -> String {
     let combined = format!("{} {}", output.stdout.trim(), output.stderr.trim());
     if combined.trim().is_empty() {
         "pnputil 未返回详细错误信息".to_string()
+    } else if looks_like_pnputil_help(&combined) {
+        "pnputil 不支持当前命令参数或 XML 输出格式，已尝试兼容模式".to_string()
     } else {
         combined.trim().to_string()
     }
 }
 
+fn looks_like_pnputil_help(output: &str) -> bool {
+    let lower = output.to_ascii_lowercase();
+    lower.contains("microsoft pnp utility")
+        && lower.contains("/enum-drivers")
+        && (lower.contains("/format") || lower.contains("/output-file"))
+}
+
+#[cfg(target_os = "windows")]
+fn decode_windows_output(raw: &[u8]) -> String {
+    if raw.is_empty() {
+        return String::new();
+    }
+    if raw.starts_with(&[0xFF, 0xFE]) {
+        return String::from_utf16_lossy(
+            &raw[2..]
+                .chunks_exact(2)
+                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                .collect::<Vec<_>>(),
+        );
+    }
+    if raw.starts_with(&[0xFE, 0xFF]) {
+        return String::from_utf16_lossy(
+            &raw[2..]
+                .chunks_exact(2)
+                .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+                .collect::<Vec<_>>(),
+        );
+    }
+    if let Ok(text) = std::str::from_utf8(raw) {
+        return text.to_string();
+    }
+
+    // pnputil 的非 XML 输出通常使用系统 OEM 代码页，调用 Windows NLS 转换避免中文变成替换字符。
+    use std::os::windows::ffi::OsStringExt;
+    use winapi::shared::ntdef::LPCCH;
+    use winapi::um::stringapiset::MultiByteToWideChar;
+    use winapi::um::winnls::CP_UTF8;
+    use winapi::um::winnls::{GetOEMCP, CP_ACP};
+    let code_pages = [unsafe { GetOEMCP() }, CP_ACP, CP_UTF8];
+    for code_page in code_pages {
+        let wide_length = unsafe {
+            MultiByteToWideChar(
+                code_page,
+                0,
+                raw.as_ptr() as LPCCH,
+                raw.len() as i32,
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        if wide_length <= 0 {
+            continue;
+        }
+        let mut wide = vec![0u16; wide_length as usize];
+        let converted = unsafe {
+            MultiByteToWideChar(
+                code_page,
+                0,
+                raw.as_ptr() as LPCCH,
+                raw.len() as i32,
+                wide.as_mut_ptr(),
+                wide.len() as i32,
+            )
+        };
+        if converted > 0 {
+            return std::ffi::OsString::from_wide(&wide)
+                .to_string_lossy()
+                .into_owned();
+        }
+    }
+    String::from_utf8_lossy(raw).into_owned()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn decode_windows_output(raw: &[u8]) -> String {
+    String::from_utf8_lossy(raw).into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        compare_versions, normalize_published_names, parse_device_matches_xml, parse_driver_version,
+        compare_versions, format_command_output, normalize_published_names,
+        parse_device_matches_xml, parse_driver_text, parse_driver_version, PnputilOutput,
     };
     use std::cmp::Ordering;
     use std::fs;
@@ -1031,5 +1203,39 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].installed_driver_name, "oem10.inf");
         assert_eq!(result[0].outranked_driver_names, vec!["oem3.inf"]);
+    }
+
+    #[test]
+    fn parses_legacy_pnputil_text_output() {
+        let text = r#"Microsoft PnP Utility
+
+Published Name:     oem42.inf
+Original Name:      example.inf
+Provider Name:      Example Provider
+Class Name:         System
+Driver Version:     02/08/2024 1.2.3.4
+Signer Name:        Example Signer
+Driver Files:
+    example.sys
+"#;
+
+        let packages = parse_driver_text(text);
+        assert_eq!(packages.len(), 1);
+        assert_eq!(packages[0].published_name, "oem42.inf");
+        assert_eq!(packages[0].original_name, "example.inf");
+        assert_eq!(packages[0].provider_name, "Example Provider");
+        assert_eq!(packages[0].file_count, 1);
+    }
+
+    #[test]
+    fn shortens_pnputil_help_output() {
+        let output = PnputilOutput {
+            stdout: "Microsoft PnP Utility\n/enum-drivers\n/format".to_string(),
+            stderr: String::new(),
+        };
+        assert_eq!(
+            format_command_output(&output),
+            "pnputil 不支持当前命令参数或 XML 输出格式，已尝试兼容模式"
+        );
     }
 }
