@@ -2,7 +2,9 @@
 // 垃圾扫描与大文件扫描命令
 // ============================================================================
 
-use crate::scanner::{big_files, CategoryScanResult, JunkCategory, ScanEngine, ScanResult};
+use crate::scanner::{
+    big_files, deep_junk, CategoryScanResult, JunkCategory, ScanEngine, ScanResult,
+};
 use log::info;
 use serde::{Deserialize, Serialize};
 use tauri::Window;
@@ -57,6 +59,37 @@ pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult,
     );
 
     Ok(result)
+}
+
+/// 执行所有固定分区的深度垃圾扫描，NTFS 优先使用 MFT。
+#[tauri::command]
+pub async fn scan_deep_junk_files(window: Window) -> Result<deep_junk::DeepJunkScanResult, String> {
+    info!("开始深度扫描垃圾文件");
+    deep_junk::reset_cancelled();
+
+    let result = tokio::task::spawn_blocking(move || deep_junk::scan_all(&window))
+        .await
+        .map_err(|error| format!("深度扫描任务异常: {}", error))??;
+
+    deep_junk::create_session(result)
+}
+
+/// 获取深度扫描分类的分页文件。
+#[tauri::command]
+pub fn get_deep_junk_category_page(
+    scan_id: String,
+    category_name: String,
+    offset: usize,
+    limit: Option<usize>,
+) -> Result<CategoryScanResult, String> {
+    deep_junk::get_category_page(&scan_id, &category_name, offset, limit.unwrap_or(500))
+}
+
+/// 取消正在执行的深度垃圾扫描。
+#[tauri::command]
+pub fn cancel_deep_junk_scan() {
+    info!("收到取消深度垃圾扫描请求");
+    deep_junk::cancel();
 }
 
 /// 扫描单个分类

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle, Download, ExternalLink, Info, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 import { useToast } from '../Toast';
 import { getOfficialDownloadConfig, type OfficialDownloadConfig } from '../../utils/downloadConfig';
+import { LIGHTC_DEFAULT_DOWNLOAD_CONFIG } from '../../config/officialLinks';
 import { verifyIntegrity, type VerifyIntegrityResult } from '../../api/commands';
 
 export function SecuritySettings() {
@@ -98,7 +99,7 @@ export function SecuritySettings() {
           </p>
 
           <a
-            href={downloadConfig?.githubReleasesUrl ?? 'https://github.com/Chunyu33/light-c/releases'}
+            href={downloadConfig?.githubReleasesUrl ?? LIGHTC_DEFAULT_DOWNLOAD_CONFIG.githubReleasesUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-between rounded-xl bg-[var(--bg-card)] px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] group"
@@ -110,20 +111,18 @@ export function SecuritySettings() {
             <ExternalLink className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--brand-green)]" />
           </a>
 
-          {downloadConfig?.netDiskUrl && (
-            <a
-              href={downloadConfig.netDiskUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between rounded-xl bg-[var(--bg-card)] px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] group"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text-primary)]">作者网盘下载</p>
-                <p className="mt-0.5 text-xs text-[var(--text-muted)]">由当前 Release 的 download.json 动态提供，适合便携版下载与覆盖更新</p>
-              </div>
-              <ExternalLink className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--brand-green)]" />
-            </a>
-          )}
+          <a
+            href={downloadConfig?.netDiskUrl ?? LIGHTC_DEFAULT_DOWNLOAD_CONFIG.netDiskUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between rounded-xl bg-[var(--bg-card)] px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] group"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)]">网盘下载</p>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">作者本人分享的、安全的网盘渠道。</p>
+            </div>
+            <ExternalLink className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--brand-green)]" />
+          </a>
 
           <div className="rounded-xl bg-[var(--bg-card)] px-3 py-3">
             <div className="flex items-start justify-between gap-3">
@@ -133,7 +132,7 @@ export function SecuritySettings() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <a
-                  href={downloadConfig?.bilibiliUrl ?? 'https://space.bilibili.com/387797235'}
+                  href={downloadConfig?.bilibiliUrl ?? LIGHTC_DEFAULT_DOWNLOAD_CONFIG.bilibiliUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[var(--brand-green)] hover:bg-[var(--brand-green)]/10"
@@ -143,7 +142,7 @@ export function SecuritySettings() {
                   <ExternalLink className="h-3 w-3" />
                 </a>
                 <a
-                  href={downloadConfig?.douyinUrl ?? 'https://www.douyin.com/search/Evan%E7%9A%84%E5%83%8F%E7%B4%A0%E7%A9%BA%E9%97%B4'}
+                  href={downloadConfig?.douyinUrl ?? LIGHTC_DEFAULT_DOWNLOAD_CONFIG.douyinUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[var(--brand-green)] hover:bg-[var(--brand-green)]/10"
@@ -260,4 +259,3 @@ function VerifyIntegrityResultCard({ result }: { result: VerifyIntegrityResult }
     </div>
   );
 }
-

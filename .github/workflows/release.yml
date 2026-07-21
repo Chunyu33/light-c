@@ -50,14 +50,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.12.2'
+          releaseName: 'LightC v2.13.0'
           releaseBody: |
             ## 更新内容
-            - 便携版配置、运行数据和 WebView2 界面数据跟随程序目录保存
-            - 兼容旧版 AppData 数据、旧便携 marker 和旧配置文件
-            - 数据管理设置页支持中间省略配置路径并一键定位配置文件
-            - 驱动检测 Windows 10 枚举兼容：支持中文系统字段、字段名与冒号之间的空格，以及无 BOM UTF-16 输出
-            - 应用图标补充 48x48 图标
+            - 垃圾清理新增全盘深度发现，NTFS 分区优先使用 MFT，其他分区自动受控降级
+            - 深度清理支持分页分类完整删除、路径安全复核、多盘物理释放量统计和后台核验
+            - 大批量删除显示处理进度、释放空间、失败数量、速度和预计剩余时间
+            - 垃圾文件列表新增用途搜索，并统一清理 Windows `\\?\` 长路径前缀
+            - 官方下载渠道增加内置网盘、GitHub 和作者平台链接兜底
+            - 使用说明补充管理员权限对 MFT 扫描和受保护目录清理的作用
 
             请查看 [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false

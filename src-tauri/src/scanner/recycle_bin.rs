@@ -7,6 +7,8 @@ use super::{CategoryScanResult, FileInfo, JunkCategory};
 use log::{debug, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::sync::OnceLock;
 
 /// 扫描当前登录用户的回收站。
 ///
@@ -35,6 +37,25 @@ pub fn scan_current_user(category: &JunkCategory, result: &mut CategoryScanResul
     #[cfg(not(windows))]
     {
         let _ = (category, result);
+    }
+}
+
+/// 校验路径是否属于当前用户可操作的回收站数据文件。
+pub fn is_current_user_entry_path(path: &str) -> bool {
+    #[cfg(windows)]
+    {
+        let Some(user_sid) = current_user_sid() else {
+            return false;
+        };
+        let normalized = path.replace('/', "\\").to_ascii_lowercase();
+        let marker = format!("\\$recycle.bin\\{}\\$r", user_sid.to_ascii_lowercase());
+        return normalized.contains(&marker) && normalized.len() > marker.len();
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        false
     }
 }
 
@@ -177,6 +198,14 @@ mod tests {
 
 #[cfg(windows)]
 fn current_user_sid() -> Option<String> {
+    static CURRENT_USER_SID: OnceLock<Option<String>> = OnceLock::new();
+    CURRENT_USER_SID
+        .get_or_init(current_user_sid_uncached)
+        .clone()
+}
+
+#[cfg(windows)]
+fn current_user_sid_uncached() -> Option<String> {
     use std::ptr::null_mut;
     use winapi::shared::minwindef::{DWORD, HLOCAL, LPVOID};
     use winapi::shared::ntdef::HANDLE;

@@ -7,6 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   DiskInfo,
   ScanResult,
+  DeepJunkScanResult,
   CategoryScanResult,
   DeleteResult,
   CategoryInfo,
@@ -140,6 +141,31 @@ export async function getDiskHealth(): Promise<DiskHealthInfo[]> {
  */
 export async function scanJunkFiles(request?: ScanRequest): Promise<ScanResult> {
   return invoke<ScanResult>('scan_junk_files', { request });
+}
+
+/** 扫描所有固定分区的深度垃圾，NTFS 分区优先使用 MFT。 */
+export async function scanDeepJunkFiles(): Promise<DeepJunkScanResult> {
+  return invoke<DeepJunkScanResult>('scan_deep_junk_files');
+}
+
+/** 取消深度垃圾扫描。 */
+export async function cancelDeepJunkScan(): Promise<void> {
+  return invoke<void>('cancel_deep_junk_scan');
+}
+
+/** 按需读取深度扫描分类的下一页文件。 */
+export async function getDeepJunkCategoryPage(
+  scanId: string,
+  categoryName: string,
+  offset: number,
+  limit = 500,
+): Promise<CategoryScanResult> {
+  return invoke<CategoryScanResult>('get_deep_junk_category_page', {
+    scanId,
+    categoryName,
+    offset,
+    limit,
+  });
 }
 
 /**
@@ -654,6 +680,29 @@ export interface EnhancedDeleteResult {
  */
 export async function enhancedDeleteFiles(paths: string[]): Promise<EnhancedDeleteResult> {
   return invoke<EnhancedDeleteResult>('enhanced_delete_files', { paths });
+}
+
+export interface DeepJunkDeleteOptions {
+  /** 深度扫描会话 ID，用于在后端取出未分页返回的完整分类文件。 */
+  scanId?: string;
+  /** 当前页全部选中且分类仍有分页时，按分类删除完整扫描结果。 */
+  categoryNames?: string[];
+  /** 用户在完整分类中取消选中的路径，保留接口以避免误删。 */
+  excludedPaths?: string[];
+}
+
+/** 删除深度扫描结果，后端会重新校验路径规则并展开完整分类。 */
+export async function deleteDeepJunkFiles(
+  paths: string[],
+  options: DeepJunkDeleteOptions = {},
+): Promise<EnhancedDeleteResult> {
+  return invoke<EnhancedDeleteResult>('delete_deep_junk_files', {
+    paths,
+    // Tauri 命令参数默认使用 camelCase；传 snake_case 会被命令层忽略，导致只删除当前页。
+    scanId: options.scanId,
+    categoryNames: options.categoryNames,
+    excludedPaths: options.excludedPaths,
+  });
 }
 
 /**

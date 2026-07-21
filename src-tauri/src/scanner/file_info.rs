@@ -75,6 +75,8 @@ pub struct CategoryScanResult {
     pub total_size: u64,
     /// 文件数量
     pub file_count: usize,
+    /// 深度扫描分页标记；快速扫描始终为 false。
+    pub has_more: bool,
 }
 
 impl CategoryScanResult {
@@ -88,6 +90,7 @@ impl CategoryScanResult {
             files: Vec::new(),
             total_size: 0,
             file_count: 0,
+            has_more: false,
         }
     }
 

@@ -12,13 +12,15 @@
 // - 详细的删除结果反馈，包括跳过原因
 // ============================================================================
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
@@ -318,6 +320,34 @@ pub struct EnhancedDeleteResult {
     pub summary_message: String,
 }
 
+/// 增强删除过程的批量进度。
+///
+/// 进度只汇总当前批次的统计，不携带文件明细，避免大批量删除时频繁向 WebView 传输大对象。
+#[derive(Debug, Clone, Serialize)]
+pub struct EnhancedDeleteProgress {
+    /// 当前阶段，删除引擎目前使用 cleaning。
+    pub phase: String,
+    /// 已处理的文件数量。
+    pub processed_count: usize,
+    /// 本次删除的去重后文件总数。
+    pub total_count: usize,
+    /// 已成功删除的文件数量。
+    pub success_count: usize,
+    /// 已失败的文件数量。
+    pub failed_count: usize,
+    /// 已标记重启删除的文件数量。
+    pub reboot_pending_count: usize,
+    /// 当前已经确认释放的物理空间。
+    pub freed_physical_size: u64,
+    /// 删除引擎启动后的耗时。
+    pub elapsed_ms: u64,
+}
+
+/// 进度事件的最大发送间隔，保证单个批次处理较慢时界面仍能持续反馈。
+const DELETE_PROGRESS_INTERVAL: Duration = Duration::from_millis(500);
+/// 常规批量进度间隔，避免每个文件发送 IPC 事件造成额外开销。
+const DELETE_PROGRESS_BATCH_SIZE: usize = 500;
+
 impl EnhancedDeleteResult {
     pub fn new() -> Self {
         Self {
@@ -410,6 +440,8 @@ const SAFE_OWNERSHIP_PATHS: &[&str] = &[
 pub struct EnhancedDeleteEngine {
     /// 磁盘簇大小缓存
     cluster_size: u32,
+    /// 多分区清理时按卷缓存簇大小，避免逐文件调用 Windows API。
+    cluster_sizes: Mutex<HashMap<String, u32>>,
     /// 是否启用重启删除功能
     enable_reboot_delete: bool,
     /// 是否尝试获取所有权
@@ -424,6 +456,7 @@ impl EnhancedDeleteEngine {
 
         Self {
             cluster_size,
+            cluster_sizes: Mutex::new(HashMap::new()),
             enable_reboot_delete: true,   // 默认启用，处理被占用的文件
             enable_take_ownership: false, // 默认禁用，icacls 调用很慢
         }
@@ -455,9 +488,85 @@ impl EnhancedDeleteEngine {
         ((logical_size + cluster_size - 1) / cluster_size) * cluster_size
     }
 
+    /// 按文件所在分区计算物理占用，避免深度清理 D/E 盘时套用 C 盘簇大小。
+    fn calculate_physical_size_for_path(&self, path: &Path, logical_size: u64) -> u64 {
+        let Some(drive_root) = drive_root(path) else {
+            return self.calculate_physical_size(logical_size);
+        };
+        let cluster_size = self.cluster_size_for_drive(&drive_root);
+        align_physical_size(logical_size, cluster_size)
+    }
+
+    fn cluster_size_for_drive(&self, drive_root: &str) -> u32 {
+        if let Ok(cache) = self.cluster_sizes.lock() {
+            if let Some(cluster_size) = cache.get(drive_root) {
+                return *cluster_size;
+            }
+        }
+
+        let cluster_size = windows_api::get_cluster_size(drive_root).unwrap_or(self.cluster_size);
+        if let Ok(mut cache) = self.cluster_sizes.lock() {
+            cache.insert(drive_root.to_string(), cluster_size);
+        }
+        cluster_size
+    }
+
     /// 删除文件列表
     pub fn delete_files(&self, paths: &[String]) -> EnhancedDeleteResult {
+        // 保留原有公开接口，其他模块无需感知进度事件即可继续复用删除引擎。
+        self.delete_files_with_progress(paths, |_| {})
+    }
+
+    /// 删除文件列表并按批次回调进度。
+    ///
+    /// 回调在删除线程内执行，调用方只能做轻量级通知，不能在其中执行文件 IO。
+    pub fn delete_files_with_progress<F>(
+        &self,
+        paths: &[String],
+        mut on_progress: F,
+    ) -> EnhancedDeleteResult
+    where
+        F: FnMut(EnhancedDeleteProgress),
+    {
         let mut result = EnhancedDeleteResult::new();
+        let total_count = paths.len();
+        let started_at = Instant::now();
+        let mut processed_count = 0usize;
+        let mut last_progress_at = Instant::now();
+
+        // 删除任务刚进入执行线程时先推送一次清理阶段，避免少量文件任务看起来没有进度。
+        on_progress(EnhancedDeleteProgress {
+            phase: "cleaning".to_string(),
+            processed_count: 0,
+            total_count,
+            success_count: 0,
+            failed_count: 0,
+            reboot_pending_count: 0,
+            freed_physical_size: 0,
+            elapsed_ms: 0,
+        });
+
+        // 进度事件只传递聚合数据，避免大批量文件删除时拖慢实际清理速度。
+        let mut emit_progress = |processed: usize, current_result: &EnhancedDeleteResult| {
+            let should_emit = processed == total_count
+                || processed.saturating_sub(1) % DELETE_PROGRESS_BATCH_SIZE == 0
+                || last_progress_at.elapsed() >= DELETE_PROGRESS_INTERVAL;
+            if !should_emit {
+                return;
+            }
+
+            on_progress(EnhancedDeleteProgress {
+                phase: "cleaning".to_string(),
+                processed_count: processed,
+                total_count,
+                success_count: current_result.success_count,
+                failed_count: current_result.failed_count,
+                reboot_pending_count: current_result.reboot_pending_count,
+                freed_physical_size: current_result.freed_physical_size,
+                elapsed_ms: started_at.elapsed().as_millis() as u64,
+            });
+            last_progress_at = Instant::now();
+        };
 
         info!("增强删除引擎：开始删除 {} 个文件", paths.len());
 
@@ -492,12 +601,14 @@ impl EnhancedDeleteEngine {
                         )),
                         marked_for_reboot: false,
                     });
+                    // 非法回收站路径也算作已处理，保证进度总数在异常输入下仍能收敛到 100%。
+                    processed_count += 1;
+                    emit_progress(processed_count, &result);
                     continue;
                 };
                 // 回收站支持多盘，物理大小必须使用条目所在卷的簇大小而不是固定 C 盘值。
-                let physical_size = windows_api::get_cluster_size(&drive_root)
-                    .map(|cluster_size| align_physical_size(logical_size, cluster_size))
-                    .unwrap_or_else(|| self.calculate_physical_size(logical_size));
+                let physical_size =
+                    align_physical_size(logical_size, self.cluster_size_for_drive(&drive_root));
                 recycle_by_drive.entry(drive_root).or_default().push((
                     (*path).clone(),
                     logical_size,
@@ -506,6 +617,8 @@ impl EnhancedDeleteEngine {
             }
 
             for (drive_root, entries) in recycle_by_drive {
+                // 先保存数量，因为后续分支会消费 entries 中的完整条目结果。
+                let processed_in_drive = entries.len();
                 match windows_api::empty_recycle_bin(Some(&drive_root)) {
                     Ok(_) => {
                         info!("Shell API 清空回收站成功: {}", drive_root);
@@ -542,6 +655,9 @@ impl EnhancedDeleteEngine {
                         }
                     }
                 }
+                // Shell API 按卷执行，完成一个卷后统一推进进度，避免对每个回收站元数据重复发事件。
+                processed_count += processed_in_drive;
+                emit_progress(processed_count, &result);
             }
         }
 
@@ -566,6 +682,8 @@ impl EnhancedDeleteEngine {
             }
 
             result.file_results.push(file_result);
+            processed_count += 1;
+            emit_progress(processed_count, &result);
         }
 
         result.generate_summary();
@@ -587,7 +705,7 @@ impl EnhancedDeleteEngine {
 
         // 获取文件大小
         let logical_size = self.get_file_size(file_path);
-        let physical_size = self.calculate_physical_size(logical_size);
+        let physical_size = self.calculate_physical_size_for_path(file_path, logical_size);
 
         // 检查文件是否存在
         if !file_path.exists() {
@@ -889,6 +1007,16 @@ fn recycle_drive_root(path: &str) -> Option<String> {
         return None;
     }
 
+    Some(format!("{}:\\", (bytes[0] as char).to_ascii_uppercase()))
+}
+
+/// 从普通文件路径提取分区根目录，用于按卷读取簇大小。
+fn drive_root(path: &Path) -> Option<String> {
+    let path = path.to_string_lossy();
+    let bytes = path.as_bytes();
+    if bytes.len() < 2 || bytes[1] != b':' || !bytes[0].is_ascii_alphabetic() {
+        return None;
+    }
     Some(format!("{}:\\", (bytes[0] as char).to_ascii_uppercase()))
 }
 

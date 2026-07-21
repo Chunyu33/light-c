@@ -54,6 +54,8 @@ export interface CategoryScanResult {
   total_size: number;
   /** 文件数量 */
   file_count: number;
+  /** 深度扫描是否还有未加载的文件 */
+  has_more?: boolean;
 }
 
 /** 完整扫描结果 */
@@ -68,6 +70,53 @@ export interface ScanResult {
   scan_duration_ms: number;
   /** 扫描时间戳 */
   scan_timestamp: number;
+}
+
+/** 深度垃圾扫描的分区摘要。 */
+export interface DeepJunkDriveSummary {
+  drive_letter: string;
+  file_system: string;
+  backend: 'mft' | 'walkdir';
+  matched_file_count: number;
+  matched_size: number;
+  warning?: string | null;
+}
+
+/** 深度垃圾扫描结果，分类文件结构与普通扫描保持一致。 */
+export interface DeepJunkScanResult extends ScanResult {
+  scan_mode: 'deep';
+  scan_id: string;
+  drives: DeepJunkDriveSummary[];
+}
+
+/** 深度垃圾扫描阶段进度。 */
+export interface DeepJunkScanProgress {
+  stage: string;
+  drive_letter: string;
+  message: string;
+  processed: number;
+  matched_count: number;
+  elapsed_ms: number;
+}
+
+/** 垃圾清理删除阶段的批量进度事件。 */
+export interface EnhancedDeleteProgress {
+  /** 当前阶段：准备中或清理中。核验由前端在命令完成后单独展示。 */
+  phase: 'preparing' | 'cleaning';
+  /** 已处理的文件数量。 */
+  processed_count: number;
+  /** 去重后的待处理文件总数。 */
+  total_count: number;
+  /** 已成功删除的文件数量。 */
+  success_count: number;
+  /** 已失败的文件数量。 */
+  failed_count: number;
+  /** 已标记为重启删除的文件数量。 */
+  reboot_pending_count: number;
+  /** 已确认释放的物理空间。 */
+  freed_physical_size: number;
+  /** 后端删除耗时（毫秒）。 */
+  elapsed_ms: number;
 }
 
 /** 删除结果 */

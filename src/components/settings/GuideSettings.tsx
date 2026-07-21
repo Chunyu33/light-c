@@ -157,6 +157,25 @@ export function GuideSettings() {
         </div>
       </div>
 
+      {/* 权限说明独立于功能列表，集中解释管理员权限的使用边界。 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          权限说明
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2">为什么需要管理员权限？</p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              管理员权限主要用于两件事：第一，读取 NTFS 的<span className="text-[var(--brand-green)] font-medium"> MFT 文件记录</span>，以更快的速度发现多个分区中的文件；普通权限无法完整访问这些系统级记录时，会自动降级为受控目录扫描。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-1">
+              第二，访问 Windows 临时目录、更新缓存等受权限保护的位置，提升清理完成度。即使以管理员身份运行，软件仍会执行路径白名单、系统保护和文件占用检查，不会为了清理而强制删除核心系统文件；正在使用的文件可能仍会保留或安排重启后处理。
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 置信度评分说明 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">

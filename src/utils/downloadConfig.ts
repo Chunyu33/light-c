@@ -3,9 +3,11 @@
 // 从 GitHub Release 的 download.json 动态读取网盘等渠道，避免把第三方下载链接固化进前端组件。
 // ============================================================================
 
+import { LIGHTC_DEFAULT_DOWNLOAD_CONFIG } from '../config/officialLinks';
+
 export interface OfficialDownloadConfig {
   githubReleasesUrl: string;
-  netDiskUrl?: string;
+  netDiskUrl: string;
   bilibiliUrl: string;
   douyinUrl: string;
 }
@@ -13,9 +15,9 @@ export interface OfficialDownloadConfig {
 const DOWNLOAD_CONFIG_URL = 'https://github.com/Chunyu33/light-c/releases/latest/download/download.json';
 
 const DEFAULT_DOWNLOAD_CONFIG: OfficialDownloadConfig = {
-  githubReleasesUrl: 'https://github.com/Chunyu33/light-c/releases',
-  bilibiliUrl: 'https://space.bilibili.com/387797235',
-  douyinUrl: 'https://www.douyin.com/search/Evan%E7%9A%84%E5%83%8F%E7%B4%A0%E7%A9%BA%E9%97%B4',
+  ...LIGHTC_DEFAULT_DOWNLOAD_CONFIG,
+  // 该对象的字段由独立官方链接常量集中维护，避免设置页再次硬编码。
+  githubReleasesUrl: LIGHTC_DEFAULT_DOWNLOAD_CONFIG.githubReleasesUrl ?? 'https://github.com/Chunyu33/light-c/releases',
 };
 
 let cachedConfigPromise: Promise<OfficialDownloadConfig> | null = null;
@@ -42,7 +44,10 @@ function mergeDownloadConfig(remoteConfig: unknown): OfficialDownloadConfig {
     douyinUrl: isSafeHttpsUrl(config.douyinUrl)
       ? config.douyinUrl
       : DEFAULT_DOWNLOAD_CONFIG.douyinUrl,
-    netDiskUrl: isSafeHttpsUrl(config.netDiskUrl) ? config.netDiskUrl : undefined,
+    // 远端字段缺失时必须回退到作者网盘，否则设置页会因为条件渲染而完全隐藏入口。
+    netDiskUrl: isSafeHttpsUrl(config.netDiskUrl)
+      ? config.netDiskUrl
+      : DEFAULT_DOWNLOAD_CONFIG.netDiskUrl,
   };
 }
 
@@ -64,4 +69,3 @@ export async function getOfficialDownloadConfig(): Promise<OfficialDownloadConfi
 
   return cachedConfigPromise;
 }
-

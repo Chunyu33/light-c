@@ -13,8 +13,10 @@ import {
   AlertTriangle,
   FolderOpen,
   ExternalLink,
+  Search,
 } from 'lucide-react';
 import { openInFolder, openFile, openRecycleBin } from '../api/commands';
+import { stripWindowsDevicePrefix } from '../utils/searchEngine';
 import type { CategoryScanResult, FileInfo } from '../types';
 import { formatSize } from '../utils/format';
 
@@ -48,7 +50,11 @@ interface CategoryCardProps {
   category: CategoryScanResult;
   selectedPaths: Set<string>;
   onToggleFile: (path: string) => void;
-  onToggleCategory: (files: FileInfo[], selected: boolean) => void;
+  onToggleCategory: (categoryName: string, files: FileInfo[], selected: boolean) => void;
+  onSearchFile: (file: FileInfo) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
 /**
@@ -59,6 +65,10 @@ export function CategoryCard({
   selectedPaths,
   onToggleFile,
   onToggleCategory,
+  onSearchFile,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
 }: CategoryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -90,8 +100,8 @@ export function CategoryCard({
   });
 
   const handleCategoryToggle = useCallback(() => {
-    onToggleCategory(category.files, !isAllSelected);
-  }, [category.files, isAllSelected, onToggleCategory]);
+    onToggleCategory(category.display_name, category.files, !isAllSelected);
+  }, [category.display_name, category.files, isAllSelected, onToggleCategory]);
 
   const handleExpand = useCallback(() => {
     setExpanded(prev => !prev);
@@ -151,7 +161,10 @@ export function CategoryCard({
               {category.file_count.toLocaleString()} 个文件
               {selectedCount > 0 && (
                 <span className="text-[var(--brand-green)] ml-1">
-                  (已选 {selectedCount.toLocaleString()} 个, {formatSize(selectedSize)})
+                  {/* 深度分类分页时提示完整删除口径，避免把当前页大小误认为分类总量。 */}
+                  {hasMore && selectedCount === category.files.length
+                    ? `(已选当前页 ${selectedCount.toLocaleString()} 个，清理时包含完整分类)`
+                    : `(已选 ${selectedCount.toLocaleString()} 个, ${formatSize(selectedSize)})`}
                 </span>
               )}
             </p>
@@ -184,11 +197,12 @@ export function CategoryCard({
                   const file = category.files[virtualRow.index];
                   const isSelected = selectedPaths.has(file.path);
                   return (
-                    <VirtualFileItem
-                      key={file.path}
-                      file={file}
-                      selected={isSelected}
-                      onToggle={() => onToggleFile(file.path)}
+                      <VirtualFileItem
+                        key={file.path}
+                        file={file}
+                        selected={isSelected}
+                        onToggle={() => onToggleFile(file.path)}
+                        onSearch={() => onSearchFile(file)}
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -202,6 +216,17 @@ export function CategoryCard({
                 })}
               </div>
             </div>
+            {hasMore && onLoadMore && (
+              <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex justify-center">
+                <button
+                  onClick={onLoadMore}
+                  disabled={isLoadingMore}
+                  className="text-xs text-[var(--brand-green)] hover:text-[var(--brand-green-hover)] disabled:text-[var(--text-faint)] transition"
+                >
+                  {isLoadingMore ? '正在加载…' : `加载更多（已显示 ${category.files.length.toLocaleString()} / ${category.file_count.toLocaleString()}）`}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -216,14 +241,17 @@ interface VirtualFileItemProps {
   file: FileInfo;
   selected: boolean;
   onToggle: () => void;
+  onSearch: () => void;
   style: React.CSSProperties;
 }
 
-const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle, style }: VirtualFileItemProps) {
+const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle, onSearch, style }: VirtualFileItemProps) {
   // 回收站的真实删除路径是隐藏的 $R 文件，界面展示元数据中的原始文件名，避免与 Explorer 看到的内容脱节。
-  const displayPath = file.category === 'RecycleBin' ? file.name : file.path;
+  const displayPath = file.category === 'RecycleBin'
+    ? file.name
+    : stripWindowsDevicePrefix(file.path);
   const displayTitle = file.category === 'RecycleBin' && file.original_path
-    ? `原位置：${file.original_path}`
+    ? `原位置：${stripWindowsDevicePrefix(file.original_path)}`
     : displayPath;
 
   return (
@@ -262,6 +290,16 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
 
       {/* 操作按钮 */}
       <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSearch();
+          }}
+          className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
+          title="搜索该文件能不能删"
+        >
+          <Search className="w-4 h-4" />
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
