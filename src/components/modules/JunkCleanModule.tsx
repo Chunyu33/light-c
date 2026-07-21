@@ -5,7 +5,8 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, StopCircle, Trash2 } from 'lucide-react';
+import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { CategoryCard } from '../CategoryCard';
 import { ScanSummary } from '../ScanSummary';
@@ -13,17 +14,67 @@ import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
-import { scanJunkFiles, enhancedDeleteFiles, recordCleanupAction, type EnhancedDeleteResult, type CleanupLogEntryInput } from '../../api/commands';
+import {
+  cancelDeepJunkScan,
+  deleteDeepJunkFiles,
+  enhancedDeleteFiles,
+  getDeepJunkCategoryPage,
+  recordCleanupAction,
+  scanDeepJunkFiles,
+  scanJunkFiles,
+  type CleanupLogEntryInput,
+  type EnhancedDeleteResult,
+} from '../../api/commands';
 import { formatSize } from '../../utils/format';
-import type { ScanResult, FileInfo } from '../../types';
+import type {
+  CategoryScanResult,
+  DeepJunkScanProgress,
+  DeepJunkScanResult,
+  FileInfo,
+  ScanResult,
+} from '../../types';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+
+const DEEP_SCAN_STORAGE_KEY = 'lightc.junkClean.deepScan';
+
+function loadDeepScanPreference(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(DEEP_SCAN_STORAGE_KEY) ?? 'false') === true;
+  } catch {
+    // 旧版本或手工修改 localStorage 时回退到快速模式，避免阻断模块加载。
+    return false;
+  }
+}
+
+function mergeDeepCategoryPage(result: ScanResult, page: CategoryScanResult): ScanResult {
+  return {
+    ...result,
+    categories: result.categories.map((category) => (
+      category.display_name === page.display_name
+        ? {
+          ...category,
+          files: [...category.files, ...page.files],
+          has_more: page.has_more,
+        }
+        : category
+    )),
+  };
+}
 
 // ============================================================================
 // 组件实现
 // ============================================================================
 
 export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('junk');
+  const {
+    moduleState,
+    expandedModule,
+    setExpandedModule,
+    updateModuleState,
+    triggerHealthRefresh,
+    oneClickScanTrigger,
+    stopScanTrigger,
+  } = useModuleDashboard('junk');
   const { showToast } = useToast();
 
   // 用于跟踪是否已处理过当前的一键扫描触发
@@ -35,6 +86,13 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deepScanEnabled, setDeepScanEnabled] = useState(loadDeepScanPreference);
+  const [deepScanResult, setDeepScanResult] = useState<DeepJunkScanResult | null>(null);
+  const [scanProgress, setScanProgress] = useState<DeepJunkScanProgress | null>(null);
+  const [scanMode, setScanMode] = useState<'quick' | 'deep' | null>(null);
+  const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);
+  const scanningRef = useRef(false);
+  const cancelRequestedRef = useRef(false);
 
   // 计算选中文件大小
   const selectedSize = useMemo(() => {
@@ -50,16 +108,51 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     return total;
   }, [scanResult, selectedPaths]);
 
+  useEffect(() => {
+    localStorage.setItem(DEEP_SCAN_STORAGE_KEY, JSON.stringify(deepScanEnabled));
+  }, [deepScanEnabled]);
+
+  // 深度扫描阶段通过事件推送，避免前端轮询后端状态。
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let disposed = false;
+
+    listen<DeepJunkScanProgress>('junk-clean:progress', (event) => {
+      if (!disposed) setScanProgress(event.payload);
+    }).then((dispose) => {
+      if (disposed) dispose();
+      else unlisten = dispose;
+    }).catch((error) => {
+      if (!disposed) showToast({ type: 'warning', title: '深度扫描进度监听失败', description: String(error) });
+    });
+
+    return () => {
+      disposed = true;
+      if (unlisten) unlisten();
+    };
+  }, [showToast]);
+
   // 开始扫描
   const handleScan = useCallback(async () => {
+    if (scanningRef.current) return;
+
+    scanningRef.current = true;
+    cancelRequestedRef.current = false;
+    const currentScanMode = deepScanEnabled ? 'deep' : 'quick';
+    setScanMode(currentScanMode);
     updateModuleState('junk', { status: 'scanning', error: null });
     setScanResult(null);
+    setDeepScanResult(null);
+    setScanProgress(null);
     setDeleteResult(null);
     setSelectedPaths(new Set());
 
     try {
-      const result = await scanJunkFiles();
+      const result = currentScanMode === 'deep'
+        ? await scanDeepJunkFiles()
+        : await scanJunkFiles();
       setScanResult(result);
+      if (currentScanMode === 'deep') setDeepScanResult(result as DeepJunkScanResult);
       
       // 默认选中风险等级 <= 2 的文件
       const defaultSelected = new Set<string>();
@@ -81,10 +174,37 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       // 自动展开模块
       setExpandedModule('junk');
     } catch (err) {
-      console.error('扫描失败:', err);
-      updateModuleState('junk', { status: 'error', error: String(err) });
+      if (cancelRequestedRef.current) {
+        updateModuleState('junk', { status: 'idle', error: null });
+      } else {
+        console.error('扫描失败:', err);
+        updateModuleState('junk', { status: 'error', error: String(err) });
+      }
+    } finally {
+      scanningRef.current = false;
+      setScanProgress(null);
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [deepScanEnabled, updateModuleState, setExpandedModule]);
+
+  const handleStopScan = useCallback(async () => {
+    if (!scanningRef.current || scanMode !== 'deep') return;
+
+    cancelRequestedRef.current = true;
+    try {
+      await cancelDeepJunkScan();
+      showToast({ type: 'info', title: '扫描已停止', description: '已取消本次深度垃圾扫描' });
+    } catch (error) {
+      cancelRequestedRef.current = false;
+      showToast({ type: 'error', title: '停止扫描失败', description: String(error) });
+    }
+  }, [scanMode, showToast]);
+
+  // 顶部全局停止按钮复用深度扫描取消命令。
+  useEffect(() => {
+    if (stopScanTrigger > 0 && moduleState.status === 'scanning') {
+      handleStopScan();
+    }
+  }, [handleStopScan, moduleState.status, stopScanTrigger]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -101,7 +221,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     setIsDeleting(true);
     try {
       const paths = Array.from(selectedPaths);
-      const result = await enhancedDeleteFiles(paths);
+      const result = scanMode === 'deep'
+        ? await deleteDeepJunkFiles(paths)
+        : await enhancedDeleteFiles(paths);
       setDeleteResult(result);
 
       // 记录清理日志（所有操作都记录，包括成功和失败）
@@ -166,11 +288,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
         if (hasRecycleBinSuccess) {
           try {
-            const refreshedResult = await scanJunkFiles();
+            const refreshedResult = scanMode === 'deep'
+              ? await scanDeepJunkFiles()
+              : await scanJunkFiles();
             const visiblePaths = new Set(
               refreshedResult.categories.flatMap((category) => category.files.map((file) => file.path))
             );
             setScanResult(refreshedResult);
+            if (scanMode === 'deep') setDeepScanResult(refreshedResult as DeepJunkScanResult);
             updateModuleState('junk', {
               fileCount: refreshedResult.total_file_count,
               totalSize: refreshedResult.total_size,
@@ -227,7 +352,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh, showToast]);
+  }, [selectedPaths, scanResult, scanMode, updateModuleState, triggerHealthRefresh, showToast]);
 
   // 切换文件选中状态
   const toggleFileSelection = useCallback((path: string) => {
@@ -272,6 +397,39 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       setSelectedPaths(new Set());
     }
   }, [scanResult]);
+
+  const handleDeepScanToggle = useCallback((enabled: boolean) => {
+    if (scanningRef.current) return;
+    setDeepScanEnabled(enabled);
+    // 模式变化后旧结果不再代表当前扫描范围，必须清空以防误删上一种模式的结果。
+    setScanResult(null);
+    setDeepScanResult(null);
+    setSelectedPaths(new Set());
+    setDeleteResult(null);
+    setScanMode(null);
+    updateModuleState('junk', { status: 'idle', error: null, fileCount: 0, totalSize: 0 });
+  }, [updateModuleState]);
+
+  const handleLoadMoreDeepCategory = useCallback(async (categoryName: string) => {
+    if (scanMode !== 'deep' || !deepScanResult || loadingDeepCategory) return;
+    const category = scanResult?.categories.find((item) => item.display_name === categoryName);
+    if (!category || !category.has_more) return;
+
+    setLoadingDeepCategory(categoryName);
+    try {
+      const page = await getDeepJunkCategoryPage(
+        deepScanResult.scan_id,
+        categoryName,
+        category.files.length,
+      );
+      setScanResult((previous) => previous ? mergeDeepCategoryPage(previous, page) : previous);
+      setDeepScanResult((previous) => previous ? mergeDeepCategoryPage(previous, page) as DeepJunkScanResult : previous);
+    } catch (error) {
+      showToast({ type: 'warning', title: '加载深度扫描结果失败', description: String(error) });
+    } finally {
+      setLoadingDeepCategory(null);
+    }
+  }, [deepScanResult, loadingDeepCategory, scanMode, scanResult, showToast]);
 
   const isExpanded = expandedModule === 'junk';
 
@@ -334,13 +492,39 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         onScan={handleScan}
         error={moduleState.error}
         headerExtra={
-          scanResult && scanResult.total_file_count > 0 && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <label
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-hover)] text-xs text-[var(--fg-muted)] cursor-pointer select-none"
+              title="扫描所有固定分区，NTFS 分区使用 MFT 快速识别明确的缓存目录"
+            >
+              <span>深度发现</span>
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={deepScanEnabled}
+                disabled={moduleState.status === 'scanning'}
+                onChange={(event) => handleDeepScanToggle(event.target.checked)}
+              />
+              <span className={`relative w-8 h-4 rounded-full transition-colors ${deepScanEnabled ? 'bg-[var(--brand-green)]' : 'bg-[var(--border-color)]'}`}>
+                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${deepScanEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </span>
+            </label>
+            {moduleState.status === 'scanning' && deepScanEnabled && (
+              <button
+                onClick={handleStopScan}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-xs font-medium text-amber-600 transition"
+              >
+                <StopCircle className="w-3.5 h-3.5" />
+                停止
+              </button>
+            )}
+            {scanResult && scanResult.total_file_count > 0 && (
+              <div className="flex items-center gap-2">
               <button
                 onClick={() => toggleAllSelection(true)}
                 className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
               >
-                全选
+                {scanMode === 'deep' ? '全选已加载' : '全选'}
               </button>
               <button
                 onClick={() => toggleAllSelection(false)}
@@ -362,8 +546,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                 <Trash2 className="w-3.5 h-3.5" />
                 清理 ({selectedPaths.size})
               </button>
-            </div>
-          )
+              </div>
+            )}
+          </div>
         }
       >
         {/* 展开内容 */}
@@ -379,6 +564,28 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             />
           )}
 
+          {scanProgress && moduleState.status === 'scanning' && (
+            <div className="px-3 py-2 rounded-xl bg-[var(--brand-green-10)] text-xs text-[var(--fg-muted)]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Loader2 className="w-3.5 h-3.5 text-[var(--brand-green)] animate-spin shrink-0" />
+                <span className="truncate">{scanProgress.drive_letter ? `${scanProgress.drive_letter} ` : ''}{scanProgress.message}</span>
+              </div>
+              <div className="mt-2 h-1 bg-[var(--bg-card)] rounded-full overflow-hidden">
+                <div className="h-full w-1/3 bg-[var(--brand-green)] rounded-full animate-pulse" />
+              </div>
+            </div>
+          )}
+
+          {deepScanResult && deepScanResult.drives.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-[11px] text-[var(--fg-muted)]">
+              {deepScanResult.drives.map((drive) => (
+                <span key={drive.drive_letter} className="px-2 py-1 rounded-md bg-[var(--bg-hover)]" title={drive.warning ?? undefined}>
+                  {drive.drive_letter} · {drive.backend === 'mft' ? 'MFT' : '常规遍历'} · {formatSize(drive.matched_size)}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* 分类列表 */}
           {scanResult ? (
             <div className="space-y-2">
@@ -392,6 +599,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                     selectedPaths={selectedPaths}
                     onToggleFile={toggleFileSelection}
                     onToggleCategory={toggleCategorySelection}
+                    hasMore={scanMode === 'deep' && category.has_more === true}
+                    onLoadMore={() => handleLoadMoreDeepCategory(category.display_name)}
+                    isLoadingMore={loadingDeepCategory === category.display_name}
                   />
                 ))}
 

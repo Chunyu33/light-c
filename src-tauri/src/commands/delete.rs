@@ -6,7 +6,7 @@ use crate::cleaner::{
     DeleteEngine, EnhancedDeleteEngine, EnhancedDeleteResult, PermanentDeleteEngine,
     PermanentDeleteResult, SafetyCheckResult,
 };
-use crate::scanner::DeleteResult;
+use crate::scanner::{deep_junk, DeleteResult};
 use log::info;
 use serde::Deserialize;
 
@@ -56,6 +56,41 @@ pub async fn enhanced_delete_files(paths: Vec<String>) -> Result<EnhancedDeleteR
         result.freed_physical_size
     );
 
+    Ok(result)
+}
+
+/// 删除深度扫描结果，后端再次校验路径规则，避免前端被篡改后删除任意文件。
+#[tauri::command]
+pub async fn delete_deep_junk_files(paths: Vec<String>) -> Result<EnhancedDeleteResult, String> {
+    if paths.is_empty() {
+        return Ok(EnhancedDeleteResult::new());
+    }
+
+    if let Some(invalid_path) = paths
+        .iter()
+        .find(|path| !deep_junk::is_deep_junk_path(path))
+    {
+        return Err(format!(
+            "深度清理安全校验失败，拒绝删除路径: {}",
+            invalid_path
+        ));
+    }
+
+    info!("深度垃圾清理: 开始删除 {} 个文件", paths.len());
+    let result = tokio::task::spawn_blocking(move || {
+        let engine = EnhancedDeleteEngine::new();
+        engine.delete_files(&paths)
+    })
+    .await
+    .map_err(|error| format!("深度垃圾删除任务失败: {}", error))?;
+
+    info!(
+        "深度垃圾清理完成: 成功 {}, 失败 {}, 待重启 {}, 释放 {} 字节",
+        result.success_count,
+        result.failed_count,
+        result.reboot_pending_count,
+        result.freed_physical_size
+    );
     Ok(result)
 }
 

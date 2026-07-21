@@ -49,6 +49,9 @@ interface CategoryCardProps {
   selectedPaths: Set<string>;
   onToggleFile: (path: string) => void;
   onToggleCategory: (files: FileInfo[], selected: boolean) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
 /**
@@ -59,6 +62,9 @@ export function CategoryCard({
   selectedPaths,
   onToggleFile,
   onToggleCategory,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
 }: CategoryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
@@ -202,6 +208,17 @@ export function CategoryCard({
                 })}
               </div>
             </div>
+            {hasMore && onLoadMore && (
+              <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex justify-center">
+                <button
+                  onClick={onLoadMore}
+                  disabled={isLoadingMore}
+                  className="text-xs text-[var(--brand-green)] hover:text-[var(--brand-green-hover)] disabled:text-[var(--text-faint)] transition"
+                >
+                  {isLoadingMore ? '正在加载…' : `加载更多（已显示 ${category.files.length.toLocaleString()} / ${category.file_count.toLocaleString()}）`}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -84,6 +84,9 @@ pub fn run() {
             get_disk_health,
             // 扫描相关
             scan_junk_files,
+            scan_deep_junk_files,
+            cancel_deep_junk_scan,
+            get_deep_junk_category_page,
             scan_category,
             scan_large_files,
             cancel_large_file_scan,
@@ -120,6 +123,7 @@ pub fn run() {
             open_registry_backup_dir,
             // 增强删除
             enhanced_delete_files,
+            delete_deep_junk_files,
             get_physical_size,
             check_admin_for_path,
             // 永久删除（深度清理）

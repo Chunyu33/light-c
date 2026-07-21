@@ -6,6 +6,7 @@ pub(crate) mod big_files;
 pub(crate) mod big_files_engine;
 mod categories;
 mod context_menu;
+pub(crate) mod deep_junk;
 mod file_info;
 mod hotspot;
 pub(crate) mod hotspot_engine;

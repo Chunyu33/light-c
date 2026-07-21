@@ -12,13 +12,14 @@
 // - 详细的删除结果反馈，包括跳过原因
 // ============================================================================
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Mutex;
 
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
@@ -410,6 +411,8 @@ const SAFE_OWNERSHIP_PATHS: &[&str] = &[
 pub struct EnhancedDeleteEngine {
     /// 磁盘簇大小缓存
     cluster_size: u32,
+    /// 多分区清理时按卷缓存簇大小，避免逐文件调用 Windows API。
+    cluster_sizes: Mutex<HashMap<String, u32>>,
     /// 是否启用重启删除功能
     enable_reboot_delete: bool,
     /// 是否尝试获取所有权
@@ -424,6 +427,7 @@ impl EnhancedDeleteEngine {
 
         Self {
             cluster_size,
+            cluster_sizes: Mutex::new(HashMap::new()),
             enable_reboot_delete: true,   // 默认启用，处理被占用的文件
             enable_take_ownership: false, // 默认禁用，icacls 调用很慢
         }
@@ -453,6 +457,29 @@ impl EnhancedDeleteEngine {
         }
         let cluster_size = self.cluster_size as u64;
         ((logical_size + cluster_size - 1) / cluster_size) * cluster_size
+    }
+
+    /// 按文件所在分区计算物理占用，避免深度清理 D/E 盘时套用 C 盘簇大小。
+    fn calculate_physical_size_for_path(&self, path: &Path, logical_size: u64) -> u64 {
+        let Some(drive_root) = drive_root(path) else {
+            return self.calculate_physical_size(logical_size);
+        };
+        let cluster_size = self.cluster_size_for_drive(&drive_root);
+        align_physical_size(logical_size, cluster_size)
+    }
+
+    fn cluster_size_for_drive(&self, drive_root: &str) -> u32 {
+        if let Ok(cache) = self.cluster_sizes.lock() {
+            if let Some(cluster_size) = cache.get(drive_root) {
+                return *cluster_size;
+            }
+        }
+
+        let cluster_size = windows_api::get_cluster_size(drive_root).unwrap_or(self.cluster_size);
+        if let Ok(mut cache) = self.cluster_sizes.lock() {
+            cache.insert(drive_root.to_string(), cluster_size);
+        }
+        cluster_size
     }
 
     /// 删除文件列表
@@ -495,9 +522,8 @@ impl EnhancedDeleteEngine {
                     continue;
                 };
                 // 回收站支持多盘，物理大小必须使用条目所在卷的簇大小而不是固定 C 盘值。
-                let physical_size = windows_api::get_cluster_size(&drive_root)
-                    .map(|cluster_size| align_physical_size(logical_size, cluster_size))
-                    .unwrap_or_else(|| self.calculate_physical_size(logical_size));
+                let physical_size =
+                    align_physical_size(logical_size, self.cluster_size_for_drive(&drive_root));
                 recycle_by_drive.entry(drive_root).or_default().push((
                     (*path).clone(),
                     logical_size,
@@ -587,7 +613,7 @@ impl EnhancedDeleteEngine {
 
         // 获取文件大小
         let logical_size = self.get_file_size(file_path);
-        let physical_size = self.calculate_physical_size(logical_size);
+        let physical_size = self.calculate_physical_size_for_path(file_path, logical_size);
 
         // 检查文件是否存在
         if !file_path.exists() {
@@ -889,6 +915,16 @@ fn recycle_drive_root(path: &str) -> Option<String> {
         return None;
     }
 
+    Some(format!("{}:\\", (bytes[0] as char).to_ascii_uppercase()))
+}
+
+/// 从普通文件路径提取分区根目录，用于按卷读取簇大小。
+fn drive_root(path: &Path) -> Option<String> {
+    let path = path.to_string_lossy();
+    let bytes = path.as_bytes();
+    if bytes.len() < 2 || bytes[1] != b':' || !bytes[0].is_ascii_alphabetic() {
+        return None;
+    }
     Some(format!("{}:\\", (bytes[0] as char).to_ascii_uppercase()))
 }
 

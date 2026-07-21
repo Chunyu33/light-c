@@ -54,6 +54,8 @@ export interface CategoryScanResult {
   total_size: number;
   /** 文件数量 */
   file_count: number;
+  /** 深度扫描是否还有未加载的文件 */
+  has_more?: boolean;
 }
 
 /** 完整扫描结果 */
@@ -68,6 +70,33 @@ export interface ScanResult {
   scan_duration_ms: number;
   /** 扫描时间戳 */
   scan_timestamp: number;
+}
+
+/** 深度垃圾扫描的分区摘要。 */
+export interface DeepJunkDriveSummary {
+  drive_letter: string;
+  file_system: string;
+  backend: 'mft' | 'walkdir';
+  matched_file_count: number;
+  matched_size: number;
+  warning?: string | null;
+}
+
+/** 深度垃圾扫描结果，分类文件结构与普通扫描保持一致。 */
+export interface DeepJunkScanResult extends ScanResult {
+  scan_mode: 'deep';
+  scan_id: string;
+  drives: DeepJunkDriveSummary[];
+}
+
+/** 深度垃圾扫描阶段进度。 */
+export interface DeepJunkScanProgress {
+  stage: string;
+  drive_letter: string;
+  message: string;
+  processed: number;
+  matched_count: number;
+  elapsed_ms: number;
 }
 
 /** 删除结果 */
