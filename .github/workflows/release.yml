@@ -50,15 +50,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.13.0'
+          releaseName: 'LightC v2.14.0'
           releaseBody: |
             ## 更新内容
-            - 垃圾清理新增全盘深度发现，NTFS 分区优先使用 MFT，其他分区自动受控降级
-            - 深度清理支持分页分类完整删除、路径安全复核、多盘物理释放量统计和后台核验
-            - 大批量删除显示处理进度、释放空间、失败数量、速度和预计剩余时间
-            - 垃圾文件列表新增用途搜索，并统一清理 Windows `\\?\` 长路径前缀
-            - 官方下载渠道增加内置网盘、GitHub 和作者平台链接兜底
-            - 使用说明补充管理员权限对 MFT 扫描和受保护目录清理的作用
+            - 新增“虚拟磁盘管理”，识别并管理此电脑中的第三方外壳图标
+            - 根据应用名称、CLSID 和组件路径展示百度网盘、夸克网盘、WPS、迅雷等关联信息
+            - 支持普通删除和彻底删除；彻底删除物理移除节点并防止普通权限软件复活
+            - 自动备份注册表和 ACL，支持恢复原节点；提供一键定位注册表和刷新 Explorer
+            - 垃圾清理、深度发现、便携版数据管理和官方下载渠道继续保持现有能力
 
             请查看 [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
           releaseDraft: false

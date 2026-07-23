@@ -161,7 +161,7 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
       <ModuleCard
         id="shellIcons"
         title="虚拟磁盘管理"
-        description="管理此电脑中的第三方外壳图标，支持备份、清理和防复活"
+        description="管理此电脑中的第三方外壳图标（如双击打开某网盘），支持备份、清理和防复活"
         icon={<HardDriveDownload className="h-6 w-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
