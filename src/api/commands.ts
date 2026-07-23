@@ -1512,6 +1512,70 @@ export async function deleteAiModel(path: string): Promise<EnhancedDeleteResult>
 }
 
 // ============================================================================
+// 虚拟磁盘管理 API
+// ============================================================================
+
+export interface ShellIconInfo {
+  clsid: string;
+  name: string;
+  applicationName?: string | null;
+  regPath: string;
+  hive: string;
+  registryView: string;
+  sourcePath?: string | null;
+  riskLevel: 'safe' | 'protected' | 'unknown' | 'locked' | string;
+  riskReason: string;
+  isSystemProtected: boolean;
+  isLocked: boolean;
+}
+
+export interface ShellIconTarget {
+  clsid: string;
+  hive: string;
+  registryView: string;
+}
+
+export interface ShellIconOperationResult {
+  success: boolean;
+  message: string;
+  backupPath?: string | null;
+  needsExplorerRefresh: boolean;
+}
+
+/** 扫描 Explorer 此电脑下的第三方外壳图标；后端会同时检查系统保护和关联组件。 */
+export async function scanShellIcons(): Promise<ShellIconInfo[]> {
+  return invoke<ShellIconInfo[]>('scan_shell_icons');
+}
+
+/** mode=1 为删除节点，mode=2 为彻底清理并防复活。 */
+export async function removeShellIcon(target: ShellIconTarget, mode: 1 | 2): Promise<ShellIconOperationResult> {
+  return invoke<ShellIconOperationResult>('remove_shell_icon', { target, mode });
+}
+
+/** 只恢复原始 ACL，适合允许软件重新注册但不立即恢复图标的场景。 */
+export async function unlockShellIcon(target: ShellIconTarget): Promise<ShellIconOperationResult> {
+  return invoke<ShellIconOperationResult>('unlock_shell_icon', { target });
+}
+
+/** 从最近一次备份恢复注册表内容和原始 ACL。 */
+export async function restoreShellIcon(target: ShellIconTarget): Promise<ShellIconOperationResult> {
+  return invoke<ShellIconOperationResult>('restore_shell_icon', { target });
+}
+
+export async function restartExplorer(): Promise<void> {
+  return invoke<void>('restart_explorer');
+}
+
+export async function openShellIconBackupDir(): Promise<void> {
+  return invoke<void>('open_shell_icon_backup_dir');
+}
+
+/** 通过注册表编辑器的 LastKey 定位到目标外壳节点。 */
+export async function openShellIconRegistry(target: ShellIconTarget): Promise<void> {
+  return invoke<void>('open_shell_icon_registry', { target });
+}
+
+// ============================================================================
 // 鏁版嵁鐩綍绠＄悊 API
 // ============================================================================
 

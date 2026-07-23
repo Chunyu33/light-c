@@ -15,6 +15,7 @@ mod recycle_bin;
 mod registry;
 mod registry_scoring;
 mod scan_engine;
+pub(crate) mod shell_icons;
 mod social_scanner;
 
 pub use categories::*;
@@ -24,4 +25,5 @@ pub use hotspot::*;
 pub use leftovers::*;
 pub use registry::*;
 pub use scan_engine::*;
+pub use shell_icons::*;
 pub use social_scanner::*;

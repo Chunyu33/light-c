@@ -13,3 +13,4 @@ export { HotspotModule } from './HotspotModule';
 export { ContextMenuModule } from './ContextMenuModule';
 export { DiskGrowthModule } from './DiskGrowthModule';
 export { AiModelsModule } from './AiModelsModule';
+export { ShellIconModule } from './ShellIconModule';

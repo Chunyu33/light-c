@@ -15,6 +15,7 @@ import {
   MousePointerClick,
   Package,
   Trash2,
+  HardDriveDownload,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -31,7 +32,8 @@ export type AppModuleId =
   | 'context-menu'
   | 'hotspot'
   | 'disk-growth'
-  | 'ai-models';
+  | 'ai-models'
+  | 'shell-icons';
 
 export interface AppModuleMeta {
   /** 模块在页面和导航里的稳定 ID，必须和 data-module-id 保持一致。 */
@@ -53,6 +55,7 @@ export const APP_MODULE_META: AppModuleMeta[] = [
   { id: 'disk-growth', label: '磁盘变化分析', icon: HardDrive },
   // AI 模型空间覆盖模型、LoRA、Embedding 和缓存，用“空间”强调这是占用分析而不是自动清理。
   { id: 'ai-models', label: 'AI 模型空间', icon: BrainCircuit },
+  { id: 'shell-icons', label: '虚拟磁盘管理', icon: HardDriveDownload },
 ];
 
 export const DEFAULT_ACTIVE_MODULE_ID: AppModuleId = 'junk-clean';

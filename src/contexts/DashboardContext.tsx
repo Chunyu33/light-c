@@ -61,6 +61,7 @@ export interface ModulesState {
   diskGrowth: ModuleState;
   /** AI资产分析模块 */
   aiModels: ModuleState;
+  shellIcons: ModuleState;
 }
 
 /** 仪表盘 Context 值类型 */
@@ -150,6 +151,7 @@ const initialModulesState: ModulesState = {
   contextMenu: { ...initialModuleState },
   diskGrowth: { ...initialModuleState },
   aiModels: { ...initialModuleState },
+  shellIcons: { ...initialModuleState },
 };
 
 // ============================================================================
@@ -173,6 +175,7 @@ const ModuleStateContexts: { [K in keyof ModulesState]: React.Context<ModuleStat
   contextMenu: createContext<ModuleState | null>(null),
   diskGrowth: createContext<ModuleState | null>(null),
   aiModels: createContext<ModuleState | null>(null),
+  shellIcons: createContext<ModuleState | null>(null),
 };
 
 // ============================================================================
@@ -368,7 +371,9 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
                           <ModuleStateContexts.contextMenu.Provider value={modules.contextMenu}>
                             <ModuleStateContexts.diskGrowth.Provider value={modules.diskGrowth}>
                               <ModuleStateContexts.aiModels.Provider value={modules.aiModels}>
-                                {children}
+                                <ModuleStateContexts.shellIcons.Provider value={modules.shellIcons}>
+                                  {children}
+                                </ModuleStateContexts.shellIcons.Provider>
                               </ModuleStateContexts.aiModels.Provider>
                             </ModuleStateContexts.diskGrowth.Provider>
                           </ModuleStateContexts.contextMenu.Provider>
