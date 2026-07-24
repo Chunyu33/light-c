@@ -76,5 +76,35 @@ pub fn is_rebuildable_system_cache_path(path: &str) -> bool {
         "\\programdata\\microsoft\\windows defender\\support",
     ]
     .iter()
-    .any(|marker| normalized.contains(marker))
+    .any(|marker| {
+        let Some(start) = normalized.find(marker) else {
+            return false;
+        };
+        let suffix = &normalized[start + marker.len()..];
+        let has_drive_root_boundary = start > 0 && normalized.as_bytes()[start - 1] == b':';
+        // 必须同时匹配系统盘根目录和完整目录名，避免误放行嵌套伪造路径或 Support2。
+        has_drive_root_boundary && (suffix.is_empty() || suffix.starts_with('\\'))
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_rebuildable_system_cache_path;
+
+    #[test]
+    fn matches_only_explicit_cache_directory_boundaries() {
+        // 只允许清理向导明确列出的目录，避免相似目录名被误放行。
+        assert!(is_rebuildable_system_cache_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Support\MPLog.log"
+        ));
+        assert!(!is_rebuildable_system_cache_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Support2\MPLog.log"
+        ));
+        assert!(!is_rebuildable_system_cache_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Quarantine\entry.bin"
+        ));
+        assert!(!is_rebuildable_system_cache_path(
+            r"C:\Temp\ProgramData\Microsoft\Windows Defender\Support\entry.bin"
+        ));
+    }
 }

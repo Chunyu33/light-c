@@ -4,6 +4,14 @@
 
 ---
 
+## Unreleased
+
+### Junk Cleanup and Documentation
+
+- Defender cleanup now uses a bounded, single-file ownership fallback for the explicitly supported `LocalCopy` and `Support` caches, while keeping the Defender root and protected data excluded.
+- Delete results now retain reboot-pending entries and include more specific permission/ownership failure details.
+- Replaced the long README with concise English and Simplified Chinese documentation using the same structure.
+
 
 ## v2.14.0 (2026-07-23)
 
