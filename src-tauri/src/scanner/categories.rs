@@ -18,6 +18,10 @@ pub enum JunkCategory {
     RecycleBin,
     /// Windows更新缓存
     WindowsUpdate,
+    /// Windows 传递优化缓存
+    DeliveryOptimization,
+    /// Microsoft Defender 防病毒非关键文件
+    WindowsDefenderCache,
     /// 缩略图缓存
     ThumbnailCache,
     /// 日志文件
@@ -49,6 +53,8 @@ impl JunkCategory {
             JunkCategory::BrowserCache => "浏览器缓存",
             JunkCategory::RecycleBin => "回收站",
             JunkCategory::WindowsUpdate => "Windows更新缓存",
+            JunkCategory::DeliveryOptimization => "传递优化文件",
+            JunkCategory::WindowsDefenderCache => "Microsoft Defender 防病毒",
             JunkCategory::ThumbnailCache => "缩略图缓存",
             JunkCategory::LogFiles => "日志文件",
             JunkCategory::MemoryDump => "内存转储文件",
@@ -72,6 +78,12 @@ impl JunkCategory {
             }
             JunkCategory::RecycleBin => "已删除但未彻底清除的文件",
             JunkCategory::WindowsUpdate => "Windows更新下载的安装包缓存",
+            JunkCategory::DeliveryOptimization => {
+                "Windows 传递优化下载和分发过程中产生的可重建缓存"
+            }
+            JunkCategory::WindowsDefenderCache => {
+                "Microsoft Defender 生成的非关键日志和临时文件，删除后会自动重建"
+            }
             JunkCategory::ThumbnailCache => "文件夹中图片和视频的缩略图缓存",
             JunkCategory::LogFiles => "系统和应用程序的日志记录文件",
             JunkCategory::MemoryDump => "系统崩溃时产生的内存转储文件",
@@ -95,6 +107,8 @@ impl JunkCategory {
             JunkCategory::ShaderCache => 1,
             JunkCategory::BrowserCache => 2,
             JunkCategory::WindowsUpdate => 2,
+            JunkCategory::DeliveryOptimization => 2,
+            JunkCategory::WindowsDefenderCache => 2,
             JunkCategory::LogFiles => 2,
             JunkCategory::WindowsErrorReports => 2,
             JunkCategory::InstallerTemp => 2,
@@ -117,8 +131,6 @@ impl JunkCategory {
             JunkCategory::SystemCache => vec![
                 // Windows 预读取缓存
                 ScanPath::fixed_path("C:\\Windows\\Prefetch"),
-                // Windows 传递优化缓存
-                ScanPath::fixed_path("C:\\Windows\\SoftwareDistribution\\DeliveryOptimization"),
                 // Windows 网络缓存
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\INetCache")),
                 // Windows 应用程序缓存
@@ -185,10 +197,28 @@ impl JunkCategory {
             JunkCategory::WindowsUpdate => vec![ScanPath::fixed_path(
                 "C:\\Windows\\SoftwareDistribution\\Download",
             )],
-            JunkCategory::ThumbnailCache => vec![ScanPath::env_path(
-                "LOCALAPPDATA",
-                Some("Microsoft\\Windows\\Explorer"),
-            )],
+            JunkCategory::DeliveryOptimization => vec![
+                // 新旧 Windows 版本使用不同服务账户目录，两个白名单根目录都只包含可重建缓存。
+                ScanPath::env_path(
+                    "SYSTEMROOT",
+                    Some("SoftwareDistribution\\DeliveryOptimization"),
+                ),
+                ScanPath::env_path(
+                    "SYSTEMROOT",
+                    Some("ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Windows\\DeliveryOptimization\\Cache"),
+                ),
+            ],
+            JunkCategory::WindowsDefenderCache => vec![
+                // Windows 清理向导的 Defender 项只指向这两个目录，不泛扫 Defender 数据根目录。
+                ScanPath::env_path(
+                    "PROGRAMDATA",
+                    Some("Microsoft\\Windows Defender\\LocalCopy"),
+                ),
+                ScanPath::env_path(
+                    "PROGRAMDATA",
+                    Some("Microsoft\\Windows Defender\\Support"),
+                ),
+            ],
             JunkCategory::LogFiles => vec![
                 ScanPath::fixed_path("C:\\Windows\\Logs"),
                 ScanPath::env_path("LOCALAPPDATA", Some("CrashDumps")),
@@ -228,8 +258,17 @@ impl JunkCategory {
                 "LOCALAPPDATA",
                 Some("Microsoft\\Windows\\Clipboard"),
             )],
+            JunkCategory::ThumbnailCache => vec![
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Explorer")),
+                // 缩略图按用户配置文件保存，补扫同一系统盘上的其他用户，但不扩大到整个 Users。
+                ScanPath::glob_path(
+                    "SYSTEMDRIVE",
+                    "Users\\*\\AppData\\Local\\Microsoft\\Windows\\Explorer",
+                ),
+            ],
             JunkCategory::ShaderCache => vec![
-                ScanPath::fixed_path("C:\\Windows\\System32\\d3d_cache"),
+                // D3DCache 位于 System32 下，但它是可重建缓存，扫描器会对该白名单例外放行。
+                ScanPath::env_path("SYSTEMROOT", Some("System32\\d3d_cache")),
                 ScanPath::env_path("LOCALAPPDATA", Some("D3DSCache")),
                 ScanPath::env_path("LOCALAPPDATA", Some("AMD\\DxCache")),
                 ScanPath::env_path("LOCALAPPDATA", Some("NVIDIA\\DXCache")),
@@ -246,6 +285,8 @@ impl JunkCategory {
             JunkCategory::BrowserCache => vec!["*"],
             JunkCategory::RecycleBin => vec!["*"],
             JunkCategory::WindowsUpdate => vec!["*"],
+            JunkCategory::DeliveryOptimization => vec!["*"],
+            JunkCategory::WindowsDefenderCache => vec!["*"],
             JunkCategory::ThumbnailCache => vec!["thumbcache_*.db", "iconcache_*.db"],
             JunkCategory::LogFiles => vec!["*.log", "*.etl", "*.evtx"],
             JunkCategory::MemoryDump => vec!["*.dmp", "MEMORY.DMP"],
@@ -267,6 +308,8 @@ impl JunkCategory {
             JunkCategory::BrowserCache,
             JunkCategory::RecycleBin,
             JunkCategory::WindowsUpdate,
+            JunkCategory::DeliveryOptimization,
+            JunkCategory::WindowsDefenderCache,
             JunkCategory::ThumbnailCache,
             JunkCategory::LogFiles,
             JunkCategory::MemoryDump,
@@ -415,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_all_categories_covered() {
-        const JUNK_CATEGORY_VARIANT_COUNT: usize = 15;
+        const JUNK_CATEGORY_VARIANT_COUNT: usize = 17;
         assert_eq!(JunkCategory::all().len(), JUNK_CATEGORY_VARIANT_COUNT);
     }
 

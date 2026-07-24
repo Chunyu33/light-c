@@ -457,7 +457,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
               </div>
               <div className="text-left">
                 <p className="text-sm font-medium text-[var(--text-primary)]">清空本地数据</p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">选择性清理日志、备份、快照和历史缓存</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">选择性清理日志、备份、快照、历史缓存和虚拟磁盘记录</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />

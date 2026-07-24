@@ -11,6 +11,7 @@ import {
   RegistryModule,
   SocialCleanModule,
   SystemSlimModule,
+  ShellIconModule,
 } from '../components/modules';
 import { APP_MODULE_META, type AppModuleId, type LayoutMode } from './moduleMeta';
 
@@ -32,6 +33,7 @@ const moduleComponents: Record<AppModuleId, ComponentType<{ layoutMode?: LayoutM
   hotspot: HotspotModule,
   'disk-growth': DiskGrowthModule,
   'ai-models': AiModelsModule,
+  'shell-icons': ShellIconModule,
 };
 
 export const APP_MODULES: AppModuleConfig[] = APP_MODULE_META.map(moduleMeta => ({

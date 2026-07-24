@@ -124,6 +124,8 @@ struct ClearableDataDefinition {
     relative_path: &'static str,
     item_type: ClearableDataType,
     warning: Option<&'static str>,
+    /// 父级目录统计和清理时排除独立管理的子路径，避免同一批文件重复计算或删除。
+    excluded_relative_paths: &'static [&'static str],
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -140,7 +142,7 @@ const DISK_GROWTH_SNAPSHOT_JSON_SUFFIX: &str = ".json";
 const DISK_GROWTH_SNAPSHOT_SHARD_SUFFIX: &str = ".files";
 
 // 快照项按盘符动态展开，普通白名单只保留固定数据，避免“清空本地数据”误删所有磁盘基线。
-const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
+const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 6] = [
     ClearableDataDefinition {
         id: "install_history",
         label: "安装历史缓存",
@@ -148,6 +150,7 @@ const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
         relative_path: "install_history.json",
         item_type: ClearableDataType::File,
         warning: Some("可安全清理，但卸载残留模块的历史识别信号会重新建立。"),
+        excluded_relative_paths: &[],
     },
     ClearableDataDefinition {
         id: "logs",
@@ -156,6 +159,7 @@ const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
         relative_path: "logs",
         item_type: ClearableDataType::DirectoryContents,
         warning: None,
+        excluded_relative_paths: &["shell_icons.log"],
     },
     ClearableDataDefinition {
         id: "reg_backups",
@@ -164,6 +168,25 @@ const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
         relative_path: "reg_backups",
         item_type: ClearableDataType::DirectoryContents,
         warning: Some("删除后无法再通过这些备份回溯旧注册表清理操作。"),
+        excluded_relative_paths: &["shell_icons"],
+    },
+    ClearableDataDefinition {
+        id: "shell_icon_logs",
+        label: "虚拟磁盘操作记录",
+        description: "记录虚拟磁盘删除、恢复和防复活操作，便于确认处理过哪些入口。",
+        relative_path: "logs/shell_icons.log",
+        item_type: ClearableDataType::File,
+        warning: None,
+        excluded_relative_paths: &[],
+    },
+    ClearableDataDefinition {
+        id: "shell_icon_backups",
+        label: "虚拟磁盘注册表备份",
+        description: "外壳图标清理操作前保存的注册表和权限备份，可用于恢复入口。",
+        relative_path: "reg_backups/shell_icons",
+        item_type: ClearableDataType::DirectoryContents,
+        warning: Some("删除后无法再通过备份恢复已移除的虚拟磁盘入口。"),
+        excluded_relative_paths: &[],
     },
     ClearableDataDefinition {
         id: "driver_backups",
@@ -172,6 +195,7 @@ const CLEARABLE_DATA_DEFINITIONS: [ClearableDataDefinition; 4] = [
         relative_path: "driver_backups",
         item_type: ClearableDataType::DirectoryContents,
         warning: Some("删除后将无法使用这些备份手动恢复已清理的驱动包。默认不会勾选。"),
+        excluded_relative_paths: &[],
     },
 ];
 
@@ -815,7 +839,9 @@ fn build_clearable_data_item(
     let target_path = data_dir.join(definition.relative_path);
     let (file_count, size) = match definition.item_type {
         ClearableDataType::File => file_usage(&target_path),
-        ClearableDataType::DirectoryContents => directory_contents_usage(&target_path)?,
+        ClearableDataType::DirectoryContents => {
+            directory_contents_usage(&target_path, definition.excluded_relative_paths)?
+        }
     };
 
     Ok(ClearableDataItem {
@@ -932,7 +958,7 @@ fn clear_data_item(
             if !target_path.is_dir() {
                 return Err(format!("清理项不是目录: {}", target_path.display()));
             }
-            let result = clear_directory_contents(target_path)?;
+            let result = clear_directory_contents(target_path, definition.excluded_relative_paths)?;
             log::info!("已清空本地数据目录: {}", definition.relative_path);
             Ok(result)
         }
@@ -967,7 +993,7 @@ fn clear_disk_growth_snapshots_for_drive(
     for path in disk_growth_snapshot_paths_for_drive(snapshot_dir, drive_letter)? {
         // 分片目录与主快照文件同名同盘符，必须成组删除，否则后续明细查询会看到残缺数据。
         if path.is_dir() {
-            let (child_files, child_bytes) = directory_usage(&path)?;
+            let (child_files, child_bytes) = directory_usage(&path, &[])?;
             file_count += child_files;
             total_size += child_bytes;
             fs::remove_dir_all(&path)
@@ -997,7 +1023,7 @@ fn disk_growth_snapshot_usage_for_drive(
     let mut total_size = 0u64;
     for path in disk_growth_snapshot_paths_for_drive(snapshot_dir, drive_letter)? {
         if path.is_dir() {
-            let (child_files, child_bytes) = directory_usage(&path)?;
+            let (child_files, child_bytes) = directory_usage(&path, &[])?;
             file_count += child_files;
             total_size += child_bytes;
         } else if path.is_file() {
@@ -1097,7 +1123,10 @@ fn file_usage(path: &Path) -> (usize, u64) {
     (1, size)
 }
 
-fn directory_contents_usage(dir: &Path) -> Result<(usize, u64), String> {
+fn directory_contents_usage(
+    dir: &Path,
+    excluded_relative_paths: &[&str],
+) -> Result<(usize, u64), String> {
     if !dir.exists() {
         return Ok((0, 0));
     }
@@ -1105,11 +1134,14 @@ fn directory_contents_usage(dir: &Path) -> Result<(usize, u64), String> {
         return Ok((0, 0));
     }
 
-    directory_usage(dir)
+    directory_usage(dir, excluded_relative_paths)
 }
 
 /// 清空指定目录下的所有内容但保留目录本身，避免日志目录等固定入口被删后还要重新创建。
-fn clear_directory_contents(dir: &Path) -> Result<(usize, u64), String> {
+fn clear_directory_contents(
+    dir: &Path,
+    excluded_relative_paths: &[&str],
+) -> Result<(usize, u64), String> {
     let mut file_count = 0usize;
     let mut total_size = 0u64;
 
@@ -1118,8 +1150,16 @@ fn clear_directory_contents(dir: &Path) -> Result<(usize, u64), String> {
     {
         let entry = entry_res.map_err(|e| format!("读取目录条目失败 {}: {}", dir.display(), e))?;
         let path = entry.path();
+        // 独立展示的虚拟磁盘数据由专属清理项处理，父级项目只统计其余内容。
+        if entry.file_name().to_str().is_some_and(|name| {
+            excluded_relative_paths
+                .iter()
+                .any(|excluded| *excluded == name)
+        }) {
+            continue;
+        }
         if path.is_dir() {
-            let (child_files, child_bytes) = directory_usage(&path)?;
+            let (child_files, child_bytes) = directory_usage(&path, &[])?;
             file_count += child_files;
             total_size += child_bytes;
             fs::remove_dir_all(&path)
@@ -1138,7 +1178,7 @@ fn clear_directory_contents(dir: &Path) -> Result<(usize, u64), String> {
 }
 
 /// 删除目录前先统计文件数和空间，保证前端提示的释放量包含嵌套目录内的快照分片。
-fn directory_usage(dir: &Path) -> Result<(usize, u64), String> {
+fn directory_usage(dir: &Path, excluded_relative_paths: &[&str]) -> Result<(usize, u64), String> {
     let mut file_count = 0usize;
     let mut total_size = 0u64;
 
@@ -1147,8 +1187,16 @@ fn directory_usage(dir: &Path) -> Result<(usize, u64), String> {
     {
         let entry = entry_res.map_err(|e| format!("统计目录条目失败 {}: {}", dir.display(), e))?;
         let path = entry.path();
+        // 这里只需要过滤当前目录的独立子项，嵌套目录由专属分类整体管理。
+        if entry.file_name().to_str().is_some_and(|name| {
+            excluded_relative_paths
+                .iter()
+                .any(|excluded| *excluded == name)
+        }) {
+            continue;
+        }
         if path.is_dir() {
-            let (child_files, child_bytes) = directory_usage(&path)?;
+            let (child_files, child_bytes) = directory_usage(&path, &[])?;
             file_count += child_files;
             total_size += child_bytes;
         } else if path.is_file() {
@@ -1181,6 +1229,39 @@ mod tests {
     fn test_get_default_dir_not_empty() {
         let dir = get_default_dir();
         assert!(!dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn excludes_virtual_disk_entries_from_parent_usage() {
+        let unique_suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("获取测试时间失败")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "lightc-data-dir-test-{}-{}",
+            std::process::id(),
+            unique_suffix
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("shell_icons")).expect("创建测试目录失败");
+        fs::write(root.join("cleanup.json"), "cleanup").expect("创建通用日志失败");
+        fs::write(root.join("shell_icons.log"), "shell icon").expect("创建专属日志失败");
+        fs::write(root.join("shell_icons").join("backup.reg"), "backup").expect("创建专属备份失败");
+
+        // 通用日志统计排除专属日志，但不会排除其他无关子目录。
+        let usage = directory_usage(&root, &["shell_icons.log"]).expect("统计测试目录失败");
+        assert_eq!(usage.0, 2);
+        assert_eq!(usage.1, "cleanup".len() as u64 + "backup".len() as u64);
+
+        // 通用备份统计排除虚拟磁盘专属目录，避免与专属备份项重复。
+        let backup_usage = directory_usage(&root, &["shell_icons"]).expect("统计备份测试目录失败");
+        assert_eq!(backup_usage.0, 2);
+        assert_eq!(
+            backup_usage.1,
+            "cleanup".len() as u64 + "shell icon".len() as u64
+        );
+
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]

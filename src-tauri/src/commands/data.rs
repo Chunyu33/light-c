@@ -33,7 +33,7 @@ pub fn set_data_directory(path: String) -> Result<String, String> {
     ))
 }
 
-/// 清空本地数据（安装历史缓存 + 清理日志 + C 盘全盘分析快照）
+/// 清空本地数据白名单项；模块专属日志和备份由数据目录统一清理清单管理。
 #[tauri::command]
 pub fn clear_local_data() -> Result<(usize, u64), String> {
     crate::data_dir::clear_local_data()

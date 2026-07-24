@@ -9,6 +9,8 @@ export type JunkCategory =
   | 'BrowserCache'
   | 'RecycleBin'
   | 'WindowsUpdate'
+  | 'DeliveryOptimization'
+  | 'WindowsDefenderCache'
   | 'ThumbnailCache'
   | 'LogFiles'
   | 'MemoryDump'

@@ -144,6 +144,18 @@ export function GuideSettings() {
           </div>
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-[var(--brand-green)]" />
+              外壳图标清理
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6">
+              用于识别和清理部分网盘、办公软件、下载工具等第三方软件注册到“此电脑”中的虚拟磁盘入口。这些项目通常不是真实磁盘，而是软件添加的外壳图标；清理后不会删除网盘中的文件，只会移除资源管理器中的入口。
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed pl-6 mt-1">
+              普通删除会移除当前入口，彻底删除还会限制普通权限软件重新注册，适合处理不希望再次出现的流氓软件虚拟磁盘。操作前会自动备份注册表，操作记录保存在当前数据目录的 logs 文件夹中。
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
               <Cpu className="w-4 h-4 text-[var(--brand-green)]" />
               AI 模型空间
             </p>
@@ -173,6 +185,22 @@ export function GuideSettings() {
               第二，访问 Windows 临时目录、更新缓存等受权限保护的位置，提升清理完成度。即使以管理员身份运行，软件仍会执行路径白名单、系统保护和文件占用检查，不会为了清理而强制删除核心系统文件；正在使用的文件可能仍会保留或安排重启后处理。
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* 虚拟磁盘的安全边界独立说明，避免把注册表风险混入功能介绍。 */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          虚拟磁盘安全说明
+        </h4>
+        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
+          <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            LightC 只处理能够确认属于第三方软件的“此电脑”外壳节点，会过滤 Windows 系统白名单、Microsoft 系统组件、内部 RegFolder 节点和无法确认归属的项目，避免把系统入口误当成流氓软件清理。
+          </p>
+          <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+            彻底删除会先备份注册表和相关权限，再物理移除入口并限制普通权限软件重新创建。该限制不是内核级绝对锁，管理员、SYSTEM、TrustedInstaller 或软件安装程序仍可能恢复权限；如需恢复，可使用备份目录中的恢复功能。每次操作也会写入当前数据目录 logs 文件夹下的 shell_icons.log。
+          </p>
         </div>
       </div>
 

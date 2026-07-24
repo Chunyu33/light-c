@@ -165,6 +165,15 @@ pub fn run() {
             // AI 资产分析
             scan_ai_model_assets,
             delete_ai_model,
+            // 外壳图标清理
+            scan_shell_icons,
+            remove_shell_icon,
+            unlock_shell_icon,
+            restore_shell_icon,
+            restart_explorer,
+            open_shell_icon_backup_dir,
+            open_shell_icon_log,
+            open_shell_icon_registry,
         ])
         .run(context)
         .expect("启动应用程序时发生错误");

@@ -76,10 +76,10 @@ function FailedFilesModal({
             </div>
             <div>
               <h3 className="text-base font-semibold text-[var(--fg-primary)]">
-                清理失败明细
+                未立即完成明细
               </h3>
               <p className="text-xs text-[var(--fg-muted)]">
-                共 {failedFiles.length.toLocaleString()} 个文件清理失败
+                共 {failedFiles.length.toLocaleString()} 个文件未立即完成
               </p>
             </div>
           </div>
@@ -94,7 +94,7 @@ function FailedFilesModal({
         {/* 列表头部 */}
         <div className="flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
           <span className="flex-1">文件路径</span>
-          <span className="w-32 text-right">失败原因</span>
+          <span className="w-32 text-right">处理结果</span>
         </div>
 
         {/* 虚拟滚动列表 */}
@@ -132,7 +132,7 @@ function FailedFilesModal({
                     {item.path}
                   </span>
                   <span 
-                    className="w-40 text-xs text-amber-500 text-right shrink-0"
+                    className={`w-40 text-xs text-right shrink-0 ${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'}`}
                     title={getFailureReasonTooltip(item.failure_reason)}
                   >
                     {getFailureReasonMessage(item.failure_reason)}
@@ -167,8 +167,8 @@ export function ScanSummary({
 }: ScanSummaryProps) {
   const [showFailedModal, setShowFailedModal] = useState(false);
   
-  // 从删除结果中提取失败的文件列表
-  const failedFiles = deleteResult?.file_results.filter(f => !f.success && !f.marked_for_reboot) || [];
+  // 待重启条目也是本次删除尝试的结果，必须保留在明细中供用户核对。
+  const failedFiles = deleteResult?.file_results.filter(f => !f.success) || [];
   
   if (!scanResult) return null;
 
@@ -277,17 +277,17 @@ export function ScanSummary({
           {failedFiles.length > 0 && (
             <div className="mt-3 pt-3 border-t border-amber-500/20">
               <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-                跳过原因：
+                未立即完成原因：
               </p>
               <div className="max-h-32 overflow-y-auto space-y-1">
                 {failedFiles.slice(0, 10).map((item, index) => (
                   <div key={index} className="text-xs text-[var(--fg-muted)] flex gap-2 items-center">
-                    <span className="text-amber-500 shrink-0">•</span>
+                    <span className={`${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'} shrink-0`}>•</span>
                     <span className="truncate flex-1" title={item.path}>
                       {item.path.split('\\').pop()}
                     </span>
                     <span 
-                      className="text-amber-500 shrink-0 cursor-help"
+                      className={`${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'} shrink-0 cursor-help`}
                       title={getFailureReasonTooltip(item.failure_reason)}
                     >
                       {getFailureReasonMessage(item.failure_reason)}
@@ -299,7 +299,7 @@ export function ScanSummary({
                     onClick={() => setShowFailedModal(true)}
                     className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 cursor-pointer transition-colors"
                   >
-                    ...还有 {failedFiles.length - 10} 个跳过项，点击查看全部
+                    ...还有 {failedFiles.length - 10} 个未立即完成项，点击查看全部
                   </button>
                 )}
               </div>

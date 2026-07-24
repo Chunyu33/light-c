@@ -659,12 +659,16 @@ fn non_ntfs_scan_roots(drive_letter: char) -> Vec<PathBuf> {
         root.join("Windows\\Temp"),
         root.join("Windows\\Prefetch"),
         root.join("Windows\\SoftwareDistribution\\Download"),
+        root.join("Windows\\SoftwareDistribution\\DeliveryOptimization"),
+        root.join("Windows\\ServiceProfiles\\NetworkService\\AppData\\Local\\Microsoft\\Windows\\DeliveryOptimization\\Cache"),
         root.join("Windows\\Logs"),
         root.join("Windows\\Minidump"),
         root.join("Windows.old"),
         root.join("$Windows.~BT"),
         root.join("$Windows.~WS"),
         root.join("ProgramData\\Microsoft\\Windows\\WER"),
+        root.join("ProgramData\\Microsoft\\Windows Defender\\LocalCopy"),
+        root.join("ProgramData\\Microsoft\\Windows Defender\\Support"),
     ];
 
     let users_root = root.join("Users");
@@ -729,6 +733,9 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     if is_shader_cache(&normalized) {
         return Some(JunkCategory::ShaderCache);
     }
+    if is_defender_cache(&normalized) {
+        return Some(JunkCategory::WindowsDefenderCache);
+    }
     if contains_any(
         &normalized,
         &["\\appdata\\local\\temp\\", "\\windows\\temp\\"],
@@ -738,8 +745,16 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     if contains_any(
         &normalized,
         &[
-            "\\windows\\prefetch\\",
             "\\windows\\softwaredistribution\\deliveryoptimization\\",
+            "\\windows\\serviceprofiles\\networkservice\\appdata\\local\\microsoft\\windows\\deliveryoptimization\\",
+        ],
+    ) {
+        return Some(JunkCategory::DeliveryOptimization);
+    }
+    if contains_any(
+        &normalized,
+        &[
+            "\\windows\\prefetch\\",
             "\\appdata\\local\\microsoft\\windows\\inetcache\\",
             "\\appdata\\local\\microsoft\\windows\\caches\\",
         ],
@@ -840,6 +855,7 @@ fn is_excluded_path(path: &str) -> bool {
             "\\file system\\",
         ],
     ) && !is_shader_cache(path)
+        && !is_defender_cache(path)
 }
 
 fn is_shader_cache(path: &str) -> bool {
@@ -851,6 +867,16 @@ fn is_shader_cache(path: &str) -> bool {
             "\\appdata\\local\\amd\\dxcache\\",
             "\\appdata\\local\\nvidia\\dxcache\\",
             "\\appdata\\local\\intel\\shadercache\\",
+        ],
+    )
+}
+
+fn is_defender_cache(path: &str) -> bool {
+    contains_any(
+        path,
+        &[
+            "\\programdata\\microsoft\\windows defender\\localcopy\\",
+            "\\programdata\\microsoft\\windows defender\\support\\",
         ],
     )
 }
@@ -988,6 +1014,19 @@ mod tests {
     fn keeps_shader_cache_as_a_known_system_exception() {
         assert!(is_deep_junk_path(
             r"C:\Windows\System32\d3d_cache\shader.bin"
+        ));
+    }
+
+    #[test]
+    fn matches_windows_cleanup_wizard_cache_categories() {
+        assert!(is_deep_junk_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Support\MPLog-old.log"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\payload.bin"
+        ));
+        assert!(!is_deep_junk_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Quarantine\entry.bin"
         ));
     }
 

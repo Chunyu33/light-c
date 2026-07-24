@@ -14,7 +14,8 @@ use crate::scanner::{DeleteResult, FileInfo};
 // ============================================================================
 
 use super::safety_constants::{
-    PROTECTED_EXTENSIONS_IN_WINDOWS, PROTECTED_FILES, PROTECTED_PATH_PREFIXES,
+    is_rebuildable_system_cache_path, PROTECTED_EXTENSIONS_IN_WINDOWS, PROTECTED_FILES,
+    PROTECTED_PATH_PREFIXES,
 };
 
 /// 删除引擎
@@ -246,7 +247,7 @@ impl DeleteEngine {
 
         // 第1层：检查路径前缀
         for protected in PROTECTED_PATH_PREFIXES {
-            if path_str.starts_with(protected) {
+            if path_str.starts_with(protected) && !is_rebuildable_system_cache_path(&path_str) {
                 error!("安全拦截: 尝试删除受保护路径 {}", path_str);
                 return true;
             }
@@ -317,6 +318,11 @@ impl DeleteEngine {
             "\\windows\\temp",
             "\\windows\\prefetch",
             "\\windows\\softwaredistribution\\download",
+            "\\windows\\softwaredistribution\\deliveryoptimization",
+            "\\deliveryoptimization\\",
+            "\\programdata\\microsoft\\windows defender\\localcopy",
+            "\\programdata\\microsoft\\windows defender\\support",
+            "\\d3d_cache",
             "\\$recycle.bin", // 回收站内容
             "\\.log",
             "\\.tmp",
@@ -360,6 +366,16 @@ mod tests {
 
         assert!(engine.is_protected_path(Path::new("C:\\Windows\\System32\\test.dll")));
         assert!(engine.is_protected_path(Path::new("C:\\Program Files\\App")));
+        // 只有 Windows 清理向导明确列出的可重建缓存子目录可以穿过系统目录保护。
+        assert!(
+            !engine.is_protected_path(Path::new("C:\\Windows\\System32\\d3d_cache\\shader.bin"))
+        );
+        assert!(!engine.is_protected_path(Path::new(
+            "C:\\ProgramData\\Microsoft\\Windows Defender\\Support\\MPLog.log"
+        )));
+        assert!(engine.is_protected_path(Path::new(
+            "C:\\ProgramData\\Microsoft\\Windows Defender\\Quarantine\\entry.bin"
+        )));
         assert!(!engine.is_protected_path(Path::new("C:\\Temp\\test.tmp")));
     }
 }

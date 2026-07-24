@@ -25,6 +25,8 @@ use std::time::{Duration, Instant};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 
+use super::safety_constants::is_rebuildable_system_cache_path;
+
 // ============================================================================
 // Windows API 绑定
 // ============================================================================
@@ -433,8 +435,17 @@ const SAFE_OWNERSHIP_PATHS: &[&str] = &[
     "\\windows\\temp",
     "\\windows\\prefetch",
     "\\windows\\softwaredistribution\\download",
+    "\\windows\\softwaredistribution\\deliveryoptimization",
+    "\\windows\\serviceprofiles\\networkservice\\appdata\\local\\microsoft\\windows\\deliveryoptimization",
+    "\\programdata\\microsoft\\windows defender\\localcopy",
+    "\\programdata\\microsoft\\windows defender\\support",
+    "\\windows\\system32\\d3d_cache",
+    "\\appdata\\local\\d3dscache",
     "\\$recycle.bin",
 ];
+
+// 使用内置管理员组 SID，避免中文 Windows 上的本地化组名导致 icacls 无法解析。
+const LOCAL_ADMINISTRATORS_SID: &str = "*S-1-5-32-544";
 
 /// 增强删除引擎
 pub struct EnhancedDeleteEngine {
@@ -783,7 +794,11 @@ impl EnhancedDeleteEngine {
                         success: false,
                         logical_size,
                         physical_size,
-                        failure_reason: Some(DeleteFailureReason::PermissionDenied),
+                        // 保留 icacls 和属性处理的具体结果，避免界面只能显示笼统的权限不足。
+                        failure_reason: Some(DeleteFailureReason::Other(format!(
+                            "权限不足：{}",
+                            e.message
+                        ))),
                         marked_for_reboot: false,
                     }
                 } else {
@@ -808,21 +823,29 @@ impl EnhancedDeleteEngine {
             Err(error) => error,
         };
 
-        // 策略2：移除保护属性后删除
-        if let Ok(_) = self.delete_after_remove_attrs(path) {
+        let mut attempt_messages = vec![format!("直接删除失败: {}", first_error)];
+
+        // 策略2：移除保护属性后删除，并保留失败原因供界面定位问题。
+        if let Err(error) = self.delete_after_remove_attrs(path) {
+            attempt_messages.push(error);
+        } else {
             return Ok(());
         }
 
-        // 策略3：获取所有权后删除（仅限安全目录）
-        if self.enable_take_ownership && self.is_safe_for_ownership(path) {
-            if let Ok(_) = self.delete_with_ownership(path) {
+        // Defender 清理向导明确标记的缓存目录允许默认执行单文件接管，其他目录仍受全局开关控制。
+        let path_string = path.to_string_lossy();
+        let is_cache_path = is_rebuildable_system_cache_path(&path_string);
+        if self.is_safe_for_ownership(path) && (self.enable_take_ownership || is_cache_path) {
+            if let Err(error) = self.delete_with_ownership(path) {
+                attempt_messages.push(error);
+            } else {
                 return Ok(());
             }
         }
 
-        // 所有策略都失败
+        // 所有策略都失败，汇总每一步结果，避免只显示笼统的“删除失败”。
         Err(DeleteAttemptError {
-            message: format!("删除失败: {}", first_error),
+            message: format!("删除失败: {}", attempt_messages.join("；")),
             raw_os_error: first_error.raw_os_error(),
         })
     }
@@ -866,7 +889,7 @@ impl EnhancedDeleteEngine {
         let output = Command::new("icacls")
             .arg(&*path_str)
             .arg("/setowner")
-            .arg("Administrators")
+            .arg(LOCAL_ADMINISTRATORS_SID)
             .arg("/C") // 继续处理错误
             .arg("/Q") // 静默模式
             .creation_flags(0x08000000) // CREATE_NO_WINDOW - 不显示命令行窗口
@@ -874,15 +897,17 @@ impl EnhancedDeleteEngine {
             .map_err(|e| format!("执行 icacls 失败: {}", e))?;
 
         if !output.status.success() {
-            // 静默失败，不阻塞
-            return Err("获取所有权失败".to_string());
+            return Err(format!(
+                "获取所有权失败（退出码 {:?}）",
+                output.status.code()
+            ));
         }
 
         // 授予完全控制权限
         let output = Command::new("icacls")
             .arg(&*path_str)
             .arg("/grant")
-            .arg("Administrators:F")
+            .arg(format!("{}:F", LOCAL_ADMINISTRATORS_SID))
             .arg("/C")
             .arg("/Q")
             .creation_flags(0x08000000)
@@ -890,7 +915,7 @@ impl EnhancedDeleteEngine {
             .map_err(|e| format!("执行 icacls 授权失败: {}", e))?;
 
         if !output.status.success() {
-            return Err("授权失败".to_string());
+            return Err(format!("授权失败（退出码 {:?}）", output.status.code()));
         }
 
         // 再次尝试删除
@@ -900,25 +925,29 @@ impl EnhancedDeleteEngine {
 
     /// 检查路径是否安全执行 Take Ownership
     fn is_safe_for_ownership(&self, path: &Path) -> bool {
-        let path_str = path.to_string_lossy().to_lowercase();
+        let path_string = path.to_string_lossy();
+        let normalized = path_string.replace('/', "\\").to_ascii_lowercase();
 
-        for safe_path in SAFE_OWNERSHIP_PATHS {
-            if path_str.contains(safe_path) {
-                return true;
-            }
-        }
-
-        false
+        SAFE_OWNERSHIP_PATHS.iter().any(|safe_path| {
+            let Some(start) = normalized.find(safe_path) else {
+                return false;
+            };
+            let suffix = &normalized[start + safe_path.len()..];
+            // 目录白名单必须按路径段匹配，避免误放行名称相近的目录。
+            suffix.is_empty() || suffix.starts_with('\\')
+        })
     }
 
     /// 检查是否为系统保护文件（使用共享安全常量，与 delete_engine 保持一致）
     fn is_system_protected(&self, path: &Path) -> bool {
-        use super::safety_constants::{PROTECTED_FILES, PROTECTED_PATH_PREFIXES};
+        use super::safety_constants::{
+            is_rebuildable_system_cache_path, PROTECTED_FILES, PROTECTED_PATH_PREFIXES,
+        };
 
         let path_str = path.to_string_lossy().to_lowercase();
 
         for prefix in PROTECTED_PATH_PREFIXES {
-            if path_str.starts_with(prefix) {
+            if path_str.starts_with(prefix) && !is_rebuildable_system_cache_path(&path_str) {
                 return true;
             }
         }
@@ -1052,6 +1081,12 @@ mod tests {
         assert!(engine.is_safe_for_ownership(Path::new("C:\\Windows\\Temp\\test.tmp")));
         assert!(engine
             .is_safe_for_ownership(Path::new("C:\\Users\\Test\\AppData\\Local\\Temp\\file.log")));
+        assert!(engine.is_safe_for_ownership(Path::new(
+            "C:\\ProgramData\\Microsoft\\Windows Defender\\Support\\MPLog.log"
+        )));
+        assert!(!engine.is_safe_for_ownership(Path::new(
+            "C:\\ProgramData\\Microsoft\\Windows Defender\\Support2\\MPLog.log"
+        )));
         assert!(!engine.is_safe_for_ownership(Path::new("C:\\Windows\\System32\\test.dll")));
     }
 

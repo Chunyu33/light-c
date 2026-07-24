@@ -5,7 +5,7 @@
 mod delete_engine;
 mod enhanced_delete;
 mod permanent_delete;
-mod safety_constants;
+pub(crate) mod safety_constants;
 
 pub use delete_engine::*;
 pub use enhanced_delete::*;

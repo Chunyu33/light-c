@@ -13,6 +13,7 @@ use std::time::Instant;
 use walkdir::WalkDir;
 
 use super::{CategoryScanResult, FileInfo, JunkCategory, ScanResult};
+use crate::cleaner::safety_constants::is_rebuildable_system_cache_path;
 
 /// 扫描引擎
 pub struct ScanEngine {
@@ -324,7 +325,8 @@ impl ScanEngine {
         ];
 
         for protected in &protected_paths {
-            if path_str.contains(protected) {
+            // Defender 和 System32 下只有清理向导明确标记的缓存子目录可扫描，父目录仍保持保护。
+            if path_str.contains(protected) && !is_rebuildable_system_cache_path(&path_str) {
                 return true;
             }
         }
@@ -414,6 +416,21 @@ mod tests {
         )));
         assert!(!engine.is_persistent_app_profile_path(Path::new(
             r"C:\Users\PC\AppData\Local\Google\Chrome\User Data\Default\Code Cache\js\cache"
+        )));
+    }
+
+    #[test]
+    fn test_rebuildable_system_cache_exception_is_narrow() {
+        let engine = ScanEngine::new();
+
+        // 例外只覆盖明确的缓存目录，不能把整个 System32 或 Defender 根目录放开。
+        assert!(!engine.is_system_protected(Path::new(r"C:\Windows\System32\d3d_cache\shader.bin")));
+        assert!(!engine.is_system_protected(Path::new(
+            r"C:\ProgramData\Microsoft\Windows Defender\Support\MPLog.log"
+        )));
+        assert!(engine.is_system_protected(Path::new(r"C:\Windows\System32\kernel32.dll")));
+        assert!(engine.is_system_protected(Path::new(
+            r"C:\ProgramData\Microsoft\Windows Defender\Quarantine\entry.bin"
         )));
     }
 }

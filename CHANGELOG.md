@@ -4,14 +4,37 @@
 
 ---
 
+## Unreleased
+
+### Junk Cleanup and Documentation
+
+- Defender cleanup now uses a bounded, single-file ownership fallback for the explicitly supported `LocalCopy` and `Support` caches, while keeping the Defender root and protected data excluded.
+- Delete results now retain reboot-pending entries and include more specific permission/ownership failure details.
+- Replaced the long README with concise English and Simplified Chinese documentation using the same structure.
+
+
+## v2.14.0 (2026-07-23)
+
+### 外壳图标清理
+
+- **第三方外壳图标识别**：扫描“此电脑”中的第三方 Namespace 节点，展示应用名称、CLSID、注册表位置和关联组件。
+- **系统节点过滤**：自动过滤 Windows 系统白名单、Microsoft 系统组件、内部 RegFolder 节点和无法确认归属的项目。
+- **双模式清理**：支持普通删除和彻底删除；彻底删除会物理移除 Namespace 节点，并锁定父级创建权限，阻止普通权限软件重新注册。
+- **安全备份与恢复**：清理前自动保存 `.reg` 和 ACL 元数据，支持恢复注册表节点、目标权限和父级 Namespace 权限。
+- **操作辅助**：提供一键打开注册表位置、打开备份目录和操作记录；清理完成前会核验目标节点确实不存在。
+- **温和刷新**：使用 Shell 变更通知重新读取外壳节点，不重启 `explorer.exe`，降低对 TranslucentTB 等任务栏增强工具的影响。
+- **数据清理整合**：设置中的本地数据清理新增虚拟磁盘操作记录和注册表备份分类，并避免与通用日志、注册表备份分类重复统计。
+- **旧版本兼容**：可以识别并重新处理旧版本遗留的空锁定节点，避免历史残留继续显示或影响清理。
+
+### 垃圾清理系统临时文件覆盖
+
+- **Windows 清理项对齐**：快速扫描和深度扫描新增传递优化文件、Microsoft Defender 防病毒非关键文件，并覆盖 Windows 清理向导使用的明确缓存目录。
+- **缩略图覆盖扩展**：缩略图缓存支持扫描系统盘其他用户配置文件中的 `thumbcache_*.db` 和 `iconcache_*.db`。
+- **DirectX 缓存修复**：放行 `D3DCache`/`d3d_cache` 等可重建着色器缓存，修复其位于 `System32` 时被通用系统目录保护规则漏扫的问题。
+- **安全边界保持**：Defender 仅处理 `LocalCopy` 和 `Support`，继续排除隔离区、定义库、签名文件及其他系统关键目录；删除前仍执行后端路径复核。
+
 
 ## v2.13.0 (2026-07-21)
-
-### 设置与垃圾清理体验
-
-- **垃圾文件用途搜索**：文件列表新增“搜索该文件能不能删”入口，复用通用搜索引擎设置；Windows 长路径 `\\?\` 前缀会在展示和搜索时自动清理。
-- **官方下载渠道兜底**：新增独立的作者项目与平台链接常量；`download.json` 缺失、网络失败或字段不完整时，作者网盘、GitHub 和平台入口仍可正常显示。
-- **管理员权限说明**：使用说明页补充管理员权限用途，明确说明其用于 MFT 加速扫描和访问受保护清理目录，同时保留安全检查与占用文件处理规则。
 
 ### 垃圾清理深度发现
 
