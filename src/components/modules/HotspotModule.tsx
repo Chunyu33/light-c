@@ -4,6 +4,8 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
 import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2, XCircle } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
@@ -78,22 +80,10 @@ function formatDuration(ms?: number): string {
 }
 
 function getProgressStageLabel(stage?: string): string {
-  switch (stage) {
-    case 'mft':
-      return '枚举 MFT';
-    case 'index':
-      return '建立索引';
-    case 'metadata':
-      return '读取大小';
-    case 'aggregate':
-      return '聚合目录';
-    case 'result':
-      return '生成结果';
-    case 'walkdir':
-      return '常规遍历';
-    default:
-      return '扫描中';
-  }
+  return i18n.t(`scanStages.${stage || 'scanning'}`, {
+    ns: 'common',
+    defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
+  });
 }
 
 // 诊断面板同时服务“扫描中”和“扫描完成”状态，避免两套指标重复展示。
@@ -114,6 +104,7 @@ function HotspotDiagnostics({
   // 相同阶段在监听器里已经合并，这里只负责过滤无效阶段，保持布局稳定。
   const visibleLogs = logs.filter((log) => log.stage && log.stage_elapsed_ms !== undefined);
   const processedCount = latestLog?.scanned_dirs || latestLog?.found_entries || 0;
+  const stageLabel = getProgressStageLabel(latestLog?.stage);
 
   return (
     <div className={`rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-4 py-3 text-xs ${compact ? 'space-y-2' : 'space-y-3'}`}>
@@ -122,13 +113,13 @@ function HotspotDiagnostics({
           <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--brand-green)] text-white font-medium">
             {getProgressStageLabel(latestLog?.stage)}
           </span>
-          <span className="truncate text-[var(--text-primary)]" title={latestLog?.message || '本次扫描阶段耗时'}>
-            {latestLog?.message || '本次扫描阶段耗时'}
+          <span className="truncate text-[var(--text-primary)]" title={stageLabel}>
+            {stageLabel}
           </span>
         </div>
         <div className="flex items-center justify-start md:justify-end gap-4 text-[var(--text-muted)] tabular-nums">
-          {processedCount > 0 && <span>已处理 {processedCount.toLocaleString()}</span>}
-          {totalElapsedMs !== undefined && <span>总耗时 {formatDuration(totalElapsedMs)}</span>}
+          {processedCount > 0 && <span>{i18n.t('scanStages.processed', { ns: 'common', count: processedCount.toLocaleString() })}</span>}
+          {totalElapsedMs !== undefined && <span>{i18n.t('scanStages.elapsed', { ns: 'common', time: formatDuration(totalElapsedMs) })}</span>}
         </div>
       </div>
       {visibleLogs.length > 0 && (
@@ -415,6 +406,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
 // ============================================================================
 
 export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('hotspot');
   const { showToast } = useToast();
   const { settings } = useSettings();
@@ -720,8 +712,8 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
       id="hotspot"
-      title="大目录分析"
-      description={fullScanEnabled ? `深度扫描 ${selectedDriveLabel}，定位空间占用元凶` : "深度分析 AppData 目录，定位占用空间的元凶"}
+        title={navT('hotspot')}
+        description={`${navT('hotspotDesc')} (${selectedDriveLabel})`}
       icon={<Flame className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}

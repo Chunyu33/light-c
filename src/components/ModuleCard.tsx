@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { ReactNode, useRef, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Loader2, Search, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatSize } from '../utils/format';
 import type { ModuleStatus } from '../contexts/DashboardContext';
@@ -80,10 +81,10 @@ export function ModuleCard({
   status,
   fileCount,
   totalSize,
-  doneBadgeText = '可清理',
-  emptyDoneBadgeText = '已清理',
+  doneBadgeText,
+  emptyDoneBadgeText,
   hideDoneBadge = false,
-  countLabel = '个文件',
+  countLabel,
   hideTotalSize = false,
   expanded,
   onToggleExpand,
@@ -98,6 +99,10 @@ export function ModuleCard({
   forceExpanded = false,
   allowStickyContent = false,
 }: ModuleCardProps) {
+  const { t } = useTranslation('common');
+  const resolvedDoneBadgeText = doneBadgeText ?? t('cleanable');
+  const resolvedEmptyDoneBadgeText = emptyDoneBadgeText ?? t('cleaned');
+  const resolvedCountLabel = countLabel ?? t('files');
   const isScanning = status === 'scanning';
   const isDone = status === 'done';
   const hasError = status === 'error' || !!error;
@@ -110,7 +115,7 @@ export function ModuleCard({
       return (
         <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
           <Loader2 className="w-3 h-3 animate-spin" />
-          扫描中
+          {t('scanningShort')}
         </span>
       );
     }
@@ -118,7 +123,7 @@ export function ModuleCard({
       return (
         <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--color-danger)]/10 text-[var(--color-danger)]">
           <AlertCircle className="w-3 h-3" />
-          出错
+          {t('errorState')}
         </span>
       );
     }
@@ -126,7 +131,7 @@ export function ModuleCard({
       if (hideDoneBadge) return null;
       return (
         <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
-          {doneBadgeText}
+          {resolvedDoneBadgeText}
         </span>
       );
     }
@@ -135,7 +140,7 @@ export function ModuleCard({
       return (
         <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)]">
           <CheckCircle2 className="w-3 h-3" />
-          {emptyDoneBadgeText}
+          {resolvedEmptyDoneBadgeText}
         </span>
       );
     }
@@ -145,9 +150,9 @@ export function ModuleCard({
   // 获取扫描按钮文本
   const getButtonText = () => {
     if (scanButtonText) return scanButtonText;
-    if (isScanning) return '扫描中...';
-    if (isDone) return '重新扫描';
-    return '开始扫描';
+    if (isScanning) return t('scanningShort');
+    if (isDone) return t('rescan');
+    return t('startScan');
   };
 
   return (
@@ -166,7 +171,7 @@ export function ModuleCard({
     >
       {/* 卡片头部 - 增加内边距提供呼吸空间 */}
       <div className="p-6">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           {/* 展开/收起按钮 */}
           {!isPageVariant && (
             <button
@@ -188,11 +193,11 @@ export function ModuleCard({
 
           {/* 模块信息 - 清晰的文字层次 */}
           <div
-            className={`flex-1 min-w-0 ${isPageVariant ? '' : 'cursor-pointer'}`}
+            className={`min-w-0 flex-[2_1_240px] ${isPageVariant ? '' : 'cursor-pointer'}`}
             onClick={isPageVariant ? undefined : onToggleExpand}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <h3 className="text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <h3 className="min-w-0 flex-[1_1_14rem] break-words text-[15px] font-bold leading-snug text-[var(--text-primary)]">{title}</h3>
               {titleExtra}
               {getStatusBadge()}
             </div>
@@ -203,12 +208,16 @@ export function ModuleCard({
           {isDone && fileCount > 0 && (
             <div className="text-right shrink-0 mr-3">
               {!hideTotalSize && <p className="text-xl font-bold text-[var(--brand-green)] tabular-nums">{formatSize(totalSize)}</p>}
-              <p className="text-[13px] text-[var(--text-muted)] tabular-nums">{fileCount.toLocaleString()} {countLabel}</p>
+              <p className="text-[13px] text-[var(--text-muted)] tabular-nums">{fileCount.toLocaleString()} {resolvedCountLabel}</p>
             </div>
           )}
 
           {/* 额外内容 */}
-          {headerExtra}
+          {headerExtra && (
+            <div className="flex min-w-0 max-w-full flex-[1_1_auto] flex-wrap items-center gap-2">
+              {headerExtra}
+            </div>
+          )}
 
           {/* 扫描按钮：完成态也保留按钮边界，避免“重新扫描/检测”在列表里看起来像普通文字。 */}
           <button
@@ -218,7 +227,7 @@ export function ModuleCard({
             }}
             disabled={isScanning || scanDisabled}
             className={`
-              flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 shrink-0
+              flex shrink-0 items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200
               border shadow-sm active:scale-[0.98]
               ${isScanning || scanDisabled
                 ? 'border-[var(--border-color)] bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed shadow-none'

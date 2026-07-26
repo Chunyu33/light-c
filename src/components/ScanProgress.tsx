@@ -6,6 +6,7 @@
 import { useEffect, useState, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle, FolderSearch, FileText, HardDrive } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // 常量配置
@@ -135,12 +136,14 @@ const CircularProgress = memo(function CircularProgress({
 
 export function ScanProgress({
   isScanning,
-  currentCategory = '准备中',
+  currentCategory,
   completedCategories = 0,
   totalCategories = 10,
   scannedFileCount = 0,
   scannedSize = 0,
 }: ScanProgressProps) {
+  const { t } = useTranslation('common');
+  const resolvedCategory = currentCategory ?? t('preparing');
   // 组件内部状态管理
   const [state, setState] = useState<ProgressState>('idle');
   const [isVisible, setIsVisible] = useState(false);
@@ -229,10 +232,10 @@ export function ScanProgress({
           
           {/* 状态文字 */}
           <h3 className="mt-4 text-base font-semibold text-[var(--fg-primary)]">
-            {isCompleted ? '扫描完成' : '正在扫描'}
+            {isCompleted ? t('scanCompleted') : t('scanning')}
           </h3>
           <p className="text-xs text-[var(--fg-muted)] mt-1">
-            {isCompleted ? '已完成所有分类扫描' : currentCategory}
+            {isCompleted ? t('allCategoriesCompleted') : resolvedCategory}
           </p>
         </div>
 
@@ -243,7 +246,7 @@ export function ScanProgress({
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {displayFileCount.toLocaleString()}
             </p>
-            <p className="text-[10px] text-[var(--fg-muted)]">文件数</p>
+            <p className="text-[10px] text-[var(--fg-muted)]">{t('fileCountLabel')}</p>
           </div>
           
           <div className="bg-[var(--bg-card)] rounded-lg p-3 text-center">
@@ -251,7 +254,7 @@ export function ScanProgress({
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {formatSize(displaySize)}
             </p>
-            <p className="text-[10px] text-[var(--fg-muted)]">可清理</p>
+            <p className="text-[10px] text-[var(--fg-muted)]">{t('cleanable')}</p>
           </div>
           
           <div className="bg-[var(--bg-card)] rounded-lg p-3 text-center">
@@ -259,7 +262,7 @@ export function ScanProgress({
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {isCompleted ? displayTotal : completedCategories}/{displayTotal}
             </p>
-            <p className="text-[10px] text-[var(--fg-muted)]">分类</p>
+            <p className="text-[10px] text-[var(--fg-muted)]">{t('categoryCountLabel')}</p>
           </div>
         </div>
 

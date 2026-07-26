@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Database, Loader2, Trash2, CheckCircle2, Shield } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
@@ -29,6 +30,8 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 // ============================================================================
 
 export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('registry');
 
   const lastScanTriggerRef = useRef(0);
@@ -199,8 +202,8 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="registry"
-        title="注册表冗余"
-        description="检测已卸载程序遗留的孤立注册表引用"
+        title={navT('registry')}
+        description={navT('registryDesc')}
         icon={<Database className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -214,7 +217,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
           <div className="p-5">
             <EmptyState
               icon={Database}
-              title="尚未扫描注册表冗余"
+              title={t('notScannedRegistry')}
               description="点击开始扫描，检测已卸载程序遗留的孤立注册表引用。"
             />
           </div>
@@ -410,7 +413,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
           <div className="p-5">
             <EmptyState
               icon={CheckCircle2}
-              title="没有发现注册表冗余"
+                title={t('noRegistryRedundancy')}
               description="未检测到已卸载程序遗留的孤立注册表引用。"
               tone="success"
             />
@@ -422,11 +425,11 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         isOpen={showDeleteConfirm}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
-        title="确认删除注册表条目"
+        title={t('confirmDeleteRegistry')}
         description={`确定要删除选中的 ${selectedCount} 个注册表条目吗？所有条目已通过安全验证。`}
-        warning="删除前已使用 reg.exe export 创建完整备份文件，您可以通过双击 .reg 文件恢复。"
-        confirmText="删除"
-        cancelText="取消"
+        warning={t('registryDeleteWarning')}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
         isDanger={true}
       />
     </>

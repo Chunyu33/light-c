@@ -5,6 +5,8 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -79,18 +81,10 @@ function formatProgressCount(progress: DiskGrowthScanProgress | null): string {
 }
 
 function getPhaseLabel(stage: string): string {
-  switch (stage) {
-    case 'mft':
-      return '枚举 MFT';
-    case 'path':
-      return '重建路径';
-    case 'metadata':
-      return '读取大小';
-    case 'aggregate':
-      return '聚合目录';
-    default:
-      return '扫描中';
-  }
+  return i18n.t(`scanStages.${stage}`, {
+    ns: 'common',
+    defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
+  });
 }
 
 function formatDuration(ms?: number): string {
@@ -768,6 +762,7 @@ function DiskGrowthDetailsModal({
 }
 
 export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('diskGrowth');
   const { settings } = useSettings();
   const lastScanTriggerRef = useRef(0);
@@ -1008,8 +1003,8 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
       id="disk-growth"
-      title="磁盘变化分析"
-      description={`基于 MFT 快速扫描 ${selectedDriveLabel}，对比上次快照定位空间变化来源`}
+        title={navT('diskGrowth')}
+        description={`${navT('diskGrowthDesc')} (${selectedDriveLabel})`}
       icon={<HardDrive className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -1067,9 +1062,9 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       {moduleState.status === 'scanning' && (
         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
-          <p className="text-sm">{scanProgress?.message ?? `正在通过 MFT 扫描 ${selectedDriveLabel}...`}</p>
+          <p className="text-sm">{scanProgress ? getPhaseLabel(scanProgress.stage) : i18n.t('scanStages.mftEnumerate', { ns: 'common', drive: selectedDriveLabel })}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
-            已用时 {scanElapsed}s
+            {i18n.t('scanStages.elapsed', { ns: 'common', time: `${scanElapsed}s` })}
           </p>
           {scanProgress && (
             <p className="text-xs text-[var(--text-faint)] mt-1 tabular-nums">

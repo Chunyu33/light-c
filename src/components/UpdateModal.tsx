@@ -13,6 +13,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { useToast } from './Toast';
 import { getDistributionChannel, type DistributionChannel } from '../api/commands';
 import { getOfficialDownloadConfig } from '../utils/downloadConfig';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // 类型定义
@@ -80,6 +81,7 @@ function getErrorMessage(error: unknown): string {
 // ============================================================================
 
 export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
+  const { t } = useTranslation('common');
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<UpdateStatus>('checking');
   const [update, setUpdate] = useState<Update | null>(null);
@@ -293,7 +295,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
                   <Sparkles className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">发现新版本</h2>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('updateAvailable')}</h2>
                   <p className="text-sm text-[var(--text-muted)]">
                     v{currentVersion} → v{update.version}
                   </p>
@@ -304,7 +306,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="mb-5">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm font-medium text-[var(--text-primary)]">更新内容</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{t('updateNotes')}</span>
                 </div>
                 <div className="bg-[var(--bg-main)] rounded-xl p-4 max-h-48 overflow-auto">
                   <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
@@ -338,8 +340,8 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
                 <RefreshCw className="w-8 h-8 text-[var(--brand-green)] animate-spin" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">正在下载更新</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-4">请勿关闭应用...</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('downloadingUpdate')}</h2>
+              <p className="text-sm text-[var(--text-muted)] mb-4">{t('doNotCloseApp')}</p>
               
               {/* 进度条 */}
               <div className="w-full h-2 bg-[var(--bg-main)] rounded-full overflow-hidden mb-2">
@@ -360,8 +362,8 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-[var(--brand-green)]" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">更新已就绪</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-5">重启应用以完成更新</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('updateReady')}</h2>
+              <p className="text-sm text-[var(--text-muted)] mb-5">{t('restartToUpdate')}</p>
               
               <div className="flex gap-3">
                 <button
@@ -387,7 +389,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-[var(--color-danger)]" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">更新失败</h2>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('updateFailed')}</h2>
               <p className="text-sm text-[var(--color-danger)] mb-5 px-4">{errorMessage}</p>
               
               {/* 错误提示 */}
@@ -424,7 +426,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
                 <RefreshCw className="w-6 h-6 text-[var(--brand-green)] animate-spin" />
               </div>
-              <p className="text-sm text-[var(--text-muted)]">正在检查更新...</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('checkingUpdates')}</p>
             </div>
           )}
         </div>

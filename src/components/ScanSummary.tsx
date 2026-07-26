@@ -11,6 +11,7 @@ import type { ScanResult } from '../types';
 import type { EnhancedDeleteResult, FileDeleteResult } from '../api/commands';
 import { getFailureReasonMessage, getFailureReasonTooltip } from '../api/commands';
 import { formatSize, formatDuration } from '../utils/format';
+import { useTranslation } from 'react-i18next';
 
 interface ScanSummaryProps {
   scanResult: ScanResult | null;
@@ -30,6 +31,7 @@ function FailedFilesModal({
   onClose: () => void; 
   failedFiles: FileDeleteResult[];
 }) {
+  const { t } = useTranslation('common');
   const parentRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -76,10 +78,10 @@ function FailedFilesModal({
             </div>
             <div>
               <h3 className="text-base font-semibold text-[var(--fg-primary)]">
-                未立即完成明细
+                {t('incompleteDetails')}
               </h3>
               <p className="text-xs text-[var(--fg-muted)]">
-                共 {failedFiles.length.toLocaleString()} 个文件未立即完成
+                {t('incompleteCount', { count: failedFiles.length.toLocaleString() })}
               </p>
             </div>
           </div>
@@ -93,8 +95,8 @@ function FailedFilesModal({
 
         {/* 列表头部 */}
         <div className="flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
-          <span className="flex-1">文件路径</span>
-          <span className="w-32 text-right">处理结果</span>
+          <span className="flex-1">{t('filePath')}</span>
+          <span className="w-32 text-right">{t('processingResult')}</span>
         </div>
 
         {/* 虚拟滚动列表 */}
@@ -149,7 +151,7 @@ function FailedFilesModal({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--bg-hover)] text-[var(--fg-primary)] hover:bg-[var(--bg-base)] transition-colors"
           >
-            关闭
+            {t('close')}
           </button>
         </div>
       </div>
@@ -165,6 +167,7 @@ export function ScanSummary({
   selectedSize,
   onClearDeleteResult,
 }: ScanSummaryProps) {
+  const { t } = useTranslation('common');
   const [showFailedModal, setShowFailedModal] = useState(false);
   
   // 待重启条目也是本次删除尝试的结果，必须保留在明细中供用户核对。
@@ -180,7 +183,7 @@ export function ScanSummary({
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <FileSearch className="w-4 h-4 text-emerald-500" />
-            <span className="text-xs text-[var(--fg-muted)]">发现文件</span>
+            <span className="text-xs text-[var(--fg-muted)]">{t('filesFound')}</span>
           </div>
           <p className="text-lg font-bold text-[var(--fg-primary)] tabular-nums">
             {scanResult.total_file_count.toLocaleString()}
@@ -191,7 +194,7 @@ export function ScanSummary({
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <Trash2 className="w-4 h-4 text-orange-500" />
-            <span className="text-xs text-[var(--fg-muted)]">可清理</span>
+            <span className="text-xs text-[var(--fg-muted)]">{t('cleanable')}</span>
           </div>
           <p className="text-lg font-bold text-orange-500 tabular-nums">
             {formatSize(scanResult.total_size)}
@@ -202,7 +205,7 @@ export function ScanSummary({
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span className="text-xs text-[var(--fg-muted)]">已选中</span>
+            <span className="text-xs text-[var(--fg-muted)]">{t('selected')}</span>
           </div>
           <p className="text-lg font-bold text-emerald-500 tabular-nums">
             {selectedCount.toLocaleString()}
@@ -214,7 +217,7 @@ export function ScanSummary({
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <Clock className="w-4 h-4 text-teal-500" />
-            <span className="text-xs text-[var(--fg-muted)]">扫描耗时</span>
+            <span className="text-xs text-[var(--fg-muted)]">{t('scanDuration')}</span>
           </div>
           <p className="text-lg font-bold text-[var(--fg-primary)] tabular-nums">
             {formatDuration(scanResult.scan_duration_ms)}
@@ -237,17 +240,16 @@ export function ScanSummary({
               <span className={`text-sm font-medium ${
                 deleteResult.failed_count === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
               }`}>
-                {deleteResult.summary_message || '清理完成'}
+                {deleteResult.summary_message || t('cleanCompleted')}
               </span>
               {/* 详细统计 */}
               <div className="text-xs text-[var(--fg-muted)] mt-1">
-                成功 {deleteResult.success_count} 个，
-                实际释放 <span className="text-emerald-500 font-medium">{formatSize(deleteResult.freed_physical_size)}</span>
+                {t('deleteStats', { success: deleteResult.success_count, size: formatSize(deleteResult.freed_physical_size) })}
                 {deleteResult.skipped_size > 0 && (
-                  <>，<span className="text-amber-500">{formatSize(deleteResult.skipped_size)}</span> 跳过</>
+                  <>{t('skippedSize', { size: formatSize(deleteResult.skipped_size) })}</>
                 )}
                 {deleteResult.reboot_pending_count > 0 && (
-                  <>，<span className="text-blue-500">{deleteResult.reboot_pending_count}</span> 个待重启删除</>
+                  <>{t('rebootPending', { count: deleteResult.reboot_pending_count })}</>
                 )}
               </div>
             </div>
@@ -256,7 +258,7 @@ export function ScanSummary({
               <button
                 onClick={onClearDeleteResult}
                 className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-                title="关闭"
+                title={t('close')}
               >
                 <X className="w-4 h-4 text-[var(--fg-muted)]" />
               </button>

@@ -11,6 +11,7 @@ LightC is a Windows desktop utility for safe junk cleanup, disk analysis, and sy
 - Large-file, disk-health, hotspot, and disk-growth analysis.
 - Registry redundancy, shell/context-menu, uninstall-leftover, old-driver, and social-app cache tools.
 - AI model storage analysis and portable mode.
+- English, Simplified Chinese, and Japanese interface languages.
 - Safe deletion checks, detailed results, optional reboot deletion, and protected system paths.
 
 ## Screenshots

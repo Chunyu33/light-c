@@ -1,0 +1,103 @@
+{
+  "title": "設定",
+  "about": { "appInfo": "アプリ情報", "appDescription": "Windows C: ドライブ向けスマートクリーンアップツール", "version": "バージョン {{version}}", "portable": "ポータブル版", "installer": "インストール版", "authorDownload": "作者の配布元からダウンロード", "checkUpdates": "更新を確認", "portableUpdateHint": "ポータブル版は自動更新をインストールしません。作者の配布元から新しい zip を取得して現在のフォルダーを置き換えてください。GitHub Releases は公式の予備配布元です。", "updateHint": "更新元は GitHub です。地域によって DNS の問題が発生する場合は、後でもう一度お試しください。", "systemInfo": "システム情報", "loadingSystemInfo": "システム情報を取得中...", "operatingSystem": "オペレーティングシステム", "architecture": "システムアーキテクチャ", "processor": "プロセッサー", "cpuCores": "CPU コア数", "memory": "メモリ", "memoryValue": "空き {{free}} / 合計 {{total}}", "computerName": "コンピューター名", "currentUser": "現在のユーザー", "uptime": "稼働時間", "uptimeValue": "{{days}} 日 {{hours}} 時間 {{minutes}} 分", "systemInfoFailed": "システム情報を取得できません", "nameSection": "LightC の名前の由来", "nameDescription": "Light は軽快さ、C は C ドライブを表します。LightC はシステムの不要ファイルを安全かつ効率的に整理し、空き容量を増やします。", "developer": "開発者", "author": "作者", "source": "ソースコード", "license": "ソースライセンス", "changelog": "変更履歴", "changelogDesc": "バージョン履歴を表示" },
+  "close": "設定を閉じる",
+  "tabs": {
+    "general": "一般",
+    "features": "機能設定",
+    "diskInfo": "ディスク情報",
+    "guide": "使用ガイド",
+    "security": "セキュリティ",
+    "feedback": "フィードバック",
+    "about": "アプリ情報"
+  },
+  "sections": {
+    "general": "一般設定",
+    "dataManagement": "データ管理",
+    "systemTools": "システムクイックツール"
+  },
+  "theme": {
+    "label": "テーマ",
+    "desc": "アプリの外観テーマを選択",
+    "light": "ライト",
+    "dark": "ダーク",
+    "system": "システム連動"
+  },
+  "language": {
+    "label": "言語",
+    "desc": "インターフェースの表示言語を選択",
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "fontSize": {
+    "label": "フォントサイズ",
+    "desc": "アプリ内のテキストサイズを調整",
+    "standard": "標準",
+    "medium": "中",
+    "large": "大",
+    "custom": "カスタム",
+    "customLabel": "カスタムサイズ",
+    "customRange": "範囲 {{min}}-{{max}}px",
+    "customTitle": "カスタムフォントサイズ（範囲 {{min}}-{{max}}px）"
+  },
+  "layout": {
+    "label": "レイアウト",
+    "desc": "ページレイアウトモードを調整",
+    "cards": "カードモード",
+    "cardsDesc": "全機能を1ページに集約、概要把握に最適",
+    "pages": "ページモード",
+    "pagesDesc": "サイドメニューで機能を切り替え、従来のPCアプリに近い操作感"
+  },
+  "searchEngine": {
+    "label": "検索エンジン",
+    "desc": "各モジュールの検索ボタンで開くデフォルト検索エンジン"
+  },
+  "logRetention": {
+    "label": "ログ保持件数",
+    "desc": "上限を超えた場合に古いログを自動削除（1-100件）",
+    "unit": "件",
+    "title": "保持するクリーンアップログの最大件数"
+  },
+  "dataDir": {
+    "configLocation": "設定ファイルの場所",
+    "webviewData": "WebViewデータ",
+    "dataLocation": "データの場所",
+    "loadingPath": "読み込み中...",
+    "cannotWrite": "現在のストレージ場所は書き込み不可です。書き込み権限のあるディレクトリにポータブルパッケージを展開してください。",
+    "migrationDone": "旧AppDataデータを移行済み。元データは保持されています。",
+    "migrateBtn": "旧AppDataデータを移行",
+    "migratingBtn": "移行中...",
+    "changeDir": "データディレクトリを変更",
+    "changeDirDesc": "クリーンアップログとキャッシュデータ用の専用フォルダを選択。設定ファイルは移行されません。",
+    "viewLogs": "クリーンアップログを表示",
+    "viewLogsDesc": "過去のクリーンアップ記録と詳細なファイルリストを表示",
+    "clearData": "ローカルデータを削除",
+    "clearDataDesc": "ログ・バックアップ・スナップショット・履歴キャッシュ・仮想ディスク記録を選択的に削除",
+    "changeDirSuccess": "データディレクトリを変更しました",
+    "changeDirFailed": "データディレクトリの変更に失敗しました",
+    "clearSuccess": "データを削除しました",
+    "clearSuccessDesc": "{{files}} 個のファイルを削除し、{{size}} を解放しました",
+    "clearFailed": "削除に失敗しました",
+    "readItemsFailed": "削除可能項目の読み込みに失敗しました",
+    "noItemsSelected": "項目が選択されていません",
+    "migrateSuccess": "旧データの移行が完了しました",
+    "migrateSuccessDesc": "元のAppDataデータは保持されています。ポータブル版はプログラムディレクトリを優先的に使用します。",
+    "migrateFailed": "旧データの移行に失敗しました",
+    "openFailed": "{{label}}を開けませんでした"
+  },
+  "systemTools": {
+    "startup": "スタートアップ管理",
+    "startupDesc": "タスクマネージャーを開いて不要なスタートアッププログラムを無効化",
+    "storage": "ストレージセンス",
+    "storageDesc": "Windowsの組み込みディスククリーンアップと容量管理を開く"
+  },
+  "units": { "items": "件", "layers": "{{count}} 階層" },
+  "feedback": { "title": "フィードバック", "description": "問題や改善提案がある場合は、以下の方法でご連絡ください。", "githubDesc": "GitHub で問題を報告", "email": "メールで送信", "contact": "コミュニティ", "qqGroup": "QQ グループ：", "copied": "コピーしました", "copy": "コピー" },
+  "clearData": { "title": "ローカルデータを削除", "subtitle": "以下の許可されたデータのみを削除し、アプリ設定は保持します。", "warning": "アプリ設定を削除せず安全に消去できます。ディスク変化スナップショットはドライブごとに分かれているため、基準を個別に保持できます。消去したドライブは次回スキャンで基準を再構築し、その次のスキャンから比較が表示されます。", "directory": "フォルダー内容", "file": "ファイル", "fileCount": "{{count}} ファイル", "summary": "{{count}} ファイルを削除し、{{size}} の空き容量を確保します", "cancel": "キャンセル", "confirm": "削除" },
+  "features": {
+    "bigFiles": { "title": "大容量ファイルのクリーンアップ", "scanLimit": "スキャンするファイル数", "scanLimitDesc": "1 回のスキャンで返す最大ファイル数を設定します。多いほど候補を見つけやすくなりますが、表示と確認の負担が増えます。", "range": "範囲：{{min}} - {{max}} 件。ドライブを切り替えると古い結果を消し、別ドライブのファイルが混ざらないようにします。" },
+    "hotspot": { "title": "大容量フォルダー分析", "depth": "表示階層", "depthDesc": "結果に表示するフォルダー階層数", "minSize": "最小表示サイズ", "minSizeDesc": "このサイズ未満のフォルダーをスキャン対象から除外します。", "ignoreSystem": "詳細スキャンでシステムフォルダーを除外", "ignoreSystemDesc": "オフにすると保護フォルダー内の大きなファイルも検出できますが、スキャン時間が大幅に延びます。", "autoIgnored": "自動的に除外するフォルダー", "autoIgnoredDesc": "以下のフォルダーはスキャン時にスキップまたは保護され、クリーンアップ候補には表示されません：" },
+    "diskGrowth": { "title": "ディスク変化分析", "maxEntries": "表示する変化フォルダー数", "maxEntriesDesc": "前回のスナップショットとの比較結果として返すフォルダー数を制限します。多いほど表示と並べ替えの負担が増えるため、300 件以下を推奨します。", "range": "範囲：50 - 1000 件。初回スキャンまたは変化がない場合は基準リストが表示されます。", "details": "変化の詳細", "speed": "スキャン速度", "mftWarmup": "初回 MFT ウォームアップ", "colors": "色の指標" }
+  }
+}

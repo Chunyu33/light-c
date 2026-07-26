@@ -5,6 +5,7 @@
 import { memo, useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmDialogProps {
   /** 是否显示 */
@@ -32,12 +33,16 @@ export const ConfirmDialog = memo(function ConfirmDialog({
   title,
   description,
   warning,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   onConfirm,
   onCancel,
   isDanger = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation('common');
+  // 仅对未指定的按钮使用全局翻译，业务模块仍可提供更具体的操作文案。
+  const resolvedConfirmText = confirmText ?? t('confirm');
+  const resolvedCancelText = cancelText ?? t('cancel');
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const enteredRef = useRef(false);
@@ -112,7 +117,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
             onClick={onCancel}
             className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
-            {cancelText}
+            {resolvedCancelText}
           </button>
           <button
             onClick={onConfirm}
@@ -122,7 +127,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
                 : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/25'
             }`}
           >
-            {confirmText}
+            {resolvedConfirmText}
           </button>
         </div>
       </div>

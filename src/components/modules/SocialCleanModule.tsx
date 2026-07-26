@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useRef, memo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -106,6 +107,8 @@ const riskLevelConfig: Record<RiskLevel, {
 // ============================================================================
 
 export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('social');
   const { showToast } = useToast();
 
@@ -335,8 +338,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="social"
-        title="社交软件专清"
-        description="清理微信、QQ、钉钉、飞书等软件的缓存文件"
+        title={navT('socialClean')}
+        description={navT('socialCleanDesc')}
         icon={<MessageCircle className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -398,7 +401,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
             <div className="p-4">
               <EmptyState
                 icon={MessageCircle}
-                title="尚未检测社交缓存"
+              title={t('notScannedSocialCache')}
                 description="点击开始扫描，检测微信、QQ、钉钉、飞书等软件缓存。"
               />
             </div>
@@ -421,7 +424,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
               <EmptyState
                 icon={CheckCircle2}
                 tone="success"
-                title="太棒了"
+              title={t('nothingToClean')}
                 description="没有发现需要清理的社交软件缓存。"
               />
             </div>
@@ -656,6 +659,7 @@ interface FileRowProps {
 }
 
 function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
+  const { t } = useTranslation('common');
   const riskConfig = riskLevelConfig[file.risk_level];
   const RiskIcon = riskConfig.icon;
   const isCritical = file.risk_level === 'critical';
@@ -723,14 +727,14 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
         <button 
           onClick={(e) => { e.stopPropagation(); openInFolder(file.path); }} 
           className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" 
-          title="打开所在文件夹"
+          title={t('openInFolder')}
         >
           <FolderOpen className="w-3 h-3" />
         </button>
         <button 
           onClick={(e) => { e.stopPropagation(); openFile(file.path); }} 
           className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" 
-          title="打开文件"
+          title={t('openFile')}
         >
           <ExternalLink className="w-3 h-3" />
         </button>
@@ -849,6 +853,7 @@ interface VirtualFileRowProps {
 }
 
 const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, onToggle, style }: VirtualFileRowProps) {
+  const { t } = useTranslation('common');
   const riskConfig = riskLevelConfig[file.risk_level];
   const RiskIcon = riskConfig.icon;
   const isCritical = file.risk_level === 'critical';
@@ -909,10 +914,10 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       </span>
       
       <div className="w-16 flex items-center justify-end gap-0.5 shrink-0">
-        <button onClick={() => openInFolder(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开所在文件夹">
+        <button onClick={() => openInFolder(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title={t('openInFolder')}>
           <FolderOpen className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => openFile(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开文件">
+        <button onClick={() => openFile(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title={t('openFile')}>
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>

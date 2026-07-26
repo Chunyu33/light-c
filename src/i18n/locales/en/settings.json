@@ -1,0 +1,103 @@
+{
+  "title": "Settings",
+  "about": { "appInfo": "Application info", "appDescription": "Smart Windows C: drive cleanup tool", "version": "Version {{version}}", "portable": "Portable", "installer": "Installer", "authorDownload": "Download from author channel", "checkUpdates": "Check for updates", "portableUpdateHint": "Portable builds do not install updates automatically. Download the new zip from the author's channel and replace the current folder; GitHub Releases is the official fallback.", "updateHint": "Updates are hosted on GitHub. DNS issues may affect access in some regions; retry later if needed.", "systemInfo": "System info", "loadingSystemInfo": "Loading system information...", "operatingSystem": "Operating system", "architecture": "Architecture", "processor": "Processor", "cpuCores": "CPU cores", "memory": "Memory", "memoryValue": "{{free}} free / {{total}} total", "computerName": "Computer name", "currentUser": "Current user", "uptime": "System uptime", "uptimeValue": "{{days}}d {{hours}}h {{minutes}}m", "systemInfoFailed": "Unable to get system information", "nameSection": "Why LightC", "nameDescription": "Light means lightweight and C refers to the C: drive. LightC helps clean system junk safely and efficiently to free disk space.", "developer": "Developer", "author": "Author", "source": "Source", "license": "Source license", "changelog": "Changelog", "changelogDesc": "View version history" },
+  "close": "Close settings",
+  "tabs": {
+    "general": "General",
+    "features": "Features",
+    "diskInfo": "Disk Info",
+    "guide": "Guide",
+    "security": "Security",
+    "feedback": "Feedback",
+    "about": "About"
+  },
+  "sections": {
+    "general": "General Settings",
+    "dataManagement": "Data Management",
+    "systemTools": "System Quick Tools"
+  },
+  "theme": {
+    "label": "Theme",
+    "desc": "Choose the app's appearance theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "label": "Language",
+    "desc": "Choose the interface display language",
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "fontSize": {
+    "label": "Font Size",
+    "desc": "Adjust text size in the app",
+    "standard": "Standard",
+    "medium": "Medium",
+    "large": "Large",
+    "custom": "Custom",
+    "customLabel": "Custom Size",
+    "customRange": "Range {{min}}-{{max}}px",
+    "customTitle": "Custom font size, range {{min}}-{{max}}px"
+  },
+  "layout": {
+    "label": "Layout",
+    "desc": "Adjust the page layout mode",
+    "cards": "Cards",
+    "cardsDesc": "All features on one page, great for quick overview",
+    "pages": "Pages",
+    "pagesDesc": "Switch features via side menu, closer to traditional PC apps"
+  },
+  "searchEngine": {
+    "label": "Search Engine",
+    "desc": "Default search engine for module search buttons"
+  },
+  "logRetention": {
+    "label": "Log Retention",
+    "desc": "Auto-delete oldest logs when count exceeds limit (1-100)",
+    "unit": "logs",
+    "title": "Max cleanup logs to retain"
+  },
+  "dataDir": {
+    "configLocation": "Config Location",
+    "webviewData": "WebView Data",
+    "dataLocation": "Data Location",
+    "loadingPath": "Loading...",
+    "cannotWrite": "Current storage location is not writable. Please extract the portable package to a directory with write permissions.",
+    "migrationDone": "Legacy AppData migrated. Original data remains.",
+    "migrateBtn": "Migrate Legacy AppData",
+    "migratingBtn": "Migrating...",
+    "changeDir": "Change Data Directory",
+    "changeDirDesc": "Select a dedicated empty folder for cleanup logs and cache data. Config file will not be migrated.",
+    "viewLogs": "View Cleanup Logs",
+    "viewLogsDesc": "View historical cleanup records and detailed file lists",
+    "clearData": "Clear Local Data",
+    "clearDataDesc": "Selectively clear logs, backups, snapshots, history cache and virtual disk records",
+    "changeDirSuccess": "Data directory changed",
+    "changeDirFailed": "Failed to change data directory",
+    "clearSuccess": "Data cleared",
+    "clearSuccessDesc": "Deleted {{files}} files, freed {{size}}",
+    "clearFailed": "Clear failed",
+    "readItemsFailed": "Failed to read clearable items",
+    "noItemsSelected": "No items selected",
+    "migrateSuccess": "Legacy data migration complete",
+    "migrateSuccessDesc": "Original AppData data retained. Portable version now uses the program directory.",
+    "migrateFailed": "Legacy data migration failed",
+    "openFailed": "Failed to open {{label}}"
+  },
+  "systemTools": {
+    "startup": "Startup Manager",
+    "startupDesc": "Open Task Manager to disable unnecessary startup programs",
+    "storage": "Storage Sense",
+    "storageDesc": "Open Windows built-in disk cleanup and space management"
+  },
+  "units": { "items": "items", "layers": "{{count}} levels" },
+  "feedback": { "title": "Feedback", "description": "If you encounter a problem or have a suggestion, contact me through one of the channels below.", "githubDesc": "Report an issue on GitHub", "email": "Email feedback", "contact": "Community", "qqGroup": "QQ group:", "copied": "Copied", "copy": "Copy" },
+  "clearData": { "title": "Clear local data", "subtitle": "Only the allowlisted data below is removed; app settings are kept.", "warning": "These items can be cleared safely without removing app settings. Disk change snapshots are separated by drive, so you can keep a drive's baseline. A cleared drive will rebuild its baseline on the next scan and show comparisons again after the following scan.", "directory": "Directory contents", "file": "File", "fileCount": "{{count}} files", "summary": "{{count}} files will be removed; estimated space freed: {{size}}", "cancel": "Cancel", "confirm": "Clear" },
+  "features": {
+    "bigFiles": { "title": "Large file cleanup", "scanLimit": "Files per scan", "scanLimitDesc": "Controls the maximum number of files returned per scan. Higher values find more candidates but increase rendering and review cost.", "range": "Range: {{min}} - {{max}} items. Switching drives clears old results so files from different drives are not mixed." },
+    "hotspot": { "title": "Large folder analysis", "depth": "Display depth", "depthDesc": "Number of folder levels shown in results", "minSize": "Minimum display size", "minSizeDesc": "Folders below this size are excluded to reduce noise.", "ignoreSystem": "Skip system folders in deep scans", "ignoreSystemDesc": "Turn this off to find unusually large files in protected folders, at the cost of a much longer scan.", "autoIgnored": "Automatically ignored folders", "autoIgnoredDesc": "The following folders are skipped or protected during scans and will not appear as cleanup candidates:" },
+    "diskGrowth": { "title": "Disk change analysis", "maxEntries": "Maximum changed folders", "maxEntriesDesc": "Limits the number of folders returned after comparing with the previous snapshot. Higher values increase rendering and sorting cost; 300 or fewer is recommended.", "range": "Range: 50 - 1000 items. The baseline list still appears on the first scan or when there are no changes.", "details": "Change details", "speed": "Scan speed", "mftWarmup": "Initial MFT warm-up", "colors": "Color indicators" }
+  }
+}

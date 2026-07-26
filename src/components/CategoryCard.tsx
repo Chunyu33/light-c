@@ -19,6 +19,7 @@ import { openInFolder, openFile, openRecycleBin } from '../api/commands';
 import { stripWindowsDevicePrefix } from '../utils/searchEngine';
 import type { CategoryScanResult, FileInfo } from '../types';
 import { formatSize } from '../utils/format';
+import { useTranslation } from 'react-i18next';
 
 // 微信风格风险等级样式配置
 const getRiskBadgeStyle = (level: number) => {
@@ -38,11 +39,11 @@ const getRiskBadgeStyle = (level: number) => {
 
 const getRiskText = (level: number) => {
   switch (level) {
-    case 1: return '安全';
-    case 2: return '低风险';
-    case 3: return '中等';
-    case 4: return '较高';
-    default: return '高风险';
+    case 1: return 'safe';
+    case 2: return 'lowRisk';
+    case 3: return 'mediumRisk';
+    case 4: return 'highRisk';
+    default: return 'criticalRisk';
   }
 };
 
@@ -70,6 +71,10 @@ export function CategoryCard({
   onLoadMore,
   isLoadingMore = false,
 }: CategoryCardProps) {
+  const { t: commonT } = useTranslation('common');
+  const { t } = useTranslation('junkClean');
+  const categoryName = t(`categories.${category.category}.name`, { defaultValue: category.display_name });
+  const categoryDescription = t(`categories.${category.category}.description`, { defaultValue: category.description });
   const [expanded, setExpanded] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -143,13 +148,13 @@ export function CategoryCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-[14px] font-bold text-[var(--text-primary)] truncate">
-                {category.display_name}
+                {categoryName}
               </span>
               <span className={`px-2 py-0.5 text-[11px] font-medium rounded border ${getRiskBadgeStyle(category.risk_level)}`}>
-                {getRiskText(category.risk_level)}
+                {commonT(getRiskText(category.risk_level))}
               </span>
             </div>
-            <p className="text-[13px] text-[var(--text-muted)] truncate mt-1">{category.description}</p>
+            <p className="text-[13px] text-[var(--text-muted)] truncate mt-1">{categoryDescription}</p>
           </div>
 
           {/* 统计信息 - tabular-nums 确保数字稳定 */}
@@ -158,13 +163,13 @@ export function CategoryCard({
               {formatSize(category.total_size)}
             </p>
             <p className="text-[13px] text-[var(--text-muted)] tabular-nums">
-              {category.file_count.toLocaleString()} 个文件
+              {commonT('fileCount', { count: category.file_count.toLocaleString() })}
               {selectedCount > 0 && (
                 <span className="text-[var(--brand-green)] ml-1">
                   {/* 深度分类分页时提示完整删除口径，避免把当前页大小误认为分类总量。 */}
                   {hasMore && selectedCount === category.files.length
-                    ? `(已选当前页 ${selectedCount.toLocaleString()} 个，清理时包含完整分类)`
-                    : `(已选 ${selectedCount.toLocaleString()} 个, ${formatSize(selectedSize)})`}
+                    ? commonT('selectedPage', { count: selectedCount.toLocaleString() })
+                    : commonT('selectedFiles', { count: selectedCount.toLocaleString(), size: formatSize(selectedSize) })}
                 </span>
               )}
             </p>
@@ -186,7 +191,7 @@ export function CategoryCard({
             {category.risk_level >= 3 && (
               <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[13px] text-[var(--color-warning)]">
                 <AlertTriangle className="w-4 h-4" />
-                <span>此分类风险等级较高，请谨慎选择删除</span>
+                <span>{commonT('highRiskWarning')}</span>
               </div>
             )}
 
@@ -223,7 +228,7 @@ export function CategoryCard({
                   disabled={isLoadingMore}
                   className="text-xs text-[var(--brand-green)] hover:text-[var(--brand-green-hover)] disabled:text-[var(--text-faint)] transition"
                 >
-                  {isLoadingMore ? '正在加载…' : `加载更多（已显示 ${category.files.length.toLocaleString()} / ${category.file_count.toLocaleString()}）`}
+                  {isLoadingMore ? commonT('loading') : commonT('loadMore', { shown: category.files.length.toLocaleString(), total: category.file_count.toLocaleString() })}
                 </button>
               </div>
             )}
@@ -246,12 +251,13 @@ interface VirtualFileItemProps {
 }
 
 const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle, onSearch, style }: VirtualFileItemProps) {
+  const { t } = useTranslation('common');
   // 回收站的真实删除路径是隐藏的 $R 文件，界面展示元数据中的原始文件名，避免与 Explorer 看到的内容脱节。
   const displayPath = file.category === 'RecycleBin'
     ? file.name
     : stripWindowsDevicePrefix(file.path);
   const displayTitle = file.category === 'RecycleBin' && file.original_path
-    ? `原位置：${stripWindowsDevicePrefix(file.original_path)}`
+    ? t('originalLocation', { path: stripWindowsDevicePrefix(file.original_path) })
     : displayPath;
 
   return (
@@ -296,7 +302,7 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
             onSearch();
           }}
           className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
-          title="搜索该文件能不能删"
+          title={t('searchDeletionAdvice')}
         >
           <Search className="w-4 h-4" />
         </button>
@@ -310,7 +316,7 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
             }
           }}
           className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
-          title={file.category === 'RecycleBin' ? '打开系统回收站' : '打开所在文件夹'}
+          title={file.category === 'RecycleBin' ? t('openRecycleBin') : t('openInFolder')}
         >
           <FolderOpen className="w-4 h-4" />
         </button>
@@ -324,7 +330,7 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
             }
           }}
           className="p-1.5 hover:bg-[var(--bg-active)] rounded-lg transition text-[var(--text-muted)] hover:text-[var(--brand-green)]"
-          title={file.category === 'RecycleBin' ? '打开系统回收站' : '打开文件'}
+          title={file.category === 'RecycleBin' ? t('openRecycleBin') : t('openFile')}
         >
           <ExternalLink className="w-4 h-4" />
         </button>

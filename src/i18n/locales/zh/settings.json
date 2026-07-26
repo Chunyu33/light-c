@@ -1,0 +1,103 @@
+{
+  "title": "设置",
+  "about": { "appInfo": "应用信息", "appDescription": "Windows C盘智能清理工具", "version": "版本 {{version}}", "portable": "便携版", "installer": "安装版", "authorDownload": "作者渠道下载", "checkUpdates": "检查更新", "portableUpdateHint": "便携版不会自动安装更新，推荐从作者网盘下载新版 zip 后覆盖当前目录，GitHub Releases 作为官方备用渠道。", "updateHint": "温馨提示：更新源为 GitHub，国内可能会出现间歇性 DNS 污染，如果失败可以稍后重试。", "systemInfo": "系统信息", "loadingSystemInfo": "正在获取系统信息...", "operatingSystem": "操作系统", "architecture": "系统架构", "processor": "处理器", "cpuCores": "CPU 核心数", "memory": "内存", "memoryValue": "{{free}} 可用 / {{total}} 总计", "computerName": "计算机名", "currentUser": "当前用户", "uptime": "系统运行时间", "uptimeValue": "{{days}} 天 {{hours}} 小时 {{minutes}} 分钟", "systemInfoFailed": "无法获取系统信息", "nameSection": "为什么叫 LightC", "nameDescription": "Light 代表轻量、轻快，C 即 C 盘。LightC 致力于帮助您安全、高效地清理系统垃圾文件，释放磁盘空间。", "developer": "开发者", "author": "作者", "source": "源码地址", "license": "源码许可证", "changelog": "更新日志", "changelogDesc": "查看版本更新历史" },
+  "close": "关闭设置",
+  "tabs": {
+    "general": "通用",
+    "features": "功能设置",
+    "diskInfo": "磁盘信息",
+    "guide": "使用说明",
+    "security": "安全与校验",
+    "feedback": "意见反馈",
+    "about": "关于"
+  },
+  "sections": {
+    "general": "常规设置",
+    "dataManagement": "数据管理",
+    "systemTools": "系统快捷工具"
+  },
+  "theme": {
+    "label": "主题模式",
+    "desc": "选择应用的外观主题",
+    "light": "浅色模式",
+    "dark": "深色模式",
+    "system": "跟随系统"
+  },
+  "language": {
+    "label": "语言",
+    "desc": "选择界面显示语言",
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "fontSize": {
+    "label": "字体大小",
+    "desc": "调整应用内文字大小",
+    "standard": "标准",
+    "medium": "适中",
+    "large": "较大",
+    "custom": "自定义",
+    "customLabel": "自定义字号",
+    "customRange": "范围 {{min}}-{{max}}px",
+    "customTitle": "自定义字号，范围 {{min}}-{{max}}px"
+  },
+  "layout": {
+    "label": "布局设置",
+    "desc": "调整页面布局模式",
+    "cards": "卡片模式",
+    "cardsDesc": "所有功能集中在同一页，适合快速总览",
+    "pages": "页面模式",
+    "pagesDesc": "左侧菜单切换单功能页，更接近传统 PC 软件"
+  },
+  "searchEngine": {
+    "label": "搜索引擎",
+    "desc": "设置各模块搜索按钮打开的默认搜索引擎"
+  },
+  "logRetention": {
+    "label": "清理日志保留",
+    "desc": "超过数量后自动删除最旧日志，范围 1-100 条",
+    "unit": "条",
+    "title": "清理日志最多保留条数"
+  },
+  "dataDir": {
+    "configLocation": "配置位置",
+    "webviewData": "界面数据",
+    "dataLocation": "数据位置",
+    "loadingPath": "加载中...",
+    "cannotWrite": "当前存储位置不可写，请将便携包解压到具有写入权限的目录。",
+    "migrationDone": "旧版 AppData 数据已兼容迁移，原数据未删除。",
+    "migrateBtn": "迁移旧版 AppData 数据",
+    "migratingBtn": "迁移中...",
+    "changeDir": "更改数据目录",
+    "changeDirDesc": "选择独立空文件夹存储清理日志和缓存数据，配置文件不会迁移",
+    "viewLogs": "查看清理日志",
+    "viewLogsDesc": "查看历史清理记录与详细文件清单",
+    "clearData": "清空本地数据",
+    "clearDataDesc": "选择性清理日志、备份、快照、历史缓存和虚拟磁盘记录",
+    "changeDirSuccess": "数据目录已更改",
+    "changeDirFailed": "更改数据目录失败",
+    "clearSuccess": "数据已清空",
+    "clearSuccessDesc": "已删除 {{files}} 个文件，释放 {{size}}",
+    "clearFailed": "清空失败",
+    "readItemsFailed": "读取清理项失败",
+    "noItemsSelected": "未选择清理项",
+    "migrateSuccess": "旧版数据迁移完成",
+    "migrateSuccessDesc": "原 AppData 数据未删除，便携版现在优先使用程序目录。",
+    "migrateFailed": "旧版数据迁移失败",
+    "openFailed": "打开{{label}}失败"
+  },
+  "systemTools": {
+    "startup": "开机启动管理",
+    "startupDesc": "打开任务管理器，禁用不必要的自启动软件",
+    "storage": "存储感知",
+    "storageDesc": "调用 Windows 原生的磁盘清理与空间管理"
+  },
+  "units": { "items": "个", "layers": "{{count}} 层" },
+  "feedback": { "title": "问题反馈", "description": "如果您在使用过程中遇到任何问题或有改进建议，欢迎通过以下方式联系我", "githubDesc": "在 GitHub 上提交问题", "email": "邮件反馈", "contact": "交流", "qqGroup": "QQ群：", "copied": "已复制", "copy": "复制" },
+  "clearData": { "title": "清理本地数据", "subtitle": "只清理下列白名单数据，应用配置独立保留", "warning": "这些数据可以安全清理，不会删除应用配置。磁盘变化分析快照已按盘符拆分，可单独保留某个磁盘的基线；被清理的磁盘下次扫描会重新建立基线，第二次扫描后才会重新显示变化对比。", "directory": "目录内容", "file": "文件", "fileCount": "{{count}} 个文件", "summary": "将删除 {{count}} 个文件，预计释放 {{size}}", "cancel": "取消", "confirm": "确认清理" },
+  "features": {
+    "bigFiles": { "title": "大文件清理", "scanLimit": "扫描文件数", "scanLimitDesc": "控制每次扫描返回的最大文件数量。数量越大越容易发现更多候选文件，但列表渲染和确认成本也会增加。", "range": "边界范围：{{min}} - {{max}} 个。切换磁盘后会清空旧结果，避免不同磁盘的文件混在同一份清理列表里。" },
+    "hotspot": { "title": "大目录分析", "depth": "展示深度", "depthDesc": "结果列表中展示的目录层数", "minSize": "最低展示大小", "minSizeDesc": "低于此大小的目录不参与扫描（减少噪音）", "ignoreSystem": "深度扫描忽略系统目录", "ignoreSystemDesc": "关闭后可发现藏在系统保护目录下的异常大文件（如日志爆满），但扫描时间将增加数倍", "autoIgnored": "自动忽略的目录", "autoIgnoredDesc": "以下目录扫描时自动跳过或标记为保护，不会出现在清理候选列表中：" },
+    "diskGrowth": { "title": "磁盘变化分析", "maxEntries": "最多展示变化目录", "maxEntriesDesc": "限制与上次快照对比后返回的变化目录数量。数值越大，软件界面渲染和排序压力越高，建议保持 300 以内。", "range": "边界范围：50 - 1000 项。首次扫描或无变化时仍显示占用基线列表，不受此项影响。", "details": "变化明细", "speed": "扫描速度", "mftWarmup": "首次 MFT 预热", "colors": "颜色指标" }
+  }
+}

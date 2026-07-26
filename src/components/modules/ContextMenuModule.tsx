@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import {
   MousePointerClick,
@@ -67,6 +68,7 @@ interface EntryRowProps {
 }
 
 function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
+  const { t } = useTranslation('common');
   const [expanded, setExpanded] = useState(false);
   const scope = getScopeStyle(entry.scope);
   const isInvalid = !entry.exe_exists && entry.exe_path !== null;
@@ -201,7 +203,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             setExpanded((v) => !v);
           }}
           className="shrink-0 p-1 rounded text-[var(--text-faint)] hover:text-[var(--text-muted)]"
-          title="查看详情"
+          title={t('viewDetails')}
         >
           {expanded
             ? <ChevronDown className="w-4 h-4" />
@@ -260,6 +262,8 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
 // ============================================================================
 
 export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const {
     moduleState,
     expandedModule,
@@ -535,8 +539,8 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="contextMenu"
-        title="右键菜单清理"
-        description="扫描并清理注册表中失效的右键菜单项"
+        title={navT('contextMenu')}
+        description={navT('contextMenuDesc')}
         icon={<MousePointerClick className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -555,7 +559,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
           <div className="p-5">
             <EmptyState
               icon={MousePointerClick}
-              title="尚未扫描右键菜单"
+              title={t('notScannedContextMenu')}
               description="点击开始扫描，检查注册表中失效或指向不存在文件的右键菜单项。"
             />
           </div>
@@ -736,7 +740,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
           <div className="p-5">
             <EmptyState
               icon={MousePointerClick}
-              title="未发现右键菜单问题"
+                title={t('noContextMenuIssues')}
               description="所有右键菜单项均指向有效的可执行文件。"
               tone="success"
             />
@@ -749,11 +753,11 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         isOpen={showDeleteConfirm}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
-        title="确认删除右键菜单条目"
+        title={t('confirmDeleteContextMenu')}
         description={`确定要从注册表中删除选中的 ${selectedCount} 个右键菜单条目吗？`}
-        warning="此操作将从注册表中永久移除对应键值，已删除的菜单项不会再出现在右键菜单中。如有 HKLM 条目，请确保以管理员身份运行。"
-        confirmText="删除"
-        cancelText="取消"
+        warning={t('contextMenuDeleteWarning')}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
         isDanger={true}
       />
     </>

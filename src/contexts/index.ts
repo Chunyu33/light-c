@@ -24,3 +24,4 @@ export {
 } from './FontSizeContext';
 export type { FontSizeLevel } from './FontSizeContext';
 export { SettingsProvider, useSettings } from './SettingsContext';
+export type { Language } from '../i18n';

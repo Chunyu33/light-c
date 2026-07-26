@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts';
 import { AboutSettings } from './settings/AboutSettings';
 import { FeedbackSettings } from './settings/FeedbackSettings';
@@ -23,6 +24,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+  const { t } = useTranslation('settings');
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const { mode, setMode } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
@@ -56,7 +58,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="flex h-full">
           <aside className="w-[160px] shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-main)] py-4">
             <div className="mb-4 px-4">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">设置</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t('title')}</h2>
             </div>
             <nav className="space-y-1 px-2">
               {SETTINGS_TABS.map(({ id, label, icon: Icon }) => (
@@ -70,7 +72,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   }`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="whitespace-nowrap">{label}</span>
+                  <span className="whitespace-nowrap">{t(label)}</span>
                 </button>
               ))}
             </nav>
@@ -79,13 +81,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <section className="flex min-w-0 flex-1 flex-col bg-[var(--bg-card)]">
             <div className="flex min-h-12 items-center justify-between border-b border-[var(--border-color)] px-5">
               <h3 className="text-sm font-medium text-[var(--text-primary)]">
-                {SETTINGS_TABS.find((tab) => tab.id === activeTab)?.label}
+                {t(SETTINGS_TABS.find((tab) => tab.id === activeTab)?.label ?? 'title')}
               </h3>
               <button
                 type="button"
                 onClick={onClose}
                 className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                aria-label="关闭设置"
+                aria-label={t('close', { defaultValue: 'Close settings' })}
               >
                 <X className="h-4 w-4" />
               </button>

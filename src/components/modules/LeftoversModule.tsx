@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
@@ -30,6 +31,8 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 // ============================================================================
 
 export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('leftovers');
 
   const lastScanTriggerRef = useRef(0);
@@ -432,8 +435,8 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="leftovers"
-        title="卸载残留"
-        description="深度检索多路径残留特征，基于置信度模型精准识别"
+        title={navT('leftovers')}
+        description={navT('leftoversDesc')}
         icon={<Package className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -447,7 +450,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
           <div className="p-5">
             <EmptyState
               icon={Package}
-              title="尚未扫描卸载残留"
+              title={t('notScannedLeftovers')}
               description="点击开始扫描，检索 AppData、ProgramData 等位置中可能遗留的软件目录。"
             />
           </div>
@@ -570,7 +573,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                       : 'bg-[var(--color-danger)] text-white hover:opacity-90'
                     }
                   `}
-                  title="直接从磁盘永久删除，不可恢复"
+                title={t('permanentDeleteWarning')}
                 >
                   {isDeleting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -724,7 +727,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                       openInFolder(leftover.path);
                     }}
                     className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
-                    title="打开所在文件夹"
+              title={t('openInFolder')}
                   >
                     <FolderOpen className="w-4 h-4" />
                   </button>
@@ -739,7 +742,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
           <div className="p-5">
             <EmptyState
               icon={CheckCircle2}
-              title="没有发现卸载残留"
+              title={t('noLeftovers')}
               description="未检测到高置信度的软件残留目录。"
               tone="success"
             />
@@ -752,11 +755,11 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         isOpen={showDeleteConfirm}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
-        title="确认删除卸载残留"
+        title={t('confirmDeleteLeftovers')}
         description={`确定要删除选中的 ${selectedPaths.size} 个文件夹吗？这将释放约 ${formatSize(selectedSize)} 空间。`}
-        warning="此操作不可撤销，请确认您不再需要这些数据。"
-        confirmText="删除"
-        cancelText="取消"
+        warning={t('leftoversDeleteWarning')}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
         isDanger={true}
       />
 
@@ -817,11 +820,11 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         isOpen={showDeepCleanConfirm}
         onCancel={() => setShowDeepCleanConfirm(false)}
         onConfirm={handleDeepClean}
-        title="确认深度清理"
+        title={t('confirmPermanentCleanup')}
         description={`即将永久删除 ${selectedPaths.size} 个文件夹，释放约 ${formatSize(selectedSize)} 空间。`}
-        warning="⚠️ 此操作将直接从磁盘删除数据，不经过回收站，无法恢复！"
-        confirmText="永久删除"
-        cancelText="取消"
+        warning={t('permanentCleanupWarning')}
+        confirmText={t('permanentDelete')}
+        cancelText={t('cancel')}
         isDanger={true}
       />
 
@@ -853,6 +856,7 @@ interface DeepCleanResultModalProps {
 }
 
 function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCleanResultModalProps) {
+  const { t } = useTranslation('common');
   const [expandedSection, setExpandedSection] = useState<'review' | 'failed' | null>(null);
 
   // 获取需要审核的项目
@@ -959,7 +963,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
                       <button
                         onClick={() => openInFolder(item.path)}
                         className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
-                        title="打开所在文件夹"
+                    title={t('openInFolder')}
                       >
                         <FolderOpen className="w-4 h-4" />
                       </button>
@@ -1015,7 +1019,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
                       <button
                         onClick={() => openInFolder(item.path)}
                         className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
-                        title="打开所在文件夹"
+                    title={t('openInFolder')}
                       >
                         <FolderOpen className="w-4 h-4" />
                       </button>

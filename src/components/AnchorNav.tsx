@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigation, PanelLeft } from 'lucide-react';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { useSettings } from '../contexts';
+import { useTranslation } from 'react-i18next';
 
 interface AnchorNavProps {
   /** 滚动容器的 ref；卡片模式下用于监听滚动和执行滚动。 */
@@ -14,6 +15,7 @@ interface AnchorNavProps {
 }
 
 export function AnchorNav({ scrollContainerRef }: AnchorNavProps) {
+  const { t } = useTranslation('nav');
   const { settings, updateSettings } = useSettings();
   const [isHovered, setIsHovered] = useState(false);
   const [activeAnchorId, setActiveAnchorId] = useState<AppModuleId>(settings.activeModuleId);
@@ -167,7 +169,7 @@ export function AnchorNav({ scrollContainerRef }: AnchorNavProps) {
                 `}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[var(--brand-green)]' : ''}`} />
-                <span className="text-xs font-medium whitespace-nowrap">{moduleConfig.label}</span>
+                <span className="text-xs font-medium whitespace-nowrap">{t(moduleConfig.label)}</span>
                 {isActive && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]" />
                 )}

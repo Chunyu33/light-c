@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Archive, CheckCheck, CheckCircle2, Cpu, FolderOpen, Loader2, RotateCcw, Search, ShieldAlert, Trash2 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -173,6 +174,8 @@ function getDriverSearchQuery(packageInfo: DriverPackageInfo): string {
 }
 
 export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('driverCleanup');
   const { showToast } = useToast();
   const lastScanTriggerRef = useRef(0);
@@ -339,8 +342,8 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
     <>
       <ModuleCard
         id="driver-cleanup"
-        title="旧驱动清理"
-        description="检测第三方驱动包，正在使用的驱动不可删除"
+        title={navT('driverCleanup')}
+        description={navT('driverCleanupDesc')}
         icon={<Cpu className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -374,7 +377,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       >
         <div className="p-4 space-y-3">
           {!scanResult && !loading && (
-            <EmptyState icon={Cpu} title="尚未检测驱动包" description="LightC 只会通过 Windows pnputil 检查第三方驱动包，不直接删除驱动文件。" />
+          <EmptyState icon={Cpu} title={t('notScannedDrivers')} description={t('driverScanDescription')} />
           )}
 
           {loading && !scanResult && (
@@ -437,7 +440,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
               )}
 
               {scanResult.packages.length === 0 ? (
-                <EmptyState icon={CheckCircle2} title="未发现第三方驱动包" description="pnputil 没有返回可分析的第三方驱动包。" tone="success" />
+        <EmptyState icon={CheckCircle2} title={t('noThirdPartyDrivers')} description={t('noDriversDescription')} tone="success" />
               ) : (
                 <div className="space-y-2">
                   {scanResult.packages.map((packageInfo) => {
@@ -479,7 +482,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                           <div className="flex shrink-0 self-center items-center gap-1">
                             <button
                               type="button"
-                              title="搜索该驱动信息"
+        title={t('searchDriver')}
                               aria-label={`搜索 ${packageInfo.provider_name} ${packageInfo.original_name}`}
                               disabled={deleting || restoring}
                               onClick={(event) => {
@@ -525,11 +528,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         isOpen={showConfirm}
         onCancel={() => setShowConfirm(false)}
         onConfirm={() => void handleDelete()}
-        title="确认删除旧驱动包"
+        title={t('confirmDeleteDriver')}
         description={`将备份并删除选中的 ${selectedNames.size} 个驱动包。删除前后后端都会重新校验设备绑定状态。`}
-        warning="正在使用的驱动不可选；其他未关联设备的驱动包均可删除，但‘未确认过时’或‘信息不完整’的条目并不代表一定无用。删除前会完整备份，备份失败会阻止删除；不会使用 /force，也不会直接删除 .sys 文件。"
-        confirmText="备份并删除"
-        cancelText="取消"
+        warning={t('driverDeleteWarning')}
+        confirmText={t('backupAndDelete')}
+        cancelText={t('cancel')}
         isDanger
       />
 
@@ -537,11 +540,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         isOpen={showRestoreConfirm}
         onCancel={() => setShowRestoreConfirm(false)}
         onConfirm={() => void handleRestore()}
-        title="确认恢复全部驱动备份"
+        title={t('confirmRestoreDrivers')}
         description="将读取当前数据目录 driver_backups 下的全部 INF 备份，并交由 Windows pnputil 递归安装。"
-        warning="该操作需要管理员权限，可能重新安装多个历史驱动版本；执行后建议重新检测，必要时重启 Windows。"
-        confirmText="确认恢复"
-        cancelText="取消"
+        warning={t('driverRestoreWarning')}
+        confirmText={t('confirmRestore')}
+        cancelText={t('cancel')}
       />
     </>
   );

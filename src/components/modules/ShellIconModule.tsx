@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CheckCircle2,
   FileText,
@@ -62,6 +63,7 @@ function ShellIconRow({
   onAction: (action: PendingAction) => void;
   onOpenRegistry: (target: ShellIconTarget) => void;
 }) {
+  const { t } = useTranslation('common');
   const risk = getRiskStyle(entry);
   const protectedEntry = entry.isSystemProtected || entry.riskLevel === 'unknown';
 
@@ -78,16 +80,16 @@ function ShellIconRow({
             <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{entry.hive} / {entry.registryView}</span>
           </div>
           <p className="mt-1 break-all font-mono text-[11px] text-[var(--text-muted)]">{entry.clsid}</p>
-          <p className="mt-1 break-all text-xs font-medium text-[var(--text-secondary)]">关联应用：{entry.applicationName || '未知应用'}</p>
+          <p className="mt-1 break-all text-xs font-medium text-[var(--text-secondary)]">{t('associatedApp')}：{entry.applicationName || t('unknownApp')}</p>
           <p className="mt-1 break-all text-xs text-[var(--text-faint)]">组件：{entry.sourcePath || entry.riskReason}</p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
           {!protectedEntry && (
             <>
-              <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'remove' })} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title="备份后删除当前注册表节点，软件之后可能重新创建">
+              <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'remove' })} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('shellRemoveTitle')}>
                 <Trash2 className="h-3.5 w-3.5" />删除
               </button>
-              <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'lock' })} className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50" title="物理删除节点并锁定父级，防止软件重新创建">
+              <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'lock' })} className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50" title={t('shellLockTitle')}>
                 <Lock className="h-3.5 w-3.5" />彻底删除
               </button>
             </>
@@ -96,7 +98,7 @@ function ShellIconRow({
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2">
         <p className="min-w-0 break-all text-[11px] text-[var(--text-faint)]">{entry.regPath}</p>
-        <button type="button" disabled={busy} onClick={() => onOpenRegistry(targetOf(entry))} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title="在注册表编辑器中定位该节点">
+        <button type="button" disabled={busy} onClick={() => onOpenRegistry(targetOf(entry))} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('openRegistryNode')}>
           <FolderOpen className="h-3.5 w-3.5" />定位注册表
         </button>
       </div>
@@ -105,6 +107,8 @@ function ShellIconRow({
 }
 
 export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('shellIcons');
   const { showToast } = useToast();
   const [entries, setEntries] = useState<ShellIconInfo[] | null>(null);
@@ -159,8 +163,8 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
     <>
       <ModuleCard
         id="shellIcons"
-        title="外壳图标清理"
-        description="清理此电脑中的第三方外壳图标（如某网盘、某PS等），支持备份、清理和防复活"
+        title={navT('shellIcons')}
+        description={navT('shellIconsDesc')}
         icon={<HardDriveDownload className="h-6 w-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -178,7 +182,7 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         titleExtra={<span className="rounded-full bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-600 dark:text-orange-400">需谨慎操作</span>}
       >
         <div className="space-y-4 p-5">
-          {!entries && moduleState.status === 'idle' && <EmptyState icon={HardDriveDownload} title="尚未扫描外壳挂载" description="扫描后会列出此电脑中的第三方外壳图标，并显示 CLSID、关联组件和安全状态。" />}
+        {!entries && moduleState.status === 'idle' && <EmptyState icon={HardDriveDownload} title={t('notScannedShellIcons')} description={t('shellScanDescription')} />}
           {moduleState.status === 'scanning' && !entries && <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" /><span>正在读取 Explorer 外壳节点...</span></div>}
 
           {entries && (
@@ -196,7 +200,7 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
                   <button type="button" onClick={() => void restartExplorer().then(() => showToast({ type: 'success', title: '外壳已刷新', description: '已通知 Explorer 重新读取外壳节点，不会重启任务栏进程。' })).catch(error => showToast({ type: 'error', title: '刷新外壳失败', description: String(error) }))} className="inline-flex items-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2.5 py-1.5 text-xs text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]"><RefreshCw className="h-3.5 w-3.5" />刷新外壳</button>
                 </div>
               </div>
-              {entries.length === 0 ? <EmptyState icon={CheckCircle2} title="未发现第三方外壳图标" description="当前此电脑中没有扫描到可展示的第三方 Namespace 节点。" tone="success" compact /> : <div className="space-y-2">{entries.map(entry => <ShellIconRow key={`${entry.hive}-${entry.registryView}-${entry.clsid}`} entry={entry} busy={busyTarget !== null} onAction={setPendingAction} onOpenRegistry={(target) => { void openShellIconRegistry(target).catch(error => showToast({ type: 'error', title: '定位注册表失败', description: String(error) })); }} />)}</div>}
+              {entries.length === 0 ? <EmptyState icon={CheckCircle2} title={t('noThirdPartyShellIcons')} description={t('noShellIconsDescription')} tone="success" compact /> : <div className="space-y-2">{entries.map(entry => <ShellIconRow key={`${entry.hive}-${entry.registryView}-${entry.clsid}`} entry={entry} busy={busyTarget !== null} onAction={setPendingAction} onOpenRegistry={(target) => { void openShellIconRegistry(target).catch(error => showToast({ type: 'error', title: t('registryLocationFailed'), description: String(error) })); }} />)}</div>}
             </>
           )}
         </div>
@@ -208,7 +212,7 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         onConfirm={() => { if (pendingAction) void executeAction(pendingAction); }}
         title={pendingAction?.mode === 'lock' ? '确认彻底删除' : '确认删除'}
         description={pendingAction?.mode === 'lock' ? '将先保存一份备份，物理删除外壳节点，并锁定父级注册表目录，阻止普通权限的软件重新创建该节点。' : '将先保存一份备份，再物理删除当前外壳节点；相关软件之后可能重新创建图标。'}
-        warning="请确认应用名称和 CLSID。防复活规则不是系统级绝对锁死，管理员、SYSTEM 或 TrustedInstaller 仍可能绕过。"
+        warning={t('shellDeleteWarning')}
         confirmText={pendingAction?.mode === 'lock' ? '彻底删除' : '删除'}
         isDanger
       />

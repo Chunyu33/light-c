@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import {
   ArrowDown,
   ArrowUp,
@@ -51,6 +53,7 @@ interface DisplayModelName {
 }
 
 export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('aiModels');
   const { showToast } = useToast();
 
@@ -212,8 +215,8 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       variant={layoutMode === 'pages' ? 'page' : 'card'}
       forceExpanded={layoutMode === 'pages'}
       id="aiModels"
-      title="AI 模型空间"
-      description="快速分析本机 AI 模型占用"
+        title={navT('aiModels')}
+        description={navT('aiModelsDesc')}
       icon={<BrainCircuit className="w-6 h-6 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -260,14 +263,23 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
               <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
             </div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">
-              {scanProgress?.message ?? (enableDeepDiscovery ? '正在深度发现 AI 模型...' : '正在快速检测 AI 模型...')}
+              {scanProgress
+                ? i18n.t(`scanStages.${scanProgress.stage}`, {
+                  ns: 'common',
+                  defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
+                })
+                : i18n.t(enableDeepDiscovery ? 'scanStages.aiDeep' : 'scanStages.aiQuick', { ns: 'common' })}
             </p>
             <p className="mt-1 text-xs text-[var(--text-muted)]">
               {scanProgress
-                ? `当前阶段 ${formatDuration(scanProgress.stage_elapsed_ms)} · 总耗时 ${formatDuration(scanProgress.elapsed_ms)}`
+                ? i18n.t('scanStages.elapsedSummary', {
+                  ns: 'common',
+                  stage: formatDuration(scanProgress.stage_elapsed_ms),
+                  total: formatDuration(scanProgress.elapsed_ms),
+                })
                 : enableDeepDiscovery
-                ? '正在用 MFT 扫描本地 NTFS 盘的大模型特征文件，并跳过已识别平台路径。'
-                : '只扫描已知平台目录和你添加的目录，不会启动全盘扫描。'}
+                ? i18n.t('scanStages.aiDeepDesc', { ns: 'common' })
+                : i18n.t('scanStages.aiQuickDesc', { ns: 'common' })}
             </p>
           </div>
         )}

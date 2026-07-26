@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Rocket, 
   Moon, 
@@ -64,6 +65,8 @@ function buildWinsxsResultMessage(item: SlimItemStatus, result: string): string 
 // ============================================================================
 
 export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('system');
   const { showToast } = useToast();
 
@@ -188,8 +191,8 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
       id="system"
-      title="系统瘦身"
-      description="通过调整系统配置，释放数 GB 的磁盘空间"
+        title={navT('systemSlim')}
+        description={navT('systemSlimDesc')}
       icon={<Rocket className="w-6 h-6 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
@@ -247,7 +250,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         {moduleState.status === 'idle' && !status && (
           <EmptyState
             icon={Rocket}
-            title="尚未检测系统状态"
+              title={t('notScannedSystemState')}
             description="点击检测状态，查看休眠、组件存储、虚拟内存等可优化项。"
           />
         )}
