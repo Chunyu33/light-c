@@ -347,35 +347,34 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'social')}
         onScan={handleScan}
         error={moduleState.error}
-        headerExtra={
-          scanResult && scanResult.total_files > 0 && (
-            <div className="flex items-center gap-2">
+        allowStickyContent
+      >
+        {/* 展开内容 */}
+        <div className="min-h-[300px]">
+          {scanResult && scanResult.total_files > 0 && (
+            // 结果较多时保持操作条可见，避免用户必须回到模块标题区操作。
+            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
               <button
                 onClick={toggleSelectAll}
                 className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
               >
-                  {selectedPaths.size === scanResult.deletable_files ? moduleT('social.deselectAll') : moduleT('social.selectAll')}
+                {selectedPaths.size === scanResult.deletable_files ? moduleT('social.deselectAll') : moduleT('social.selectAll')}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedPaths.size === 0}
-                className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                  ${selectedPaths.size === 0
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedPaths.size === 0
                     ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
                     : 'bg-rose-500 text-white hover:bg-rose-600'
-                  }
-                `}
+                }`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 {moduleT('social.clean')} ({selectedStats.files})
               </button>
             </div>
-          )
-        }
-      >
-        {/* 展开内容 */}
-        <div className="min-h-[300px]">
+          )}
+
           {/* 说明提示 */}
           {showTip && (
             <div className="mx-4 mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">

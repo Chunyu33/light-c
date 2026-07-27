@@ -212,27 +212,21 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
             </div>
           </div>
 
-          {/* 语言选择使用明确的分段控件，避免依赖系统语言检测造成不可预期的切换。 */}
+          {/* 使用通用下拉选择器，语言名称长度变化时不会撑开设置页布局。 */}
           <div className="flex items-center justify-between border-t border-[var(--border-color)] pt-4">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('language.label')}</p>
               <p className="mt-1 text-xs text-[var(--text-muted)]">{t('language.desc')}</p>
             </div>
-            <div className="flex items-center gap-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1">
-              {LANGUAGE_OPTIONS.map(({ value, labelKey }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => updateSettings({ language: value })}
-                  className={`rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${settings.language === value
-                    ? 'bg-[var(--brand-green)] text-white'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                  }`}
-                >
-                  {t(labelKey)}
-                </button>
-              ))}
-            </div>
+            <Select<Language>
+              value={settings.language}
+              options={LANGUAGE_OPTIONS.map(({ value, labelKey }) => ({
+                value,
+                label: t(labelKey),
+              }))}
+              onChange={(language) => updateSettings({ language })}
+              widthClass="w-32"
+            />
           </div>
 
           {/* 字体大小 */}

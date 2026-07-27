@@ -739,42 +739,43 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                 {i18n.t('stop', { ns: 'common' })}
               </button>
             )}
-            {scanResult && scanResult.total_file_count > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleAllSelection(true)}
-                  title={scanMode === 'deep' ? t('selectAllDeepTitle') : undefined}
-                  className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
-                >
-                  {scanMode === 'deep' ? i18n.t('selectAllLoaded', { ns: 'common' }) : i18n.t('selectAll', { ns: 'common' })}
-                </button>
-                <button
-                  onClick={() => toggleAllSelection(false)}
-                  className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] transition"
-                >
-                  {i18n.t('deselect', { ns: 'common' })}
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                    ${deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)
-                      ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
-                      : 'bg-rose-500 text-white hover:bg-rose-600'
-                    }
-                  `}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {t('cleanBtn', { count: selectedFileCount })}
-                </button>
-              </div>
-            )}
           </div>
         }
+        allowStickyContent
       >
         {/* 展开内容 */}
         <div className="p-4 space-y-3">
+          {scanResult && scanResult.total_file_count > 0 && (
+            // 操作条吸顶显示，避免结果较长时必须滚回标题区才能继续清理。
+            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
+              <button
+                onClick={() => toggleAllSelection(true)}
+                title={scanMode === 'deep' ? t('selectAllDeepTitle') : undefined}
+                className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
+              >
+                {scanMode === 'deep' ? i18n.t('selectAllLoaded', { ns: 'common' }) : i18n.t('selectAll', { ns: 'common' })}
+              </button>
+              <button
+                onClick={() => toggleAllSelection(false)}
+                className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] transition"
+              >
+                {i18n.t('deselect', { ns: 'common' })}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                  deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)
+                    ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
+                    : 'bg-rose-500 text-white hover:bg-rose-600'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {t('cleanBtn', { count: selectedFileCount })}
+              </button>
+            </div>
+          )}
+
           {/* 扫描结果摘要 */}
           {scanResult && (
             <ScanSummary

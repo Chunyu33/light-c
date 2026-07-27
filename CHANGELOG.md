@@ -8,6 +8,9 @@
 
 ### Junk Cleanup and Documentation
 
+- Tightened the sticky cleanup toolbars so they use only the required width, with right alignment, rounded corners, and a subtle shadow.
+- Restored the compact module header layout and moved junk, large-file, and social cleanup actions into sticky result toolbars without changing result scrolling.
+- Replaced the language segmented control with the shared dropdown selector for stable multilingual layout.
 - Added static i18next translations for Chinese, English, and Japanese, with language selection persisted in application settings.
 - Completed localization coverage for module result pages, scan states, settings controls, stable enum labels, and shared delete summaries; long Japanese labels now use responsive result layouts.
 - Defender cleanup now uses a bounded, single-file ownership fallback for the explicitly supported `LocalCopy` and `Support` caches, while keeping the Defender root and protected data excluded.

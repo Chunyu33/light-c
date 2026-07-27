@@ -171,7 +171,7 @@ export function ModuleCard({
     >
       {/* 卡片头部 - 增加内边距提供呼吸空间 */}
       <div className="p-6">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-4">
           {/* 展开/收起按钮 */}
           {!isPageVariant && (
             <button
@@ -193,11 +193,11 @@ export function ModuleCard({
 
           {/* 模块信息 - 清晰的文字层次 */}
           <div
-            className={`min-w-0 flex-[2_1_240px] ${isPageVariant ? '' : 'cursor-pointer'}`}
+            className={`flex-1 min-w-0 ${isPageVariant ? '' : 'cursor-pointer'}`}
             onClick={isPageVariant ? undefined : onToggleExpand}
           >
-            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-              <h3 className="min-w-0 flex-[1_1_14rem] break-words text-[15px] font-bold leading-snug text-[var(--text-primary)]">{title}</h3>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <h3 className="text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
               {titleExtra}
               {getStatusBadge()}
             </div>
@@ -213,11 +213,7 @@ export function ModuleCard({
           )}
 
           {/* 额外内容 */}
-          {headerExtra && (
-            <div className="flex min-w-0 max-w-full flex-[1_1_auto] flex-wrap items-center gap-2">
-              {headerExtra}
-            </div>
-          )}
+          {headerExtra}
 
           {/* 扫描按钮：完成态也保留按钮边界，避免“重新扫描/检测”在列表里看起来像普通文字。 */}
           <button
@@ -227,7 +223,7 @@ export function ModuleCard({
             }}
             disabled={isScanning || scanDisabled}
             className={`
-              flex shrink-0 items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200
+              flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 shrink-0
               border shadow-sm active:scale-[0.98]
               ${isScanning || scanDisabled
                 ? 'border-[var(--border-color)] bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed shadow-none'
