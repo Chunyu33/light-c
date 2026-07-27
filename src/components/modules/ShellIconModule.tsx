@@ -35,17 +35,17 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 
 type PendingAction = { target: ShellIconTarget; mode: 'remove' | 'lock' };
 
-function getRiskStyle(entry: ShellIconInfo): { label: string; className: string } {
+function getRiskStyle(entry: ShellIconInfo, translate: (key: string) => string): { label: string; className: string } {
   if (entry.isSystemProtected || entry.riskLevel === 'protected') {
-    return { label: '系统保护', className: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]' };
+    return { label: translate('shellIcons.riskProtected'), className: 'bg-[var(--color-danger)]/10 text-[var(--color-danger)]' };
   }
   if (entry.riskLevel === 'unknown') {
-    return { label: '无法确认', className: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' };
+    return { label: translate('shellIcons.riskUnknown'), className: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]' };
   }
   if (entry.isLocked || entry.riskLevel === 'locked') {
-    return { label: '已锁定', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' };
+    return { label: translate('shellIcons.riskLocked'), className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' };
   }
-  return { label: '第三方节点', className: 'bg-[var(--brand-green-10)] text-[var(--brand-green)]' };
+  return { label: translate('shellIcons.riskThirdParty'), className: 'bg-[var(--brand-green-10)] text-[var(--brand-green)]' };
 }
 
 function targetOf(entry: ShellIconInfo): ShellIconTarget {
@@ -64,7 +64,8 @@ function ShellIconRow({
   onOpenRegistry: (target: ShellIconTarget) => void;
 }) {
   const { t } = useTranslation('common');
-  const risk = getRiskStyle(entry);
+  const { t: moduleT } = useTranslation('modules');
+  const risk = getRiskStyle(entry, moduleT);
   const protectedEntry = entry.isSystemProtected || entry.riskLevel === 'unknown';
 
   return (
@@ -81,16 +82,16 @@ function ShellIconRow({
           </div>
           <p className="mt-1 break-all font-mono text-[11px] text-[var(--text-muted)]">{entry.clsid}</p>
           <p className="mt-1 break-all text-xs font-medium text-[var(--text-secondary)]">{t('associatedApp')}：{entry.applicationName || t('unknownApp')}</p>
-          <p className="mt-1 break-all text-xs text-[var(--text-faint)]">组件：{entry.sourcePath || entry.riskReason}</p>
+          <p className="mt-1 break-all text-xs text-[var(--text-faint)]">{moduleT('shellIcons.component')}: {entry.sourcePath || entry.riskReason}</p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
           {!protectedEntry && (
             <>
               <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'remove' })} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('shellRemoveTitle')}>
-                <Trash2 className="h-3.5 w-3.5" />删除
+                <Trash2 className="h-3.5 w-3.5" />{moduleT('shellIcons.remove')}
               </button>
               <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'lock' })} className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50" title={t('shellLockTitle')}>
-                <Lock className="h-3.5 w-3.5" />彻底删除
+                <Lock className="h-3.5 w-3.5" />{moduleT('shellIcons.lock')}
               </button>
             </>
           )}
@@ -99,7 +100,7 @@ function ShellIconRow({
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2">
         <p className="min-w-0 break-all text-[11px] text-[var(--text-faint)]">{entry.regPath}</p>
         <button type="button" disabled={busy} onClick={() => onOpenRegistry(targetOf(entry))} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('openRegistryNode')}>
-          <FolderOpen className="h-3.5 w-3.5" />定位注册表
+          <FolderOpen className="h-3.5 w-3.5" />{moduleT('shellIcons.openRegistry')}
         </button>
       </div>
     </div>
@@ -109,6 +110,7 @@ function ShellIconRow({
 export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('shellIcons');
   const { showToast } = useToast();
   const [entries, setEntries] = useState<ShellIconInfo[] | null>(null);
@@ -146,10 +148,10 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
       const result = action.mode === 'remove'
         ? await removeShellIcon(action.target, 1)
         : await removeShellIcon(action.target, 2);
-      showToast({ type: 'success', title: '操作完成', description: result.message });
+      showToast({ type: 'success', title: moduleT('shellIcons.actionCompleted'), description: result.message });
       await scan();
     } catch (error) {
-      showToast({ type: 'error', title: '虚拟磁盘操作失败', description: String(error) });
+      showToast({ type: 'error', title: moduleT('shellIcons.actionFailed'), description: String(error) });
     } finally {
       setBusyTarget(null);
       setPendingAction(null);
@@ -169,35 +171,35 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={0}
-        countLabel="个节点"
+        countLabel={moduleT('shellIcons.nodes')}
         hideTotalSize
         expanded={isExpanded}
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'shellIcons')}
         onScan={() => void scan()}
         scanDisabled={Boolean(busyTarget)}
-        scanButtonText={moduleState.status === 'scanning' ? '扫描中...' : entries ? '重新扫描' : '扫描外壳挂载'}
+        scanButtonText={moduleState.status === 'scanning' ? t('scanningShort') : entries ? t('rescan') : moduleT('shellIcons.scan')}
         error={moduleState.error}
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
-        titleExtra={<span className="rounded-full bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-600 dark:text-orange-400">需谨慎操作</span>}
+        titleExtra={<span className="rounded-full bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-600 dark:text-orange-400">{moduleT('shellIcons.caution')}</span>}
       >
         <div className="space-y-4 p-5">
         {!entries && moduleState.status === 'idle' && <EmptyState icon={HardDriveDownload} title={t('notScannedShellIcons')} description={t('shellScanDescription')} />}
-          {moduleState.status === 'scanning' && !entries && <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" /><span>正在读取 Explorer 外壳节点...</span></div>}
+          {moduleState.status === 'scanning' && !entries && <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" /><span>{moduleT('shellIcons.scanningDesc')}</span></div>}
 
           {entries && (
             <>
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl bg-[var(--bg-main)] p-3 text-center"><p className="text-xl font-bold text-[var(--text-primary)]">{entries.length}</p><p className="text-xs text-[var(--text-muted)]">扫描节点</p></div>
-                <div className="rounded-xl bg-[var(--brand-green-10)] p-3 text-center"><p className="text-xl font-bold text-[var(--brand-green)]">{actionableCount}</p><p className="text-xs text-[var(--text-muted)]">可操作节点</p></div>
-                <div className="rounded-xl bg-blue-500/10 p-3 text-center"><p className="text-xl font-bold text-blue-600 dark:text-blue-400">{entries.filter(entry => entry.isLocked).length}</p><p className="text-xs text-[var(--text-muted)]">已锁定</p></div>
+                <div className="rounded-xl bg-[var(--bg-main)] p-3 text-center"><p className="text-xl font-bold text-[var(--text-primary)]">{entries.length}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.scannedNodes')}</p></div>
+                <div className="rounded-xl bg-[var(--brand-green-10)] p-3 text-center"><p className="text-xl font-bold text-[var(--brand-green)]">{actionableCount}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.actionableNodes')}</p></div>
+                <div className="rounded-xl bg-blue-500/10 p-3 text-center"><p className="text-xl font-bold text-blue-600 dark:text-blue-400">{entries.filter(entry => entry.isLocked).length}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.lockedNodes')}</p></div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
-                <div className="flex flex-wrap gap-2 text-xs text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-[var(--color-warning)]" />系统保护节点不会被操作</span><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-[var(--brand-green)]" />操作前自动备份</span></div>
+                <div className="flex flex-wrap gap-2 text-xs text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-[var(--color-warning)]" />{moduleT('shellIcons.protectedHint')}</span><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-[var(--brand-green)]" />{moduleT('shellIcons.backupHint')}</span></div>
                 <div className="flex gap-2">
-                  <button type="button" disabled={isOpeningBackup} onClick={() => { setIsOpeningBackup(true); void openShellIconBackupDir().catch(error => showToast({ type: 'error', title: '打开备份目录失败', description: String(error) })).finally(() => setIsOpeningBackup(false)); }} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><FolderOpen className="h-3.5 w-3.5" />备份目录</button>
-                  <button type="button" onClick={() => void openShellIconLog().catch(error => showToast({ type: 'error', title: '打开操作记录失败', description: String(error) }))} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><FileText className="h-3.5 w-3.5" />操作记录</button>
-                  <button type="button" onClick={() => void restartExplorer().then(() => showToast({ type: 'success', title: '外壳已刷新', description: '已通知 Explorer 重新读取外壳节点，不会重启任务栏进程。' })).catch(error => showToast({ type: 'error', title: '刷新外壳失败', description: String(error) }))} className="inline-flex items-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2.5 py-1.5 text-xs text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]"><RefreshCw className="h-3.5 w-3.5" />刷新外壳</button>
+                  <button type="button" disabled={isOpeningBackup} onClick={() => { setIsOpeningBackup(true); void openShellIconBackupDir().catch(error => showToast({ type: 'error', title: moduleT('shellIcons.openBackupFailed'), description: String(error) })).finally(() => setIsOpeningBackup(false)); }} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><FolderOpen className="h-3.5 w-3.5" />{moduleT('shellIcons.backupDir')}</button>
+                  <button type="button" onClick={() => void openShellIconLog().catch(error => showToast({ type: 'error', title: moduleT('shellIcons.openLogFailed'), description: String(error) }))} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"><FileText className="h-3.5 w-3.5" />{moduleT('shellIcons.operationLog')}</button>
+                  <button type="button" onClick={() => void restartExplorer().then(() => showToast({ type: 'success', title: moduleT('shellIcons.explorerRefreshed'), description: moduleT('shellIcons.explorerRefreshedDesc') })).catch(error => showToast({ type: 'error', title: moduleT('shellIcons.refreshFailed'), description: String(error) }))} className="inline-flex items-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2.5 py-1.5 text-xs text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]"><RefreshCw className="h-3.5 w-3.5" />{moduleT('shellIcons.refresh')}</button>
                 </div>
               </div>
               {entries.length === 0 ? <EmptyState icon={CheckCircle2} title={t('noThirdPartyShellIcons')} description={t('noShellIconsDescription')} tone="success" compact /> : <div className="space-y-2">{entries.map(entry => <ShellIconRow key={`${entry.hive}-${entry.registryView}-${entry.clsid}`} entry={entry} busy={busyTarget !== null} onAction={setPendingAction} onOpenRegistry={(target) => { void openShellIconRegistry(target).catch(error => showToast({ type: 'error', title: t('registryLocationFailed'), description: String(error) })); }} />)}</div>}
@@ -210,10 +212,10 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         isOpen={pendingAction !== null}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => { if (pendingAction) void executeAction(pendingAction); }}
-        title={pendingAction?.mode === 'lock' ? '确认彻底删除' : '确认删除'}
-        description={pendingAction?.mode === 'lock' ? '将先保存一份备份，物理删除外壳节点，并锁定父级注册表目录，阻止普通权限的软件重新创建该节点。' : '将先保存一份备份，再物理删除当前外壳节点；相关软件之后可能重新创建图标。'}
+        title={pendingAction?.mode === 'lock' ? moduleT('shellIcons.confirmLock') : moduleT('shellIcons.confirmRemove')}
+        description={pendingAction?.mode === 'lock' ? moduleT('shellIcons.confirmLockDesc') : moduleT('shellIcons.confirmRemoveDesc')}
         warning={t('shellDeleteWarning')}
-        confirmText={pendingAction?.mode === 'lock' ? '彻底删除' : '删除'}
+        confirmText={pendingAction?.mode === 'lock' ? moduleT('shellIcons.lock') : moduleT('shellIcons.remove')}
         isDanger
       />
     </>

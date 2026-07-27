@@ -10,6 +10,7 @@ import { formatSize } from '../../utils/format';
 import binlockxIcon from '../../assets/binlockx.svg';
 import viapIcon from '../../assets/viap.svg';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 
 export function AboutSettings() {
   const { t } = useTranslation('settings');
@@ -20,7 +21,7 @@ export function AboutSettings() {
 
   // 获取应用版本号和系统信息
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => setAppVersion('未知'));
+    getVersion().then(setAppVersion).catch(() => setAppVersion(i18n.t('unknown', { ns: 'common' })));
 
     // 获取系统信息
     getSystemInfo()
@@ -114,7 +115,7 @@ export function AboutSettings() {
                   <Cpu className="w-4 h-4 text-[var(--text-muted)]" />
                   <span className="text-sm text-[var(--text-secondary)]">{t('about.cpuCores')}</span>
                 </div>
-                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.cpu_cores} 核</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.cpu_cores} {t('about.cpuCores')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -176,7 +177,7 @@ export function AboutSettings() {
             <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
           </div>
           {/* <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">官方网站</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('about.source')}</span>
             <a
               href="https://evanspace.icu/lightc"
               target="_blank"
@@ -252,19 +253,19 @@ export function AboutSettings() {
 
 // 更多工具推荐放在关于页底部，用轻量入口承接同作者的其他实用工具，不打断主设置流程。
 function MoreToolsSection() {
+  const { t } = useTranslation('ui');
   const tools = [
     {
       name: 'Viap',
       icon: viapIcon,
-      description:
-        'Windows 应用存储重定向工具。通过目录/符号链接将 C 盘应用迁移到其他磁盘，支持批量迁移。常见场景如桌面/文档/微信/QQ 等数据迁移。',
+      description: t('toolViapDesc'),
       downloadUrl: 'https://pan.quark.cn/s/4761ee4ba698',
     },
     {
       name: 'BinlockX',
       icon: binlockxIcon,
       description:
-        '本地隐私保护工具。支持 AES-256-GCM 文件加密、隐私空间、隐私便签和隐私体检，数据全程保留在本机。',
+        t('toolBinlockxDesc'),
       downloadUrl: 'https://pan.quark.cn/s/4243a5142b29',
     },
   ];
@@ -273,7 +274,7 @@ function MoreToolsSection() {
     <div className="space-y-3">
       <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
         <Rocket className="w-3.5 h-3.5" />
-        更多实用工具
+        {t('moreTools')}
       </h4>
       <div className="space-y-3">
         {tools.map(({ name, icon, description, downloadUrl }) => (
@@ -284,7 +285,7 @@ function MoreToolsSection() {
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 flex items-center justify-center">
                 {/* 使用项目原始图标，避免推荐卡片和 LightC 自身功能图标混淆。 */}
-                <img src={icon} alt={`${name} 图标`} className="w-5 h-5 object-contain" />
+                <img src={icon} alt={`${name} ${t('toolIcon')}`} className="w-5 h-5 object-contain" />
               </div>
               <h5 className="text-sm font-semibold text-[var(--text-primary)]">{name}</h5>
             </div>
@@ -297,13 +298,13 @@ function MoreToolsSection() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--brand-green)] hover:border-[var(--brand-green)]/40 transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
-                下载
+                {t('download')}
               </a>
             </div>
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-[var(--text-faint)] text-center">以上同为我维护的工具，欢迎试用</p>
+      <p className="text-[11px] text-[var(--text-faint)] text-center">{t('moreToolsHint')}</p>
     </div>
   );
 }

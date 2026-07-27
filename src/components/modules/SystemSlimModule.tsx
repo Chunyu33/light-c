@@ -52,12 +52,12 @@ const itemColors: Record<string, { bg: string; text: string }> = {
   pagefile: { bg: 'bg-cyan-500/10', text: 'text-cyan-500' },
 };
 
-function buildWinsxsResultMessage(item: SlimItemStatus, result: string): string {
-  const estimate = item.size > 0 ? `本次检测估算可回收 ${formatSize(item.size)}。` : '';
+function buildWinsxsResultMessage(item: SlimItemStatus, translate: (key: string, options?: Record<string, unknown>) => string): string {
+  const estimate = item.size > 0 ? translate('systemSlim.estimatedReclaim', { size: formatSize(item.size) }) : '';
   if (item.id === 'winsxs_resetbase') {
-    return `${result}。已执行 ResetBase，处理对象为已被替代的组件版本和系统更新基线；完成后当前已安装的 Windows 更新无法卸载。${estimate}可重新检测刷新状态。`;
+    return `${translate('systemSlim.resetBaseCompleted')} ${estimate}`.trim();
   }
-  return `${result}。已执行 StartComponentCleanup，处理对象为已被替代的组件版本、组件存储缓存和临时组件数据。${estimate}可重新检测刷新状态。`;
+  return `${translate('systemSlim.componentCleanupCompleted')} ${estimate}`.trim();
 }
 
 // ============================================================================
@@ -67,6 +67,7 @@ function buildWinsxsResultMessage(item: SlimItemStatus, result: string): string 
 export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('system');
   const { showToast } = useToast();
 
@@ -90,8 +91,8 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
           enabled: false,
           size: 0,
           actionable: false,
-          action_text: '重新检测',
-          status_text: '操作已完成，请重新检测刷新当前状态',
+          action_text: moduleT('systemSlim.rescan'),
+          status_text: moduleT('systemSlim.done'),
         };
       });
       updateModuleState('system', {
@@ -137,7 +138,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
   // 执行瘦身操作
   const handleAction = useCallback(async (item: SlimItemStatus) => {
     if (!status?.is_admin) {
-      showToast({ title: '需要管理员权限', description: '请以管理员身份运行程序', type: 'error' });
+      showToast({ title: moduleT('systemSlim.adminRequired'), description: moduleT('systemSlim.adminHint'), type: 'error' });
       return;
     }
 
@@ -146,27 +147,27 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
       switch (item.id) {
         case 'hibernation':
           if (item.enabled) {
-            const hibResult = await disableHibernation();
-            showToast({ title: '操作成功', description: `${hibResult}，可重新检测刷新状态`, type: 'success' });
+            await disableHibernation();
+            showToast({ title: moduleT('systemSlim.operationCompleted'), description: moduleT('systemSlim.operationCompletedDesc'), type: 'success' });
           } else {
-            const hibResult = await enableHibernation();
-            showToast({ title: '操作成功', description: `${hibResult}，可重新检测刷新状态`, type: 'success' });
+            await enableHibernation();
+            showToast({ title: moduleT('systemSlim.operationCompleted'), description: moduleT('systemSlim.operationCompletedDesc'), type: 'success' });
           }
           markItemsNeedRescan(['hibernation']);
           break;
         case 'winsxs':
-          const winsxsResult = await cleanupWinsxs();
-          showToast({ title: '组件清理完成', description: buildWinsxsResultMessage(item, winsxsResult), type: 'success' });
+          await cleanupWinsxs();
+          showToast({ title: moduleT('systemSlim.componentCleanup'), description: buildWinsxsResultMessage(item, moduleT), type: 'success' });
           markItemsNeedRescan(['winsxs', 'winsxs_resetbase']);
           break;
         case 'winsxs_resetbase':
-          const resetbaseResult = await cleanupWinsxsResetbase();
-          showToast({ title: '组件基线压缩完成', description: buildWinsxsResultMessage(item, resetbaseResult), type: 'success' });
+          await cleanupWinsxsResetbase();
+          showToast({ title: moduleT('systemSlim.resetBaseCompletedTitle'), description: buildWinsxsResultMessage(item, moduleT), type: 'success' });
           markItemsNeedRescan(['winsxs', 'winsxs_resetbase']);
           break;
         case 'pagefile':
           await openVirtualMemorySettings();
-          showToast({ title: '已打开设置', description: '请手动配置虚拟内存位置', type: 'info' });
+          showToast({ title: moduleT('systemSlim.settingsOpened'), description: moduleT('systemSlim.pagefileOpened'), type: 'info' });
           break;
       }
 
@@ -174,7 +175,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         triggerHealthRefresh();
       }
     } catch (error) {
-      showToast({ title: '操作失败', description: String(error), type: 'error' });
+      showToast({ title: moduleT('systemSlim.operationFailed'), description: String(error), type: 'error' });
     } finally {
       setActionLoading(null);
     }
@@ -200,7 +201,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
       expanded={isExpanded}
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'system')}
       onScan={loadStatus}
-      scanButtonText={loading ? '检测中...' : status ? '重新检测' : '检测状态'}
+      scanButtonText={loading ? moduleT('systemSlim.checking') : status ? moduleT('systemSlim.rescan') : moduleT('systemSlim.check')}
       error={moduleState.error}
       headerExtra={
         status && (
@@ -208,12 +209,12 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
             {status.is_admin ? (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600">
                 <CheckCircle2 className="w-3 h-3" />
-                管理员
+                {moduleT('systemSlim.administrator')}
               </span>
             ) : (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
                 <ShieldAlert className="w-3 h-3" />
-                需要权限
+                {moduleT('systemSlim.permissionRequired')}
               </span>
             )}
           </div>
@@ -227,9 +228,9 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
             <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-xs font-medium text-amber-600">需要管理员权限</p>
+              <p className="text-xs font-medium text-amber-600">{moduleT('systemSlim.adminRequired')}</p>
               <p className="text-[11px] text-[var(--fg-muted)] mt-0.5">
-                请关闭程序，右键点击程序图标选择"以管理员身份运行"。
+                {moduleT('systemSlim.adminHint')}
               </p>
             </div>
             <button onClick={() => setShowAdminWarning(false)} className="text-amber-500 hover:text-amber-700 transition shrink-0">
@@ -242,7 +243,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         {loading && !status && (
           <div className="py-8 flex flex-col items-center justify-center">
             <Loader2 className="w-7 h-7 text-emerald-500 animate-spin mb-2" />
-            <p className="text-sm text-[var(--fg-muted)]">正在检测系统状态...</p>
+            <p className="text-sm text-[var(--fg-muted)]">{moduleT('systemSlim.checking')}...</p>
           </div>
         )}
 
@@ -251,7 +252,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
           <EmptyState
             icon={Rocket}
               title={t('notScannedSystemState')}
-            description="点击检测状态，查看休眠、组件存储、虚拟内存等可优化项。"
+            description={moduleT('systemSlim.emptyDesc')}
           />
         )}
 
@@ -280,7 +281,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                       {/* 内容 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-[var(--fg-primary)]">{item.name}</h4>
+                          <h4 className="text-sm font-semibold text-[var(--fg-primary)]">{moduleT(`systemSlim.items.${item.id}.name`, { defaultValue: item.name })}</h4>
                           {item.enabled && item.size > 0 && (
                             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
                               {formatSize(item.size)}
@@ -288,19 +289,19 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                           )}
                           {!item.enabled && item.id === 'hibernation' && (
                             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
-                              已关闭
+                              {moduleT('systemSlim.disabled')}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[var(--fg-secondary)] mt-0.5">{item.description}</p>
+                        <p className="text-xs text-[var(--fg-secondary)] mt-0.5">{moduleT(`systemSlim.items.${item.id}.description`, { defaultValue: item.description })}</p>
                         {item.status_text && (
-                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">{item.status_text}</p>
+                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">{moduleT('systemSlim.itemStatus', { defaultValue: item.status_text })}</p>
                         )}
 
                         {/* 风险提示 */}
                         <div className="mt-2 flex items-start gap-1.5 bg-amber-500/5 rounded-lg px-2 py-1.5">
                           <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
-                          <p className="text-[10px] text-amber-600 leading-relaxed">{item.warning}</p>
+                          <p className="text-[10px] text-amber-600 leading-relaxed">{moduleT(`systemSlim.items.${item.id}.warning`, { defaultValue: item.warning })}</p>
                         </div>
                       </div>
 
@@ -320,11 +321,11 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                           {isLoading ? (
                             <>
                               <Loader2 className="w-3 h-3 animate-spin" />
-                              <span>执行中</span>
+                              <span>{moduleT('systemSlim.executing')}</span>
                             </>
                           ) : (
                             <>
-                              <span>{item.action_text}</span>
+                              <span>{moduleT(`systemSlim.items.${item.id}.action`, { defaultValue: item.action_text })}</span>
                               <ChevronRight className="w-3 h-3" />
                             </>
                           )}
@@ -341,8 +342,8 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         {/* 底部说明 */}
         {status && (
           <div className="bg-[var(--bg-elevated)] rounded-lg px-3 py-2 text-[10px] text-[var(--fg-muted)] leading-relaxed">
-            <strong className="text-[var(--fg-secondary)]">提示：</strong>
-            系统瘦身操作会修改 Windows 系统配置，建议在执行前了解各项功能的作用。
+            <strong className="text-[var(--fg-secondary)]">{moduleT('systemSlim.tip')}</strong>
+            {moduleT('systemSlim.tipDesc')}
           </div>
         )}
       </div>

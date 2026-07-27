@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getLocalDrives, type LocalDriveInfo } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { Select, type SelectOption } from './Select';
+import i18n from '../../i18n';
 
 export function normalizeDriveLetter(value?: string | null): string {
   const letter = value?.match(/[a-z]/i)?.[0]?.toUpperCase() ?? 'C';
@@ -9,7 +10,7 @@ export function normalizeDriveLetter(value?: string | null): string {
 }
 
 export function driveDisplayName(driveLetter: string): string {
-  return `${normalizeDriveLetter(driveLetter).replace(':', '')} 盘`;
+  return i18n.t('driveLabel', { ns: 'common', drive: normalizeDriveLetter(driveLetter).replace(':', '') });
 }
 
 export function useLocalDrives() {
@@ -52,10 +53,10 @@ export function driveOptionTitle(drive: LocalDriveInfo): string {
   const parts = [drive.drive_letter];
   if (drive.volume_name) parts.push(drive.volume_name);
   if (drive.file_system) parts.push(drive.file_system);
-  parts.push(`可用 ${formatSize(drive.free_space)}`);
-  parts.push(`总计 ${formatSize(drive.total_space)}`);
-  if (drive.is_system) parts.push('系统盘');
-  if (!drive.is_ntfs) parts.push('非 NTFS');
+  parts.push(i18n.t('driveAvailable', { ns: 'common', size: formatSize(drive.free_space) }));
+  parts.push(i18n.t('driveTotal', { ns: 'common', size: formatSize(drive.total_space) }));
+  if (drive.is_system) parts.push(i18n.t('systemDrive', { ns: 'common' }));
+  if (!drive.is_ntfs) parts.push(i18n.t('nonNtfs', { ns: 'common' }));
   return parts.join(' · ');
 }
 
@@ -89,7 +90,7 @@ export function DriveSelect({
       }));
       return driveOptions.length > 0
         ? driveOptions
-        : [{ value: 'C:', label: 'C:', title: 'C: · 默认系统盘' }];
+        : [{ value: 'C:', label: 'C:', title: `C: · ${i18n.t('defaultSystemDrive', { ns: 'common' })}` }];
     },
     [drives],
   );

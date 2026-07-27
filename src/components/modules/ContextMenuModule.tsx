@@ -40,18 +40,13 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 /**
  * 根据 scope 字段返回对应的中文描述和颜色样式
  */
-function getScopeStyle(scope: string): { label: string; className: string } {
+function getScopeStyle(scope: string, translate: (key: string) => string): { label: string; className: string } {
   switch (scope) {
-    case '任意文件':
-      return { label: '任意文件', className: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' };
-    case '文件夹':
-      return { label: '文件夹', className: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-500' };
-    case '桌面背景':
-      return { label: '桌面背景', className: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400' };
-    case '磁盘驱动器':
-      return { label: '磁盘', className: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400' };
-    case '库文件夹':
-      return { label: '库文件夹', className: 'bg-teal-50 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400' };
+    case '任意文件': return { label: translate('contextMenu.scope.file'), className: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' };
+    case '文件夹': return { label: translate('contextMenu.scope.folder'), className: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-500' };
+    case '桌面背景': return { label: translate('contextMenu.scope.desktop'), className: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400' };
+    case '磁盘驱动器': return { label: translate('contextMenu.scope.drive'), className: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400' };
+    case '库文件夹': return { label: translate('contextMenu.scope.library'), className: 'bg-teal-50 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400' };
     default:
       return { label: scope, className: 'bg-[var(--bg-hover)] text-[var(--text-muted)]' };
   }
@@ -69,8 +64,9 @@ interface EntryRowProps {
 
 function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
   const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const [expanded, setExpanded] = useState(false);
-  const scope = getScopeStyle(entry.scope);
+  const scope = getScopeStyle(entry.scope, moduleT);
   const isInvalid = !entry.exe_exists && entry.exe_path !== null;
   const isProtected = entry.is_system_protected;
 
@@ -141,12 +137,12 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             {/* 风险等级标签 */}
             {entry.risk_level === 'danger' && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-danger)]/15 text-[var(--color-danger)] shrink-0">
-                系统保护
+                {moduleT('contextMenu.systemProtected')}
               </span>
             )}
             {entry.risk_level === 'caution' && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-warning)]/10 text-[var(--color-warning)] shrink-0">
-                需谨慎
+                {moduleT('contextMenu.caution')}
               </span>
             )}
 
@@ -163,14 +159,14 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             {/* 无效标记 */}
             {isInvalid && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-danger)]/10 text-[var(--color-danger)] shrink-0">
-                文件不存在
+                {moduleT('contextMenu.missing')}
               </span>
             )}
 
             {/* 需要管理员 */}
             {entry.needs_admin && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--color-warning)]/10 text-[var(--color-warning)] shrink-0">
-                需管理员
+                {moduleT('contextMenu.admin')}
               </span>
             )}
           </div>
@@ -191,7 +187,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
           {/* 系统保护提示 */}
           {isProtected && (
             <p className="text-xs mt-0.5 text-[var(--color-danger)]/70">
-              此条目为系统 COM 处理器，不建议清理
+              {moduleT('contextMenu.comWarning')}
             </p>
           )}
         </div>
@@ -220,7 +216,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
         >
           {/* 注册表完整路径 */}
           <div className="flex items-start gap-2 pt-2">
-            <span className="text-[11px] text-[var(--text-faint)] shrink-0 w-20">注册表路径</span>
+            <span className="text-[11px] text-[var(--text-faint)] shrink-0 w-20">{moduleT('contextMenu.registryPath')}</span>
             <span className="text-[11px] text-[var(--text-muted)] break-all font-mono">
               {entry.registry_path}
             </span>
@@ -229,7 +225,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
           {/* 原始命令 */}
           {entry.command && (
             <div className="flex items-start gap-2">
-              <span className="text-[11px] text-[var(--text-faint)] shrink-0 w-20">命令</span>
+              <span className="text-[11px] text-[var(--text-faint)] shrink-0 w-20">{moduleT('contextMenu.command')}</span>
               <span
                 className="text-[11px] text-[var(--text-muted)] break-all font-mono"
                 title={entry.command}
@@ -245,7 +241,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
           {/* 图标路径 */}
           {entry.icon_path && (
             <div className="flex items-start gap-2">
-              <span className="text-[11px] text-[var(--text-faint)] shrink-0 w-20">图标</span>
+              <span className="text-[11px] text-[var(--text-faint)] shrink-0 w-20">{moduleT('contextMenu.icon')}</span>
               <span className="text-[11px] text-[var(--text-muted)] break-all font-mono">
                 {entry.icon_path}
               </span>
@@ -264,6 +260,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
 export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const {
     moduleState,
     expandedModule,
@@ -453,7 +450,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         .map((d) => d.error as string);
 
       if (errorMessages.length > 0) {
-        setDeleteError(`${errorMessages.length} 个条目删除失败`);
+        setDeleteError(t('failedCount', { count: errorMessages.length }));
         setDeleteErrors(errorMessages);
       }
 
@@ -518,9 +515,9 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               <Loader2 className="w-8 h-8 text-[var(--color-danger)] animate-spin" />
             </div>
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">正在清理右键菜单</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">{moduleT('contextMenu.cleaning')}</h3>
               <p className="text-sm text-[var(--text-muted)] mt-1">
-                正在删除 {selectedCount} 个注册表条目，请稍候...
+                {moduleT('contextMenu.cleaningDesc', { count: selectedCount })}
               </p>
             </div>
             <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
@@ -529,7 +526,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                 style={{ width: '100%' }}
               />
             </div>
-            <p className="text-xs text-[var(--text-faint)]">请勿关闭窗口</p>
+            <p className="text-xs text-[var(--text-faint)]">{t('doNotCloseWindow')}</p>
           </div>
         </div>,
         document.body
@@ -551,7 +548,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         error={moduleState.error}
         headerExtra={
           <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--color-warning)]/10 text-[var(--color-warning)] border border-[var(--color-warning)]/20">
-            中风险
+            {moduleT('contextMenu.highRisk')}
           </span>
         }
       >
@@ -560,7 +557,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
             <EmptyState
               icon={MousePointerClick}
               title={t('notScannedContextMenu')}
-              description="点击开始扫描，检查注册表中失效或指向不存在文件的右键菜单项。"
+              description={moduleT('contextMenu.idleDesc')}
             />
           </div>
         )}
@@ -573,10 +570,9 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
             <div className="flex items-start gap-3 p-4 bg-[var(--brand-green-10)] rounded-xl border border-[var(--brand-green-20)]">
               <Shield className="w-5 h-5 text-[var(--brand-green)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">操作安全提示</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">{moduleT('contextMenu.safetyTitle')}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  默认仅勾选"文件不存在"的无效菜单项。标记为「系统保护」的 COM 处理器条目无法选中删除。
-                  HKLM 条目需要管理员权限，删除前会自动导出 .reg 备份文件。
+                  {moduleT('contextMenu.safetyDesc')}
                 </p>
               </div>
             </div>
@@ -587,19 +583,19 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                 <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">
                   {scanResult.entries.length}
                 </p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">扫描到的条目</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">{moduleT('contextMenu.scanned')}</p>
               </div>
               <div className="p-3 bg-[var(--color-danger)]/5 rounded-xl text-center">
                 <p className="text-xl font-bold text-[var(--color-danger)] tabular-nums">
                   {scanResult.invalid_count}
                 </p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">无效条目</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">{moduleT('contextMenu.invalid')}</p>
               </div>
               <div className="p-3 bg-[var(--brand-green-10)] rounded-xl text-center">
                 <p className="text-xl font-bold text-[var(--brand-green)] tabular-nums">
                   {scanResult.scan_duration_ms}ms
                 </p>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">扫描耗时</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">{moduleT('contextMenu.duration')}</p>
               </div>
             </div>
 
@@ -611,7 +607,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                   onClick={toggleSelectAll}
                   className="text-sm text-[var(--brand-green)] hover:underline"
                 >
-                  {allFilteredSelected ? '取消全选' : '全选'}
+                  {allFilteredSelected ? t('deselectAll') : t('selectAll')}
                 </button>
 
                 {/* 仅显示无效条目开关 */}
@@ -625,11 +621,11 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                     }
                   `}
                 >
-                  仅显示无效
+                  {moduleT('contextMenu.invalidOnly')}
                 </button>
 
                 <span className="text-sm text-[var(--text-muted)]">
-                  已选 {selectedCount} 项
+                  {moduleT('contextMenu.selected', { count: selectedCount })}
                 </span>
               </div>
 
@@ -649,7 +645,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                   ? <Loader2 className="w-4 h-4 animate-spin" />
                   : <Trash2 className="w-4 h-4" />
                 }
-                删除选中
+                {moduleT('contextMenu.deleteSelected')}
               </button>
             </div>
 
@@ -663,7 +659,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                       onClick={() => setShowErrorDetails(!showErrorDetails)}
                       className="text-xs text-[var(--color-danger)] hover:underline"
                     >
-                      {showErrorDetails ? '收起详情' : '查看详情'}
+                      {showErrorDetails ? t('close') : t('viewDetails')}
                     </button>
                   )}
                 </div>
@@ -684,7 +680,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               <div className="space-y-3">
                 {Array.from(groupedEntries.entries()).map(([scope, entries]) => {
                   const isCollapsed = collapsedScopes.has(scope);
-                  const scopeStyle = getScopeStyle(scope);
+                  const scopeStyle = getScopeStyle(scope, moduleT);
 
                   return (
                     <div key={scope} className="space-y-1.5">
@@ -698,10 +694,10 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                           : <ChevronDown className="w-3.5 h-3.5 text-[var(--text-faint)]" />
                         }
                         <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${scopeStyle.className}`}>
-                          {scope}
+                          {scopeStyle.label}
                         </span>
                         <span className="text-xs text-[var(--text-faint)]">
-                          {entries.length} 项
+                          {t('fileCount', { count: entries.length })}
                         </span>
                       </button>
 
@@ -726,8 +722,8 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               /* 过滤后无条目 */
               <EmptyState
                 icon={MousePointerClick}
-                title={showInvalidOnly ? '当前没有无效的右键菜单项' : '没有扫描到右键菜单条目'}
-                description={showInvalidOnly ? '所有可见菜单项都指向有效文件。' : '注册表中没有发现可展示的右键菜单项。'}
+                title={showInvalidOnly ? moduleT('contextMenu.noInvalid') : moduleT('contextMenu.noEntries')}
+                description={showInvalidOnly ? moduleT('contextMenu.validOnly') : moduleT('contextMenu.empty')}
                 tone={showInvalidOnly ? 'success' : 'neutral'}
                 compact
               />
@@ -741,7 +737,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
             <EmptyState
               icon={MousePointerClick}
                 title={t('noContextMenuIssues')}
-              description="所有右键菜单项均指向有效的可执行文件。"
+              description={moduleT('contextMenu.allValid')}
               tone="success"
             />
           </div>
@@ -754,7 +750,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
         title={t('confirmDeleteContextMenu')}
-        description={`确定要从注册表中删除选中的 ${selectedCount} 个右键菜单条目吗？`}
+        description={moduleT('contextMenu.confirmDesc', { count: selectedCount })}
         warning={t('contextMenuDeleteWarning')}
         confirmText={t('delete')}
         cancelText={t('cancel')}

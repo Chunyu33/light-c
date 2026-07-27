@@ -4,6 +4,7 @@
 
 import { Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme, type ThemeMode } from '../contexts';
+import { useTranslation } from 'react-i18next';
 
 const themes: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
   { mode: 'light', icon: Sun, label: '浅色' },
@@ -13,14 +14,20 @@ const themes: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
 
 export function ThemeToggle() {
   const { mode, setMode } = useTheme();
+  const { t } = useTranslation('common');
+  const themeLabels: Record<ThemeMode, string> = {
+    light: t('theme.light'),
+    dark: t('theme.dark'),
+    system: t('theme.system'),
+  };
 
   return (
     <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-gray-200 dark:bg-white/10">
-      {themes.map(({ mode: m, icon: Icon, label }) => (
+      {themes.map(({ mode: m, icon: Icon }) => (
         <button
           key={m}
           onClick={() => setMode(m)}
-          title={label}
+          title={themeLabels[m]}
           className={`p-1.5 rounded transition-all ${
             mode === m
               ? 'bg-white dark:bg-white/20 text-emerald-600 dark:text-emerald-400 shadow-sm'

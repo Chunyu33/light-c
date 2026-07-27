@@ -1,4 +1,5 @@
 {
+  "supportTitle": "支持作者", "supportDesc": "维护不易，如果软件对您有帮助，请我吃个猪脚饭~（自愿原则）", "wechatQr": "微信赞赏码", "alipayQr": "支付宝赞赏码", "zoom": "点击放大", "zoomHint": "点击图片可放大扫描", "wechat": "微信", "alipay": "支付宝",
   "scan": "扫描",
   "scanning": "扫描中",
   "scanningShort": "扫描中...",
@@ -65,6 +66,14 @@
   "fileCountLabel": "文件数",
   "categoryCountLabel": "分类",
   "healthScore": "健康评分",
+  "scoreDetails": { "diskSpace": "磁盘空间评分（满分40）\n• 可用空间 ≥30%：40分\n• 可用空间 20-30%：30分\n• 可用空间 10-20%：20分\n• 可用空间 <10%：10分", "hibernation": "休眠文件评分（满分30）\n• 已关闭休眠：30分\n• 休眠文件存在：0分\n休眠文件通常占用 8-32GB 空间", "junk": "垃圾文件评分（满分30）\n• 垃圾 <500MB：30分\n• 垃圾 500MB-2GB：20分\n• 垃圾 2-5GB：10分\n• 垃圾 >5GB：0分" },
+  "backToTop": "回到顶部",
+  "dragMove": "拖拽移动",
+  "theme": { "light": "浅色", "dark": "深色", "system": "系统" },
+  "driveAvailable": "可用 {{size}}",
+  "driveTotal": "总计 {{size}}",
+  "nonNtfs": "非 NTFS",
+  "defaultSystemDrive": "默认系统盘",
   "diskSpace": "{{drive}} 盘空间",
   "freeOfTotal": "{{free}} 可用 / {{total}}",
   "oneClickScan": "一键扫描",
@@ -99,6 +108,9 @@
   "deleteStats": "成功 {{success}} 个，实际释放 {{size}}",
   "skippedSize": "，{{size}} 跳过",
   "rebootPending": "，{{count}} 个待重启删除",
+  "rebootPendingDesc": "部分文件被系统占用，将在下次重启后自动删除",
+  "incompleteReason": "未立即完成原因：",
+  "incompleteMore": "...还有 {{count}} 个未立即完成项，点击查看全部",
   "confirmDelete": "确认删除",
   "confirmDeleteLargeFiles": "确认删除大文件",
   "largeFileDeleteWarning": "免责声明：大文件删除可能影响系统或软件正常运行，请确认文件用途后再执行。",
@@ -176,7 +188,8 @@
     "engineLabel": "扫描引擎",
     "mft": "MFT",
     "walkdir": "常规遍历",
-    "detecting": "检测中..."
+    "detecting": "检测中...",
+    "source": { "virtualDisk": "虚拟机磁盘", "memoryDump": "内存转储", "diskImage": "光盘镜像", "database": "数据库文件", "archive": "压缩包", "log": "日志文件", "systemTemp": "系统临时文件", "windowsUpdate": "Windows 更新缓存", "steam": "Steam 游戏文件", "wechat": "微信文件", "chrome": "Chrome 浏览器", "edge": "Edge 浏览器", "firefox": "Firefox 浏览器", "downloads": "下载文件", "desktop": "桌面文件", "recycleBin": "回收站", "video": "视频文件", "audio": "音频文件", "image": "图片文件" }
   },
   "bigFilesStages": {
     "detect": "正在检测扫描引擎",
@@ -211,4 +224,5 @@
     "processed": "已处理 {{count}}",
     "elapsedSummary": "当前阶段 {{stage}} · 总耗时 {{total}}"
   }
+  ,"windowSettings": "设置", "windowMinimize": "最小化", "windowMaximize": "最大化", "windowRestore": "还原", "welcomeTitle": "欢迎使用 LightC", "welcomeSubtitle": "轻量 · 安全 · 高效", "welcomeDescription": "专为 Windows 用户打造的智能 C 盘清理工具，帮助您轻松释放磁盘空间，让系统运行更流畅。", "welcomeLight": "轻量极速", "welcomeLightDesc": "小巧无广告，启动即用", "welcomeSafe": "安全可靠", "welcomeSafeDesc": "智能识别，保护系统", "welcomeFast": "高效清理", "welcomeFastDesc": "一键扫描，快速释放", "welcomeDismiss": "不再显示", "welcomeStart": "开始使用", "updateErrorNetwork": "网络连接失败，请检查网络后重试", "updateErrorSignature": "更新包签名验证失败，请从官方渠道下载", "updateErrorTimeout": "连接超时，请稍后重试", "updateErrorNotFound": "未找到更新信息，请稍后重试", "updateErrorFormat": "更新信息格式错误，请联系开发者", "updateErrorPermission": "没有写入权限，请以管理员身份运行", "updateErrorDisk": "磁盘空间不足，请清理后重试"
 }

@@ -170,23 +170,23 @@ export function FeatureSettings() {
             <div className="space-y-1 text-[11px] text-[var(--text-muted)]">
               <p className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                C:\Windows — 系统核心目录，删除会导致系统崩溃
+                {t('features.hotspot.systemCore')}
               </p>
               <p className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                Program Files / Program Files (x86) — 软件安装目录，仅查看不清理
+                {t('features.hotspot.programFiles')}
               </p>
               <p className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                WinSxS / System32 / SysWOW64 — Windows 组件存储，由系统管理
+                {t('features.hotspot.windowsComponents')}
               </p>
               <p className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
-                $Recycle.Bin / System Volume Information — 系统保留目录
+                {t('features.hotspot.systemReserved')}
               </p>
               <p className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
-                DriverStore / WindowsApps / assembly — 驱动和应用商店缓存
+                {t('features.hotspot.appCache')}
               </p>
             </div>
           </div>
@@ -208,7 +208,7 @@ export function FeatureSettings() {
               </p>
             </div>
             <span className="text-sm font-semibold text-[var(--brand-green)] shrink-0">
-              {settings.diskGrowthMaxEntries} 项
+              {settings.diskGrowthMaxEntries} {t('units.items')}
             </span>
           </div>
           <div className="grid grid-cols-6 gap-2">
@@ -233,22 +233,22 @@ export function FeatureSettings() {
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.diskGrowth.details')}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                点击变化量可打开明细弹窗，左侧展示当前目录的下一级变化目录，右侧展示当前目录内变化文件。明细通过后端接口按需分页加载，每次最多 200 条，并使用虚拟列表渲染，避免大目录一次性渲染造成卡顿。
+                {t('features.diskGrowth.detailDesc')}
               </p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                快照按磁盘盘符独立保存：C 盘沿用旧的 disk_growth_* 文件名，其他盘使用 d_disk_growth_* 这类盘符前缀。每个磁盘最多保留 3 组；最近两组用于变化对比，额外一组用于异常排查和兜底，超过后会自动清理该磁盘的旧快照及对应文件分片。
+                {t('features.diskGrowth.snapshotDesc')}
               </p>
             </div>
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.diskGrowth.speed')}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                磁盘变化分析主要受文件数量、硬盘类型和系统负载影响。M.2 SSD 通常最快，SATA SSD 次之，机械硬盘会明显变慢；磁盘容量越大不一定越慢，真正决定耗时的是文件记录数量、$MFT 体积、metadata 回退数量和安全软件实时扫描。
+                {t('features.diskGrowth.speedDesc')}
               </p>
             </div>
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.diskGrowth.mftWarmup')}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-                应用启动后第一次 MFT 扫描可能比后续扫描慢十几秒，这是 Windows 文件系统缓存、$MFT 数据和安全软件检查尚未预热导致的正常现象。完成一次 MFT 扫描后，大目录、大文件和全盘分析等模块通常都会明显变快。
+                {t('features.diskGrowth.mftWarmupDesc')}
               </p>
             </div>
             <div>
@@ -256,27 +256,27 @@ export function FeatureSettings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mt-2 text-xs text-[var(--text-muted)]">
                 <p className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                  蓝色：新增，上次快照不存在、本次出现
+                  {t('features.diskGrowth.newColor')}
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                  红色：显著增长，增加 1GB 及以上
+                  {t('features.diskGrowth.growthColor')}
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-                  橙色：快速增长，增加 300MB 及以上
+                  {t('features.diskGrowth.fastColor')}
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                  黄色：轻微增长，增加 1B 及以上
+                  {t('features.diskGrowth.minorColor')}
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                  绿色：相比上次快照减少
+                  {t('features.diskGrowth.reducedColor')}
                 </p>
                 <p className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0" />
-                  灰色：基本稳定，无明显变化
+                  {t('features.diskGrowth.stableColor')}
                 </p>
               </div>
             </div>

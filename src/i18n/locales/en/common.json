@@ -1,4 +1,5 @@
 {
+  "supportTitle": "Support the author", "supportDesc": "Maintaining the project takes time. If LightC helps you, a voluntary meal tip is appreciated.", "wechatQr": "WeChat donation QR code", "alipayQr": "Alipay donation QR code", "zoom": "Click to enlarge", "zoomHint": "Click the image to enlarge it", "wechat": "WeChat", "alipay": "Alipay",
   "scan": "Scan",
   "scanning": "Scanning",
   "scanningShort": "Scanning...",
@@ -65,6 +66,14 @@
   "fileCountLabel": "Files",
   "categoryCountLabel": "Categories",
   "healthScore": "Health score",
+  "scoreDetails": { "diskSpace": "Disk-space score (maximum 40)\n• Free space ≥30%: 40\n• Free space 20-30%: 30\n• Free space 10-20%: 20\n• Free space <10%: 10", "hibernation": "Hibernation-file score (maximum 30)\n• Hibernation disabled: 30\n• Hibernation file present: 0\nHibernation files commonly use 8-32 GB", "junk": "Junk-file score (maximum 30)\n• Junk <500 MB: 30\n• Junk 500 MB-2 GB: 20\n• Junk 2-5 GB: 10\n• Junk >5 GB: 0" },
+  "backToTop": "Back to top",
+  "dragMove": "Drag to move",
+  "theme": { "light": "Light", "dark": "Dark", "system": "System" },
+  "driveAvailable": "Free {{size}}",
+  "driveTotal": "Total {{size}}",
+  "nonNtfs": "Non-NTFS",
+  "defaultSystemDrive": "Default system drive",
   "diskSpace": "{{drive}} drive space",
   "freeOfTotal": "{{free}} free / {{total}}",
   "oneClickScan": "Scan all",
@@ -99,6 +108,9 @@
   "deleteStats": "{{success}} succeeded, {{size}} freed",
   "skippedSize": ", {{size}} skipped",
   "rebootPending": ", {{count}} pending reboot",
+  "rebootPendingDesc": "Some files are in use and will be deleted after the next restart",
+  "incompleteReason": "Reason for incomplete items:",
+  "incompleteMore": "...{{count}} more incomplete items; click to view all",
   "confirmDelete": "Delete",
   "confirmDeleteLargeFiles": "Delete large files",
   "largeFileDeleteWarning": "Deleting large files may affect Windows or applications. Confirm their purpose before continuing.",
@@ -176,7 +188,8 @@
     "engineLabel": "Scan engine",
     "mft": "MFT",
     "walkdir": "Standard walk",
-    "detecting": "Detecting..."
+    "detecting": "Detecting...",
+    "source": { "virtualDisk": "Virtual disk", "memoryDump": "Memory dump", "diskImage": "Disc image", "database": "Database file", "archive": "Archive", "log": "Log file", "systemTemp": "System temporary file", "windowsUpdate": "Windows update cache", "steam": "Steam game file", "wechat": "WeChat file", "chrome": "Chrome browser", "edge": "Edge browser", "firefox": "Firefox browser", "downloads": "Downloaded file", "desktop": "Desktop file", "recycleBin": "Recycle Bin", "video": "Video file", "audio": "Audio file", "image": "Image file" }
   },
   "bigFilesStages": {
     "detect": "Detecting the scan engine",
@@ -211,4 +224,5 @@
     "processed": "Processed {{count}}",
     "elapsedSummary": "Stage {{stage}} · Total {{total}}"
   }
+  ,"windowSettings": "Settings", "windowMinimize": "Minimize", "windowMaximize": "Maximize", "windowRestore": "Restore", "welcomeTitle": "Welcome to LightC", "welcomeSubtitle": "Lightweight · Safe · Efficient", "welcomeDescription": "A smart Windows C: drive cleanup tool that safely frees disk space and keeps your system running smoothly.", "welcomeLight": "Lightweight", "welcomeLightDesc": "Small, ad-free and ready to use", "welcomeSafe": "Reliable", "welcomeSafeDesc": "Smart detection protects your system", "welcomeFast": "Efficient cleanup", "welcomeFastDesc": "Scan once and free space quickly", "welcomeDismiss": "Do not show again", "welcomeStart": "Get started", "updateErrorNetwork": "Network connection failed. Check your connection and try again.", "updateErrorSignature": "Update signature verification failed. Download from an official channel.", "updateErrorTimeout": "The connection timed out. Try again later.", "updateErrorNotFound": "Update information was not found. Try again later.", "updateErrorFormat": "The update information is invalid. Contact the developer.", "updateErrorPermission": "Write permission is unavailable. Run as administrator.", "updateErrorDisk": "There is not enough disk space. Clean up and try again."
 }

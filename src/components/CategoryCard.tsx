@@ -121,7 +121,8 @@ export function CategoryCard({
         className="px-5 py-4 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors select-none"
         onClick={handleExpand}
       >
-        <div className="flex items-center gap-4">
+        {/* 多语言分类名称长度不同，允许窄窗口换行，避免风险标签和统计信息互相挤压。 */}
+        <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
           {/* 展开图标 */}
           <div className="text-[var(--text-faint)] transition-transform duration-200" style={{ transform: expanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}>
             <ChevronDown className="w-5 h-5" />
@@ -145,12 +146,12 @@ export function CategoryCard({
           </div>
 
           {/* 分类信息 */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+          <div className="min-w-[140px] flex-1 sm:min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
               <span className="text-[14px] font-bold text-[var(--text-primary)] truncate">
                 {categoryName}
               </span>
-              <span className={`px-2 py-0.5 text-[11px] font-medium rounded border ${getRiskBadgeStyle(category.risk_level)}`}>
+              <span className={`shrink-0 whitespace-nowrap px-2 py-0.5 text-[11px] font-medium rounded border ${getRiskBadgeStyle(category.risk_level)}`}>
                 {commonT(getRiskText(category.risk_level))}
               </span>
             </div>
@@ -158,7 +159,7 @@ export function CategoryCard({
           </div>
 
           {/* 统计信息 - tabular-nums 确保数字稳定 */}
-          <div className="text-right">
+          <div className="ml-auto shrink-0 text-right">
             <p className="text-[15px] font-bold text-[var(--text-primary)] tabular-nums">
               {formatSize(category.total_size)}
             </p>

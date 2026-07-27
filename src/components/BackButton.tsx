@@ -5,6 +5,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, GripVertical } from 'lucide-react';
+import i18n from '../i18n';
 
 const STORAGE_KEY = 'back-button-position';
 
@@ -46,7 +47,7 @@ function savePosition(pos: Position) {
  * 统一的返回按钮组件
  * 支持拖拽定位，位置持久化
  */
-export function BackButton({ onClick, label = '返回' }: BackButtonProps) {
+export function BackButton({ onClick, label = i18n.t('back', { ns: 'common' }) }: BackButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
   // 初始化时直接使用保存的位置，避免动画
   const [position, setPosition] = useState<Position>(() => {
@@ -154,7 +155,7 @@ export function BackButton({ onClick, label = '返回' }: BackButtonProps) {
           border-r border-slate-300 rounded-l-full hover:bg-slate-200 transition
           ${isDragging ? 'cursor-grabbing text-slate-600 bg-slate-200' : ''}
         `}
-        title="拖拽移动"
+          title={i18n.t('dragMove', { ns: 'common' })}
       >
         <GripVertical className="w-3.5 h-3.5" />
       </div>

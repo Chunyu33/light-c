@@ -33,6 +33,7 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('leftovers');
 
   const lastScanTriggerRef = useRef(0);
@@ -177,9 +178,9 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
       if (result.errors.length > 0) {
         const skippedMsg = result.skipped_executables?.length
-          ? `（${result.skipped_executables.length} 个因包含可执行文件被跳过，请使用深度清理）`
+          ? moduleT('leftoversExtra.skippedExecutables', { count: result.skipped_executables.length })
           : '';
-        setDeleteError(`${result.errors.length} 个文件夹处理异常${skippedMsg}`);
+        setDeleteError(moduleT('leftoversExtra.deleteErrorSummary', { count: result.errors.length, skipped: skippedMsg }));
         setDeleteErrors(result.errors);
       }
 
@@ -222,7 +223,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
-  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh]);
+  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh, moduleT]);
 
   // 深度清理（永久删除）- 首次点击显示警告
   const handleDeepCleanClick = useCallback(() => {
@@ -348,11 +349,11 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   // 获取来源显示名称
   const getSourceName = (source: LeftoverEntry['source']) => {
     switch (source) {
-      case 'LocalAppData': return '本地应用数据';
-      case 'RoamingAppData': return '漫游应用数据';
-      case 'LocalLowAppData': return 'LocalLow数据';
-      case 'ProgramData': return '程序数据';
-      case 'VirtualDiskFile': return '虚拟磁盘';
+      case 'LocalAppData': return moduleT('leftovers.source.local');
+      case 'RoamingAppData': return moduleT('leftovers.source.roaming');
+      case 'LocalLowAppData': return moduleT('leftovers.source.localLow');
+      case 'ProgramData': return moduleT('leftovers.source.programData');
+      case 'VirtualDiskFile': return moduleT('leftovers.source.virtualDisk');
       default: return source;
     }
   };
@@ -382,10 +383,10 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   // 置信度分类标签
   const getCategoryLabel = (category: string) => {
     switch (category) {
-      case 'HighConfidenceLeftover': return '高置信度';
-      case 'Suspicious': return '可疑';
-      case 'LikelyAppData': return '可能在用';
-      case 'SystemShared': return '系统共享';
+      case 'HighConfidenceLeftover': return moduleT('leftovers.category.high_confidence');
+      case 'Suspicious': return moduleT('leftovers.category.suspicious');
+      case 'LikelyAppData': return moduleT('leftovers.category.possibly_in_use');
+      case 'SystemShared': return moduleT('leftovers.category.system_shared');
       default: return category;
     }
   };
@@ -417,15 +418,15 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
               <Loader2 className="w-8 h-8 text-[var(--color-warning)] animate-spin" />
             </div>
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">正在清理卸载残留</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">{moduleT('leftovers.deleting')}</h3>
               <p className="text-sm text-[var(--text-muted)] mt-1">
-                正在删除 {selectedPaths.size} 个文件夹，请稍候...
+                {moduleT('leftovers.deletingFolder')} ({selectedPaths.size})...
               </p>
             </div>
             <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
               <div className="h-full bg-[var(--color-warning)] rounded-full animate-pulse" style={{ width: '100%' }} />
             </div>
-            <p className="text-xs text-[var(--text-faint)]">请勿关闭窗口</p>
+            <p className="text-xs text-[var(--text-faint)]">{moduleT('leftovers.doNotClose')}</p>
           </div>
         </div>,
         document.body
@@ -451,7 +452,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
             <EmptyState
               icon={Package}
               title={t('notScannedLeftovers')}
-              description="点击开始扫描，检索 AppData、ProgramData 等位置中可能遗留的软件目录。"
+              description={moduleT('leftovers.idleDesc')}
             />
           </div>
         )}
@@ -464,18 +465,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-green)]/10">
                   <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
                 </div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">正在扫描卸载残留...</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('leftovers.scanning')}</p>
                 <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--text-muted)]">
-                  正在检索 AppData、ProgramData、LocalLow 等常见残留位置，并结合安装记录、目录特征和置信度模型识别可疑目录。
+                  {moduleT('leftovers.scanningDesc')}
                 </p>
               </div>
 
               {/* <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { label: '多路径检索', detail: '覆盖用户与公共数据目录', icon: FolderOpen },
-                  { label: '安装记录匹配', detail: '排除仍在使用的软件', icon: Package },
-                  { label: '置信度评分', detail: '优先识别高可信残留', icon: CheckCircle2 },
-                  { label: '特殊目录识别', detail: '标记模拟器与虚拟磁盘', icon: HardDrive },
+                  { label: moduleT('leftoversExtra.stage.search'), detail: moduleT('leftoversExtra.stage.searchDesc'), icon: FolderOpen },
+                  { label: moduleT('leftoversExtra.stage.installRecords'), detail: moduleT('leftoversExtra.stage.installRecordsDesc'), icon: Package },
+                  { label: moduleT('leftoversExtra.stage.confidence'), detail: moduleT('leftoversExtra.stage.confidenceDesc'), icon: CheckCircle2 },
+                  { label: moduleT('leftoversExtra.stage.specialFolders'), detail: moduleT('leftoversExtra.stage.specialFoldersDesc'), icon: HardDrive },
                 ].map((step) => {
                   const StepIcon = step.icon;
                   return (
@@ -510,13 +511,13 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
             <div className="flex items-start gap-3 p-4 bg-[var(--color-warning)]/10 rounded-xl border border-[var(--color-warning)]/20">
               <AlertTriangle className="w-5 h-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">置信度检测结果</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">{moduleT('leftovers.confidenceTitle')}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
-                  基于评分模型分析：
-                  {highConfidenceCount > 0 && <span className="text-[var(--color-danger)] font-medium"> {highConfidenceCount} 个高置信度残留</span>}
-                  {highConfidenceCount > 0 && suspiciousCount > 0 && '、'}
-                  {suspiciousCount > 0 && <span className="text-[var(--color-warning)] font-medium">{suspiciousCount} 个可疑项</span>}
-                  。事后扫描无法 100% 准确，结果默认不勾选，请结合路径、大小和软件使用情况自行验证。
+                  {moduleT('leftovers.confidenceDesc')}
+                  {highConfidenceCount > 0 && <span className="text-[var(--color-danger)] font-medium">{moduleT('leftovers.highConfidence', { count: highConfidenceCount })}</span>}
+                  {highConfidenceCount > 0 && suspiciousCount > 0 && ' · '}
+                  {suspiciousCount > 0 && <span className="text-[var(--color-warning)] font-medium">{moduleT('leftovers.suspicious', { count: suspiciousCount })}</span>}
+                  {` ${moduleT('leftovers.accuracy')}`}
                 </p>
               </div>
             </div>
@@ -528,18 +529,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                   onClick={toggleSelectAll}
                   className="text-sm text-[var(--brand-green)] hover:underline"
                 >
-                  {selectedPaths.size === scanResult.leftovers.length ? '取消全选' : '全选'}
+                  {selectedPaths.size === scanResult.leftovers.length ? t('deselectAll') : t('selectAll')}
                 </button>
                 {suspiciousCount > 0 && (
                   <button
                     onClick={selectAllSuspicious}
                     className="text-sm text-[var(--color-warning)] hover:underline"
                   >
-                    选择可疑项
+                    {moduleT('leftovers.selectSuspicious')}
                   </button>
                 )}
                 <span className="text-sm text-[var(--text-muted)]">
-                  已选 {selectedPaths.size} 项，共 {formatSize(selectedSize)}
+                  {moduleT('leftovers.selected', { count: selectedPaths.size, size: formatSize(selectedSize) })}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -560,7 +561,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                   ) : (
                     <Trash2 className="w-4 h-4" />
                   )}
-                  删除选中
+                  {moduleT('leftovers.deleteSelected')}
                 </button>
                 {/* 深度清理按钮 */}
                 <button
@@ -580,7 +581,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                   ) : (
                     <Trash2 className="w-4 h-4" />
                   )}
-                  深度清理
+                  {moduleT('leftovers.deepClean')}
                 </button>
               </div>
             </div>
@@ -595,7 +596,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                       onClick={() => setShowErrorDetails(!showErrorDetails)}
                       className="text-xs text-[var(--color-danger)] hover:underline"
                     >
-                      {showErrorDetails ? '收起详情' : '查看详情'}
+                      {showErrorDetails ? moduleT('leftovers.collapseDetails') : moduleT('leftovers.viewDetails')}
                     </button>
                   )}
                 </div>
@@ -616,12 +617,13 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
               <div className="flex items-start gap-3 p-4 bg-[var(--color-danger)]/10 rounded-xl border border-[var(--color-danger)]/20">
                 <Smartphone className="w-5 h-5 text-[var(--color-danger)] shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">发现大型模拟器残留文件</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{moduleT('leftovers.emulatorTitle')}</p>
                   <p className="text-xs text-[var(--text-muted)] mt-1">
-                    检测到 {emulatorCount > 0 ? `${emulatorCount} 个模拟器残留` : ''}
-                    {emulatorCount > 0 && virtualDiskCount > 0 ? '、' : ''}
-                    {virtualDiskCount > 0 ? `${virtualDiskCount} 个虚拟磁盘文件` : ''}
-                    ，这些文件通常占用大量空间，建议清理。
+                    {moduleT('leftovers.emulatorDesc', {
+                      emulator: emulatorCount > 0 ? moduleT('leftovers.emulatorItem', { count: emulatorCount }) : '',
+                      separator: emulatorCount > 0 && virtualDiskCount > 0 ? '、' : '',
+                      virtualDisk: virtualDiskCount > 0 ? moduleT('leftovers.virtualDiskItem', { count: virtualDiskCount }) : '',
+                    })}
                   </p>
                 </div>
               </div>
@@ -689,12 +691,12 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                       {/* 模拟器/虚拟磁盘标签 */}
                       {leftover.is_emulator && (
                         <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-[var(--color-danger)] bg-[var(--color-danger)]/10">
-                          模拟器残留
+                          {moduleT('leftovers.emulatorTag')}
                         </span>
                       )}
                       {leftover.is_virtual_disk && (
                         <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-purple-500 bg-purple-500/10">
-                          虚拟磁盘
+                          {moduleT('leftovers.virtualDiskTag')}
                         </span>
                       )}
                     </div>
@@ -703,8 +705,8 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                     </p>
                     <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-faint)]">
                       <span>{getSourceName(leftover.source)}</span>
-                      <span>{leftover.file_count} 个文件</span>
-                      <span title={leftover.reasons.join('\n')}>置信度 {Math.round(leftover.confidence * 100)}%</span>
+                      <span>{leftover.file_count} {moduleT('leftovers.files')}</span>
+                      <span title={leftover.reasons.join('\n')}>{moduleT('leftovers.confidence', { percent: Math.round(leftover.confidence * 100) })}</span>
                     </div>
                   </div>
 
@@ -743,7 +745,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
             <EmptyState
               icon={CheckCircle2}
               title={t('noLeftovers')}
-              description="未检测到高置信度的软件残留目录。"
+              description={moduleT('leftovers.noResultDesc')}
               tone="success"
             />
           </div>
@@ -756,7 +758,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
         title={t('confirmDeleteLeftovers')}
-        description={`确定要删除选中的 ${selectedPaths.size} 个文件夹吗？这将释放约 ${formatSize(selectedSize)} 空间。`}
+        description={moduleT('leftovers.confirmDesc', { count: selectedPaths.size, size: formatSize(selectedSize) })}
         warning={t('leftoversDeleteWarning')}
         confirmText={t('delete')}
         cancelText={t('cancel')}
@@ -777,20 +779,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
             {/* 标题 */}
             <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-3">
-              深度清理警告
+              {moduleT('leftovers.deepWarningTitle')}
             </h3>
 
             {/* 内容 */}
             <div className="space-y-3 mb-6">
               <p className="text-sm text-[var(--text-secondary)] text-center">
-                深度清理将<span className="text-[var(--color-danger)] font-semibold">直接从磁盘永久删除</span>文件，
-                <span className="text-[var(--color-danger)] font-semibold">不可恢复</span>。
+                {moduleT('leftovers.deepWarningDesc')}
               </p>
               <div className="bg-[var(--color-warning)]/10 rounded-xl p-4 border border-[var(--color-warning)]/20">
                 <p className="text-xs text-[var(--text-muted)]">
-                  <span className="font-semibold text-[var(--color-warning)]">安全机制：</span>
-                  系统会自动检查文件夹是否包含可执行文件（.exe/.dll/.sys），
-                  如发现将跳过并标记为"需人工审核"，确保不会误删正在使用的软件。
+                  <span className="font-semibold text-[var(--color-warning)]">{moduleT('leftovers.safetyTitle')}</span>
+                  {moduleT('leftovers.safetyDesc')}
                 </p>
               </div>
             </div>
@@ -801,13 +801,13 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                 onClick={() => setShowDeepCleanWarning(false)}
                 className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-colors"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 onClick={handleDeepCleanWarningConfirm}
                 className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-[var(--color-danger)] text-white hover:opacity-90 transition-colors"
               >
-                我已了解，继续
+                {moduleT('leftovers.understood')}
               </button>
             </div>
           </div>
@@ -821,7 +821,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         onCancel={() => setShowDeepCleanConfirm(false)}
         onConfirm={handleDeepClean}
         title={t('confirmPermanentCleanup')}
-        description={`即将永久删除 ${selectedPaths.size} 个文件夹，释放约 ${formatSize(selectedSize)} 空间。`}
+        description={moduleT('leftovers.confirmDesc', { count: selectedPaths.size, size: formatSize(selectedSize) })}
         warning={t('permanentCleanupWarning')}
         confirmText={t('permanentDelete')}
         cancelText={t('cancel')}
@@ -857,6 +857,7 @@ interface DeepCleanResultModalProps {
 
 function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCleanResultModalProps) {
   const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const [expandedSection, setExpandedSection] = useState<'review' | 'failed' | null>(null);
 
   // 获取需要审核的项目
@@ -869,13 +870,13 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
     if (detail.failure_reason) {
       // 简化常见错误信息
       if (detail.failure_reason.includes('拒绝访问') || detail.failure_reason.includes('Access is denied')) {
-        return '权限不足，请以管理员身份运行';
+        return moduleT('leftoversExtra.permissionDenied');
       }
       if (detail.failure_reason.includes('正由另一个进程使用') || detail.failure_reason.includes('being used')) {
-        return '文件被占用，请关闭相关程序后重试';
+        return moduleT('leftoversExtra.fileLocked');
       }
       if (detail.failure_reason.includes('找不到') || detail.failure_reason.includes('not find')) {
-        return '文件已不存在';
+        return moduleT('leftoversExtra.fileMissing');
       }
       return detail.failure_reason;
     }
@@ -911,7 +912,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
 
         {/* 标题 */}
         <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">
-          深度清理完成
+          {moduleT('leftovers.completed')}
         </h3>
 
         {/* 统计信息 - 可滚动区域 */}
@@ -919,9 +920,9 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
           {/* 成功删除 */}
           {result.success_count > 0 && (
             <div className="flex items-center justify-between p-3 bg-[var(--brand-green)]/10 rounded-xl">
-              <span className="text-sm text-[var(--text-secondary)]">成功删除</span>
+              <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.successDeleted')}</span>
               <span className="text-sm font-bold text-[var(--brand-green)]">
-                {result.success_count} 个，释放 {formatSize(result.freed_size)}
+                {moduleT('leftoversExtra.successSummary', { count: result.success_count, size: formatSize(result.freed_size) })}
               </span>
             </div>
           )}
@@ -933,10 +934,10 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
                 onClick={() => setExpandedSection(expandedSection === 'review' ? null : 'review')}
                 className="w-full flex items-center justify-between p-3 hover:bg-[var(--color-warning)]/5 transition-colors"
               >
-                <span className="text-sm text-[var(--text-secondary)]">需人工审核</span>
+                <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.manualReview')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-[var(--color-warning)]">
-                    {reviewItems.length} 个
+                    {moduleT('leftoversExtra.count', { count: reviewItems.length })}
                   </span>
                   {expandedSection === 'review' ? (
                     <ChevronUp className="w-4 h-4 text-[var(--color-warning)]" />
@@ -948,7 +949,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
               {expandedSection === 'review' && (
                 <div className="px-3 pb-3 space-y-2">
                   <p className="text-xs text-[var(--text-muted)] mb-2">
-                    以下文件夹包含可执行文件，可能是正在使用的软件，请手动确认后删除：
+                    {moduleT('leftovers.manualReviewDesc')}
                   </p>
                   {reviewItems.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-[var(--bg-card)] rounded-lg">
@@ -977,9 +978,9 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
           {/* 待重启删除 */}
           {result.reboot_pending_count > 0 && (
             <div className="flex items-center justify-between p-3 bg-[var(--color-info)]/10 rounded-xl">
-              <span className="text-sm text-[var(--text-secondary)]">待重启删除</span>
+              <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.pendingReboot')}</span>
               <span className="text-sm font-bold text-[var(--color-info)]">
-                {result.reboot_pending_count} 个
+                {moduleT('leftoversExtra.count', { count: result.reboot_pending_count })}
               </span>
             </div>
           )}
@@ -991,10 +992,10 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
                 onClick={() => setExpandedSection(expandedSection === 'failed' ? null : 'failed')}
                 className="w-full flex items-center justify-between p-3 hover:bg-[var(--color-danger)]/5 transition-colors"
               >
-                <span className="text-sm text-[var(--text-secondary)]">删除失败</span>
+                <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.deleteFailed')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-[var(--color-danger)]">
-                    {failedItems.length} 个
+                    {moduleT('leftoversExtra.count', { count: failedItems.length })}
                   </span>
                   {expandedSection === 'failed' ? (
                     <ChevronUp className="w-4 h-4 text-[var(--color-danger)]" />
@@ -1036,7 +1037,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
           onClick={onClose}
           className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors shrink-0"
         >
-          确定
+          {moduleT('leftoversExtra.confirm')}
         </button>
       </div>
     </div>

@@ -270,7 +270,7 @@ export function ScanSummary({
             <div className="mt-3 pt-3 border-t border-blue-500/20 flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-blue-500" />
               <span className="text-xs text-blue-500">
-                部分文件被系统占用，将在下次重启后自动删除
+                {t('rebootPendingDesc')}
               </span>
             </div>
           )}
@@ -279,7 +279,7 @@ export function ScanSummary({
           {failedFiles.length > 0 && (
             <div className="mt-3 pt-3 border-t border-amber-500/20">
               <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-                未立即完成原因：
+                {t('incompleteReason')}
               </p>
               <div className="max-h-32 overflow-y-auto space-y-1">
                 {failedFiles.slice(0, 10).map((item, index) => (
@@ -301,7 +301,7 @@ export function ScanSummary({
                     onClick={() => setShowFailedModal(true)}
                     className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 cursor-pointer transition-colors"
                   >
-                    ...还有 {failedFiles.length - 10} 个未立即完成项，点击查看全部
+                    {t('incompleteMore', { count: failedFiles.length - 10 })}
                   </button>
                 )}
               </div>

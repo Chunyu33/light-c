@@ -54,6 +54,8 @@ interface DisplayModelName {
 
 export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('aiModels');
   const { showToast } = useToast();
 
@@ -113,13 +115,13 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       if (result.total_model_count === 0) {
         showToast({
           type: 'info',
-          title: '未发现 AI 资产',
-          description: '可开启深度发现，扫描本地 NTFS 盘中的大模型特征文件。',
+          title: moduleT('aiModels.notFound'),
+          description: moduleT('aiModels.notFoundDesc'),
         });
       }
     } catch (error) {
       updateModuleState('aiModels', { status: 'error', error: String(error) });
-      showToast({ type: 'error', title: 'AI资产分析失败', description: String(error) });
+      showToast({ type: 'error', title: moduleT('aiModels.analysisFailed'), description: String(error) });
     } finally {
       scanningRef.current = false;
     }
@@ -160,7 +162,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       // 搜索使用用户能理解的模型文件名，避免把 ComfyUI 内部类型目录带进查询词降低结果相关性。
       await openSearchUrl(`${displayName.title} AI 模型`);
     } catch (error) {
-      showToast({ type: 'error', title: '打开搜索失败', description: String(error) });
+      showToast({ type: 'error', title: moduleT('aiModels.openSearchFailed'), description: String(error) });
     }
   }, [showToast]);
 
@@ -177,8 +179,8 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
         const reason = detail ? getFailureReasonMessage(detail.failure_reason) : result.summary_message;
         showToast({
           type: 'warning',
-          title: '模型删除未完成',
-          description: reason || result.summary_message || '文件未被删除，请检查文件占用情况。',
+          title: moduleT('aiModels.deleteIncomplete'),
+          description: reason || result.summary_message || moduleT('aiModels.notDeleted'),
         });
         return;
       }
@@ -192,11 +194,11 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       });
       showToast({
         type: 'success',
-        title: '模型文件已删除',
-        description: `${model.name} · 已释放 ${formatSize(detail.logical_size)}`,
+        title: moduleT('aiModels.deleted'),
+        description: `${model.name} · ${moduleT('aiModels.released', { size: formatSize(detail.logical_size) })}`,
       });
     } catch (error) {
-      showToast({ type: 'error', title: '删除模型失败', description: String(error) });
+      showToast({ type: 'error', title: moduleT('aiModels.deleteFailed'), description: String(error) });
     } finally {
       setDeletingModelPath(null);
     }
@@ -221,13 +223,13 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       status={moduleState.status}
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}
-      doneBadgeText="已发现"
-      emptyDoneBadgeText="未发现"
-      countLabel="个资产"
+      doneBadgeText={moduleT('aiModels.found')}
+      emptyDoneBadgeText={moduleT('aiModels.notFoundBadge')}
+      countLabel={moduleT('aiModels.assetCount')}
       expanded={isExpanded}
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'aiModels')}
       onScan={handleScan}
-      scanButtonText={isScanning ? '分析中...' : scanResult ? '重新分析' : '开始分析'}
+      scanButtonText={isScanning ? moduleT('aiModels.analyzing') : scanResult ? moduleT('aiModels.reanalyze') : moduleT('aiModels.start')}
       error={moduleState.error}
       headerExtra={
         <div className="flex shrink-0 items-center gap-2">
@@ -243,15 +245,15 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
         {moduleState.status === 'idle' && !scanResult && (
           <EmptyState
             icon={BrainCircuit}
-            title="尚未分析 AI 资产"
-            description="点击开始分析，快速检测 Ollama、LM Studio、ComfyUI、HuggingFace；找不到模型时再开启深度发现。"
+            title={moduleT('aiModels.idle')}
+            description={moduleT('aiModels.idleDesc')}
             action={
               <button
                 onClick={handleScan}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--brand-green)] text-white text-sm font-semibold hover:bg-[var(--brand-green-hover)] transition"
               >
                 <Search className="w-4 h-4" />
-                开始分析
+                {moduleT('aiModels.start')}
               </button>
             }
           />
@@ -322,7 +324,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
                   onKeywordClear={() => setModelKeyword('')}
                 />
                 <ModelTable
-                  title="模型列表"
+                  title={moduleT('aiModels.modelList')}
                   models={filteredModels}
                   totalCount={allModels.length}
                   sortMode={sortMode}
@@ -337,7 +339,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
             {scanResult.warnings.length > 0 && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
-                <p className="text-xs font-semibold text-amber-600">部分目录读取失败</p>
+                <p className="text-xs font-semibold text-amber-600">{moduleT('aiModels.partialFailure')}</p>
                 <div className="mt-1 space-y-1">
                   {scanResult.warnings.slice(0, 3).map(warning => (
                     <p key={warning} className="text-[11px] leading-relaxed text-amber-700">{warning}</p>
@@ -354,15 +356,15 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
         isOpen={modelPendingDeletion !== null}
         onCancel={() => setModelPendingDeletion(null)}
         onConfirm={() => void handleDeleteModel()}
-        title="确认删除模型文件"
+        title={moduleT('aiModels.confirmDelete')}
         description={modelPendingDeletion
-          ? `将永久删除“${modelPendingDeletion.name}”，文件大小约 ${formatSize(modelPendingDeletion.size)}。`
+          ? moduleT('aiModels.confirmDeleteDesc', { name: modelPendingDeletion.name, size: formatSize(modelPendingDeletion.size) })
           : ''}
         warning={modelPendingDeletion
-          ? `路径：${modelPendingDeletion.path}。删除后无法通过 LightC 恢复，请确认该文件不是正在使用的模型。`
+          ? moduleT('aiModels.confirmDeletePath', { path: modelPendingDeletion.path })
           : undefined}
-        confirmText="确认删除"
-        cancelText="取消"
+        confirmText={moduleT('aiModels.confirmDeleteButton')}
+        cancelText={t('cancel')}
         isDanger
       />
     </>
@@ -378,12 +380,13 @@ function DeepDiscoveryToggle({
   disabled: boolean;
   onChange: (enabled: boolean) => void;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   return (
     <div
       className="flex items-center gap-2 rounded-lg bg-[var(--bg-hover)] px-3 py-1.5"
-      title="开启后深度扫描全盘模型特征文件；管理员权限下速度和覆盖率更好。"
+      title={moduleT('aiModels.deepDiscoveryTip')}
     >
-      <span className="text-xs font-medium text-[var(--fg-secondary)]">深度发现</span>
+      <span className="text-xs font-medium text-[var(--fg-secondary)]">{moduleT('aiModels.deepDiscovery')}</span>
       <button
         type="button"
         disabled={disabled}
@@ -392,7 +395,7 @@ function DeepDiscoveryToggle({
           enabled ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-hover)]'
         } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
         aria-pressed={enabled}
-        aria-label="切换深度发现"
+        aria-label={moduleT('aiModels.deepDiscovery')}
       >
         <span
           className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
@@ -415,6 +418,8 @@ function HeroOverview({
   onOpenPath: (path: string) => Promise<void>;
   onSearchModel: (modelName: string) => Promise<void>;
 }) {
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const displayName = largestModel ? splitDisplayModelName(largestModel.name) : null;
   const largestModelType = largestModel ? getModelType(largestModel) : null;
 
@@ -423,32 +428,32 @@ function HeroOverview({
       <div className="grid grid-cols-[190px_minmax(0,1fr)] items-center gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold text-[var(--text-muted)]">AI资产总占用</p>
+            <p className="text-xs font-semibold text-[var(--text-muted)]">{moduleT('aiModels.totalUsage')}</p>
             <ScanDurationPopover scanResult={scanResult} />
           </div>
           <p className="mt-1 text-3xl font-bold tabular-nums text-[var(--brand-green)]">
             {formatSize(scanResult.total_size)}
           </p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
-            发现 {scanResult.total_model_count.toLocaleString()} 个资产 · {scanResult.source_count} 个来源 · {scanResult.discovery_mode === 'deep' ? '深度发现' : '快速扫描'}
+            {moduleT('aiModels.discoverySummary', { models: scanResult.total_model_count.toLocaleString(), sources: scanResult.source_count, mode: scanResult.discovery_mode === 'deep' ? moduleT('aiModels.deepDiscovery') : t('scan') })}
           </p>
         </div>
 
         <div className="flex min-w-0 items-start justify-between gap-4 border-l border-[var(--border-color)] pl-5">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-[var(--text-muted)]">最大模型</p>
+            <p className="text-xs font-semibold text-[var(--text-muted)]">{moduleT('aiModels.largestModel')}</p>
             <div className="mt-1 flex min-w-0 items-center gap-2">
               <p className="min-w-0 truncate text-xl font-bold text-[var(--text-primary)]" title={largestModel?.path ?? largestModel?.name}>
-                {displayName?.title ?? '未发现模型'}
+                {displayName?.title ?? moduleT('aiModels.notFoundModel')}
               </p>
               {largestModelType && (
                 <span className="shrink-0 rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-                  {largestModelType}
+                  {largestModelType === '__unknown__' ? moduleT('aiModels.unknownType') : largestModelType}
                 </span>
               )}
             </div>
             <p className="mt-1 text-sm font-semibold text-[var(--brand-green)]">
-              {largestModel ? `${formatSize(largestModel.size)} · ${largestModel.sourceName}` : '开启深度发现后重新分析'}
+              {largestModel ? `${formatSize(largestModel.size)} · ${largestModel.sourceName}` : moduleT('aiModels.reanalyzeDeep')}
             </p>
             {largestModel && (
               <p className="mt-1 truncate text-xs text-[var(--text-muted)]" title={largestModel.path}>
@@ -458,8 +463,8 @@ function HeroOverview({
           </div>
           {largestModel && (
             <div className="flex shrink-0 items-center gap-1">
-              <IconButton title="打开目录" onClick={() => onOpenPath(largestModel.path)} icon={<FolderOpen className="w-4 h-4" />} />
-              <IconButton title="搜索模型" onClick={() => onSearchModel(largestModel.name)} icon={<Search className="w-4 h-4" />} />
+              <IconButton title={t('openInFolder')} onClick={() => onOpenPath(largestModel.path)} icon={<FolderOpen className="w-4 h-4" />} />
+              <IconButton title={t('search')} onClick={() => onSearchModel(largestModel.name)} icon={<Search className="w-4 h-4" />} />
             </div>
           )}
         </div>
@@ -469,6 +474,7 @@ function HeroOverview({
 }
 
 function ScanDurationPopover({ scanResult }: { scanResult: AiModelScanResult }) {
+  const { t: moduleT } = useTranslation('modules');
   if (scanResult.phase_durations.length === 0) return null;
 
   return (
@@ -477,13 +483,13 @@ function ScanDurationPopover({ scanResult }: { scanResult: AiModelScanResult }) 
         type="button"
         className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--brand-green)] transition"
       >
-        耗时 {formatDuration(scanResult.scan_duration_ms)}
+        {moduleT('aiModels.scanDuration')} {formatDuration(scanResult.scan_duration_ms)}
       </button>
       <div className="pointer-events-none absolute left-0 top-full z-20 w-[420px] pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
         <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-lg">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold text-[var(--text-primary)]">扫描耗时</p>
-            <p className="text-xs text-[var(--text-muted)]">总计 {formatDuration(scanResult.scan_duration_ms)}</p>
+            <p className="text-xs font-semibold text-[var(--text-primary)]">{moduleT('aiModels.scanDuration')}</p>
+            <p className="text-xs text-[var(--text-muted)]">{moduleT('aiModels.total')} {formatDuration(scanResult.scan_duration_ms)}</p>
           </div>
           <div className="mt-2 grid max-h-56 grid-cols-2 gap-1.5 overflow-y-auto pr-1">
             {scanResult.phase_durations.map((phase, index) => (
@@ -510,10 +516,11 @@ function InsightsRow({
   largestSource: AiAssetSource | null;
   largeModelCount: number;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const insights = [
-    { label: '发现模型', value: `${scanResult.total_model_count.toLocaleString()} 个`, icon: Sparkles },
-    { label: '最大平台', value: largestSource ? `${largestSource.name} · ${formatSize(largestSource.total_size)}` : '暂无', icon: BarChart3 },
-    { label: '超过 20GB', value: `${largeModelCount} 个`, icon: Gauge },
+    { label: moduleT('aiModels.foundModels'), value: `${scanResult.total_model_count.toLocaleString()}`, icon: Sparkles },
+    { label: moduleT('aiModels.largestPlatform'), value: largestSource ? `${largestSource.name} · ${formatSize(largestSource.total_size)}` : moduleT('aiModels.noData'), icon: BarChart3 },
+    { label: moduleT('aiModels.over20GB'), value: `${largeModelCount}`, icon: Gauge },
   ];
 
   return (
@@ -539,9 +546,10 @@ function InsightsRow({
 }
 
 function ViewModeTabs({ value, onChange }: { value: AiModelViewMode; onChange: (value: AiModelViewMode) => void }) {
+  const { t: moduleT } = useTranslation('modules');
   const tabs: Array<{ value: AiModelViewMode; label: string }> = [
-    { value: 'overview', label: '概览' },
-    { value: 'models', label: '模型列表' },
+    { value: 'overview', label: moduleT('aiModels.overview') },
+    { value: 'models', label: moduleT('aiModels.models') },
   ];
 
   return (
@@ -570,8 +578,9 @@ function OverviewDashboard({
   scanResult: AiModelScanResult;
   models: FlattenedModel[];
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const modelTypeStats = getModelTypeStats(models);
-  const uncategorizedSource = scanResult.sources.find(source => source.name === '未归类');
+  const uncategorizedSource = scanResult.sources.find(source => source.name === '未归类' || source.name === '__uncategorized__');
 
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
@@ -580,9 +589,9 @@ function OverviewDashboard({
 
       {uncategorizedSource && (
         <div className="xl:col-span-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
-          <p className="text-xs font-semibold text-amber-700">发现未归类模型</p>
+          <p className="text-xs font-semibold text-amber-700">{moduleT('aiModels.uncategorizedTitle')}</p>
           <p className="mt-1 text-xs text-amber-700">
-            {uncategorizedSource.model_count.toLocaleString()} 个模型 · {formatSize(uncategorizedSource.total_size)}。这些文件未匹配到已知平台目录，建议在模型列表中筛选“未归类”确认归属。
+            {moduleT('aiModels.uncategorizedDesc', { count: uncategorizedSource.model_count.toLocaleString(), size: formatSize(uncategorizedSource.total_size) })}
           </p>
         </div>
       )}
@@ -591,6 +600,7 @@ function OverviewDashboard({
 }
 
 function PlatformUsageChart({ sources }: { sources: AiAssetSource[] }) {
+  const { t: moduleT } = useTranslation('modules');
   const totalSize = sources.reduce((sum, source) => sum + source.total_size, 0);
   const chartItems: ChartItem[] = sources.map((source, index) => {
     const percent = totalSize > 0 ? (source.total_size / totalSize) * 100 : 0;
@@ -600,7 +610,7 @@ function PlatformUsageChart({ sources }: { sources: AiAssetSource[] }) {
       value: source.total_size,
       valueLabel: formatSize(source.total_size),
       percentLabel: `${percent.toFixed(1)}%`,
-      secondaryLabel: `${source.model_count.toLocaleString()} 个模型`,
+      secondaryLabel: moduleT('aiModels.modelCount', { count: source.model_count.toLocaleString() }),
       color: CHART_PALETTE[index % CHART_PALETTE.length],
     };
   });
@@ -608,16 +618,16 @@ function PlatformUsageChart({ sources }: { sources: AiAssetSource[] }) {
   return (
     <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-[var(--text-primary)]">平台占用</p>
-        <p className="text-xs text-[var(--text-muted)]">{sources.length.toLocaleString()} 个来源</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('aiModels.platformUsage')}</p>
+        <p className="text-xs text-[var(--text-muted)]">{moduleT('aiModels.sourceCount', { count: sources.length.toLocaleString() })}</p>
       </div>
 
       <div className="mt-4">
         <DonutChart
           items={chartItems}
-          totalLabel="总占用"
+          totalLabel={moduleT('aiModels.totalUsage')}
           totalValueLabel={formatSize(totalSize)}
-          emptyText="暂无平台占用数据"
+          emptyText={moduleT('aiModels.noData')}
         />
       </div>
     </div>
@@ -625,26 +635,27 @@ function PlatformUsageChart({ sources }: { sources: AiAssetSource[] }) {
 }
 
 function ModelTypeChart({ stats }: { stats: Array<{ type: string; count: number; size: number }> }) {
+  const { t: moduleT } = useTranslation('modules');
   const visibleStats = getVisibleModelTypeStats(stats);
   const chartItems: ChartItem[] = visibleStats.map((item, index) => ({
     id: item.type,
     label: item.type,
     value: item.size,
     valueLabel: formatSize(item.size),
-    secondaryLabel: `${item.count.toLocaleString()} 个模型`,
+    secondaryLabel: moduleT('aiModels.modelCount', { count: item.count.toLocaleString() }),
     color: CHART_PALETTE[index % CHART_PALETTE.length],
   }));
 
   return (
     <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-[var(--text-primary)]">类型分布</p>
-        <p className="text-xs text-[var(--text-muted)]">{stats.length.toLocaleString()} 类</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('aiModels.typeDistribution')}</p>
+        <p className="text-xs text-[var(--text-muted)]">{moduleT('aiModels.typeCount', { count: stats.length.toLocaleString() })}</p>
       </div>
 
       <div className="mt-4">
         {/* 柱状图保留 8 个展示位，超出的类别汇总到“其他类型”，避免图表拥挤同时不丢总量。 */}
-        <ColumnChart items={chartItems} emptyText="暂无类型分布数据" />
+        <ColumnChart items={chartItems} emptyText={moduleT('aiModels.noData')} />
       </div>
     </div>
   );
@@ -664,7 +675,7 @@ function getVisibleModelTypeStats(
       count: summary.count + item.count,
       size: summary.size + item.size,
     }),
-    { type: '其他类型', count: 0, size: 0 }
+    { type: '__other__', count: 0, size: 0 }
   );
 
   // 概览统计关注空间结构，长尾类别汇总展示比直接截断更符合“空间分析”的总量认知。
@@ -692,31 +703,32 @@ function ModelListFilters({
   onKeywordChange: (value: string) => void;
   onKeywordClear: () => void;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const platformOptions: SelectOption[] = [
-    { value: 'all', label: '全部平台' },
+    { value: 'all', label: moduleT('aiModels.allPlatforms') },
     ...sources.map(source => ({ value: source.name, label: source.name })),
   ];
   const typeSelectOptions: SelectOption[] = [
-    { value: 'all', label: '全部类型' },
-    ...typeOptions.map(type => ({ value: type, label: type })),
+    { value: 'all', label: moduleT('aiModels.allTypes') },
+    ...typeOptions.map(type => ({ value: type, label: type === '__unknown__' ? moduleT('aiModels.unknownType') : type })),
   ];
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
-      <FilterField label="平台">
+      <FilterField label={moduleT('aiModels.platform') }>
         <Select value={platformFilter} options={platformOptions} onChange={onPlatformChange} widthClass="w-36" size="sm" />
       </FilterField>
 
-      <FilterField label="类型">
+      <FilterField label={moduleT('aiModels.type')}>
         <Select value={typeFilter} options={typeSelectOptions} onChange={onTypeChange} widthClass="w-36" size="sm" />
       </FilterField>
 
-      <FilterField label="搜索" className="min-w-[280px] flex-1">
+      <FilterField label={moduleT('aiModels.search')} className="min-w-[280px] flex-1">
         <div className="relative w-full min-w-[180px]">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             value={modelKeyword}
             onChange={event => onKeywordChange(event.target.value)}
-            placeholder="搜索模型、路径或来源"
+            placeholder={moduleT('aiModels.searchPlaceholder')}
             className="h-8 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] pl-8 pr-8 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--brand-green)] focus:ring-2 focus:ring-[var(--brand-green)]/20"
           />
           {modelKeyword.trim().length > 0 && (
@@ -724,8 +736,8 @@ function ModelListFilters({
               type="button"
               onClick={onKeywordClear}
               className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-              aria-label="清空模型搜索关键词"
-              title="清空搜索"
+              aria-label={moduleT('aiModels.clearSearch')}
+              title={moduleT('aiModels.clearSearch')}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -776,26 +788,27 @@ function ModelTable({
   onDeleteModel: (model: FlattenedModel) => void;
   deletingModelPath: string | null;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
           <p className="text-xs text-[var(--text-muted)]">
-            {models.length.toLocaleString()} / {(totalCount ?? models.length).toLocaleString()} 项
+            {moduleT('aiModels.itemCount', { current: models.length.toLocaleString(), total: (totalCount ?? models.length).toLocaleString() })}
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
           <SortHeaderButton
-            label="名称"
+            label={moduleT('aiModels.name')}
             activeAscMode="name-asc"
             activeDescMode="name-desc"
             sortMode={sortMode}
             onSortChange={onSortChange}
           />
           <SortHeaderButton
-            label="大小"
+            label={moduleT('aiModels.size')}
             activeAscMode="size-asc"
             activeDescMode="size-desc"
             sortMode={sortMode}
@@ -830,11 +843,11 @@ function ModelTable({
                 {formatSize(model.size)}
               </p>
               <div className="flex shrink-0 items-center gap-1">
-                <IconButton title="打开目录" onClick={() => onOpenPath(model.path)} icon={<FolderOpen className="w-4 h-4" />} />
-                <IconButton title="搜索模型" onClick={() => onSearchModel(model.name)} icon={<Search className="w-4 h-4" />} />
+                <IconButton title={moduleT('aiModels.openFolder')} onClick={() => onOpenPath(model.path)} icon={<FolderOpen className="w-4 h-4" />} />
+                <IconButton title={moduleT('aiModels.searchModel')} onClick={() => onSearchModel(model.name)} icon={<Search className="w-4 h-4" />} />
                 {canDeleteModel && (
                   <IconButton
-                    title="删除模型文件"
+                    title={moduleT('aiModels.deleteModel')}
                     onClick={() => onDeleteModel(model)}
                     disabled={deletingModelPath !== null}
                     icon={deletingModelPath === model.path
@@ -864,6 +877,7 @@ function SortHeaderButton({
   sortMode: AiModelSortMode;
   onSortChange: (value: AiModelSortMode) => void;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const isActive = sortMode === activeAscMode || sortMode === activeDescMode;
   const nextSortMode = sortMode === activeDescMode ? activeAscMode : activeDescMode;
   const DirectionIcon = sortMode === activeAscMode ? ArrowUp : ArrowDown;
@@ -877,9 +891,9 @@ function SortHeaderButton({
           ? 'border-[var(--brand-green)] bg-[var(--brand-green)]/10 text-[var(--brand-green)]'
           : 'border-[var(--border-color)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
       }`}
-      title={`按${label}${sortMode === activeDescMode ? '升序' : '降序'}排列`}
+      title={moduleT('aiModels.sort', { label, direction: sortMode === activeDescMode ? moduleT('aiModels.ascending') : moduleT('aiModels.descending') })}
     >
-      <span>按{label}</span>
+      <span>{moduleT('aiModels.sortBy', { label })}</span>
       {/* 只在当前排序列展示方向，避免两个按钮同时出现箭头造成误读。 */}
       {isActive && <DirectionIcon className="h-3 w-3" />}
     </button>
@@ -887,7 +901,8 @@ function SortHeaderButton({
 }
 
 function SourceTag({ sourceName }: { sourceName: string }) {
-  const isUncategorized = sourceName === '未归类';
+  const { t: moduleT } = useTranslation('modules');
+  const isUncategorized = sourceName === '未归类' || sourceName === '__uncategorized__';
 
   return (
     <span
@@ -897,15 +912,16 @@ function SourceTag({ sourceName }: { sourceName: string }) {
           : 'bg-[var(--brand-green)] text-white'
       }`}
     >
-      {sourceName}
+      {isUncategorized ? moduleT('aiModels.uncategorized') : sourceName}
     </span>
   );
 }
 
 function TypeTag({ label }: { label: string }) {
+  const { t: moduleT } = useTranslation('modules');
   return (
     <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-transparent px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
-      {label}
+      {label === '__unknown__' ? moduleT('aiModels.unknownType') : label}
     </span>
   );
 }
@@ -1033,7 +1049,7 @@ function getModelChartType(model: AiModelItem): string {
 function getModelType(model: AiModelItem): string {
   const extension = model.path.split('.').pop()?.trim().toLowerCase();
   // 类型统一使用文件扩展名，避免 ComfyUI 子目录名和其他平台扩展名混用导致语义不一致。
-  return extension ? `${extension}` : '未知类型';
+  return extension ? `${extension}` : '__unknown__';
 }
 
 function formatMiddleEllipsisPath(path: string): string {

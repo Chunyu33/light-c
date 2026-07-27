@@ -1,4 +1,5 @@
 {
+  "supportTitle": "作者を支援", "supportDesc": "開発の維持には時間がかかります。LightC が役立った場合は、任意のご支援をお願いします。", "wechatQr": "WeChat 支援 QR コード", "alipayQr": "Alipay 支援 QR コード", "zoom": "クリックで拡大", "zoomHint": "画像をクリックして拡大", "wechat": "WeChat", "alipay": "Alipay",
   "scan": "スキャン",
   "scanning": "スキャン中",
   "scanningShort": "スキャン中...",
@@ -65,6 +66,14 @@
   "fileCountLabel": "ファイル数",
   "categoryCountLabel": "カテゴリ",
   "healthScore": "健全性スコア",
+  "scoreDetails": { "diskSpace": "ディスク容量スコア（最大40）\n• 空き容量 ≥30%：40\n• 空き容量 20-30%：30\n• 空き容量 10-20%：20\n• 空き容量 <10%：10", "hibernation": "休止状態ファイルスコア（最大30）\n• 休止状態を無効化：30\n• 休止状態ファイルあり：0\n休止状態ファイルは通常8-32GBを使用します", "junk": "不要ファイルスコア（最大30）\n• 不要ファイル <500MB：30\n• 500MB-2GB：20\n• 2-5GB：10\n• >5GB：0" },
+  "backToTop": "先頭へ戻る",
+  "dragMove": "ドラッグして移動",
+  "theme": { "light": "ライト", "dark": "ダーク", "system": "システム" },
+  "driveAvailable": "空き {{size}}",
+  "driveTotal": "合計 {{size}}",
+  "nonNtfs": "NTFS 以外",
+  "defaultSystemDrive": "既定のシステムドライブ",
   "diskSpace": "{{drive}} ドライブ容量",
   "freeOfTotal": "空き {{free}} / {{total}}",
   "oneClickScan": "一括スキャン",
@@ -99,6 +108,9 @@
   "deleteStats": "{{success}} 件成功、{{size}} を解放",
   "skippedSize": "、{{size}} をスキップ",
   "rebootPending": "、{{count}} 件は再起動後に削除",
+  "rebootPendingDesc": "一部のファイルは使用中のため、次回再起動後に削除されます",
+  "incompleteReason": "未完了の理由：",
+  "incompleteMore": "…未完了の項目がさらに {{count}} 件あります。すべて表示",
   "confirmDelete": "削除",
   "confirmDeleteLargeFiles": "大容量ファイルを削除",
   "largeFileDeleteWarning": "大容量ファイルの削除は Windows やアプリに影響する場合があります。用途を確認してから実行してください。",
@@ -176,7 +188,8 @@
     "engineLabel": "スキャンエンジン",
     "mft": "MFT",
     "walkdir": "標準走査",
-    "detecting": "検出中..."
+    "detecting": "検出中...",
+    "source": { "virtualDisk": "仮想マシンディスク", "memoryDump": "メモリダンプ", "diskImage": "ディスクイメージ", "database": "データベースファイル", "archive": "アーカイブ", "log": "ログファイル", "systemTemp": "システム一時ファイル", "windowsUpdate": "Windows 更新キャッシュ", "steam": "Steam ゲームファイル", "wechat": "WeChat ファイル", "chrome": "Chrome ブラウザー", "edge": "Edge ブラウザー", "firefox": "Firefox ブラウザー", "downloads": "ダウンロードファイル", "desktop": "デスクトップファイル", "recycleBin": "ごみ箱", "video": "動画ファイル", "audio": "音声ファイル", "image": "画像ファイル" }
   },
   "bigFilesStages": {
     "detect": "スキャンエンジンを検出中",
@@ -211,4 +224,5 @@
     "processed": "処理済み {{count}}",
     "elapsedSummary": "現在の段階 {{stage}} · 合計 {{total}}"
   }
+  ,"windowSettings": "設定", "windowMinimize": "最小化", "windowMaximize": "最大化", "windowRestore": "元に戻す", "welcomeTitle": "LightC へようこそ", "welcomeSubtitle": "軽量 · 安全 · 効率的", "welcomeDescription": "Windows の C: ドライブを安全に整理し、空き容量を増やしてシステムを快適に保つツールです。", "welcomeLight": "軽快", "welcomeLightDesc": "小さく広告なしですぐ使える", "welcomeSafe": "安全・信頼", "welcomeSafeDesc": "スマート検出でシステムを保護", "welcomeFast": "効率的な整理", "welcomeFastDesc": "一度のスキャンで容量を解放", "welcomeDismiss": "次回から表示しない", "welcomeStart": "始める", "updateErrorNetwork": "ネットワーク接続に失敗しました。接続を確認して再試行してください。", "updateErrorSignature": "更新パッケージの署名検証に失敗しました。公式チャンネルから取得してください。", "updateErrorTimeout": "接続がタイムアウトしました。後でもう一度お試しください。", "updateErrorNotFound": "更新情報が見つかりません。後でもう一度お試しください。", "updateErrorFormat": "更新情報の形式が不正です。開発者に連絡してください。", "updateErrorPermission": "書き込み権限がありません。管理者として実行してください。", "updateErrorDisk": "ディスク容量が不足しています。整理して再試行してください。"
 }

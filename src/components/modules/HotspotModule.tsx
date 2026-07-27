@@ -189,6 +189,7 @@ interface HotspotItemProps {
 }
 
 function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup, onSearch, parentName, isChild, treeDepth = 0, onDrillDown }: HotspotItemProps) {
+  const { t: moduleT } = useTranslation('modules');
   const { settings } = useSettings();
   // 根据用户设置的展示深度动态控制树形展开层数：treeDepth 0 为顶级，settings.hotspotDepth 限制最多展示层数
   const maxTreeDepth = settings.hotspotDepth;
@@ -264,28 +265,28 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             {entry.is_protected && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
                 <Shield className="w-3 h-3" />
-                系统保护
+                {moduleT('hotspot.systemProtected')}
               </span>
             )}
             {/* 程序目录标签 - 红色警告，禁止删除 */}
             {entry.is_program && !entry.is_protected && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
                 <ShieldAlert className="w-3 h-3" />
-                系统/程序
+                {moduleT('hotspot.systemProgram')}
               </span>
             )}
             {/* 缓存目录标签 - 建议清理（仅非深度扫描模式显示） */}
             {entry.is_cache && !entry.is_program && !entry.is_protected && !isFullScan && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
                 <Trash2 className="w-3 h-3" />
-                临时缓存
+                {moduleT('hotspot.temporaryCache')}
               </span>
             )}
             {/* 深度扫描只读提示 */}
             {isFullScan && !entry.is_protected && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-blue-500 bg-blue-50 dark:bg-blue-900/20">
                 <Eye className="w-3 h-3" />
-                仅查看
+                {moduleT('hotspot.viewOnly')}
               </span>
             )}
           </div>
@@ -302,7 +303,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
           {/* 文件数 */}
           <div className="hidden sm:flex items-center gap-1 text-[var(--text-muted)]">
             <HardDrive className="w-3 h-3" />
-            <span>{entry.file_count.toLocaleString()} 个</span>
+            <span>{moduleT('hotspot.fileCount', { count: entry.file_count.toLocaleString() })}</span>
           </div>
           
           {/* 最后修改时间 */}
@@ -328,7 +329,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                   onDrillDown(entry.path);
                 }}
                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
-                title="展开下级目录"
+                title={moduleT('drillDown.expand')}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -342,7 +343,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                   onCleanup(entry);
                 }}
                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
-                title="清理缓存文件"
+                title={moduleT('drillDown.cleanup')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -355,7 +356,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                 onSearch(entry.path);
               }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
-              title="搜索该文件夹是否可以删除"
+              title={moduleT('drillDown.search')}
             >
               <Search className="w-4 h-4" />
             </button>
@@ -367,7 +368,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                 onOpenFolder(entry.path);
               }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
-              title="在文件资源管理器中打开"
+              title={moduleT('drillDown.open')}
             >
               <FolderOpen className="w-4 h-4" />
             </button>
@@ -407,6 +408,8 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
 
 export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('hotspot');
   const { showToast } = useToast();
   const { settings } = useSettings();
@@ -512,7 +515,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
     if (fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs) {
-      const message = `${selectedDriveLabel}当前文件系统为 ${selectedDrive.file_system || '未知'}，MFT 深度扫描仅支持 NTFS 分区。`;
+      const message = moduleT('hotspotExtra.ntfsError', { drive: selectedDriveLabel, fileSystem: selectedDrive.file_system || moduleT('hotspotExtra.unknownFileSystem') });
       setError(message);
       updateModuleState('hotspot', { status: 'error', error: message });
       return;
@@ -566,7 +569,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         setScanProgress(null);
       }
     }
-  }, [updateModuleState, fullScanEnabled, settings, selectedDriveLetter, selectedDrive, selectedDriveLabel]);
+  }, [updateModuleState, fullScanEnabled, settings, selectedDriveLetter, selectedDrive, selectedDriveLabel, moduleT]);
 
   const resetHotspotResult = useCallback(() => {
     setScanResult(null);
@@ -593,7 +596,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     setScanProgress(null);
     try {
       await cancelHotspotScan();
-      showToast({ type: 'info', title: '扫描已停止', description: '已取消本次扫描' });
+      showToast({ type: 'info', title: t('scanStopped'), description: t('scanStoppedDesc') });
     } catch (err) {
       console.error('停止扫描失败:', err);
     }
@@ -645,45 +648,45 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       if (result.deleted_count > 0) {
         showToast({
           type: 'success',
-          title: `清理完成`,
-          description: `已删除 ${result.deleted_count} 项，释放 ${formatSize(result.freed_size)}`,
+          title: moduleT('hotspot.cleanupDone'),
+          description: moduleT('hotspot.cleanupDoneDesc', { count: result.deleted_count, size: formatSize(result.freed_size) }),
         });
         // 清理完成后重新扫描以更新数据
         handleScan();
       } else if (result.failed_count > 0) {
         showToast({
           type: 'warning',
-          title: '清理受阻',
-          description: `${result.failed_count} 个文件被占用无法删除`,
+          title: moduleT('hotspot.cleanupBlocked'),
+          description: moduleT('hotspot.cleanupBlockedDesc', { count: result.failed_count }),
         });
       } else {
         showToast({
           type: 'info',
-          title: '目录已为空',
-          description: '没有需要清理的文件',
+          title: moduleT('hotspot.empty'),
+          description: moduleT('hotspot.emptyDesc'),
         });
       }
     } catch (err) {
       console.error('清理失败:', err);
       showToast({
         type: 'error',
-        title: '清理失败',
+        title: moduleT('hotspot.cleanupFailed'),
         description: String(err),
       });
     } finally {
       setIsCleaning(false);
       setCleanupTarget(null);
     }
-  }, [cleanupTarget, handleScan, showToast]);
+  }, [cleanupTarget, handleScan, showToast, moduleT]);
 
   // 搜索文件夹是否可以删除 - 使用 Tauri opener 插件打开浏览器
   const handleSearch = useCallback(async (path: string) => {
     try {
-      await openSearchUrl(`Windows 文件夹 ${path} 可以删除吗`);
+      await openSearchUrl(`${moduleT('hotspotExtra.searchPrefix')} ${path} ${moduleT('hotspotExtra.searchSuffix')}`);
     } catch (err) {
       console.error('打开搜索链接失败:', err);
     }
-  }, []);
+  }, [moduleT]);
 
   // 显示的条目（默认显示 10 条，展开显示全部）
   const displayedEntries = showAll 
@@ -718,11 +721,11 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       status={moduleState.status}
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}
-      countLabel="个大目录"
+      countLabel={moduleT('hotspot.folders')}
       expanded={isExpanded}
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'hotspot')}
       onScan={handleScan}
-      scanButtonText="开始扫描"
+      scanButtonText={moduleState.status === 'scanning' ? t('scanningShort') : t('startScan')}
       scanDisabled={Boolean(fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs)}
       error={error}
       titleExtra={fullScanEnabled ? driveSelector : null}
@@ -736,10 +739,10 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
                 ? 'bg-[var(--brand-green)] text-white'
                 : 'bg-[var(--bg-main)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-color)]'
             }`}
-            title={fullScanEnabled ? '当前：全盘深度扫描' : '当前：仅扫描 AppData'}
+            title={fullScanEnabled ? moduleT('hotspot.fullScanOn') : moduleT('hotspot.appDataOnly')}
           >
             <Eye className="w-3.5 h-3.5" />
-            深度扫描
+            {moduleT('hotspot.deepScan')}
           </button>
         </div>
       }
@@ -749,7 +752,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
           <p className="text-sm flex items-center gap-2">
-            {fullScanEnabled ? `正在深度扫描 ${selectedDriveLabel}...` : '正在扫描 AppData 目录...'}
+            {fullScanEnabled ? moduleT('hotspot.deepScanning', { drive: selectedDriveLabel }) : moduleT('hotspot.scanningAppData')}
             {/* 扫描引擎模式标签 — MFT 直读 vs 常规遍历 */}
             {fullScanEnabled && scanProgress && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
@@ -757,18 +760,18 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
                   ? 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
                   : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
               }`}>
-                {scanProgress.backend === 'mft' ? 'MFT 直读' : '常规遍历'}
+                {scanProgress.backend === 'mft' ? moduleT('hotspot.mft') : moduleT('hotspot.walkdir')}
               </span>
             )}
           </p>
           <p className="text-xs mt-1">
-            {fullScanEnabled ? '深度扫描可能需要较长时间，请耐心等待' : '这可能需要几秒钟'}
+            {fullScanEnabled ? moduleT('hotspot.deepScanWait') : moduleT('hotspot.quickScanWait')}
           </p>
           {fullScanEnabled && !settings.hotspotIgnoreSystemDirs && (
-            <p className="text-xs mt-1 text-amber-500">⚠ 已关闭系统目录过滤，扫描时间可能较长</p>
+            <p className="text-xs mt-1 text-amber-500">⚠ {moduleT('hotspot.systemFilterOff')}</p>
           )}
           {fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs && (
-            <p className="text-xs mt-1 text-amber-500">当前分区不是 NTFS，将无法使用 MFT 深度扫描</p>
+            <p className="text-xs mt-1 text-amber-500">{moduleT('hotspot.notNtfs')}</p>
           )}
 
           {/* 深度扫描进度：展示关键阶段和耗时，用于判断瓶颈在枚举、读大小还是聚合。 */}
@@ -791,7 +794,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
                 border border-red-200 dark:border-red-800/30 transition-colors"
             >
               <XCircle className="w-3.5 h-3.5" />
-              停止扫描
+              {moduleT('hotspot.stop')}
             </button>
           )}
         </div>
@@ -804,20 +807,20 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
           {scanResult.is_full_scan && (
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-600 dark:text-blue-400">
               <Eye className="w-4 h-4 flex-shrink-0" />
-              <span>深度扫描模式：仅供查看分析，清理功能已禁用以保护系统安全</span>
+              <span>{moduleT('hotspot.deepScanReadOnly')}</span>
             </div>
           )}
 
           {/* 统计摘要 */}
           <div className="flex items-center justify-between px-1 text-xs text-[var(--text-muted)]">
             <div className="flex items-center gap-4 mt-4">
-              <span>共 <strong className="text-[var(--text-primary)]">{scanResult.total_folders_scanned.toLocaleString()}</strong> 个文件夹</span>
-              <span title="扫描遍历到的所有文件累计大小；系统保护目录（WinSxS 等）因性能原因跳过，实际磁盘占用更大">
-                覆盖总大小{' '}
+              <span>{moduleT('hotspot.folderCount', { count: scanResult.total_folders_scanned.toLocaleString() })}</span>
+              <span title={moduleT('hotspot.coverageTitle')}>
+                {moduleT('hotspot.coverage')}{' '}
                 <strong className="text-[var(--brand-green)]">{formatSize(scanResult.scanned_total_size)}</strong>
               </span>
             </div>
-            <span>耗时 {(scanResult.scan_duration_ms / 1000).toFixed(1)}s</span>
+            <span>{moduleT('hotspot.durationValue', { time: (scanResult.scan_duration_ms / 1000).toFixed(1) })}</span>
           </div>
 
           {scanResult.is_full_scan && (
@@ -852,7 +855,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
               onClick={() => setShowAll(!showAll)}
               className="w-full flex items-center justify-center gap-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             >
-              <span>{showAll ? '收起' : `显示全部 ${scanResult.entries.length} 项`}</span>
+              <span>{showAll ? moduleT('hotspot.collapse') : moduleT('hotspot.showAll', { count: scanResult.entries.length })}</span>
               <ChevronDown className={`w-4 h-4 transition-transform ${showAll ? 'rotate-180' : ''}`} />
             </button>
           )}
@@ -863,8 +866,8 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
               <EmptyState
                 icon={Flame}
                 tone="success"
-                title="未发现大型目录"
-                description="当前阈值下没有需要特别关注的大目录。"
+                title={moduleT('hotspot.noResult')}
+                description={moduleT('hotspot.noResultDesc')}
               />
             </div>
           )}
@@ -876,8 +879,8 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         <div className="p-4">
           <EmptyState
             icon={Flame}
-            title="尚未分析大目录"
-            description="点击开始扫描，定位占用空间较大的目录。"
+            title={moduleT('hotspot.idle')}
+            description={moduleT('hotspot.idleDesc')}
           />
         </div>
       )}
@@ -886,11 +889,11 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       {cleanupTarget && createPortal(
         <ConfirmDialog
           isOpen={!!cleanupTarget}
-          title="确认清理"
-          description={`确定清理 "${cleanupTarget.name}" 的临时文件吗？此操作将删除该目录下的所有文件，但保留目录本身。`}
-          warning="被占用的文件将被跳过，不会影响正在运行的程序。"
-          confirmText={isCleaning ? '清理中...' : '确认清理'}
-          cancelText="取消"
+          title={moduleT('hotspot.confirmCleanup')}
+          description={moduleT('hotspot.cleanupConfirm', { name: cleanupTarget.name })}
+          warning={moduleT('hotspot.occupiedWarning')}
+          confirmText={isCleaning ? t('deleting') : moduleT('hotspot.confirmCleanup')}
+          cancelText={t('cancel')}
           onConfirm={handleCleanupConfirm}
           onCancel={() => setCleanupTarget(null)}
           isDanger={false}

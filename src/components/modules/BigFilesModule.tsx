@@ -22,10 +22,37 @@ import {
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { useSettings } from '../../contexts';
 import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
-import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelText } from '../../utils/format';
+import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelKey } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
 import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+
+// 后端当前返回固定来源标签；只映射已知枚举，未知值不展示，避免误译真实文件信息。
+function getLocalizedSourceLabel(sourceLabel: string, translate: (key: string) => string): string {
+  const sourceKey: Record<string, string> = {
+    '虚拟机磁盘': 'bigFiles.source.virtualDisk',
+    '内存转储': 'bigFiles.source.memoryDump',
+    '光盘镜像': 'bigFiles.source.diskImage',
+    '数据库文件': 'bigFiles.source.database',
+    '压缩包': 'bigFiles.source.archive',
+    '日志文件': 'bigFiles.source.log',
+    '系统临时文件': 'bigFiles.source.systemTemp',
+    'Windows 更新缓存': 'bigFiles.source.windowsUpdate',
+    'Steam 游戏文件': 'bigFiles.source.steam',
+    '微信文件': 'bigFiles.source.wechat',
+    'Chrome 浏览器': 'bigFiles.source.chrome',
+    'Edge 浏览器': 'bigFiles.source.edge',
+    'Firefox 浏览器': 'bigFiles.source.firefox',
+    '下载文件': 'bigFiles.source.downloads',
+    '桌面文件': 'bigFiles.source.desktop',
+    '回收站': 'bigFiles.source.recycleBin',
+    '视频文件': 'bigFiles.source.video',
+    '音频文件': 'bigFiles.source.audio',
+    '图片文件': 'bigFiles.source.image',
+  };
+  const key = sourceKey[sourceLabel];
+  return key ? translate(key) : '';
+}
 
 // ============================================================================
 // 组件实现
@@ -496,6 +523,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 const riskLevel = file.risk_level;
                 const isSelected = selectedFiles.has(file.path);
                 const isLocked = riskLevel >= 4; // 后端风险等级 >= 4，锁定不可删除
+                const localizedSourceLabel = getLocalizedSourceLabel(file.source_label, t);
 
                 return (
                   <div
@@ -544,9 +572,9 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                         <p className="text-sm text-[var(--fg-primary)] truncate font-medium" title={file.path}>
                           {file.path.split('\\').pop() || file.path}
                         </p>
-                        {file.source_label && file.source_label !== '未知来源' && (
+                        {localizedSourceLabel && (
                           <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
-                            {file.source_label}
+                            {localizedSourceLabel}
                           </span>
                         )}
                       </div>
@@ -561,7 +589,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                       <div className="flex items-center justify-end gap-2 mt-0.5">
                         <span className="text-[10px] text-[var(--fg-muted)]">{formatDate(file.modified)}</span>
                         <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${getRiskLevelColor(riskLevel)} ${getRiskLevelBgColor(riskLevel)}`}>
-                          {isLocked ? '🔒 ' : ''}{getRiskLevelText(riskLevel)}
+                          {isLocked ? '🔒 ' : ''}{t(getRiskLevelKey(riskLevel))}
                         </span>
                       </div>
                     </div>

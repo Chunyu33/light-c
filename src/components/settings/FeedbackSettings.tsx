@@ -108,7 +108,7 @@ export function FeedbackSettings() {
           {/* 微信号 */}
           {/* <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]"> 微 信：</span>
+              <span className="text-sm text-[var(--text-secondary)]">{t('feedback.wechat')}:</span>
               <span className="text-sm font-medium text-[var(--text-primary)]">{WECHAT_ID}</span>
             </div>
             <button
@@ -119,9 +119,9 @@ export function FeedbackSettings() {
                 }`}
             >
               {copiedWechat ? (
-                <><CheckCircle className="w-3 h-3" />已复制</>
+                <><CheckCircle className="w-3 h-3" />{t('feedback.copied')}</>
               ) : (
-                <><Copy className="w-3 h-3" />复制</>
+                <><Copy className="w-3 h-3" />{t('feedback.copy')}</>
               )}
             </button>
           </div> */}

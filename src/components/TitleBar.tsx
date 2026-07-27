@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Copy, Minus, Square, X, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface TitleBarProps {
   onSettingsClick: () => void;
@@ -13,6 +14,8 @@ interface TitleBarProps {
 const DRAG_START_THRESHOLD = 4;
 
 export function TitleBar({ onSettingsClick }: TitleBarProps) {
+  const { t } = useTranslation('ui');
+  const { t: commonT } = useTranslation('common');
   const [isMaximized, setIsMaximized] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const appWindowRef = useRef(getCurrentWindow());
@@ -127,7 +130,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
           data-window-control
           onClick={onSettingsClick}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          title="设置"
+          title={t('windowSettings')}
         >
           <Settings className="w-4 h-4" />
         </button>
@@ -140,7 +143,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
           data-window-control
           onClick={handleMinimize}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          title="最小化"
+          title={t('windowMinimize')}
         >
           <Minus className="w-4 h-4" />
         </button>
@@ -150,7 +153,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
           data-window-control
           onClick={handleMaximize}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          title={isMaximized ? "还原" : "最大化"}
+          title={isMaximized ? t('windowRestore') : t('windowMaximize')}
         >
           {/* 最大化后显示叠框图标，符合 Windows「还原窗口」的视觉习惯。 */}
           {isMaximized ? <Copy className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
@@ -161,7 +164,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
           data-window-control
           onClick={handleClose}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--color-danger)] hover:text-white transition-colors"
-          title="关闭"
+          title={commonT('close')}
         >
           <X className="w-4 h-4" />
         </button>
