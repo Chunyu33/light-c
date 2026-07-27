@@ -50,16 +50,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.14.0'
+          releaseName: 'LightC v2.15.0'
           releaseBody: |
-            ## 更新内容
-            - 新增“外壳图标清理”，识别并管理此电脑中的第三方外壳图标
-            - 根据应用名称、CLSID 和组件路径展示百度网盘、夸克网盘、WPS、迅雷等关联信息
-            - 支持普通删除和彻底删除；彻底删除物理移除节点并防止普通权限软件复活
-            - 自动备份注册表和 ACL，支持恢复原节点；提供一键定位注册表和刷新 Explorer
-            - 垃圾清理、深度发现、便携版数据管理和官方下载渠道继续保持现有能力
+            ## LightC v2.15.0
+            - 新增多语言支持，覆盖导航、设置、扫描过程、结果页和操作反馈
+            - 优化垃圾清理、大文件清理和社交软件专清的结果操作工具条与多语言布局适配
+            - 优化分类展示、删除失败反馈和重启待处理结果
 
-            请查看 [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) 了解详细版本变更。
+            See [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) for full details.
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

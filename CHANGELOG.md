@@ -1,722 +1,184 @@
-# 更新日志
+# Changelog
 
-以下是 LightC 各版本的完整更新内容。
-
----
+English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## Unreleased
 
-### Junk Cleanup and Documentation
+- Fixed the disk information media label using a translation object instead of a string.
+- Constrained long disk metadata while allowing volume free-space values to use their available card width.
 
-- Tightened the sticky cleanup toolbars so they use only the required width, with right alignment, rounded corners, and a subtle shadow.
-- Restored the compact module header layout and moved junk, large-file, and social cleanup actions into sticky result toolbars without changing result scrolling.
-- Replaced the language segmented control with the shared dropdown selector for stable multilingual layout.
-- Added static i18next translations for Chinese, English, and Japanese, with language selection persisted in application settings.
-- Completed localization coverage for module result pages, scan states, settings controls, stable enum labels, and shared delete summaries; long Japanese labels now use responsive result layouts.
-- Defender cleanup now uses a bounded, single-file ownership fallback for the explicitly supported `LocalCopy` and `Support` caches, while keeping the Defender root and protected data excluded.
-- Delete results now retain reboot-pending entries and include more specific permission/ownership failure details.
-- Replaced the long README with concise English and Simplified Chinese documentation using the same structure.
+## v2.15.0 (2026-07-27)
 
+### Internationalization
+
+- Added Simplified Chinese, English, and Japanese UI support across navigation, settings, scan stages, result pages, dialogs, and operation feedback.
+- Added persisted language selection with Chinese as the default and static resource loading for instant switching.
+- Localized stable backend enums and scan states while keeping real paths, filenames, and system error details unchanged.
+
+### Cleanup and Safety
+
+- Expanded junk cleanup to Delivery Optimization files, thumbnails, DirectX shader caches, and selected rebuildable Microsoft Defender caches.
+- Kept protected Defender data excluded and improved permission, ownership, and reboot-pending deletion feedback.
+
+### User Experience
+
+- Restored compact module headers and moved junk, large-file, and social-cache actions into compact sticky toolbars without changing result scrolling.
+- Improved multilingual layout handling, shared language selection, and release documentation.
 
 ## v2.14.0 (2026-07-23)
 
-### 外壳图标清理
-
-- **第三方外壳图标识别**：扫描“此电脑”中的第三方 Namespace 节点，展示应用名称、CLSID、注册表位置和关联组件。
-- **系统节点过滤**：自动过滤 Windows 系统白名单、Microsoft 系统组件、内部 RegFolder 节点和无法确认归属的项目。
-- **双模式清理**：支持普通删除和彻底删除；彻底删除会物理移除 Namespace 节点，并锁定父级创建权限，阻止普通权限软件重新注册。
-- **安全备份与恢复**：清理前自动保存 `.reg` 和 ACL 元数据，支持恢复注册表节点、目标权限和父级 Namespace 权限。
-- **操作辅助**：提供一键打开注册表位置、打开备份目录和操作记录；清理完成前会核验目标节点确实不存在。
-- **温和刷新**：使用 Shell 变更通知重新读取外壳节点，不重启 `explorer.exe`，降低对 TranslucentTB 等任务栏增强工具的影响。
-- **数据清理整合**：设置中的本地数据清理新增虚拟磁盘操作记录和注册表备份分类，并避免与通用日志、注册表备份分类重复统计。
-- **旧版本兼容**：可以识别并重新处理旧版本遗留的空锁定节点，避免历史残留继续显示或影响清理。
-
-### 垃圾清理系统临时文件覆盖
-
-- **Windows 清理项对齐**：快速扫描和深度扫描新增传递优化文件、Microsoft Defender 防病毒非关键文件，并覆盖 Windows 清理向导使用的明确缓存目录。
-- **缩略图覆盖扩展**：缩略图缓存支持扫描系统盘其他用户配置文件中的 `thumbcache_*.db` 和 `iconcache_*.db`。
-- **DirectX 缓存修复**：放行 `D3DCache`/`d3d_cache` 等可重建着色器缓存，修复其位于 `System32` 时被通用系统目录保护规则漏扫的问题。
-- **安全边界保持**：Defender 仅处理 `LocalCopy` 和 `Support`，继续排除隔离区、定义库、签名文件及其他系统关键目录；删除前仍执行后端路径复核。
-
+- Added third-party This PC shell icon management with registry/ACL backup, restore, safe removal, and anti-respawn protection.
+- Expanded junk cleanup coverage for Windows temporary files, thumbnails, Defender rebuildable caches, and DirectX shader caches.
 
 ## v2.13.0 (2026-07-21)
 
-### 垃圾清理深度发现
-
-- **大批量删除进度**：删除过程按批次推送已处理数量、释放空间、失败数量、速度和预计剩余时间，避免大量文件清理时界面长时间停留在无进度 Loading。
-- **删除与核验解耦**：文件删除命令完成后立即结束阻塞遮罩并反馈真实删除结果，扫描结果核验在后台执行，完成后自动同步分类统计；核验失败会明确提示重新扫描。
-- **扫描中界面优化**：扫描期间增加模式、阶段、当前分区、已处理记录、候选文件和耗时信息，并展示安全过滤说明，减少等待过程中的空白区域。
-- **删除反馈修复**：删除命令完成后立即按真实结果反馈成功、失败和待重启数量；后续核验在后台同步，核验失败会明确提示重新扫描。
-- **缓存规则适度放宽**：深度扫描增加用户 AppData 下明确命名的 `Cache`、`Caches`、`Code Cache`、`GPUCache`、`ShaderCache` 等可重建缓存目录，同时继续排除 MSIX、WebView2、Local Storage、IndexedDB 等持久化数据。
-- **分页统计修复**：深度扫描删除已加载文件后保留分类总数和总大小口径，不再把当前页数量误当作完整扫描结果。
-- **删除结果真实同步**：删除完成后一律重新扫描并更新分类、总数量和总大小，删除失败或刷新失败时不再从前端乐观移除条目。
-- **深度分类完整清理**：深度扫描分类按页展示时，当前页全部选中的分类会由后端从扫描会话展开为完整分类后再删除，避免只清理首屏几百 MB。
-- **整类删除参数修复**：修正深度删除命令的 Tauri 参数命名，确保“应用程序缓存”等分页分类真正传递扫描会话并删除完整分类，而不是只删除当前页。
-- **删除交互收敛**：删除阶段使用批量进度遮罩，命令完成后解除阻塞并在页面内显示后台核验状态，避免大量文件删除时长时间占用整个窗口。
-- **全盘深度扫描**：新增“深度发现”开关，扫描所有本地固定分区；NTFS 分区使用 USN + `$MFT`，非 NTFS 分区使用受控目录遍历降级。
-- **安全规则过滤**：只识别高置信度的临时、缓存和错误报告目录，跳过回收站、系统保护目录、WebView2/Chromium 持久化数据和最近 24 小时内文件。
-- **进度与取消**：新增分区、MFT 阶段进度事件和停止命令；单个分区 MFT 失败不会阻断其他分区。
-- **结果按需加载**：深度扫描建立短期结果会话，分类首屏按页返回，展开后再加载后续文件，降低大盘结果对前端内存和 IPC 的压力。
-- **删除安全复核**：深度删除由后端再次校验路径规则，并按文件所在分区缓存簇大小，修正多盘物理释放空间统计。
+- Added deep junk discovery across local fixed drives with NTFS MFT/USN scanning, controlled fallbacks, progress reporting, cancellation, paging, and backend safety rechecks.
+- Added batch deletion progress, physical-size accounting, reboot-pending results, and post-delete verification.
+- Expanded safe cache detection while excluding persistent application data and protected system paths.
 
 ## v2.12.2 (2026-07-17)
 
-
-### 旧驱动清理
-
-- **Windows 10 枚举兼容**：纯文本回退解析支持中文系统字段、字段名与冒号之间的空格，以及无 BOM UTF-16 输出，修复部分 Windows 10 22H2 环境提示“枚举驱动包失败”。
-
-### 应用图标
-
-- **补充 48x48 图标**：图标生成脚本、Windows ICO 和 Tauri bundle 配置均加入 `48x48.png`，改善 Windows 大图标视图的清晰度。
-
-### 设置与便携版数据
-
-- **便携版数据随程序目录保存**：便携版默认将 `config/config.json` 和运行数据写入 `LightC.exe` 同目录，使用相对 `data` 配置，移动整个便携目录后不会继续指向旧路径。
-- **旧版本数据兼容迁移**：首次运行新版便携版时，会从旧版 `%LOCALAPPDATA%/LightC` 复制 LightC 自有配置、日志、备份、快照和安装历史，并从 `%LOCALAPPDATA%/com.chunyu.LightC` 迁移 WebView2 设置；原数据保留，重复迁移不会覆盖便携目录已有文件。
-- **发行模式统一识别**：新增版本化 `LightC.portable.json`，同时兼容旧版 `LightC.portable`；数据目录、更新策略和 exe 完整性校验使用同一发行模式结果。
-- **签名资产保持隔离**：安装版、WebView2 离线版和便携版继续分别生成对应的 `LightC_*_exe.sig`，完整性校验仍针对当前运行中的 `LightC.exe`。
-
+- Improved old-driver detection compatibility on Windows 10 and added a clearer 48px application icon.
+- Improved portable-mode data migration, release markers, and separated signatures for installer, offline WebView2, and portable packages.
 
 ## v2.12.1
 
-### 体验修复
-
-- **回收站扫描与清理修复**：回收站仅显示当前用户可见的有效 `$I/$R` 条目，过滤其他用户、孤儿元数据和 `desktop.ini`；清空按盘符隔离并修复实际释放量统计，权限失败不再误提示为重启删除。
-- **回收站条目显示修复**：修正 Windows `$I` v2 元数据的路径长度偏移，恢复中文文件名和原始位置；打开回收站条目改为进入系统回收站视图，不再打开 SID 内部目录。
-- **扫描路径匹配修复**：修复中间通配符和 `%SystemRoot%` 等环境变量路径无法匹配的问题，避免合法缓存和注册表路径被错误漏扫。
-
+- Fixed Recycle Bin filtering, per-drive cleanup, Unicode filename parsing, and safe path matching.
 
 ## v2.12.0 (2026-07-13)
 
-### 旧驱动清理
-
-- **新增旧驱动清理**：通过 Windows `pnputil` 结构化检测驱动包、设备绑定和驱动排名，区分正在使用、待确认和高置信旧驱动。
-- **旧驱动检测兼容性修复**：兼容不支持 XML 参数的旧版 Windows `pnputil`，自动回退到文本枚举；同时按 Windows 本地代码页解码输出，避免“枚举驱动包失败”提示乱码。
-- **安全删除链路**：删除前备份到当前 LightC 数据目录，二次复核设备状态并验证删除结果；支持搜索驱动信息、打开驱动目录和一键恢复备份。
-
-### 磁盘信息
-
-- **设置页新增磁盘信息**：在「设置 - 磁盘信息」中手动读取物理磁盘型号、容量、介质、总线、盘符、分区空间和 Windows 报告的健康状态。
-
-### AI 模型空间
-
-- **模型文件删除**：模型列表支持删除单个模型文件，删除前必须二次确认，后端复用增强删除引擎并在成功后更新当前结果。
-
-### 体验修复
-
-- **隐藏后台命令窗口**：旧驱动清理的 `pnputil` 检测和设置页磁盘信息的 PowerShell 查询使用脱离控制台与无窗口创建标志，避免发布包在管理员环境中闪现控制台窗口。
-- **磁盘信息读取修复**：PowerShell 查询改用 UTF-16LE 编码命令并显式写入标准输出，修复部分测试环境和发布包中返回空结果的问题。
----
+- Added old-driver cleanup with device-state checks, backup, restore, search, and safe deletion verification.
+- Added physical disk information, AI model file deletion, and hidden-console handling for system queries.
 
 ## v2.11.3 (2026-07-08)
 
-### 系统瘦身
-
-- **WinSxS 检测修复**：组件存储分析不再使用 `/quiet` 抑制输出，改为解析 DISM 的可回收组件、缓存和临时数据，避免误显示“无需清理”。
-- **组件清理分级**：普通“系统组件存储”清理改为执行 `StartComponentCleanup`；新增“组件基线压缩”高级项单独执行 `ResetBase`，避免把不可回滚的深度清理混入默认操作。
-- **状态提示增强**：系统瘦身条目新增当前状态说明，DISM 分析超时或不可解析时会提示可直接执行官方清理，而不是误判为无可清理内容。
-- **清理交互优化**：DISM 明确无可回收内容时禁用组件清理按钮；清理完成只保留一条结果提示，并说明本次执行的组件清理类型。
-- **执行后状态收敛**：系统瘦身操作完成后不再立即自动重扫，相关按钮会临时禁用并提示重新检测，避免用户误以为可以连续清理。
-- **日志保留设置**：通用设置新增清理日志保留数量，可在 1-100 条之间调整，超过上限仍按最旧日志优先删除。
-
-### 垃圾清理
-
-- **应用 LocalCache 保护**：移除 `Packages\*\LocalCache` 泛扫规则，并在扫描引擎中跳过 WebView2/Chromium 应用 Profile 的持久化数据库，避免误删 Claude 等桌面应用的会话索引、偏好和状态数据。
-- **误删原因修复**：此前普通“应用程序缓存”会把 Claude MSIX 包内 `EBWebView\Default` 下的数据库文件当作缓存清理，可能导致 Claude 侧边栏会话索引被重建；本次收紧为只清理确定性更高的缓存路径。
-
-### 安装与更新
-
-- **常规安装包调整**：常规 NSIS 安装包不再自动联网下载 WebView2 Runtime，避免微软 WebView2 bootstrapper 在部分环境里创建额外 Edge 快捷方式或触发异常安装。
-- **WebView2 缺失提示**：常规安装包安装前会检测 WebView2 Runtime，缺失时提示用户改用 `LightC_webview2_offline_x64.exe` 或先安装 WebView2 Runtime。
-- **更新覆盖修复**：安装前会主动关闭残留的 `LightC.exe` 进程，降低自动更新或覆盖安装时目标 exe 被占用导致“无法打开要写入的文件”的概率。
+- Improved System Slim DISM analysis, cleanup states, timeouts, caching, and cleanup-log retention settings.
+- Tightened application-cache rules to protect WebView2/Chromium persistent data and improved installer WebView2 handling.
 
 ## v2.11.2 (2026-07-07)
 
-### 磁盘变化分析 -- 功能增强
-
-- **磁盘变化分析**：磁盘变化分析功能新增具体变化时间字段显示。
-
+- Added concrete change-time display to Disk Growth Analysis.
 
 ## v2.11.1 (2026-07-06)
 
-### 安全与校验
-
-- **完整性校验修复**：修复新增 WebView2 离线安装包后，常规安装版可能误用后续构建产物签名导致校验失败的问题。
-- **签名资产兼容**：安装版会同时兼容常规安装包和 WebView2 离线安装包的 exe 签名资产，缺少单个候选签名时不会阻断其他官方签名继续校验。
-- **提示文案优化**：校验未通过时改为提示“签名与当前文件不匹配”，避免把发布签名资产异常直接误判为本地文件被篡改。
+- Improved release signature compatibility and clarified integrity-check failures.
 
 ## v2.11.0 (2026-07-05)
 
-### 磁盘变化分析
-
-- **C 盘全盘分析升级**：原“C 盘全盘分析”升级为“磁盘变化分析”，支持读取本机分区并在模块标题旁选择 C/D/E 等目标磁盘。
-- **快照按盘符隔离**：C 盘继续沿用 `disk_growth_*` 历史快照命名，其他磁盘使用 `d_disk_growth_*`、`e_disk_growth_*` 等盘符前缀，统一保存在 `disk_growth_snapshots/` 下。
-- **本地数据清理同步升级**：清空本地数据时，磁盘变化分析快照可按具体盘符勾选清理，默认全选但保留用户确认。
-
-### 大文件清理 / 大目录分析
-
-- **分区选择扩展**：大文件清理接入统一盘符选择器，MFT 与常规遍历都会扫描用户选择的磁盘；大目录分析在开启深度扫描后支持选择目标磁盘。
-- **大文件扫描数量可配置**：设置页新增“大文件清理”功能设置项，可自定义每次返回的大文件数量，范围 10-500，默认 50。
-
-### 体验修复
-
-- **窗口双击修复**：修复自定义标题栏双击最大化/还原后窗口内容偏移、无边框错位或跨显示器缩放异常的问题。
-- **清理动画优化**：垃圾清理删除遮罩移除高成本的全屏背景模糊，保留轻量旋转反馈，降低高刷新率屏幕下 WebView2 GPU 合成压力。
+- Upgraded C-drive analysis into multi-drive Disk Growth Analysis with isolated snapshots and configurable result limits.
+- Added drive selection to large-file and directory analysis, plus configurable large-file result counts.
+- Fixed window scaling issues and reduced cleanup animation overhead.
 
 ## v2.10.4 (2026-07-05)
 
-### AI 模型空间
-
-- **深度发现降噪**：收紧 `.bin/.dlc` 等高误判格式的 MFT 兜底识别规则，排除 Steam、3DMark 等游戏/跑分资源目录，避免把大型资源包误报为未归类模型。
-- **候选确认更稳**：`.bin/.dlc` 需要命中 AI/模型相关目录或强模型文件名特征才会进入深度发现结果，配置层识别到的 HuggingFace、Ollama、ComfyUI 等平台模型不受影响。
-
-### 设置与数据目录
-
-- **修复递归复制问题**：更改数据目录时禁止选择当前数据目录、父目录或子目录，并要求目标为空文件夹，避免误选后生成无限嵌套目录。
-- **配置与数据分离**：应用配置固定迁移到 `%LOCALAPPDATA%/LightC/config/config.json`，默认运行数据放入 `%LOCALAPPDATA%/LightC/data/`；旧版 `config.json` 会自动兼容读取并写入新位置。
-- **迁移范围收敛**：数据目录迁移只复制 LightC 明确拥有的日志、备份、快照和安装历史缓存，不再把旧目录下的无关文件一起迁移。
-
-### 发布包
-
-- **WebView2 离线安装包**：Release 额外上传内置 WebView2 离线安装器的安装包，供 WebView2 环境异常或安装时网络受限的用户使用；常规安装包和便携包继续保留。
-
----
+- Improved AI model candidate filtering, data-directory migration safeguards, and WebView2 offline release packaging.
 
 ## v2.10.3 (2026-06-30)
 
-### 许可证
-
-- **许可证迁移**：自 v2.10.3 起，LightC 从 MIT License 调整为 LightC Source Available License v1.0，源码继续公开用于安全审计、学习、非商业开发和向官方仓库贡献。
-- **授权边界明确**：新许可证明确禁止改名二次发布、独立修改版发布、商业销售、商业产品捆绑再分发以及删除版权、许可证或官方渠道信息。
+- Migrated to LightC Source Available License v1.0 and clarified redistribution boundaries.
 
 ## v2.10.2 (2026-06-29)
 
-### 安全与发布渠道
-
-- **动态官方渠道配置**：Release 新增 `download.json` 资产，便携版更新入口和“安全与校验”页会动态读取作者网盘、GitHub Releases、B站和抖音链接，后续调整下载渠道无需改动代码。
-- **官方完整性校验**：设置新增“安全与校验”一级菜单，可验证当前 LightC.exe 是否通过官方 ed25519 签名；安装版和便携版分别读取 `LightC_installer_exe.sig` / `LightC_portable_exe.sig`，避免把更新包签名误用于运行中 exe。
-- **签名资产兼容修复**：完整性校验兼容历史 Release 中被双重 base64 包装的 exe 签名资产，并将“签名格式异常”和“文件不一致”分开提示，避免官方包被误报为篡改。
-
-### 卸载残留
-
-- **默认选择更保守**：卸载残留扫描结果不再默认勾选任何条目，高置信度仅用于优先提示；清理前需要用户结合路径、大小、置信度和软件使用情况自行验证。
-- **说明文案同步**：扫描结果提示、设置页使用说明和 README 均强调卸载后的目录归属属于事后推断，无法做到 100% 准确。
-
----
+- Added dynamic official download configuration and executable integrity verification for release packages.
+- Made uninstall-leftover selection more conservative and emphasized manual verification.
 
 ## v2.10.1 (2026-06-26)
 
-### AI 模型空间
-
-- **类型统计修复**：模型列表标签统一为文件扩展名，概览类型柱状图保留平台模型类别并用扩展名兜底，超出展示上限的长尾类型会合并为“其他类型”，避免空间总量被截断。
-- **列表操作优化**：模型列表支持关键词搜索与一键清空，排序入口移到表头，支持按名称和大小升降序排列。
-
-### 设置说明
-
-- **卸载残留说明简化**：使用说明不再枚举具体应用类型，明确卸载后的目录归属属于事后推断，清理前需要结合路径、大小和使用情况自行确认。
-
----
+- Improved AI model type statistics, search, sorting, and bulk actions.
+- Simplified uninstall-leftover guidance and risk explanations.
 
 ## v2.10.0 (2026-06-23)
 
-### AI 模型空间
-
-- **新增独立模块**：新增“AI 模型空间”，用于分析本机 AI 模型、LoRA、Embedding 和模型缓存占用，首页优先展示 AI 资产总占用与最大模型。
-- **平台优先识别**：支持 Ollama、LM Studio、ComfyUI、HuggingFace Cache 和深度发现来源；Ollama 解析 manifest 展示真实模型名，并按 blob 映射统计占用。
-- **深度发现兜底**：默认使用配置文件与已知目录快速扫描；开启“深度发现”后追加 MFT 特征扫描本地 NTFS 盘，按模型文件扩展名与体积阈值筛选候选，并跳过已覆盖路径避免重复计数。
-- **结果视图收敛**：概览视图改为平台占用饼图和模型类型柱状图，模型列表支持按平台、类型、关键词筛选，并在表头支持按名称/大小升降序排序，保留打开目录与搜索模型信息。
-- **模型列表可读性优化**：平台标签改为主色实心样式、类型标签统一展示文件扩展名，“未归类”使用暖色提醒；长路径改为中间省略，尽量保留模型文件名。
-- **扫描阶段反馈**：深度发现展示 MFT 枚举、候选筛选、路径重建、结果汇总等阶段进度；完成后可在总览卡片查看各阶段耗时。
-
-### 设置与数据管理
-
-- **使用说明更新**：设置页新增“AI 模型空间”说明，并简化大目录分析、C 盘全盘分析的长说明。
-- **清空本地数据增强**：清理前列出可清理数据项，支持按目录/文件勾选，保留 `config.json` 和数据目录本身；清理全盘分析快照后会在下次扫描重新建立基线。
-- **便携版更新策略**：便携包内新增 `LightC.portable` 标记文件，运行时自动识别便携版并禁用安装器式自动更新，手动更新入口优先打开网盘下载页，GitHub Releases 作为备用渠道。
-- **弹窗动效优化**：清空本地数据弹窗接入 Framer Motion 入退场动画，减少设置页操作的生硬跳变。
-
-### 界面体验
-
-- **统一下拉组件**：新增符合 LightC 主风格的可复用下拉选择组件，用于模型列表筛选。
-- **图表组件复用**：新增轻量饼图、柱状图组件，支持 hover 高亮和 tooltip，便于后续模块复用。
-- **搜索引擎设置**：通用设置新增默认搜索引擎选项，支持 Bing、Google、百度，并统一作用于 AI 模型空间、大文件清理、大目录分析和全盘分析的搜索按钮。
-- **页面模式性能优化**：页面模式下非当前模块会保留本地状态但跳过大列表/图表 DOM 渲染，并将模块扫描状态拆成按模块订阅，减少多个模块已有扫描结果后切换菜单的卡顿。
-
----
+- Added AI Model Storage analysis for Ollama, LM Studio, ComfyUI, HuggingFace, LoRA, Embedding, and model caches.
+- Added model filters, charts, deep discovery, settings/data cleanup improvements, portable update handling, and reusable dropdown components.
 
 ## v2.9.1 (2026-06-22)
 
-### 大目录分析
-
-- **日期显示修复**：修复 MFT 深度扫描结果中最后修改时间显示为 1970 年的问题，主列表和下钻弹窗均已兼容秒/毫秒时间戳。
-- **MFT 时间戳统一**：后端大目录 MFT 引擎统一按毫秒输出修改时间，保持与常规遍历结果一致。
-
-### 卸载残留
-
-- **评分策略更保守**：当前已安装应用 DisplayName 命中改为保护性降权，降低仍在使用的软件数据被误判为残留的概率。
-- **默认勾选收敛**：高置信度阈值从 0.65 提高到 0.75，可疑项继续展示但不默认勾选，更适合人工确认。
-- **准确性说明补充**：设置页和 README 增加卸载后残留无法 100% 权威判断的说明，避免用户误以为可无脑清理。
-
-### 界面体验
-
-- **扫描中状态补齐**：卸载残留、注册表冗余模块在扫描期间展示关键步骤和进度骨架，页面模式下不再大面积空白。
-- **模块操作优化**：各模块重新扫描/检测按钮强化按钮边界，垃圾清理分类卡片展开增加手风琴过渡。
-- **回到顶部**：长列表滚动后显示平滑回顶按钮，便于在页面模式和长结果列表中快速返回顶部。
-
----
+- Improved directory-analysis timestamps and made uninstall-leftover scoring and default selection more conservative.
+- Added scanning-state layouts and a return-to-top action for long results.
 
 ## v2.9.0 (2026-06-21)
 
-### 自定义布局 — 新增页面模式
-
-- **双布局模式**：设置页新增“布局设置”，支持默认卡片总览和传统 PC 软件式页面模式，满足不同用户的使用习惯。
-- **页面式模块切换**：页面模式下左侧导航从锚点滚动自动切换为功能页切换，顶部隐藏“一键扫描”，每个模块独立展示。
-- **状态保留**：卡片模式和页面模式共用同一批模块实例，切换布局或切换模块时不会丢失扫描结果、展开状态和本地选择状态。
-- **轻量过渡动画**：页面模式切换使用新页轻量入场动画和顶部绿色扫描光带，避免大目录分析、C 盘全盘分析等重结果页切换时拖慢界面。
-- **空状态统一**：系统瘦身、社交软件专清、大文件清理、大目录分析等模块补齐统一空数据占位，未扫描时页面更完整。
-
-### 体验修复
-
-- **C 盘全盘分析弹窗修复**：变化明细弹窗改为挂载到 `document.body`，避免在页面模式下被模块容器裁切。
-- **社交软件专清动画优化**：删除确认、删除进度、文件详情弹窗统一使用 Framer Motion 入退场动画，分类结果展开/折叠增加手风琴过渡。
-- **风险标签乱码修复**：修复社交软件专清中文风险等级显示乱码，恢复为“危险（聊天记录）/谨慎清理/建议清理/安全清理”。
-
----
+- Added card and page layout modes with persistent module state and page navigation.
+- Improved modal behavior, social-cache transitions, risk labels, and empty states.
 
 ## v2.8.1 (2026-06-18)
 
-### C 盘全盘分析 — 超大磁盘优化
-
-- **快照存储优化**：文件级明细改为同名 `.files` 分片目录存储，主 JSON 只保留目录聚合快照，百万级文件和多 TB 磁盘下打开明细不再需要加载超大快照
-- **快照保留收敛**：历史快照最多保留 3 组，满足最近两次对比并保留一组排查余量，同时降低长期磁盘占用
-- **极端场景内存优化**：扫描结果不再额外生成完整 `file_entries` 大数组，保存快照时直接消费文件大小记录写入分片，降低百万级文件场景的峰值内存
-- **深层变化明细兜底**：修复父目录存在变化量但弹窗内子目录/文件明细为空的问题，必要时按分片流式对比深层变化文件，并只保留当前分页需要的 Top 结果
-- **弹窗动画修复**：变化明细弹窗改用 Framer Motion 入退场动画，关闭时不再生硬瞬间消失
-- **清空本地数据增强**：清空操作增加二次确认，并同步清理 C 盘全盘分析快照；清理后下一次扫描会重新建立基线
-
+- Optimized large-disk snapshots with file shards, retention limits, streaming detail comparison, and lower memory usage.
 
 ## v2.8.0 (2026-06-17)
 
-### C 盘全盘分析 — 明细能力增强
-
-- **文件级变化明细**：全盘快照新增文件级记录，点击变化量后可查看当前目录内具体新增、减少和增长的文件
-- **双栏明细弹窗**：明细弹窗左侧展示下一级变化目录，右侧展示当前目录变化文件，目录支持面包屑下钻和一键打开位置
-- **分页与虚拟列表**：目录和文件明细均通过 Rust API 按需加载，每次最多 200 条，并使用虚拟列表渲染，大量变化文件下仍保持流畅
-- **弹窗体验优化**：修复明细弹窗单列显示、双层滚动条和过渡动画不明显的问题，打开/关闭更自然，列表底部显示已加载数量和总数
-- **颜色指标说明**：设置页新增全盘分析颜色规则说明，明确蓝色为新增、红色为显著增长、橙色为快速增长、黄色为轻微增长、绿色为减少
-- **布局稳定性**：优化全盘分析概览指标卡宽度，主窗口初始宽度与最小宽度统一，避免窄窗口下关键指标换行
-
-
----
+- Added file-level Disk Growth details with drill-down navigation, pagination, virtualization, and clearer change indicators.
 
 ## v2.7.1 (2026-06-16)
 
-### C 盘全盘分析 — 体验修复
-
-- **扫描可取消**：模块内停止按钮和顶部全局「停止扫描」都会通知后端中断 MFT 扫描，取消后不再把半截结果写回界面
-- **耗时诊断统一**：扫描结果上方的阶段耗时改为与大目录分析一致的卡片布局，展示总耗时、处理文件数、各阶段耗时和大小来源
-
-### 大目录分析 / 大文件清理 — 修复
-
-- **大目录扫描停止修复**：修复模块内暂停按钮不会真正停止、且取消后结果只剩一级目录的问题
-- **大目录结果恢复**：深度扫描结果继续遵循设置中的展示深度，不再只显示 1-2 级目录
-- **大目录诊断面板优化**：扫描中和扫描完成后的性能指标布局更紧凑，亮色主题下可读性更稳定
-- **大文件清理体验增强**：结果操作栏支持一键跳转 Bing 搜索文件用途，辅助判断文件是否可删
-
-### 系统瘦身 / 社交软件专清 — 修复
-
-- **系统瘦身检查提速**：WinSxS 检查页对 DISM 分析使用短超时和 10 分钟缓存，避免每次打开都长时间等待；清理完成后会自动刷新缓存
-- **社交缓存分类修复**：修复微信动态缓存可能被图片/视频规则提前归类的问题，补充 `Sns`、`WebView`、小程序、临时目录等常见缓存路径
-
-### 设置与发布
-
-- **关于页新增更多工具**：新增 Viap 和 BinlockX 推荐入口，提供夸克网盘下载
-- **发布文案更新**：同步更新自动发布工作流和版本更新日志
-
----
+- Fixed scan cancellation and diagnostics for disk, directory, and large-file analysis.
+- Improved social-cache classification, System Slim timeouts, and large-file search assistance.
 
 ## v2.7.0 (2026-06-15)
 
-### C 盘全盘分析 — 新增
-
-- **ProgramData 分析升级为 C 盘全盘分析**：管理员运行时通过 NTFS MFT 快速扫描 C 盘，保存快照并与上次扫描对比，展示新增、减少和明显变化的目录
-- **变化结果可配置**：功能设置中新增全盘分析展示数量配置，支持在性能和结果完整度之间平衡
-- **阶段耗时诊断**：扫描过程展示 MFT 枚举、路径重建、大小读取、目录聚合等阶段耗时，便于判断性能瓶颈
-
-### 大目录分析 / 大文件清理 — 性能与体验优化
-
-- **大目录分析 MFT 聚合优化**：改为自底向上聚合目录大小，并基于内存父子索引生成结果树，展示深度与设置保持一致，减少结果生成阶段磁盘 IO
-- **大文件清理 MFT 模式优化**：管理员运行时优先使用 MFT 数据读取大文件信息，同时保留非管理员/异常场景下的降级扫描方案
-- **扫描诊断面板优化**：大目录分析的扫描中和扫描完成状态统一展示结构化阶段耗时，亮色/深色主题下可读性更稳定
-
-### 通用界面优化
-
-- **通用空数据组件**：垃圾清理、卸载残留、注册表冗余、右键菜单清理、C 盘全盘分析统一使用空数据占位，扫描为空时状态更明确
-- **一键搜索辅助判断**：大文件清理和 C 盘全盘分析结果支持一键跳转 Bing 搜索路径/文件用途，方便判断是否可清理
-
----
+- Added C-drive full analysis with MFT support, snapshots, change reports, configurable result limits, and stage diagnostics.
+- Improved directory aggregation, large-file scanning, empty states, and search assistance.
 
 ## v2.6.0 (2026-06-08)
 
-### 大文件清理 — 扫描性能大幅提升
-
-- **MFT 混合扫描引擎**：管理员运行时，大文件扫描自动启用 NTFS USN Journal 枚举 + 并行文件大小检测，扫描速度从 30-60 秒降至 10 秒以内。非管理员或非 NTFS 时自动降级为原有方案，前端标注「混合扫描」模式
-- **智能路径过滤**：自动跳过系统目录（System32、WinSxS 等）和小文件扩展名，聚焦用户目录和程序目录中的大文件
-- **大目录分析优化**：MFT 直读引擎的初始化提示更友好，扫描过程中实时显示进度
-
----
+- Added the hybrid MFT large-file scanner with safe path filtering and automatic fallback for unsupported environments.
 
 ## v2.5.0 (2026-06-07)
 
-### 大目录分析 — MFT 直读引擎
-
-- **管理员运行时可秒级全盘扫描**：以管理员身份启动时，深度扫描自动启用 NTFS MFT（主文件表）直读引擎，绕开文件系统 API 直接读取磁盘元数据，实现类似 WizTree 的极致速度。非管理员或非 NTFS 文件系统时自动降级为常规遍历，无需任何手动切换
-- **前端实时显示引擎类型**：扫描过程中界面会标注当前使用的引擎（「MFT 直读」绿色标签 或 「常规遍历」灰色标签），一目了然
-
-### 回收站清理 — 修复
-
-- **回收站清空现在真正可用了**：修复了回收站文件删除时提示成功但实际未能清空的 bug。现在通过 Windows Shell API 统一处理，所有驱动器的回收站都能正常清空
-
-### 卸载残留扫描 — 误报修复
-
-- **WSL2 虚拟磁盘不再被误判为残留**：修复了 WSL2 的 `ext4.vhdx` 虚拟磁盘文件被误报的问题
-- **剪映 / CapCut 工作区数据不再被误判为残留**：新增剪映、CapCut 等视频编辑软件到安全白名单
-
----
+- Added the MFT directory-analysis engine with fast administrator-mode scanning and safe fallback traversal.
+- Improved Recycle Bin cleanup, uninstall-leftover accuracy, and cache classification.
 
 ## v2.4.5 (2026-06-07)
 
-### Bug 修复
-
-- **回收站清理现在可以正常工作了**：修复了回收站文件删除时提示成功但实际未能清空的 bug。现在删除回收站文件时通过 Windows Shell API 统一清空所有驱动器回收站，不再出现"点了删除、文件还在"的情况
-
----
+- Delivered a focused bug-fix release for cleanup and result handling.
 
 ## v2.4.4 (2026-06-04)
 
-### 卸载残留扫描 — 误报修复
-
-- **WSL2 虚拟磁盘不再被误判为残留**：修复了 WSL2 的 `ext4.vhdx` 虚拟磁盘文件被检测为「孤立虚拟磁盘」误报的问题。现在所有已加入白名单的应用（wsl、Docker、VS Code 等）的子目录和文件都会被正确跳过，不再出现误勾选
-- **剪映 / CapCut 工作区数据不再被误判为残留**：新增剪映（JianyingPro）、CapCut 等视频编辑软件到安全白名单，避免工作区和草稿数据被误清理
-
-### 设置界面优化
-
-- **存储位置新增「前往」按钮**：通用设置 → 数据管理 → 存储位置旁新增一键打开按钮，点击直接跳转到数据目录，无需手动在资源管理器中逐级导航
-
----
+- Improved uninstall-leftover false-positive filtering and settings layout.
 
 ## v2.4.3 (2026-06-03)
 
-### 大目录分析 — 新增设置项
-
-- **深度扫描可选择是否忽略系统目录**：功能设置中新增「深度扫描忽略系统目录」开关。关闭后，Windows、Program Files 等系统保护目录的子目录也会被扫描并显示在结果中，帮助发现藏在系统目录下的异常大文件（如某个 20GB 的日志文件）。开启时保持原有行为，扫描更快、结果更聚焦
-
-### Bug 修复
-
-- **注册表冗余模块删除时备份失败**：修复了在中文/日文/韩文等非英文 Windows 系统上，删除注册表残留条目时 `reg.exe` 导出的备份文件编码不兼容导致操作报错的问题。现在所有语言版本的 Windows 都能正常删除和恢复
-
----
+- Added directory-analysis display settings and fixed related scan and threshold update issues.
 
 ## v2.4.2 (2026-05-16)
 
-### 大目录分析 — 扫描引擎升级
-
-- **目录大小统计更准确**：重写了底层统计算法，现在每个目录的大小都会完整计入所有上级目录，深层目录不会出现大小显示偏小的问题
-- **扫描速度与稳定性提升**：优化了文件遍历方式，在 Win11 开启 Defender 的环境下扫描更流畅，不会因安全软件实时扫描而明显卡顿
-- **树形目录层级更完整**：所有目录条目现在都能展开查看子目录，不再出现"有的能展开、有的不能展开"的情况；目录树展示层数跟随设置面板的深度配置动态调整
-- **排行榜更实用**：全盘扫描时，Windows、Program Files 等系统级大目录会自动展开为子目录参与排名，不再霸占排行榜前几名，让你一眼看到微信聊天记录、npm 缓存、Docker 数据等真正值得关注的目录
-- **扫描深度与展示深度分离**：底层扫描覆盖足够深的目录层级，前端展示深度可独立调节，两者互不干扰
-
-### 大目录分析 — 功能增强
-
-- **可调节的最低展示大小**：新增滑块（10-500MB），低于设定值的小目录不再显示在列表中，有效过滤细碎噪音
-- **扩大扫描覆盖范围**：Windows Update 更新缓存、OneDrive/Teams 等应用数据、ProgramData 下的 Docker/Scoop 数据等现在都会正常显示，之前被误跳过的目录重新可见
-- **结果数量提升**：默认模式显示 Top 50、深度扫描显示 Top 80（分别从 30/50 提升），更多大目录一目了然
-- **Windows Update 缓存可见**：SoftwareDistribution 目录现在正常扫描显示，标记为系统保护但不再跳过，体积一目了然
-
-### 设置界面优化
-
-- **独立的功能设置页**：新增「功能设置」一级菜单（图标：滑块），大目录分析的展示深度、大小阈值、自动忽略说明等独立于此，与通用设置分离
-- **使用说明更新**：大目录分析章节完整重写，介绍树形层级、热点展开、大小阈值等新机制
-
-### 性能优化
-
-- 全盘扫描时的目录排序更高效，大列表操作响应更快
-- 减少了文件遍历时的重复判断，降低 CPU 开销
-
-### Bug 修复
-
-- 修复调整展示深度或大小阈值后扫描参数没有立即更新的问题（设置面板的改动现在会即时生效）
-- 修复全盘扫描时子目录大小可能被不完整数据覆盖的问题
-
-### 垃圾清理 — 扫描准确性修复
-
-- **Windows 临时文件不再重复统计**：`%TEMP%` 和 `%TMP%` 指向同一目录时，扫描引擎自动去重，不再双倍虚报文件数量和体积
-- **目录大小不再重复计数**：扫描引擎改为只统计文件、跳过目录条目，彻底修复了"目录大小 + 子文件大小"叠加导致的虚报问题
-- **回收站改用系统 API 清理**：不再直接删除 `$Recycle.Bin` 中的文件（该操作需要 SYSTEM 权限），改为调用 Windows Shell 原生 `SHEmptyRecycleBinW` API，清理更彻底、不再残留元数据
-- **被占用的文件自动标记重启删除**：删除失败时检测文件是否被其他进程占用（共享冲突），如果是且路径安全，自动调用 Windows `MoveFileExW` 注册为"重启后删除"，不再简单标记为失败
-- **安装程序临时文件范围精确化**：不再扫描 `C:\NVIDIA`、`C:\AMD`、`C:\Intel` 目录（这些是用户手动保存的驱动安装包，删除后影响驱动回退）
-- **应用缓存与浏览器缓存不再重复**：移除 `AppCache` 中与 `BrowserCache` 重叠的 `INetCache\IE` 路径，避免同一批文件在两个分类中重复统计
-
-### 社交软件专清 — 扫描分类修复
-
-- **「传输文件」「图片视频」「动态缓存」不再空白**：修复了文件分类规则的优先级错误——临时缓存的路径匹配（`\cache\` 等）会提前拦截所有含 `Cache` 关键字的文件路径（如企业微信 `Cache\File\`、`Cache\Image\`），导致文件传输入口、图片视频、动态缓存这三个分类始终为空。现在仅当目录明确标记为「临时缓存」时才会按 cache 路径归类，其他分类不受影响
-- **企业微信检测更全面**：新增 AppData（Roaming 和 Local）下的 `WXWork` 目录扫描，覆盖将数据迁移到 AppData 的企业微信版本
-- **朋友圈缓存识别更准确**：新增 `FileStorage\Sns` 路径特征匹配，微信朋友圈缓存目录的覆盖率更高
-
-### 大文件清理 — 风险等级与交互修复
-
-- **全选逻辑修正**：全选/取消全选现在自动排除系统关键文件，不再出现全选后无法取消的假象
-- **Windows 更新缓存风险修复**：`C:\Windows\SoftwareDistribution\Download\` 下的文件现在正确标记为安全等级，不再显示为危险文件
-- **系统文件判断更精确**：.sys 后缀文件仅在核心系统目录（system32/syswow64/drivers）下才标记为系统关键，临时目录下的 .sys 临时文件不再误判
-- **压缩包识别扩展**：新增 bz2/xz/zst/cab/tar.gz 等更多压缩格式的来源识别
-- **删除后列表更新修正**：部分删除失败时，剩余文件列表和选中状态基于实际删除结果重建，不再遗漏失败项
-
-### ProgramData 分析 — 增长对比显示修复
-
-- **[BUG] 增长列表全部显示 "-" 修复**：分析结果的路径格式（`C:\ProgramData\Microsoft`，Windows 反斜杠）与增长快照的路径格式（`c:/programdata/microsoft`，小写正斜杠）不一致，导致前端 `growthMap` 查找永远失败。修复方案为三层路径标准化——后端命令层统一 `normalize_path()` 后返回、前端构建 `growthMap` 和查询时均做 `toLowerCase() + replace(/\\/g, '/')` 标准化
-- **快照保存异步化**：`scan_and_analyze_programdata` 中快照保存移至独立 `spawn_blocking`，不再阻塞扫描结果返回前端
-- **"全部新增"兼容逻辑优化**：旧格式快照与新格式路径不匹配时，不再返回空列表，改为返回实际条目数据 + 格式升级提示，下次扫描后自动恢复正常
-
-### 自动更新 — 桌面快捷方式重复修复
-
-- **更新后不再出现两个桌面快捷方式**：移除了 MSI 安装包构建（仅保留 NSIS），MSI 安装到 `%ProgramFiles%` 而 NSIS 安装到 `%LOCALAPPDATA%`，两种安装路径不同导致更新时可能产生两套程序+两个快捷方式
-- **更新模式下快捷方式不再被误删**：修复了自定义安装脚本在更新过程中无条件删除桌面快捷方式的逻辑，现在仅在用户主动卸载时才删除
-
----
-
+- Upgraded directory analysis accuracy, ranking, depth controls, performance, and Windows cache coverage.
+- Fixed duplicate junk accounting, Recycle Bin cleanup, social-cache categories, large-file risk labels, and snapshot path matching.
 
 ## v2.4.1 (2026-05-03)
 
-### 系统瘦身 — 严重缺陷修复
-
-- **[CRITICAL] 扫描卡死修复**：`get_status()` 改为异步并发架构，DISM 组存储分析移至 `spawn_blocking` 独立线程 + 30s 超时兜底，不再阻塞主线程导致前端假死
-- **[BUG] 休眠状态检测错误**：放弃解析 `powercfg /a` 输出（GBK 编码导致中文字符乱码），改用注册表 `HKLM\System\CurrentControlSet\Control\Power\HibernateEnabled` 直接读取，瞬时完成、编码无关、100% 准确
-- 三项检测（休眠 / WinSxS / 虚拟内存）改为 `tokio::join!` 并发执行，总耗时从 2 分钟降至 1-3 秒
-
-### 自动更新 — 体验优化
-
-- **手动检查即时反馈**：点击「检查更新」按钮后立即弹出 loading 弹窗，不再等到结果返回
-- **启动自动检查静默失败**：自动检查出错不再弹窗打扰用户，仅 console 记录
-- **native-tls 兼容**：updater 插件启用 Windows 原生 TLS（SChannel），解决 rustls 证书/代理兼容性问题
-- **重试逻辑修复**：`handleRetry` 使用 `sourceRef` 跟踪触发来源，重试时行为一致
-
-### 工程改进
-
-- GitHub Actions 新增绿色版（Portable）ZIP 包自动上传
-- `release.yml` 优化 Release 说明，包含完整下载链接和安装指引
-
----
+- Fixed critical System Slim scan blocking and improved update checks, retry behavior, and release packaging.
 
 ## v2.4.0 (2026-05-01)
 
-### 自动更新 — 新功能
-
-- **GitHub Releases 自动更新**：基于 Tauri v2 updater plugin + GitHub Releases 实现全自动更新，零额外服务器成本
-- **启动自动检查**：应用启动后自动检查新版本，发现更新弹窗提示，出错静默不打扰
-- **手动检查更新**：设置 → 关于 → 「检查更新」按钮，实时反馈 loading / 已是最新 / 发现新版本
-- **更新弹窗**：支持检查/已发现/下载中（进度条）/安装/错误重试五种状态，提供完整的 Release Notes 展示
-
-### 大目录分析 — 性能优化
-
-- **扫描速度提升 50%**：优化目录遍历算法和并行策略，大幅缩短扫描时间
-- 更高效的内存管理，减少大目录场景下的内存占用
-
-### 设置 — 功能增强
-
-- **自定义数据目录**：通用设置中支持修改应用数据存储路径（快照、日志、缓存等），方便迁移和备份
-- **清空本地数据反馈**：点击「清空本地数据」后弹出 Toast 提示，显示清理的文件数量和释放空间
-
-### 体验优化
-
-- **锚点导航开关**：设置中可开启/关闭首页锚点导航组件，满足不同使用习惯
-- **Toast z-index 修复**：Toast 通知层级提升至 `z-[10000]`，修复被设置弹窗遮罩遮挡的问题
-- **设置弹窗关闭按钮**：标题栏右侧新增关闭按钮，操作更便捷
-
-### 右键菜单清理 — 全面升级
-
-- **MUIVerb 间接字符串解析**：通过 `SHLoadIndirectString` FFI 调用 Windows Shell32 API，将 `@%SystemRoot%\System32\xxx.dll,-1234` 等原始字符串解析为人类可读的菜单名称（如「使用画图编辑」「打印」等），彻底解决前端显示不可读问题
-- **系统级菜单项自动保护**：`shellex\ContextMenuHandlers` 下的系统级右键菜单条目标记为受保护（`is_system_protected`），前端 UI 禁止勾选+删除，避免破坏系统右键功能
-- **风险三级徽标**：每个条目独立标注风险等级——安全（safe）/ 谨慎（caution）/ 危险（danger），一目了然
-- **删除前自动备份**：清理前自动调用 `reg.exe export` 导出 .reg 备份文件，出问题可双击还原
-- **白名单精确匹配**：改用 `eq_ignore_ascii_case` 而非通配 `contains`，杜绝短词碰撞误匹配
-
-### ProgramData 分析 — 关键缺陷修复
-
-- **[CRITICAL] 增长对比彻底修复**：修复快照路径标准化不一致问题——旧版快照仅存目录名（如 `Microsoft`），新代码使用完整路径（`c:/programdata/microsoft`），导致增长对比自上线以来全部判定为「新增」。现已统一标准化逻辑，并加入旧格式快照自动清理机制
-- **Regex 匹配模式真正实现**：规则引擎的 Regex 匹配模式之前仅降级为 `contains`，现已通过 `regex::Regex::new()` 实现真正的正则匹配
-- **清理后本地增量更新**：单项/批量清理后仅在本地移除已清理条目，不再触发完整重扫
-- **合并扫描+分析命令**：新增 `scan_and_analyze_programdata` 合并命令，单次 IPC 完成扫描+分析，前端从 3 次 IPC 降为 2 次
-- **路径安全校验加固**：`validate_path` 改用 `starts_with("c:/programdata/")` 组件边界匹配，替换不安全的 `contains`
-- **快照数据目录统一**：快照存储纳入统一 `data_dir` 模块管理，不再使用独立目录
-- **首次扫描兼容处理**：检测到新旧快照格式不兼容时自动返回优雅提示，不再显示错误的「全部新增」
-
-### 后端架构 — 命令模块化重构
-
-- **commands.rs 全面拆分**：将 ~1500 行的单文件命令模块拆分为 12 个功能域子模块，按大企业生产级标准组织：
-  `disk`（磁盘信息）、`scan`（垃圾扫描+大文件）、`social`（社交软件）、`delete`（文件删除+增强删除）、`system`（系统瘦身+健康评分）、`leftovers`（卸载残留）、`registry`（注册表+右键菜单）、`hotspot`（大目录分析+下钻）、`programdata`（ProgramData 全系列）、`tools`（系统工具）、`logger_cmd`（清理日志）、`data`（数据目录管理）
-- 所有公开 API 签名保持不变，`lib.rs` 无需任何改动，零新增警告
-
-### 文档更新
-
-- 新增《右键菜单清理模块》技术文档（完整链路 + 问题分析 + 修复记录）
-- 新增《ProgramData 分析模块》技术文档（完整链路 + Critical Bug 分析 + 优化记录）
-- 新增《自动更新功能技术方案》技术文档
-- 新增 `CHANGELOG.md` 替代 `update-logs.md`
-
----
+- Added automatic updates, custom data directories, upgraded Context Menu Cleaner, and modular backend commands.
+- Improved ProgramData snapshot safety, path validation, local incremental updates, and release assets.
 
 ## v2.3.0 (2026-04-24)
 
-### 新增功能
-
-- **ProgramData 分析模块**：深度分析 C:\ProgramData 目录
-  - 两层扫描策略，一级目录全量扫描，超过 100MB 的目录自动下钻子目录
-  - 内置 20+ 条分类规则，自动识别 Windows Update、Defender、驱动缓存、Docker、Adobe 等目录
-  - 三级风险标识（安全/谨慎/危险），安全项可一键清理，危险项自动保护
-  - 基于快照系统追踪目录大小变化，自动生成增长报告
-  - 所有删除操作移动到回收站，支持一键清理和单项清理
-  - 未匹配规则的目录标记为「第三方软件」，提示用户自行判断
-- **锚点导航组件**：首页左侧悬浮锚点导航，悬浮展开、平滑滚动、智能高亮，设置中可开关
-- **一键扫描控制**：扫描过程中支持停止操作，可立即终止所有扫描任务
-
-### 优化改进
-
-- **卸载残留置信度引擎重构**：彻底重写置信度评分模型，大幅降低误报率
-  - 评分基线从 0.5 改为 0.0，杜绝「默认可疑」的误判
-  - 去除 DisplayName token 拆分，仅使用 InstallLocation 末级目录名构建精确映射
-  - 7 项正向信号 + 6 项负向信号独立加权
-  - 高置信度阈值 0.65，输出门槛 0.40
-  - 预过滤包名/版本号格式目录，模拟器直接 0.90 短路评分
-  - 新增 5 个单元测试
-- ProgramData 清理错误中文本地化提示
-- 可清理空间计算仅统计安全级别 + 可操作条目
-- 路径安全：修复子目录包含 "Windows" 关键字时被误判为受保护路径
-- 模块内部滚动容器移除，统一使用全局滚动条
-
-### 后端新增
-
-- ProgramData 扫描模块（`programdata.rs`）：Rayon 并行扫描，两层策略
-- 规则引擎模块（`programdata_rules.rs`）：JSON 可配置规则集
-- 快照系统（`programdata_snapshot.rs`）：轻量级历史数据记录，最多保留 3 份
-- 增长对比模块（`programdata_growth.rs`）
-- 安全清理模块（`programdata_cleaner.rs`）：多层安全校验 + 回收站删除
-
----
+- Added ProgramData analysis, anchor navigation, global scan cancellation, and a confidence-based uninstall-leftover engine.
 
 ## v2.2.3 (2026-04-06)
 
-### 新增功能
-
-- **大目录分析 - 无限下钻弹窗**：点击目录条目右侧的 ▶ 按钮，弹出沉浸式模态框，支持无限层级深入探索子目录结构
-  - 全路径面包屑导航，路径过长时自动截断，每级可点击快速回溯
-  - 沉浸式列表布局，全宽无缩进设计，长文件名完整显示
-  - 智能层级识别，面包屑中已扫描的层级不可点击，仅新下钻层级可跳转
-  - 键盘快捷键：ESC 关闭弹窗
-  - 清理操作后关闭弹窗时主界面数据自动刷新
-
-### 后端优化
-
-- 新增 `scan_path_direct` API：单层目录扫描 + Rayon 并行计算
-
----
+- Added unlimited directory drill-down with breadcrumbs, keyboard navigation, and direct single-directory scanning.
 
 ## v2.2.2 (2026-04-05)
 
-### 新增功能
-
-- **字体大小设置**：通用设置中支持标准/适中/较大三档字号调节
-- **系统快捷工具**：通用设置中新增开机启动管理、存储感知快捷入口
-- **更新日志链接**：关于页面底部新增更新日志跳转链接
-
-### UI 优化
-
-- 主题切换器改为纯图标显示
-- 意见反馈重构：交流群移至意见反馈页面，支持一键复制
-- 赞赏功能移至意见反馈页面
-- 更新日志从 README 抽离为独立文件
-
----
+- Added font-size settings, system shortcuts, and an in-app changelog link.
 
 ## v2.2.1 (2026-03-29)
 
-### 新增功能
-
-- **启动动画**：新增官方正版验证视觉，像素风 Logo + 扫描光束 + SHA-256 校验提示
-- **安全与校验选项卡**：设置中新增独立选项卡，包含正版声明和一键校验工具
-- **版权与渠道声明**：首页底部新增版权信息及官方渠道提示
-
-### UI 优化
-
-- 健康评分指标悬停提示
-- Tauri 2.0 splashscreen + main 双窗口启动架构
-
----
+- Added the verified startup animation, integrity checks, and official channel notices.
 
 ## v2.2.0 (2026-03-28)
 
-### 新增功能
-
-- **右键菜单清理**：深度扫描注册表中失效的右键菜单条目，一键清理
-  - 覆盖任意文件、文件夹、桌面背景、磁盘驱动器等所有场景
-  - 自动识别 exe 是否存在，默认仅勾选失效条目
-  - 支持按作用范围分组展示、展开查看完整注册表路径
-
-### UI 优化
-
-- 模态框动画升级：弹簧曲线动画，弹出/关闭更丝滑
-
----
+- Added Context Menu Cleaner with invalid-entry detection, system protection, risk labels, and registry backups.
 
 ## v2.1.0 (2026-03-17)
 
-### 新增功能
-
-- **大目录分析**：快速定位 AppData 中占用空间的元凶，通过语义识别智能分析目录
-- **智能下钻分析**：深度扫描模式下，目录超过 5GB 且包含 1000+ 文件时自动分析子目录结构，最多下钻 3 层
-- **社交软件专清增强**：
-  - 智能路径溯源：自动读取注册表获取微信/QQ 自定义存储路径
-  - 全盘搜索备选：当默认路径失败时自动搜索所有磁盘
-  - 精准风险分级：聊天记录数据库自动锁定，传输文件提示谨慎，缓存文件建议清理
-  - 支持微信、QQ/NTQQ、钉钉、飞书、企业微信、Telegram
-- **深度卸载残留**：支持模拟器（雷电、蓝叠、夜神等）、注册表及驱动级深度残留分析
-- **交流群模块**：关于页面新增 QQ 交流群，支持一键复制群号
-
-### UI 优化
-
-- 全局禁用文本选中，应用更像原生桌面软件
-- 欢迎弹窗重构：简约圆角风格
-- 下钻结果分级展示：缩进 + 路径简写，层级清晰
-
-### 技术改进
-
-- 暂不提供自动更新功能，简化架构
-- Rayon 多线程并行扫描，优化大目录分析性能
-- 一键扫描采用前端触发器 + 后端 spawn_blocking 并发模式
-- 社交软件扫描模块重构为独立的 `social_scanner.rs`
-
----
+- Added Directory Analyzer, social-app cleanup expansion, deep uninstall-leftover scanning, and the feedback/community entry.
 
 ## v2.0.0 (2025-02-27)
 
-### 新增功能
-
-- **卸载残留扫描**：扫描 AppData 和 ProgramData 中无对应已安装程序的孤立文件夹
-- **注册表冗余扫描**：安全扫描 Windows 注册表中的孤立键值和无效引用，支持备份导出
-- **增强删除引擎**：
-  - 支持 Take Ownership 获取文件所有权（仅限安全目录）
-  - 支持 Delete on Reboot 处理锁定文件（`MoveFileExW` + `MOVEFILE_DELAY_UNTIL_REBOOT`）
-  - 显示物理释放量而非逻辑大小（按磁盘簇对齐计算）
-  - 详细的失败原因反馈（权限不足、文件被占用、系统保护等）
-
-### UI 优化
-
-- 手风琴动画：模块卡片折叠/展开添加平滑过渡
-- 清理完成后显示真实释放量、跳过原因、待重启删除数
-- 失败原因悬停提示
-
-### 技术改进
-
-- 新增 `EnhancedDeleteEngine` 模块（`src-tauri/src/cleaner/enhanced_delete.rs`）
-- 前端新增 `EnhancedDeleteResult` 类型和相关 API
+- Initial release with junk cleanup, uninstall-leftover scanning, registry cleanup, and the enhanced deletion engine.

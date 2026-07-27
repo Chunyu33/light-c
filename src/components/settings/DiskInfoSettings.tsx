@@ -89,8 +89,9 @@ function HealthBadge({ status, translate }: { status: DiskHealthInfo['health_sta
 
 function InfoItem({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-      <p className="text-[11px] font-medium text-[var(--text-muted)]">{label}</p>
+    <div className="min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+      {/* 磁盘字段来自系统接口，标签和值都限制为单行，避免异常厂商文本撑开卡片。 */}
+      <p className="truncate text-[11px] font-medium text-[var(--text-muted)]" title={label}>{label}</p>
       <p className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)]" title={title ?? value}>
         {value}
       </p>
@@ -101,12 +102,12 @@ function InfoItem({ label, value, title }: { label: string; value: string; title
 function VolumeItem({ volume, translate }: { volume: DiskVolumeInfo; translate: Translate }) {
   const usagePercent = Math.min(Math.max(volume.usage_percent, 0), 100);
   return (
-    <div className="min-w-0 rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+    <div className="min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
         <span className="min-w-0 truncate text-xs font-semibold text-[var(--text-primary)]" title={getVolumeLabel(volume)}>
           {getVolumeLabel(volume)}
         </span>
-        <span className="whitespace-nowrap text-right text-[11px] tabular-nums text-[var(--text-muted)]" title={`${formatSize(volume.free_space)} ${translate('diskInfo.available')}`}>
+        <span className="min-w-0 whitespace-nowrap text-right text-[11px] tabular-nums text-[var(--text-muted)]" title={`${formatSize(volume.free_space)} ${translate('diskInfo.available')}`}>
           {formatSize(volume.free_space)} {translate('diskInfo.available')}
         </span>
         <div className="col-span-2 mt-2 flex min-w-0 items-center gap-2">
@@ -146,7 +147,7 @@ function DiskInfoCard({ disk, translate }: { disk: DiskHealthInfo; translate: Tr
 
       <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2">
         <InfoItem label={translate('diskInfo.capacity')} value={formatSize(disk.size || totalVolumeSize)} />
-        <InfoItem label={translate('diskInfo.media')} value={formatMediaType(disk.media_type, translate)} />
+        <InfoItem label={translate('diskInfo.mediaLabel')} value={formatMediaType(disk.media_type, translate)} />
         <InfoItem label={translate('diskInfo.bus')} value={disk.bus_type || translate('diskInfo.unknown')} />
         <InfoItem label={translate('diskInfo.operationalStatus')} value={disk.operational_status || translate('diskInfo.unknown')} title={disk.operational_status} />
         <InfoItem label={translate('diskInfo.firmware')} value={disk.firmware_version || translate('diskInfo.notProvided')} />
