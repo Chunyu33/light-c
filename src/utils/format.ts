@@ -121,3 +121,15 @@ export function getRiskLevelText(level: number): string {
       return '未知';
   }
 }
+
+// 风险等级是后端稳定的数值枚举，交给调用方使用语言包生成显示文案。
+export function getRiskLevelKey(level: number): string {
+  switch (level) {
+    case 1: return 'safe';
+    case 2: return 'lowRisk';
+    case 3: return 'mediumRisk';
+    case 4: return 'highRisk';
+    case 5: return 'criticalRisk';
+    default: return 'unknown';
+  }
+}

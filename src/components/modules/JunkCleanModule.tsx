@@ -5,6 +5,8 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import i18n from '../../i18n';
+import { useTranslation } from 'react-i18next';
 import {
   Activity,
   Database,
@@ -80,16 +82,16 @@ function mergeDeepCategoryPage(result: ScanResult, page: CategoryScanResult): Sc
 const DEEP_SCAN_STAGES = ['discover', 'mft', 'path', 'filter', 'metadata', 'result', 'summary'];
 
 function getScanStageLabel(stage: string, isDeep: boolean): string {
-  if (!isDeep) return '检查已知垃圾目录';
+  if (!isDeep) return i18n.t('scanStages.quick', { ns: 'junkClean' });
   switch (stage) {
-    case 'discover': return '发现本地分区';
-    case 'mft': return '枚举 NTFS 文件记录';
-    case 'path': return '重建候选文件路径';
-    case 'filter': return '匹配安全清理规则';
-    case 'metadata': return '读取文件大小与时间';
-    case 'result': return '整理扫描结果';
-    case 'summary': return '汇总扫描结果';
-    default: return '准备扫描';
+    case 'discover': return i18n.t('scanStages.discover', { ns: 'junkClean' });
+    case 'mft': return i18n.t('scanStages.mft', { ns: 'junkClean' });
+    case 'path': return i18n.t('scanStages.path', { ns: 'junkClean' });
+    case 'filter': return i18n.t('scanStages.filter', { ns: 'junkClean' });
+    case 'metadata': return i18n.t('scanStages.metadata', { ns: 'junkClean' });
+    case 'result': return i18n.t('scanStages.result', { ns: 'junkClean' });
+    case 'summary': return i18n.t('scanStages.summary', { ns: 'junkClean' });
+    default: return i18n.t('scanStages.default', { ns: 'junkClean' });
   }
 }
 
@@ -100,27 +102,29 @@ function getScanStageIndex(stage: string): number {
 
 function formatScanDuration(milliseconds: number): string {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));
-  if (seconds < 60) return `${seconds} 秒`;
-  return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+  if (seconds < 60) return i18n.t('seconds', { ns: 'common', count: seconds });
+  return i18n.t('minutes', { ns: 'common', min: Math.floor(seconds / 60), sec: seconds % 60 });
 }
 
 function getDeletePhaseLabel(phase: EnhancedDeleteProgress['phase']): string {
-  return phase === 'preparing' ? '正在准备清理任务' : '正在清理垃圾文件';
+  return i18n.t(`deleteProgress.${phase === 'preparing' ? 'preparing' : 'cleaning'}`, { ns: 'junkClean' });
 }
 
 function formatDeleteSpeed(progress: EnhancedDeleteProgress | null): string {
-  if (!progress || progress.elapsed_ms < 1000 || progress.processed_count === 0) return '计算中';
+  if (!progress || progress.elapsed_ms < 1000 || progress.processed_count === 0) return i18n.t('calculating', { ns: 'common' });
   const filesPerSecond = progress.processed_count / (progress.elapsed_ms / 1000);
-  return `${filesPerSecond.toFixed(0)} 个/秒`;
+  return i18n.t('filesPerSecond', { ns: 'common', count: filesPerSecond.toFixed(0) });
 }
 
 function getDeleteRemainingTime(progress: EnhancedDeleteProgress | null): string {
   if (!progress || progress.processed_count === 0 || progress.total_count <= progress.processed_count) {
-    return progress?.processed_count === progress?.total_count ? '即将完成' : '计算中';
+    return progress?.processed_count === progress?.total_count
+      ? i18n.t('almostDone', { ns: 'common' })
+      : i18n.t('calculating', { ns: 'common' });
   }
   const remainingCount = progress.total_count - progress.processed_count;
   const remainingMilliseconds = (progress.elapsed_ms / progress.processed_count) * remainingCount;
-  return `预计剩余 ${formatScanDuration(remainingMilliseconds)}`;
+  return i18n.t('estimatedRemaining', { ns: 'common', time: formatScanDuration(remainingMilliseconds) });
 }
 
 // ============================================================================
@@ -128,6 +132,7 @@ function getDeleteRemainingTime(progress: EnhancedDeleteProgress | null): string
 // ============================================================================
 
 export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t } = useTranslation('junkClean');
   const {
     moduleState,
     expandedModule,
@@ -232,14 +237,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       if (disposed) dispose();
       else unlisten = dispose;
     }).catch((error) => {
-      if (!disposed) showToast({ type: 'warning', title: '深度扫描进度监听失败', description: String(error) });
+      if (!disposed) showToast({ type: 'warning', title: t('toast.listenProgressFailed'), description: String(error) });
     });
 
     return () => {
       disposed = true;
       if (unlisten) unlisten();
     };
-  }, [showToast]);
+  }, [showToast, t]);
 
   // 删除进度只传递批量统计，避免大批量文件逐条更新前端造成额外渲染压力。
   useEffect(() => {
@@ -252,14 +257,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       if (disposed) dispose();
       else unlisten = dispose;
     }).catch((error) => {
-      if (!disposed) showToast({ type: 'warning', title: '删除进度监听失败', description: String(error) });
+      if (!disposed) showToast({ type: 'warning', title: t('toast.listenDeleteProgressFailed'), description: String(error) });
     });
 
     return () => {
       disposed = true;
       if (unlisten) unlisten();
     };
-  }, [showToast]);
+  }, [showToast, t]);
 
   // 开始扫描
   const handleScan = useCallback(async () => {
@@ -325,12 +330,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     cancelRequestedRef.current = true;
     try {
       await cancelDeepJunkScan();
-      showToast({ type: 'info', title: '扫描已停止', description: '已取消本次深度垃圾扫描' });
+      showToast({ type: 'info', title: t('toast.scanStopped'), description: t('toast.scanStoppedDesc') });
     } catch (error) {
       cancelRequestedRef.current = false;
-      showToast({ type: 'error', title: '停止扫描失败', description: String(error) });
+      showToast({ type: 'error', title: t('toast.stopScanFailed'), description: String(error) });
     }
-  }, [scanMode, showToast]);
+  }, [scanMode, showToast, t]);
 
   const refreshScanResultAfterDelete = useCallback(async (
     currentScanMode: 'quick' | 'deep',
@@ -422,7 +427,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           console.warn('记录清理日志失败:', err);
           showToast({
             type: 'warning',
-            title: '清理完成，但日志记录失败',
+            title: t('toast.logFailed'),
             description: String(err),
           });
         });
@@ -451,8 +456,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           if (!refreshSucceeded) {
             showToast({
               type: 'warning',
-              title: '清理已完成，但核验失败',
-              description: '最新扫描结果未能同步，请稍后手动重新扫描。',
+              title: t('toast.refreshFailed'),
+              description: t('toast.refreshFailedDesc'),
             });
           }
         }).finally(() => {
@@ -465,43 +470,55 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
       setDeleteResult(result);
       if (result.success_count > 0) {
+        // 后端 summary_message 固定为中文，因此使用结构化结果在前端生成当前语言的摘要。
+        const releasedText = result.freed_physical_size > 0
+          ? i18n.t('freedSize', { ns: 'common', size: formatSize(result.freed_physical_size) })
+          : '';
+        const skippedText = result.skipped_size > 0
+          ? i18n.t('skippedSize', { ns: 'common', size: formatSize(result.skipped_size) })
+          : '';
         const blockedText = result.failed_count > 0
-          ? `，${result.failed_count} 个文件清理失败`
+          ? t('toast.blocked', { count: result.failed_count })
           : '';
         const rebootText = result.reboot_pending_count > 0
-          ? `，${result.reboot_pending_count} 个文件将在重启后删除`
+          ? t('toast.reboot', { count: result.reboot_pending_count })
           : '';
         showToast({
           // 已经有文件成功删除时使用成功色；失败/待重启数量通过文案和明细表达，避免用户误以为整体未执行。
           type: 'success',
-          title: '垃圾清理完成',
-          description: `${result.summary_message || `成功释放 ${formatSize(result.freed_physical_size)}`}${blockedText}${rebootText}${refreshStarted ? '，正在后台核验最新结果' : ''}`,
+          title: t('toast.cleanDone'),
+          description: t('toast.cleanDoneDesc', {
+            summary: `${releasedText}${skippedText}`,
+            blocked: blockedText,
+            reboot: rebootText,
+            refreshing: refreshStarted ? t('toast.refreshing') : '',
+          }),
         });
       } else if (result.failed_count > 0 || result.reboot_pending_count > 0) {
         const firstFailure = result.file_results.find((f) => !f.success && !f.marked_for_reboot);
         showToast({
           type: 'warning',
-          title: '清理受阻',
+          title: t('toast.cleanBlocked'),
           description: firstFailure
-            ? `部分文件未能删除：${firstFailure.path}`
-            : result.summary_message || '部分文件将在重启后删除',
+            ? t('toast.cleanBlockedDesc', { path: firstFailure.path })
+            : t('toast.cleanBlockedReboot'),
         });
       } else {
         showToast({
           type: 'info',
-          title: '没有文件被清理',
-          description: result.summary_message || '所选文件未发生变化',
+          title: t('toast.noFileCleaned'),
+          description: t('toast.noFileCleanedDesc'),
         });
       }
 
     } catch (err) {
       console.error('删除失败:', err);
-      showToast({ type: 'error', title: '垃圾清理失败', description: String(err) });
+      showToast({ type: 'error', title: t('toast.cleanFailed'), description: String(err) });
     } finally {
       setIsDeleting(false);
       if (!deleteVerificationRef.current) setDeleteProgress(null);
     }
-  }, [deepScanResult, excludedDeepPaths, fullySelectedDeepCategoryNames, refreshScanResultAfterDelete, scanMode, selectedFileCount, selectedPaths, selectedCategoryNames, showToast]);
+  }, [deepScanResult, excludedDeepPaths, fullySelectedDeepCategoryNames, refreshScanResultAfterDelete, scanMode, selectedFileCount, selectedPaths, selectedCategoryNames, showToast, t]);
 
   // 垃圾文件默认使用完整路径搜索，回收站条目则搜索原始路径，避免把内部 $R 文件名交给搜索引擎。
   const handleSearchFile = useCallback(async (file: FileInfo) => {
@@ -509,12 +526,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       ? file.original_path || file.name
       : file.path;
     try {
-      await openSearchUrl(`Windows 文件 ${searchPath} 可以删除吗`);
+      await openSearchUrl(t('searchQuery', { path: searchPath }));
     } catch (error) {
       console.error('搜索文件用途失败:', error);
-      showToast({ type: 'error', title: '打开搜索失败', description: String(error) });
+      showToast({ type: 'error', title: t('toast.openSearchFailed'), description: String(error) });
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   // 切换文件选中状态
   const toggleFileSelection = useCallback((path: string) => {
@@ -613,7 +630,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         });
       }
     } catch (error) {
-      showToast({ type: 'warning', title: '加载深度扫描结果失败', description: String(error) });
+      showToast({ type: 'warning', title: t('toast.loadDeepPageFailed'), description: String(error) });
     } finally {
       setLoadingDeepCategory(null);
     }
@@ -644,7 +661,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                 {getDeletePhaseLabel(deleteProgress?.phase ?? 'preparing')}
               </h3>
               <p className="text-sm text-[var(--fg-muted)] mt-1">
-                已处理 {deleteProcessedCount.toLocaleString()} / {deleteTotalCount.toLocaleString()} 个文件
+                {t('deleteProgress.processed', { current: deleteProcessedCount.toLocaleString(), total: deleteTotalCount.toLocaleString() })}
               </p>
             </div>
             <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
@@ -654,12 +671,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               />
             </div>
             <div className="w-full grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--fg-muted)]">
-              <span>已释放 {formatSize(deleteProgress?.freed_physical_size ?? 0)}</span>
-              <span className="text-right">失败 {deleteProgress?.failed_count ?? 0}</span>
-              <span>速度 {formatDeleteSpeed(deleteProgress)}</span>
+              <span>{t('deleteProgress.freed', { size: formatSize(deleteProgress?.freed_physical_size ?? 0) })}</span>
+              <span className="text-right">{t('deleteProgress.failed', { count: deleteProgress?.failed_count ?? 0 })}</span>
+              <span>{t('deleteProgress.speed', { speed: formatDeleteSpeed(deleteProgress) })}</span>
               <span className="text-right">{getDeleteRemainingTime(deleteProgress)}</span>
             </div>
-            <p className="text-xs text-[var(--fg-faint)]">请勿关闭窗口，清理完成后可继续使用其他功能</p>
+            <p className="text-xs text-[var(--fg-faint)]">{t('deleteProgress.doNotClose')}</p>
           </div>
         </div>,
         document.body
@@ -668,11 +685,11 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       {/* 删除确认弹窗 */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
-        title="确认清理"
-        description={`您即将删除 ${selectedFileCount.toLocaleString()} 个文件，预计释放 ${formatSize(selectedSize)} 空间。此操作不可撤销。`}
-        warning="免责声明：本软件仅清理常见的系统垃圾文件，但不对任何数据丢失承担责任。请确保您已了解所选文件的内容，重要数据请提前备份。"
-        confirmText="确认清理"
-        cancelText="取消"
+        title={t('confirmTitle')}
+        description={t('confirmDesc', { count: selectedFileCount.toLocaleString(), size: formatSize(selectedSize) })}
+        warning={i18n.t('disclaimer', { ns: 'common' })}
+        confirmText={t('confirmTitle')}
+        cancelText={i18n.t('cancel', { ns: 'common' })}
         onConfirm={() => {
           setShowDeleteConfirm(false);
           handleDelete();
@@ -685,8 +702,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="junk"
-        title="垃圾清理"
-        description="清理系统缓存、临时文件、日志等垃圾文件"
+        title={t('title')}
+        description={t('desc')}
         icon={<Trash2 className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -696,12 +713,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         onScan={handleScan}
         error={moduleState.error}
         headerExtra={
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
             <label
               className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-hover)] text-xs text-[var(--fg-muted)] cursor-pointer select-none"
-              title="扫描所有固定分区，NTFS 分区使用 MFT 快速识别明确的缓存目录"
+              title={t('deepDiscoveryTitle')}
             >
-              <span>深度发现</span>
+              <span>{t('deepDiscovery')}</span>
               <input
                 type="checkbox"
                 className="sr-only"
@@ -719,45 +736,46 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-xs font-medium text-amber-600 transition"
               >
                 <StopCircle className="w-3.5 h-3.5" />
-                停止
+                {i18n.t('stop', { ns: 'common' })}
               </button>
-            )}
-            {scanResult && scanResult.total_file_count > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleAllSelection(true)}
-                  title={scanMode === 'deep' ? '当前页全部选中；执行清理时会包含这些分类的完整扫描结果' : undefined}
-                  className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
-                >
-                  {scanMode === 'deep' ? '全选已加载' : '全选'}
-                </button>
-                <button
-                  onClick={() => toggleAllSelection(false)}
-                  className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] transition"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                    ${deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)
-                      ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
-                      : 'bg-rose-500 text-white hover:bg-rose-600'
-                    }
-                  `}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  清理 ({selectedFileCount})
-                </button>
-              </div>
             )}
           </div>
         }
+        allowStickyContent
       >
         {/* 展开内容 */}
         <div className="p-4 space-y-3">
+          {scanResult && scanResult.total_file_count > 0 && (
+            // 操作条吸顶显示，避免结果较长时必须滚回标题区才能继续清理。
+            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
+              <button
+                onClick={() => toggleAllSelection(true)}
+                title={scanMode === 'deep' ? t('selectAllDeepTitle') : undefined}
+                className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
+              >
+                {scanMode === 'deep' ? i18n.t('selectAllLoaded', { ns: 'common' }) : i18n.t('selectAll', { ns: 'common' })}
+              </button>
+              <button
+                onClick={() => toggleAllSelection(false)}
+                className="text-xs text-[var(--fg-muted)] hover:text-[var(--fg-secondary)] transition"
+              >
+                {i18n.t('deselect', { ns: 'common' })}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                  deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)
+                    ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
+                    : 'bg-rose-500 text-white hover:bg-rose-600'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {t('cleanBtn', { count: selectedFileCount })}
+              </button>
+            </div>
+          )}
+
           {/* 扫描结果摘要 */}
           {scanResult && (
             <ScanSummary
@@ -773,8 +791,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             <div className="flex items-center gap-3 rounded-xl border border-[var(--brand-green-20)] bg-[var(--brand-green-10)] px-4 py-3">
               <Loader2 className="w-4 h-4 shrink-0 text-[var(--brand-green)] animate-spin" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--fg-primary)]">清理已完成，正在同步最新结果</p>
-                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">后台核验不会阻塞当前页面操作，完成后会自动更新分类统计。</p>
+                <p className="text-sm font-medium text-[var(--fg-primary)]">{t('verification.title')}</p>
+                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{t('verification.desc')}</p>
               </div>
             </div>
           )}
@@ -789,14 +807,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-semibold text-[var(--fg-primary)]">
-                        {scanMode === 'deep' ? '正在进行全盘深度发现' : '正在检查系统垃圾'}
+                        {scanMode === 'deep' ? t('scanning.deepTitle') : t('scanning.quickTitle')}
                       </h4>
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-card)] text-[var(--brand-green)]">
-                        {scanMode === 'deep' ? 'MFT / 多分区' : '快速扫描'}
+                        {scanMode === 'deep' ? t('scanning.deepBadge') : t('scanning.quickBadge')}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-[var(--fg-muted)] truncate">
-                      {scanProgress?.message ?? getScanStageLabel('', scanMode === 'deep')}
+                      {scanProgress ? getScanStageLabel(scanProgress.stage, scanMode === 'deep') : getScanStageLabel('', scanMode === 'deep')}
                     </p>
                   </div>
                 </div>
@@ -813,26 +831,26 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                   />
                 </div>
                 <div className="mt-2 flex justify-between text-[11px] text-[var(--fg-muted)]">
-                  <span>{scanProgress ? getScanStageLabel(scanProgress.stage, scanMode === 'deep') : '正在启动扫描'}</span>
-                  <span>{scanProgress ? formatScanDuration(scanProgress.elapsed_ms) : '准备中'}</span>
+                  <span>{scanProgress ? getScanStageLabel(scanProgress.stage, scanMode === 'deep') : t('scanning.starting')}</span>
+                  <span>{scanProgress ? formatScanDuration(scanProgress.elapsed_ms) : t('scanning.preparing')}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />当前分区</div>
-                  <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{scanProgress?.drive_letter || '准备中'}</p>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />{t('scanning.partition')}</div>
+                  <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{scanProgress?.drive_letter || t('scanning.preparing')}</p>
                 </div>
                 <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Database className="w-3.5 h-3.5" />已处理记录</div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Database className="w-3.5 h-3.5" />{t('scanning.processedRecords')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.processed ?? 0).toLocaleString()}</p>
                 </div>
                 <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />候选文件</div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />{t('scanning.candidateFiles')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.matched_count ?? 0).toLocaleString()}</p>
                 </div>
                 <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Timer className="w-3.5 h-3.5" />扫描耗时</div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Timer className="w-3.5 h-3.5" />{t('scanning.elapsed')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{formatScanDuration(scanProgress?.elapsed_ms ?? 0)}</p>
                 </div>
               </div>
@@ -840,7 +858,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               {scanMode === 'deep' && (
                 <div className="flex items-center gap-2 text-[11px] text-[var(--fg-muted)] border-t border-[var(--brand-green-20)] pt-3">
                   <ShieldCheck className="w-3.5 h-3.5 text-[var(--brand-green)] shrink-0" />
-                  <span>仅匹配明确的缓存、临时文件和错误报告目录，系统文件与持久化用户数据会自动跳过</span>
+                  <span>{t('scanning.safetyNote')}</span>
                 </div>
               )}
             </div>
@@ -850,7 +868,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             <div className="flex flex-wrap gap-2 text-[11px] text-[var(--fg-muted)]">
               {deepScanResult.drives.map((drive) => (
                 <span key={drive.drive_letter} className="px-2 py-1 rounded-md bg-[var(--bg-hover)]" title={drive.warning ?? undefined}>
-                  {drive.drive_letter} · {drive.backend === 'mft' ? 'MFT' : '常规遍历'} · {formatSize(drive.matched_size)}
+                  {drive.drive_letter} · {drive.backend === 'mft' ? t('drives.mft') : t('drives.walkdir')} · {formatSize(drive.matched_size)}
                 </span>
               ))}
             </div>
@@ -879,8 +897,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               {scanResult.categories.every((c) => c.files.length === 0) && (
                 <EmptyState
                   icon={Trash2}
-                  title="没有发现可清理的垃圾文件"
-                  description="常见临时文件、缓存和日志都很干净。"
+                  title={t('emptyTitle')}
+                  description={t('emptyDesc')}
                   tone="success"
                   compact
                 />
@@ -889,8 +907,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           ) : moduleState.status === 'idle' ? (
             <EmptyState
               icon={Trash2}
-              title="尚未扫描垃圾文件"
-              description="点击开始扫描，查找系统缓存、临时文件和日志等可清理内容。"
+              title={t('idleTitle')}
+              description={t('idleDesc')}
             />
           ) : null}
         </div>

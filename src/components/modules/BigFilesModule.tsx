@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, ExternalLink, StopCircle, Search } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
@@ -21,16 +22,45 @@ import {
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { useSettings } from '../../contexts';
 import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
-import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelText } from '../../utils/format';
+import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelKey } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
 import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+
+// 后端当前返回固定来源标签；只映射已知枚举，未知值不展示，避免误译真实文件信息。
+function getLocalizedSourceLabel(sourceLabel: string, translate: (key: string) => string): string {
+  const sourceKey: Record<string, string> = {
+    '虚拟机磁盘': 'bigFiles.source.virtualDisk',
+    '内存转储': 'bigFiles.source.memoryDump',
+    '光盘镜像': 'bigFiles.source.diskImage',
+    '数据库文件': 'bigFiles.source.database',
+    '压缩包': 'bigFiles.source.archive',
+    '日志文件': 'bigFiles.source.log',
+    '系统临时文件': 'bigFiles.source.systemTemp',
+    'Windows 更新缓存': 'bigFiles.source.windowsUpdate',
+    'Steam 游戏文件': 'bigFiles.source.steam',
+    '微信文件': 'bigFiles.source.wechat',
+    'Chrome 浏览器': 'bigFiles.source.chrome',
+    'Edge 浏览器': 'bigFiles.source.edge',
+    'Firefox 浏览器': 'bigFiles.source.firefox',
+    '下载文件': 'bigFiles.source.downloads',
+    '桌面文件': 'bigFiles.source.desktop',
+    '回收站': 'bigFiles.source.recycleBin',
+    '视频文件': 'bigFiles.source.video',
+    '音频文件': 'bigFiles.source.audio',
+    '图片文件': 'bigFiles.source.image',
+  };
+  const key = sourceKey[sourceLabel];
+  return key ? translate(key) : '';
+}
 
 // ============================================================================
 // 组件实现
 // ============================================================================
 
 export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('bigFiles');
   const { showToast } = useToast();
   const { settings } = useSettings();
@@ -49,7 +79,6 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [currentPath, setCurrentPath] = useState('');
   const [scanBackend, setScanBackend] = useState(''); // "mft" | "walkdir"
   const [scanStage, setScanStage] = useState('');
-  const [scanMessage, setScanMessage] = useState('');
   const [backendElapsedMs, setBackendElapsedMs] = useState(0);
   const [scannedCount, setScannedCount] = useState(0);
   const [scanElapsed, setScanElapsed] = useState(0);
@@ -76,7 +105,6 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
     setCurrentPath('');
     setScanBackend('');
     setScanStage('');
-    setScanMessage('');
     setBackendElapsedMs(0);
     setScannedCount(0);
     updateModuleState('bigFiles', { status: 'idle', error: null, fileCount: 0, totalSize: 0, progress: 0 });
@@ -94,11 +122,10 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
     const setupListener = async () => {
       unlisten = await listen<LargeFileScanProgress>('large-file-scan:progress', (event) => {
-        const { current_path, scanned_count, backend, stage, message, elapsed_ms } = event.payload;
+        const { current_path, scanned_count, backend, stage, elapsed_ms } = event.payload;
         setCurrentPath(current_path);
         setScannedCount(scanned_count);
         setScanStage(stage || '');
-        setScanMessage(message || current_path);
         setBackendElapsedMs(elapsed_ms || 0);
         if (backend) {
           setScanBackend(backend);
@@ -136,7 +163,6 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
     setCurrentPath('');
     setScanBackend('');
     setScanStage('');
-    setScanMessage('');
     setBackendElapsedMs(0);
     setScannedCount(0);
     setScanElapsed(0);
@@ -175,26 +201,26 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const handleStopScan = useCallback(async () => {
     try {
       await cancelLargeFileScan();
-      showToast({ type: 'info', title: '扫描已停止', description: '将显示已扫描到的大文件' });
+      showToast({ type: 'info', title: t('bigFiles.scanStopped'), description: t('bigFiles.scanStoppedDesc') });
     } catch (err) {
       console.error('停止扫描失败:', err);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   // 切换文件选中状态（后端风险等级 >= 4 锁定不可选）
   const handleSearchFile = useCallback(async (path: string) => {
     try {
       // 搜索时带上完整路径，帮助用户在删除前确认文件来源和风险。
-      await openSearchUrl(`Windows 文件 ${path} 可以删除吗`);
+      await openSearchUrl(t('bigFiles.searchQuery', { path }));
     } catch (err) {
       console.error('搜索文件用途失败:', err);
       showToast({
         type: 'error',
-        title: '打开搜索失败',
+        title: t('openSearchFailed'),
         description: String(err),
       });
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const toggleFileSelection = useCallback((path: string, riskLevel: number) => {
     if (riskLevel >= 4) return;
@@ -250,20 +276,20 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       if (result.failed_count === 0) {
         showToast({
           type: 'success',
-          title: `成功删除 ${result.success_count} 个文件`,
-          description: `已释放 ${formatSize(result.freed_size)} 空间`,
+          title: t('bigFiles.deleteSuccess', { count: result.success_count }),
+          description: t('bigFiles.deleteSuccessDesc', { size: formatSize(result.freed_size) }),
         });
       } else if (result.success_count === 0) {
         showToast({
           type: 'error',
-          title: '删除失败',
-          description: `${result.failed_count} 个文件无法删除`,
+          title: t('bigFiles.deleteFailed'),
+          description: t('bigFiles.deleteFailedDesc', { count: result.failed_count }),
         });
       } else {
         showToast({
           type: 'warning',
-          title: '部分成功',
-          description: `${result.success_count} 个已删除，${result.failed_count} 个失败`,
+          title: t('bigFiles.deletePartial'),
+          description: t('bigFiles.deletePartialDesc', { success: result.success_count, failed: result.failed_count }),
         });
       }
 
@@ -294,13 +320,13 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       console.error('删除大文件失败:', err);
       showToast({
         type: 'error',
-        title: '删除失败',
+        title: t('bigFiles.deleteFailed'),
         description: String(err),
       });
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedFiles, files, updateModuleState, triggerHealthRefresh, showToast]);
+  }, [selectedFiles, files, updateModuleState, triggerHealthRefresh, showToast, t]);
 
   // 计算选中文件的总大小
   const selectedSize = files
@@ -315,6 +341,11 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const displayElapsedSeconds = isScanning
     ? scanElapsed
     : Math.round(backendElapsedMs / 1000);
+  // 当前后端所有进度分支都提供稳定 stage，未知阶段统一回退到本地化提示，避免显示历史中文 message。
+  const localizedScanStage = scanStage
+    ? t(`bigFilesStages.${scanStage}`, { defaultValue: t('bigFiles.detecting') })
+    : t('bigFiles.detecting');
+  const displayScanPath = /^[A-Za-z]:[\\/]/.test(currentPath) ? currentPath : '';
   const driveSelector = (
     <div className="flex items-center gap-2 shrink-0" onClick={(event) => event.stopPropagation()}>
       <DriveSelect
@@ -340,9 +371,9 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
             </div>
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--fg-primary)]">正在删除文件</h3>
+            <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{t('bigFiles.deleting')}</h3>
               <p className="text-sm text-[var(--fg-muted)] mt-1">
-                正在删除 {selectedFiles.size} 个文件，请稍候...
+                {t('bigFiles.deletingDesc', { count: selectedFiles.size.toLocaleString() })}
               </p>
             </div>
           </div>
@@ -353,11 +384,11 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       {/* 删除确认弹窗 */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
-        title="确认删除大文件"
-        description={`您即将删除 ${selectedFiles.size.toLocaleString()} 个大文件，共 ${formatSize(selectedSize)}。此操作不可撤销。`}
-        warning="免责声明：大文件删除可能影响系统或软件正常运行，请确认文件用途后再执行。"
-        confirmText="确认删除"
-        cancelText="取消"
+        title={t('confirmDeleteLargeFiles')}
+        description={t('bigFiles.confirmDesc', { count: selectedFiles.size.toLocaleString(), size: formatSize(selectedSize) })}
+        warning={t('largeFileDeleteWarning')}
+        confirmText={t('confirmDelete')}
+        cancelText={t('cancel')}
         onConfirm={() => {
           setShowDeleteConfirm(false);
           handleDelete();
@@ -370,8 +401,8 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="bigFiles"
-        title="大文件清理"
-        description={`扫描 ${selectedDriveLabel} 体积最大的文件，快速释放存储空间`}
+        title={navT('bigFiles')}
+        description={`${navT('bigFilesDesc')} (${selectedDriveLabel})`}
         icon={<FileBox className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -389,56 +420,57 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-xs font-medium text-amber-600 transition"
               >
                 <StopCircle className="w-3.5 h-3.5" />
-                停止
+                {t('stop')}
               </button>
-            )}
-            {files.length > 0 && !isScanning && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleSelectAll}
-                  className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
-                >
-                  {selectedFiles.size === selectableCount && selectableCount > 0 ? '取消全选' : '全选'}
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  disabled={selectedFiles.size === 0}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                    ${selectedFiles.size === 0
-                      ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
-                      : 'bg-rose-500 text-white hover:bg-rose-600'
-                    }
-                  `}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  删除 ({selectedFiles.size})
-                </button>
-              </div>
             )}
           </>
         }
+        allowStickyContent
       >
         {/* 展开内容 */}
         <div>
+          {files.length > 0 && !isScanning && (
+            // 结果列表沿用页面原有滚动，操作条单独吸顶保证长列表中的可操作性。
+            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
+              <button
+                onClick={toggleSelectAll}
+                className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
+              >
+                {selectedFiles.size === selectableCount && selectableCount > 0 ? t('deselectAll') : t('selectAll')}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={selectedFiles.size === 0}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedFiles.size === 0
+                    ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
+                    : 'bg-rose-500 text-white hover:bg-rose-600'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {t('cleanSelected', { count: selectedFiles.size })}
+              </button>
+            </div>
+          )}
+
           {/* 扫描进度 + 引擎 + 时长（扫描中 & 扫描完成后都显示） */}
-          {(isScanning || scanBackend) && currentPath && (
+          {(isScanning || scanBackend) && (displayScanPath || localizedScanStage) && (
             <div className={`px-4 py-2 border-b border-[var(--border-default)] text-xs truncate flex items-center gap-3 ${
               scanBackend === 'mft' ? 'bg-[var(--brand-green-10)]' : 'bg-emerald-500/5'
             }`}>
-              <span className="truncate text-[var(--fg-muted)]">{isScanning ? '正在扫描:' : '扫描完成:'} {scanMessage || currentPath}</span>
+              <span className="truncate text-[var(--fg-muted)]">{isScanning ? t('bigFiles.scanningPrefix') : t('bigFiles.scanCompletedPrefix')} {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}</span>
               {scanBackend && (
                 <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
                   scanBackend === 'mft'
                     ? 'bg-[var(--brand-green)] text-white'
                     : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
                 }`}>
-                  {scanBackend === 'mft' ? '⚡ MFT 全量扫描' : '常规'}
+                  {scanBackend === 'mft' ? t('bigFiles.mftFullScan') : t('bigFiles.normalScan')}
                 </span>
               )}
-              <span className="shrink-0 text-[var(--fg-faint)]">{scannedCount.toLocaleString()} 文件</span>
+              <span className="shrink-0 text-[var(--fg-faint)]">{t('fileCount', { count: scannedCount.toLocaleString() })}</span>
               {scanStage && scanBackend === 'mft' && (
-                <span className="shrink-0 text-[var(--fg-faint)]">{scanStage}</span>
+                <span className="shrink-0 text-[var(--fg-faint)]">{localizedScanStage}</span>
               )}
               {displayElapsedSeconds > 0 && (
                 <span className="shrink-0 text-[var(--fg-faint)]">{displayElapsedSeconds}s</span>
@@ -451,8 +483,8 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
             <div className="p-4">
               <EmptyState
                 icon={FileBox}
-                title="尚未扫描大文件"
-                description="点击开始扫描，快速找出占用空间较大的文件。"
+                  title={t('notScannedLargeFiles')}
+                description={t('bigFiles.emptyDesc')}
               />
             </div>
           )}
@@ -466,20 +498,20 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
               {/* 扫描引擎模式 — 居中醒目展示 */}
               {scanBackend === 'mft' && (
                 <span className="mb-2 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--brand-green-10)] text-[var(--brand-green)] border border-[var(--brand-green-20)]">
-                  ⚡ MFT 全量扫描
+                  {t('bigFiles.mftFullScan')}
                 </span>
               )}
               <p className="text-sm font-medium text-[var(--fg-secondary)]">
-                {scanBackend === 'mft' ? `MFT全量模式扫描${selectedDriveLabel}...`
-                  : scanBackend === 'walkdir' ? `正在遍历${selectedDriveLabel}文件...`
-                  : '正在扫描中...'}
+                {scanBackend === 'mft' ? t('bigFiles.mftScanning', { drive: selectedDriveLabel })
+                  : scanBackend === 'walkdir' ? t('bigFiles.walkdirScanning', { drive: selectedDriveLabel })
+                  : t('scanningShort')}
               </p>
               <p className="text-xs text-[var(--fg-muted)] mt-1">
-                扫描引擎: {scanBackend || '检测中...'}
+                {t('bigFiles.engineLabel')}: {scanBackend === 'mft' ? t('bigFiles.mft') : scanBackend === 'walkdir' ? t('bigFiles.walkdir') : t('bigFiles.detecting')}
               </p>
-              {scanMessage && (
+              {(localizedScanStage || displayScanPath) && (
                 <p className="text-xs text-[var(--fg-faint)] mt-1 max-w-md truncate">
-                  {scanMessage}
+                  {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}
                 </p>
               )}
             </div>
@@ -492,6 +524,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 const riskLevel = file.risk_level;
                 const isSelected = selectedFiles.has(file.path);
                 const isLocked = riskLevel >= 4; // 后端风险等级 >= 4，锁定不可删除
+                const localizedSourceLabel = getLocalizedSourceLabel(file.source_label, t);
 
                 return (
                   <div
@@ -540,9 +573,9 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                         <p className="text-sm text-[var(--fg-primary)] truncate font-medium" title={file.path}>
                           {file.path.split('\\').pop() || file.path}
                         </p>
-                        {file.source_label && file.source_label !== '未知来源' && (
+                        {localizedSourceLabel && (
                           <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
-                            {file.source_label}
+                            {localizedSourceLabel}
                           </span>
                         )}
                       </div>
@@ -557,7 +590,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                       <div className="flex items-center justify-end gap-2 mt-0.5">
                         <span className="text-[10px] text-[var(--fg-muted)]">{formatDate(file.modified)}</span>
                         <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${getRiskLevelColor(riskLevel)} ${getRiskLevelBgColor(riskLevel)}`}>
-                          {isLocked ? '🔒 ' : ''}{getRiskLevelText(riskLevel)}
+                          {isLocked ? '🔒 ' : ''}{t(getRiskLevelKey(riskLevel))}
                         </span>
                       </div>
                     </div>
@@ -570,7 +603,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                           handleSearchFile(file.path);
                         }}
                         className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition text-[var(--fg-muted)] hover:text-emerald-600"
-                        title="搜索该文件能不能删"
+                  title={t('searchDeletionAdvice')}
                       >
                         <Search className="w-4 h-4" />
                       </button>
@@ -580,7 +613,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                           openInFolder(file.path);
                         }}
                         className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition text-[var(--fg-muted)] hover:text-emerald-600"
-                        title="打开所在文件夹"
+                  title={t('openInFolder')}
                       >
                         <FolderOpen className="w-4 h-4" />
                       </button>
@@ -590,7 +623,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                           openFile(file.path);
                         }}
                         className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition text-[var(--fg-muted)] hover:text-emerald-600"
-                        title="打开文件"
+                  title={t('openFile')}
                       >
                         <ExternalLink className="w-4 h-4" />
                       </button>

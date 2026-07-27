@@ -4,15 +4,21 @@ LightC is a Windows desktop utility for safe junk cleanup, disk analysis, and sy
 
 [简体中文](README.zh-CN.md)
 
-## Highlights
+## Features
 
-- Junk cleanup with quick and deep scan modes.
-- Windows cleanup categories including temporary files, Delivery Optimization files, thumbnails, DirectX shader caches, and selected Microsoft Defender non-critical files.
-- Large-file, disk-health, hotspot, and disk-growth analysis.
-- Registry redundancy, shell/context-menu, uninstall-leftover, old-driver, and social-app cache tools.
-- AI model storage analysis and portable mode.
-- Safe deletion checks, detailed results, optional reboot deletion, and protected system paths.
-
+- **Junk Cleaner** — Quick and deep scans for temporary files, Delivery Optimization files, thumbnails, DirectX shader caches, and selected rebuildable Microsoft Defender caches.
+- **Large Files** — Find space-consuming files with drive-aware scanning, risk indicators, selection controls, and safe deletion feedback.
+- **Social App Cache** — Review cache categories from WeChat, QQ, DingTalk, Lark, and other supported desktop apps before cleanup.
+- **System Slim** — Review optional Windows system components and space-saving settings with clear safety warnings before applying changes.
+- **Old Drivers** — Identify unused third-party driver packages while protecting drivers currently in use; supports backup and restore workflows.
+- **Uninstall Leftovers** — Detect probable remnants of removed applications across common locations using confidence-based results.
+- **Registry Cleanup** — Find orphaned registry references and provide backup-aware cleanup with operation feedback.
+- **Context Menu Cleaner** — Review invalid context-menu entries and remove unwanted shell integrations.
+- **Directory Analyzer** — Inspect directory space usage, drill into large folders, and clean supported temporary caches.
+- **Disk Growth Analysis** — Compare disk snapshots to locate changed files and directories over time.
+- **Shell Icons** — Manage third-party This PC shell icons with registry/ACL backup, restore, and anti-respawn protection.
+- **AI Model Storage** — Analyze local model, LoRA, embedding, and related cache storage, then remove selected model data.
+- **Localization** — Switch between Simplified Chinese, English, and Japanese; module pages, scan stages, settings, and stable backend labels follow the selected language.
 ## Screenshots
 
 <p align="center">
@@ -45,6 +51,16 @@ Place `LightC.portable.json` beside the executable. LightC then stores its confi
 - System32 cleanup is limited to the explicitly supported DirectX shader cache path.
 - Some files require administrator permission or a system reboot and may remain listed as incomplete.
 - Review selected items before permanent cleanup and keep important data backed up.
+
+## Reporting Issues
+
+Please search existing issues first, then describe one problem per issue with a clear, factual title. Following the core principles of [How To Ask Questions The Smart Way](https://www.catb.org/esr/faqs/smart-questions.html) helps issues get understood and resolved faster:
+
+- **Bug reports** must include the exact reproduction steps, expected and actual behavior, LightC version, Windows version, selected interface language, and relevant logs or screenshots.
+- Include the smallest reproducible example when possible. Redact personal paths, usernames, tokens, and other sensitive information before posting logs or screenshots.
+- **Feature requests** should explain the problem and intended outcome, rather than only demanding a specific implementation.
+- Keep the discussion concise, respectful, and open to clarification. Please avoid assumptions, insults, or orders; a clear report with useful context is far more effective.
+- Low-quality issues (e.g., arrogant questions, pure complaints, no context, no reproduction steps) will not be processed.
 
 ## License
 

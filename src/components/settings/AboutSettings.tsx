@@ -9,8 +9,11 @@ import { getDistributionChannel, getSystemInfo, type DistributionChannel, type S
 import { formatSize } from '../../utils/format';
 import binlockxIcon from '../../assets/binlockx.svg';
 import viapIcon from '../../assets/viap.svg';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 
 export function AboutSettings() {
+  const { t } = useTranslation('settings');
   const [appVersion, setAppVersion] = useState('');
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [loadingSystemInfo, setLoadingSystemInfo] = useState(true);
@@ -18,7 +21,7 @@ export function AboutSettings() {
 
   // 获取应用版本号和系统信息
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => setAppVersion('未知'));
+    getVersion().then(setAppVersion).catch(() => setAppVersion(i18n.t('unknown', { ns: 'common' })));
 
     // 获取系统信息
     getSystemInfo()
@@ -37,7 +40,7 @@ export function AboutSettings() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <Info className="w-3.5 h-3.5" />
-          应用信息
+          {t('about.appInfo')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center gap-4">
@@ -46,9 +49,9 @@ export function AboutSettings() {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[var(--text-primary)]">LightC</h3>
-              <p className="text-sm text-[var(--text-muted)]">Windows C盘智能清理工具</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('about.appDescription')}</p>
               <p className="text-xs text-[var(--text-faint)] mt-1">
-                版本 {appVersion || '...'} · {distributionChannel === 'portable' ? '便携版' : '安装版'}
+                {t('about.version', { version: appVersion || '...' })} · {distributionChannel === 'portable' ? t('about.portable') : t('about.installer')}
               </p>
             </div>
           </div>
@@ -58,12 +61,12 @@ export function AboutSettings() {
             className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--brand-green)] bg-[var(--brand-green)]/10 rounded-xl hover:bg-[var(--brand-green)]/20 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            {distributionChannel === 'portable' ? '作者渠道下载' : '检查更新'}
+            {distributionChannel === 'portable' ? t('about.authorDownload') : t('about.checkUpdates')}
           </button>
           <p className="text-xs text-[var(--text-faint)] mt-3">
             {distributionChannel === 'portable'
-              ? '便携版不会自动安装更新，推荐从作者网盘下载新版 zip 后覆盖当前目录，GitHub Releases 作为官方备用渠道。'
-              : '温馨提示：更新源为GitHub，国内可能会出现间歇性DNS污染，如果失败可以稍后重试。'}
+              ? t('about.portableUpdateHint')
+              : t('about.updateHint')}
           </p>
         </div>
       </div>
@@ -72,20 +75,20 @@ export function AboutSettings() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <MonitorIcon className="w-3.5 h-3.5" />
-          系统信息
+          {t('about.systemInfo')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           {loadingSystemInfo ? (
             <div className="flex items-center justify-center py-4">
               <RefreshCw className="w-5 h-5 text-[var(--brand-green)] animate-spin" />
-              <span className="ml-2 text-sm text-[var(--text-muted)]">正在获取系统信息...</span>
+              <span className="ml-2 text-sm text-[var(--text-muted)]">{t('about.loadingSystemInfo')}</span>
             </div>
           ) : systemInfo ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MonitorIcon className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">操作系统</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.operatingSystem')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[280px] truncate" title={systemInfo.os_version}>
                   {systemInfo.os_version}
@@ -94,14 +97,14 @@ export function AboutSettings() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">系统架构</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.architecture')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.os_arch}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Cpu className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">处理器</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.processor')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[280px] truncate" title={systemInfo.cpu_info}>
                   {systemInfo.cpu_info}
@@ -110,45 +113,45 @@ export function AboutSettings() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Cpu className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">CPU 核心数</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.cpuCores')}</span>
                 </div>
-                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.cpu_cores} 核</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.cpu_cores} {t('about.cpuCores')}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <HardDrive className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">内存</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.memory')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)]">
-                  {formatSize(systemInfo.available_memory)} 可用 / {formatSize(systemInfo.total_memory)} 总计
+                  {t('about.memoryValue', { free: formatSize(systemInfo.available_memory), total: formatSize(systemInfo.total_memory) })}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">计算机名</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.computerName')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.computer_name}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">当前用户</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.currentUser')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)]">{systemInfo.user_name}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">系统运行时间</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{t('about.uptime')}</span>
                 </div>
                 <span className="text-sm font-medium text-[var(--text-primary)]">
-                  {Math.floor(systemInfo.uptime_seconds / 86400)} 天 {Math.floor((systemInfo.uptime_seconds % 86400) / 3600)} 小时 {Math.floor((systemInfo.uptime_seconds % 3600) / 60)} 分钟
+                  {t('about.uptimeValue', { days: Math.floor(systemInfo.uptime_seconds / 86400), hours: Math.floor((systemInfo.uptime_seconds % 86400) / 3600), minutes: Math.floor((systemInfo.uptime_seconds % 3600) / 60) })}
                 </span>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-[var(--text-muted)] text-center py-4">无法获取系统信息</p>
+            <p className="text-sm text-[var(--text-muted)] text-center py-4">{t('about.systemInfoFailed')}</p>
           )}
         </div>
       </div>
@@ -156,29 +159,25 @@ export function AboutSettings() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <HelpCircle className="w-3.5 h-3.5" />
-          为什么叫LightC
+          {t('about.nameSection')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
-          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-            <span className="font-medium text-[var(--brand-green)]">Light</span> 代表轻量、轻快，寓意让您的C盘变得轻盈；
-            <span className="font-medium text-[var(--brand-green)]">C</span> 即C盘，Windows系统的核心磁盘。
-            LightC 致力于帮助您安全、高效地清理C盘垃圾文件，释放宝贵的磁盘空间，让系统运行更加流畅。
-          </p>
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{t('about.nameDescription')}</p>
         </div>
       </div>
 
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <Code2 className="w-3.5 h-3.5" />
-          开发者
+          {t('about.developer')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">作者</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('about.author')}</span>
             <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
           </div>
           {/* <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">官方网站</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('about.source')}</span>
             <a
               href="https://evanspace.icu/lightc"
               target="_blank"
@@ -190,7 +189,7 @@ export function AboutSettings() {
             </a>
           </div> */}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">源码地址</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('about.source')}</span>
             <a
               href="https://github.com/Chunyu33/light-c"
               target="_blank"
@@ -202,7 +201,7 @@ export function AboutSettings() {
             </a>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">源码许可证</span>
+            <span className="text-sm text-[var(--text-secondary)]">{t('about.license')}</span>
             <a
               href="https://github.com/Chunyu33/light-c/blob/main/LICENSE"
               target="_blank"
@@ -220,7 +219,7 @@ export function AboutSettings() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <ClipboardList className="w-3.5 h-3.5" />
-          更新日志
+          {t('about.changelog')}
         </h4>
         <a
           href="https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md"
@@ -233,8 +232,8 @@ export function AboutSettings() {
               <Clock className="w-4 h-4 text-[var(--brand-green)]" />
             </div>
             <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">更新日志</p>
-              <p className="text-xs text-[var(--text-muted)]">查看版本更新历史</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t('about.changelog')}</p>
+              <p className="text-xs text-[var(--text-muted)]">{t('about.changelogDesc')}</p>
             </div>
           </div>
           <ExternalLink className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)]" />
@@ -254,19 +253,19 @@ export function AboutSettings() {
 
 // 更多工具推荐放在关于页底部，用轻量入口承接同作者的其他实用工具，不打断主设置流程。
 function MoreToolsSection() {
+  const { t } = useTranslation('ui');
   const tools = [
     {
       name: 'Viap',
       icon: viapIcon,
-      description:
-        'Windows 应用存储重定向工具。通过目录/符号链接将 C 盘应用迁移到其他磁盘，支持批量迁移。常见场景如桌面/文档/微信/QQ 等数据迁移。',
+      description: t('toolViapDesc'),
       downloadUrl: 'https://pan.quark.cn/s/4761ee4ba698',
     },
     {
       name: 'BinlockX',
       icon: binlockxIcon,
       description:
-        '本地隐私保护工具。支持 AES-256-GCM 文件加密、隐私空间、隐私便签和隐私体检，数据全程保留在本机。',
+        t('toolBinlockxDesc'),
       downloadUrl: 'https://pan.quark.cn/s/4243a5142b29',
     },
   ];
@@ -275,7 +274,7 @@ function MoreToolsSection() {
     <div className="space-y-3">
       <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
         <Rocket className="w-3.5 h-3.5" />
-        更多实用工具
+        {t('moreTools')}
       </h4>
       <div className="space-y-3">
         {tools.map(({ name, icon, description, downloadUrl }) => (
@@ -286,7 +285,7 @@ function MoreToolsSection() {
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 flex items-center justify-center">
                 {/* 使用项目原始图标，避免推荐卡片和 LightC 自身功能图标混淆。 */}
-                <img src={icon} alt={`${name} 图标`} className="w-5 h-5 object-contain" />
+                <img src={icon} alt={`${name} ${t('toolIcon')}`} className="w-5 h-5 object-contain" />
               </div>
               <h5 className="text-sm font-semibold text-[var(--text-primary)]">{name}</h5>
             </div>
@@ -299,13 +298,13 @@ function MoreToolsSection() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--brand-green)] hover:border-[var(--brand-green)]/40 transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
-                下载
+                {t('download')}
               </a>
             </div>
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-[var(--text-faint)] text-center">以上同为我维护的工具，欢迎试用</p>
+      <p className="text-[11px] text-[var(--text-faint)] text-center">{t('moreToolsHint')}</p>
     </div>
   );
 }

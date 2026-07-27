@@ -13,6 +13,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { useToast } from './Toast';
 import { getDistributionChannel, type DistributionChannel } from '../api/commands';
 import { getOfficialDownloadConfig } from '../utils/downloadConfig';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // 类型定义
@@ -34,45 +35,45 @@ interface UpdateModalProps {
 // 错误信息映射
 // ============================================================================
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, translate: (key: string) => string): string {
   const errorStr = error instanceof Error ? error.message : String(error);
   
   // 网络相关错误
   if (errorStr.includes('network') || errorStr.includes('fetch') || errorStr.includes('connect')) {
-    return '网络连接失败，请检查网络后重试';
+    return translate('updateErrorNetwork');
   }
   
   // 签名验证错误
   if (errorStr.includes('signature') || errorStr.includes('pubkey') || errorStr.includes('verify')) {
-    return '更新包签名验证失败，请从官方渠道下载';
+    return translate('updateErrorSignature');
   }
   
   // 超时错误
   if (errorStr.includes('timeout') || errorStr.includes('timed out')) {
-    return '连接超时，请稍后重试';
+    return translate('updateErrorTimeout');
   }
   
   // 404 错误
   if (errorStr.includes('404') || errorStr.includes('not found')) {
-    return '未找到更新信息，请稍后重试';
+    return translate('updateErrorNotFound');
   }
   
   // JSON 解析错误
   if (errorStr.includes('JSON') || errorStr.includes('parse')) {
-    return '更新信息格式错误，请联系开发者';
+    return translate('updateErrorFormat');
   }
   
   // 权限错误
   if (errorStr.includes('permission') || errorStr.includes('access denied')) {
-    return '没有写入权限，请以管理员身份运行';
+    return translate('updateErrorPermission');
   }
   
   // 磁盘空间错误
   if (errorStr.includes('disk') || errorStr.includes('space') || errorStr.includes('storage')) {
-    return '磁盘空间不足，请清理后重试';
+    return translate('updateErrorDisk');
   }
   
-  return errorStr || '未知错误';
+  return errorStr || translate('unknown');
 }
 
 // ============================================================================
@@ -80,6 +81,8 @@ function getErrorMessage(error: unknown): string {
 // ============================================================================
 
 export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
+  const { t } = useTranslation('common');
+  const { t: uiT } = useTranslation('ui');
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<UpdateStatus>('checking');
   const [update, setUpdate] = useState<Update | null>(null);
@@ -93,7 +96,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
 
   // 获取当前版本
   useEffect(() => {
-    getVersion().then(setCurrentVersion).catch(() => setCurrentVersion('未知'));
+    getVersion().then(setCurrentVersion).catch(() => setCurrentVersion(t('unknown')));
   }, []);
 
   // 便携版不能走安装器式自动更新，否则会误导用户下载并安装 NSIS 包。
@@ -131,17 +134,17 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
           await openUrl(targetUrl);
           showToast({
             type: 'info',
-            title: downloadConfig.netDiskUrl ? '已打开网盘下载页' : '已打开 GitHub Releases',
+            title: downloadConfig.netDiskUrl ? uiT('downloadOpened') : uiT('githubOpened'),
             description: downloadConfig.netDiskUrl
-              ? '便携版推荐从作者发布的网盘下载新版 zip 后覆盖当前目录；GitHub Releases 可作为备用渠道。'
-              : '未读取到网盘下载配置，已打开 GitHub Releases 作为官方备用渠道。',
+              ? uiT('portableDownloadOpened')
+              : uiT('githubFallbackOpened'),
           });
         } catch (error) {
           console.error('打开便携版下载页失败:', error);
           showToast({
             type: 'error',
-            title: '打开下载页失败',
-            description: '请手动访问 GitHub Releases 下载新版便携包。',
+            title: uiT('downloadOpenFailed'),
+            description: uiT('downloadOpenFailedDesc'),
           });
         }
       }
@@ -174,8 +177,8 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
         setTimeout(() => setIsOpen(false), 200);
         showToast({
           type: 'success',
-          title: '已是最新版本',
-          description: `当前版本 v${currentVersion} 已是最新`,
+          title: uiT('upToDate'),
+          description: uiT('upToDateDesc', { version: currentVersion }),
         });
       }
       // auto 模式无更新：静默（不弹窗）
@@ -184,11 +187,11 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
       // auto 模式：静默失败，不弹窗打扰用户
       // manual 模式：弹窗已打开，切换为错误状态展示
       if (source === 'manual') {
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(getErrorMessage(error, uiT));
         setStatus('error');
       }
     }
-  }, [currentVersion, distributionChannel, showToast]);
+  }, [currentVersion, distributionChannel, showToast, t, uiT]);
 
   // 启动时自动检查
   useEffect(() => {
@@ -230,7 +233,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
       setStatus('ready');
     } catch (error) {
       console.error('下载更新失败:', error);
-      setErrorMessage(getErrorMessage(error));
+      setErrorMessage(getErrorMessage(error, uiT));
       setStatus('error');
     }
   };
@@ -241,7 +244,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
       await relaunch();
     } catch (error) {
       console.error('重启失败:', error);
-      setErrorMessage('重启失败，请手动重启应用');
+      setErrorMessage(uiT('relaunchFailed'));
       setStatus('error');
     }
   };
@@ -293,7 +296,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
                   <Sparkles className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">发现新版本</h2>
+                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('updateAvailable')}</h2>
                   <p className="text-sm text-[var(--text-muted)]">
                     v{currentVersion} → v{update.version}
                   </p>
@@ -304,11 +307,11 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="mb-5">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm font-medium text-[var(--text-primary)]">更新内容</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{t('updateNotes')}</span>
                 </div>
                 <div className="bg-[var(--bg-main)] rounded-xl p-4 max-h-48 overflow-auto">
                   <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
-                    {update.body || '• 性能优化和问题修复'}
+                    {update.body || t('updateNotes')}
                   </div>
                 </div>
               </div>
@@ -319,14 +322,14 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
                   onClick={handleClose}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  稍后提醒
+                  {t('cancel')}
                 </button>
                 <button
                   onClick={handleDownloadAndInstall}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors shadow-lg shadow-[var(--brand-green)]/20"
                 >
                   <Download className="w-4 h-4" />
-                  立即更新
+                  {t('confirm')}
                 </button>
               </div>
             </>
@@ -338,8 +341,8 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
                 <RefreshCw className="w-8 h-8 text-[var(--brand-green)] animate-spin" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">正在下载更新</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-4">请勿关闭应用...</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('downloadingUpdate')}</h2>
+              <p className="text-sm text-[var(--text-muted)] mb-4">{t('doNotCloseApp')}</p>
               
               {/* 进度条 */}
               <div className="w-full h-2 bg-[var(--bg-main)] rounded-full overflow-hidden mb-2">
@@ -360,22 +363,22 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-[var(--brand-green)]" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">更新已就绪</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-5">重启应用以完成更新</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('updateReady')}</h2>
+              <p className="text-sm text-[var(--text-muted)] mb-5">{t('restartToUpdate')}</p>
               
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  稍后重启
+                  {t('cancel')}
                 </button>
                 <button
                   onClick={handleRelaunch}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  立即重启
+                  {t('confirm')}
                 </button>
               </div>
             </div>
@@ -387,7 +390,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
                 <AlertCircle className="w-8 h-8 text-[var(--color-danger)]" />
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">更新失败</h2>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('updateFailed')}</h2>
               <p className="text-sm text-[var(--color-danger)] mb-5 px-4">{errorMessage}</p>
               
               {/* 错误提示 */}
@@ -395,7 +398,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-[var(--color-warning)] mt-0.5 shrink-0" />
                   <p className="text-xs text-[var(--text-muted)]">
-                    如果问题持续存在，请访问 GitHub 或 作者分享的其他下载渠道手动下载最新版本
+                    {t('updateFailed')}
                   </p>
                 </div>
               </div>
@@ -405,14 +408,14 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
                   onClick={handleClose}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  关闭
+                  {t('close')}
                 </button>
                 <button
                   onClick={handleRetry}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  重试
+                  {t('retry')}
                 </button>
               </div>
             </div>
@@ -424,7 +427,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
               <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
                 <RefreshCw className="w-6 h-6 text-[var(--brand-green)] animate-spin" />
               </div>
-              <p className="text-sm text-[var(--text-muted)]">正在检查更新...</p>
+              <p className="text-sm text-[var(--text-muted)]">{t('checkingUpdates')}</p>
             </div>
           )}
         </div>

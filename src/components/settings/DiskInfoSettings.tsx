@@ -16,12 +16,13 @@ import {
 import type { DiskHealthInfo, DiskVolumeInfo } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { useDiskInfoStore } from '../../stores/diskInfoStore';
+import { useTranslation } from 'react-i18next';
 
-const HEALTH_LABELS: Record<DiskHealthInfo['health_status'], string> = {
-  Healthy: '健康',
-  Warning: '警告',
-  Unhealthy: '异常',
-  Unknown: '未知',
+const HEALTH_KEYS: Record<DiskHealthInfo['health_status'], string> = {
+  Healthy: 'diskInfo.health.healthy',
+  Warning: 'diskInfo.health.warning',
+  Unhealthy: 'diskInfo.health.unhealthy',
+  Unknown: 'diskInfo.health.unknown',
 };
 
 function getHealthPresentation(status: DiskHealthInfo['health_status']) {
@@ -49,45 +50,48 @@ function getHealthPresentation(status: DiskHealthInfo['health_status']) {
   }
 }
 
-function getDiskTitle(disk: DiskHealthInfo): string {
-  return disk.model || (disk.number === null ? '未命名物理磁盘' : `磁盘 ${disk.number}`);
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function getDiskTitle(disk: DiskHealthInfo, translate: Translate): string {
+  return disk.model || (disk.number === null ? translate('diskInfo.unnamedDisk') : translate('diskInfo.diskNumber', { number: disk.number }));
 }
 
 function getVolumeLabel(volume: DiskVolumeInfo): string {
   return volume.volume_name ? `${volume.drive_letter} · ${volume.volume_name}` : volume.drive_letter;
 }
 
-function formatSerial(serialNumber: string): string {
-  if (!serialNumber) return '未提供';
+function formatSerial(serialNumber: string, translate: Translate): string {
+  if (!serialNumber) return translate('diskInfo.notProvided');
   const normalized = serialNumber.trim();
   if (normalized.length <= 8) return normalized;
   return `${normalized.slice(0, 4)}•••${normalized.slice(-4)}`;
 }
 
-function formatMediaType(mediaType: string): string {
+function formatMediaType(mediaType: string, translate: Translate): string {
   switch (mediaType) {
-    case 'SSD': return '固态硬盘';
-    case 'HDD': return '机械硬盘';
-    case 'SCM': return '存储类内存';
-    default: return mediaType || '未知介质';
+    case 'SSD': return translate('diskInfo.media.ssd');
+    case 'HDD': return translate('diskInfo.media.hdd');
+    case 'SCM': return translate('diskInfo.media.scm');
+    default: return mediaType || translate('diskInfo.unknownMedia');
   }
 }
 
-function HealthBadge({ status }: { status: DiskHealthInfo['health_status'] }) {
+function HealthBadge({ status, translate }: { status: DiskHealthInfo['health_status']; translate: Translate }) {
   const presentation = getHealthPresentation(status);
   const Icon = presentation.icon;
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${presentation.className}`}>
       <Icon className="h-3 w-3" />
-      {HEALTH_LABELS[status]}
+      {translate(HEALTH_KEYS[status])}
     </span>
   );
 }
 
 function InfoItem({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-      <p className="text-[11px] font-medium text-[var(--text-muted)]">{label}</p>
+    <div className="min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+      {/* 磁盘字段来自系统接口，标签和值都限制为单行，避免异常厂商文本撑开卡片。 */}
+      <p className="truncate text-[11px] font-medium text-[var(--text-muted)]" title={label}>{label}</p>
       <p className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)]" title={title ?? value}>
         {value}
       </p>
@@ -95,16 +99,16 @@ function InfoItem({ label, value, title }: { label: string; value: string; title
   );
 }
 
-function VolumeItem({ volume }: { volume: DiskVolumeInfo }) {
+function VolumeItem({ volume, translate }: { volume: DiskVolumeInfo; translate: Translate }) {
   const usagePercent = Math.min(Math.max(volume.usage_percent, 0), 100);
   return (
-    <div className="min-w-0 rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+    <div className="min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
         <span className="min-w-0 truncate text-xs font-semibold text-[var(--text-primary)]" title={getVolumeLabel(volume)}>
           {getVolumeLabel(volume)}
         </span>
-        <span className="whitespace-nowrap text-right text-[11px] tabular-nums text-[var(--text-muted)]" title={`${formatSize(volume.free_space)} 可用`}>
-          {formatSize(volume.free_space)} 可用
+        <span className="min-w-0 whitespace-nowrap text-right text-[11px] tabular-nums text-[var(--text-muted)]" title={`${formatSize(volume.free_space)} ${translate('diskInfo.available')}`}>
+          {formatSize(volume.free_space)} {translate('diskInfo.available')}
         </span>
         <div className="col-span-2 mt-2 flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--bg-hover)]">
@@ -119,10 +123,10 @@ function VolumeItem({ volume }: { volume: DiskVolumeInfo }) {
   );
 }
 
-function DiskInfoCard({ disk }: { disk: DiskHealthInfo }) {
+function DiskInfoCard({ disk, translate }: { disk: DiskHealthInfo; translate: Translate }) {
   const totalVolumeSize = disk.volumes.reduce((sum, volume) => sum + volume.total_space, 0);
-  const title = getDiskTitle(disk);
-  const subtitle = `${disk.drive_letters.length > 0 ? disk.drive_letters.join(' / ') : '未分配盘符'} · ${formatMediaType(disk.media_type)} · ${disk.bus_type || '未知总线'}`;
+  const title = getDiskTitle(disk, translate);
+  const subtitle = `${disk.drive_letters.length > 0 ? disk.drive_letters.join(' / ') : translate('diskInfo.unassignedDrive')} · ${formatMediaType(disk.media_type, translate)} · ${disk.bus_type || translate('diskInfo.unknownBus')}`;
 
   return (
     <article className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
@@ -135,28 +139,28 @@ function DiskInfoCard({ disk }: { disk: DiskHealthInfo }) {
             <h5 className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--text-primary)]" title={title}>
               {title}
             </h5>
-            <HealthBadge status={disk.health_status} />
+            <HealthBadge status={disk.health_status} translate={translate} />
           </div>
           <p className="mt-1 truncate text-xs text-[var(--text-muted)]" title={subtitle}>{subtitle}</p>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2">
-        <InfoItem label="容量" value={formatSize(disk.size || totalVolumeSize)} />
-        <InfoItem label="介质" value={formatMediaType(disk.media_type)} />
-        <InfoItem label="总线" value={disk.bus_type || '未知'} />
-        <InfoItem label="工作状态" value={disk.operational_status || '未知'} title={disk.operational_status} />
-        <InfoItem label="固件版本" value={disk.firmware_version || '未提供'} />
-        <InfoItem label="序列号" value={formatSerial(disk.serial_number)} title={disk.serial_number || '未提供'} />
-        <InfoItem label="磁盘编号" value={disk.number === null ? '未知' : `磁盘 ${disk.number}`} />
-        <InfoItem label="分区数量" value={`${disk.drive_letters.length} 个`} />
+        <InfoItem label={translate('diskInfo.capacity')} value={formatSize(disk.size || totalVolumeSize)} />
+        <InfoItem label={translate('diskInfo.mediaLabel')} value={formatMediaType(disk.media_type, translate)} />
+        <InfoItem label={translate('diskInfo.bus')} value={disk.bus_type || translate('diskInfo.unknown')} />
+        <InfoItem label={translate('diskInfo.operationalStatus')} value={disk.operational_status || translate('diskInfo.unknown')} title={disk.operational_status} />
+        <InfoItem label={translate('diskInfo.firmware')} value={disk.firmware_version || translate('diskInfo.notProvided')} />
+        <InfoItem label={translate('diskInfo.serial')} value={formatSerial(disk.serial_number, translate)} title={disk.serial_number || translate('diskInfo.notProvided')} />
+        <InfoItem label={translate('diskInfo.diskNumberLabel')} value={disk.number === null ? translate('diskInfo.unknown') : translate('diskInfo.diskNumber', { number: disk.number })} />
+        <InfoItem label={translate('diskInfo.volumeCount')} value={`${disk.drive_letters.length} ${translate('diskInfo.unit')}`} />
       </div>
 
       {disk.volumes.length > 0 && (
         <div className="mt-3 border-t border-[var(--border-color)] pt-3">
-          <p className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">分区与空间</p>
+          <p className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">{translate('diskInfo.volumes')}</p>
           <div className="grid min-w-0 gap-2">
-            {disk.volumes.map(volume => <VolumeItem key={`${disk.number}-${volume.drive_letter}`} volume={volume} />)}
+            {disk.volumes.map(volume => <VolumeItem key={`${disk.number}-${volume.drive_letter}`} volume={volume} translate={translate} />)}
           </div>
         </div>
       )}
@@ -165,6 +169,7 @@ function DiskInfoCard({ disk }: { disk: DiskHealthInfo }) {
 }
 
 export function DiskInfoSettings() {
+  const { t } = useTranslation('settings');
   const disks = useDiskInfoStore(state => state.disks);
   const loadStatus = useDiskInfoStore(state => state.status);
   const error = useDiskInfoStore(state => state.error);
@@ -177,10 +182,10 @@ export function DiskInfoSettings() {
         <div className="min-w-0">
           <h4 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
             <HardDrive className="h-4 w-4 shrink-0 text-[var(--brand-green)]" />
-            磁盘信息
+            {t('diskInfo.title')}
           </h4>
           <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-            查看物理磁盘基础信息、分区空间和 Windows 报告的健康状态。
+            {t('diskInfo.description')}
           </p>
         </div>
         <button
@@ -190,27 +195,27 @@ export function DiskInfoSettings() {
           className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--brand-green-20)] bg-[var(--brand-green-10)] px-3 py-2 text-xs font-semibold text-[var(--brand-green)] transition hover:bg-[var(--brand-green)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? '读取中...' : disks ? '重新读取' : '读取信息'}
+          {isLoading ? t('diskInfo.loading') : disks ? t('diskInfo.reload') : t('diskInfo.read')}
         </button>
       </div>
 
       <div className="flex min-w-0 items-start gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2.5 text-xs leading-relaxed text-blue-700 dark:text-blue-300">
         <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>健康状态来自 Windows Storage 与设备报告，不代表完整 SMART 检测；显示“未知”不等于健康或故障。</p>
+        <p>{t('diskInfo.healthNotice')}</p>
       </div>
 
       {isLoading && (
         <div className="flex items-center justify-center rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] py-12 text-sm text-[var(--text-muted)]">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin text-[var(--brand-green)]" /> 正在读取本机磁盘信息...
+          <Loader2 className="mr-2 h-4 w-4 animate-spin text-[var(--brand-green)]" /> {t('diskInfo.reading')}
         </div>
       )}
 
       {!isLoading && error && (
         <div className="rounded-2xl border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 p-4">
-          <p className="text-sm font-semibold text-[var(--color-danger)]">读取失败</p>
+          <p className="text-sm font-semibold text-[var(--color-danger)]">{t('diskInfo.readFailed')}</p>
           <p className="mt-1 break-words text-xs leading-relaxed text-[var(--color-danger)]">{error}</p>
           <button type="button" onClick={() => void fetchDiskInfo(true)} className="mt-3 rounded-lg border border-[var(--color-danger)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10">
-            重试
+            {t('diskInfo.retry')}
           </button>
         </div>
       )}
@@ -218,22 +223,22 @@ export function DiskInfoSettings() {
       {!isLoading && !error && disks === null && (
         <div className="rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-4 py-12 text-center">
           <HardDrive className="mx-auto h-8 w-8 text-[var(--brand-green)]" />
-          <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">尚未读取磁盘信息</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">点击右上角“读取信息”后获取本机物理磁盘数据。</p>
+          <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{t('diskInfo.notRead')}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">{t('diskInfo.notReadDesc')}</p>
         </div>
       )}
 
       {!isLoading && !error && disks !== null && disks.length === 0 && (
         <div className="rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-4 py-12 text-center">
           <HardDrive className="mx-auto h-8 w-8 text-[var(--brand-green)]" />
-          <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">未发现可读取的物理磁盘</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">请稍后重新读取，或检查 Windows Storage 服务是否可用。</p>
+          <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{t('diskInfo.none')}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">{t('diskInfo.noneDesc')}</p>
         </div>
       )}
 
       {!isLoading && !error && disks !== null && disks.length > 0 && (
         <div className="grid min-w-0 gap-3">
-          {disks.map((disk, index) => <DiskInfoCard key={`${disk.number ?? 'unknown'}-${disk.model}-${index}`} disk={disk} />)}
+          {disks.map((disk, index) => <DiskInfoCard key={`${disk.number ?? 'unknown'}-${disk.model}-${index}`} disk={disk} translate={t} />)}
         </div>
       )}
     </div>

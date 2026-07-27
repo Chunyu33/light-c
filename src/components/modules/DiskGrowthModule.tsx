@@ -5,6 +5,8 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -79,18 +81,10 @@ function formatProgressCount(progress: DiskGrowthScanProgress | null): string {
 }
 
 function getPhaseLabel(stage: string): string {
-  switch (stage) {
-    case 'mft':
-      return '枚举 MFT';
-    case 'path':
-      return '重建路径';
-    case 'metadata':
-      return '读取大小';
-    case 'aggregate':
-      return '聚合目录';
-    default:
-      return '扫描中';
-  }
+  return i18n.t(`scanStages.${stage}`, {
+    ns: 'common',
+    defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
+  });
 }
 
 function formatDuration(ms?: number): string {
@@ -100,7 +94,7 @@ function formatDuration(ms?: number): string {
 }
 
 function formatPreviousScanTime(scanSummary: DiskGrowthScanResponse): string {
-  return scanSummary.previous_scan_time || '暂无历史快照';
+  return scanSummary.previous_scan_time || i18n.t('diskGrowth.noHistory', { ns: 'modules' });
 }
 
 function formatModifiedTime(timestamp?: number | null, compact = false): string {
@@ -122,7 +116,7 @@ function buildPathTitle(path: string, modified?: number | null, extraLine?: stri
   const modifiedText = formatModifiedTime(modified);
   if (modifiedText !== '-') {
     // title 支持换行，路径很长时把真实修改时间单独放一行，避免关键信息被长路径淹没。
-    lines.push(`变化时间：${modifiedText}`);
+    lines.push(i18n.t('diskGrowth.modifiedTimeTitle', { ns: 'modules', time: modifiedText }));
   }
   return lines.join('\n');
 }
@@ -135,6 +129,9 @@ function buildChildGrowthEntry(parent: DiskGrowthEntry, path: string): DiskGrowt
   const detail = (parent.details ?? []).find((item) => normalizeDiskPath(item.path) === normalizeDiskPath(path));
   if (!detail) return null;
   const style = getGrowthStyle(detail.level);
+  const direction = detail.diff > 0
+    ? i18n.t('diskGrowth.increase', { ns: 'modules' })
+    : i18n.t('diskGrowth.decrease', { ns: 'modules' });
   return {
     path: detail.path,
     old_size: detail.old_size,
@@ -143,8 +140,13 @@ function buildChildGrowthEntry(parent: DiskGrowthEntry, path: string): DiskGrowt
     diff_percent: detail.old_size > 0 ? (detail.diff / detail.old_size) * 100 : 100,
     modified: detail.modified,
     level: detail.level,
-    explanation: `${style.label}，空间${detail.diff > 0 ? '增加' : '减少'} ${formatSize(Math.abs(detail.diff))}`,
-    suggestion: '建议继续查看文件级变化或打开目录确认来源',
+    explanation: i18n.t('diskGrowth.growthExplanation', {
+      ns: 'modules',
+      level: style.label,
+      direction,
+      size: formatSize(Math.abs(detail.diff)),
+    }),
+    suggestion: i18n.t('diskGrowth.growthSuggestion', { ns: 'modules' }),
     details: [],
   };
 }
@@ -152,17 +154,17 @@ function buildChildGrowthEntry(parent: DiskGrowthEntry, path: string): DiskGrowt
 function getGrowthStyle(level: DiskGrowthEntry['level']) {
   switch (level) {
     case 'significant':
-      return { icon: TrendingUp, color: 'text-red-500', label: '显著增长' };
+      return { icon: TrendingUp, color: 'text-red-500', label: i18n.t('diskGrowth.level.significant', { ns: 'modules' }) };
     case 'fast':
-      return { icon: TrendingUp, color: 'text-orange-500', label: '快速增长' };
+      return { icon: TrendingUp, color: 'text-orange-500', label: i18n.t('diskGrowth.level.fast', { ns: 'modules' }) };
     case 'minor':
-      return { icon: TrendingUp, color: 'text-amber-500', label: '轻微增长' };
+      return { icon: TrendingUp, color: 'text-amber-500', label: i18n.t('diskGrowth.level.minor', { ns: 'modules' }) };
     case 'decreased':
-      return { icon: TrendingDown, color: 'text-green-500', label: '已减少' };
+      return { icon: TrendingDown, color: 'text-green-500', label: i18n.t('diskGrowth.level.decreased', { ns: 'modules' }) };
     case 'new':
-      return { icon: Sparkles, color: 'text-blue-500', label: '新增目录' };
+      return { icon: Sparkles, color: 'text-blue-500', label: i18n.t('diskGrowth.level.new', { ns: 'modules' }) };
     default:
-      return { icon: Minus, color: 'text-[var(--text-faint)]', label: '稳定' };
+      return { icon: Minus, color: 'text-[var(--text-faint)]', label: i18n.t('diskGrowth.level.stable', { ns: 'modules' }) };
   }
 }
 
@@ -175,24 +177,25 @@ function SummaryCards({
   growthReport: DiskGrowthReport;
   driveLabel: string;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const totalGrowth = growthReport.total_growth;
   const indexedSizeText = formatSize(scanSummary.total_size);
-  const totalGrowthText = totalGrowth === 0 ? '暂无变化' : formatDiff(totalGrowth);
+  const totalGrowthText = totalGrowth === 0 ? moduleT('diskGrowth.noChange') : formatDiff(totalGrowth);
   const previousScanText = formatPreviousScanTime(scanSummary);
   const scannedFileCountText = scanSummary.total_files_scanned.toLocaleString();
 
   return (
     <div className="grid grid-cols-4 gap-3">
       <div className="min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={`${driveLabel}已索引占用`}>
-          {driveLabel}已占用
+        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={`${driveLabel} ${moduleT('diskGrowth.indexed')}`}>
+          {driveLabel} {moduleT('diskGrowth.indexed')}
         </p>
         <p className="text-base font-bold text-[var(--text-primary)] tabular-nums truncate" title={indexedSizeText}>
           {indexedSizeText}
         </p>
       </div>
       <div className="min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title="与上次净变化">与上次净变化</p>
+        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.netChange')}>{moduleT('diskGrowth.netChange')}</p>
         <p
           className={`text-base font-bold tabular-nums truncate ${
             totalGrowth > 0
@@ -207,22 +210,22 @@ function SummaryCards({
         </p>
       </div>
       <div className="min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title="上次扫描">上次扫描</p>
+        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.previousScan')}>{moduleT('diskGrowth.previousScan')}</p>
         <p className="text-[13px] font-semibold text-[var(--text-primary)] tabular-nums truncate" title={previousScanText}>
           {previousScanText}
         </p>
       </div>
       <div className="min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title="扫描文件数">扫描文件数</p>
+        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.fileCount')}>{moduleT('diskGrowth.fileCount')}</p>
         <p className="text-base font-bold text-[var(--brand-green)] tabular-nums truncate" title={scannedFileCountText}>
           {scannedFileCountText}
         </p>
       </div>
       {growthReport.entries.length > 0 && (
         <div className="col-span-4 flex items-center gap-3 text-[12px] text-[var(--text-muted)] min-w-0 overflow-hidden whitespace-nowrap">
-          <span className="text-red-500">新增 {formatSize(scanSummary.analyze.increased_size ?? 0)}</span>
-          <span className="text-green-500">减少 {formatSize(scanSummary.analyze.decreased_size ?? 0)}</span>
-          <span className="truncate">按变化量排序</span>
+          <span className="text-red-500">{moduleT('diskGrowth.increased', { size: formatSize(scanSummary.analyze.increased_size ?? 0) })}</span>
+          <span className="text-green-500">{moduleT('diskGrowth.decreased', { size: formatSize(scanSummary.analyze.decreased_size ?? 0) })}</span>
+          <span className="truncate">{moduleT('diskGrowth.sorted')}</span>
         </div>
       )}
     </div>
@@ -259,6 +262,7 @@ function DiskGrowthDiagnostics({
   resultMode: 'change' | 'usage';
   maxEntries: number;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   // 与大目录分析复用同一类诊断布局，让用户在不同 MFT 模块里看到一致的阶段耗时信息。
   const hasPhaseDurations = scanSummary.phase_durations.length > 0;
   const latestPhase = hasPhaseDurations
@@ -270,17 +274,17 @@ function DiskGrowthDiagnostics({
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 md:gap-4">
         <div className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--brand-green)] text-white font-medium">
-            {latestPhase ? getPhaseLabel(latestPhase.stage) : '扫描完成'}
+            {latestPhase ? getPhaseLabel(latestPhase.stage) : moduleT('diskGrowth.completed')}
           </span>
           <span className="truncate text-[var(--text-primary)]">
             {resultMode === 'change'
-              ? `展示变化目录，按变化量排序，最多 ${maxEntries} 项`
-              : '暂无变化目录，展示本次占用基线'}
+              ? moduleT('diskGrowth.changeSummary', { count: maxEntries })
+              : moduleT('diskGrowth.baselineSummary')}
           </span>
         </div>
         <div className="flex items-center justify-start md:justify-end gap-4 text-[var(--text-muted)] tabular-nums">
-          <span>已处理 {scanSummary.total_files_scanned.toLocaleString()}</span>
-          <span>总耗时 {formatDuration(scanSummary.scan_duration_ms)}</span>
+          <span>{moduleT('diskGrowth.processed', { count: scanSummary.total_files_scanned.toLocaleString() })}</span>
+          <span>{moduleT('diskGrowth.elapsed', { time: formatDuration(scanSummary.scan_duration_ms) })}</span>
         </div>
       </div>
 
@@ -301,10 +305,9 @@ function DiskGrowthDiagnostics({
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[var(--text-faint)]">
-        <span>引擎：{scanSummary.backend === 'mft' ? 'MFT' : scanSummary.backend}</span>
+        <span>{moduleT('diskGrowth.engine', { name: scanSummary.backend === 'mft' ? 'MFT' : scanSummary.backend })}</span>
         <span>
-          大小来源：MFT {scanSummary.mft_size_count.toLocaleString()} 个，metadata 回退{' '}
-          {scanSummary.metadata_fallback_count.toLocaleString()} 个
+          {moduleT('diskGrowth.sizeSource', { mft: scanSummary.mft_size_count.toLocaleString(), fallback: scanSummary.metadata_fallback_count.toLocaleString() })}
         </span>
       </div>
     </div>
@@ -339,6 +342,7 @@ function ChangeRow({
   onSearchPath: (path: string) => void;
   onShowDetails: (growth: DiskGrowthEntry) => void;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const style = growth ? getGrowthStyle(growth.level) : getGrowthStyle('stable');
   const Icon = style.icon;
   const diff = growth?.diff ?? 0;
@@ -370,7 +374,9 @@ function ChangeRow({
 
       <span
         className="w-20 text-center text-[11px] text-[var(--text-muted)] tabular-nums shrink-0"
-        title={modifiedTimeTitle === '-' ? '旧快照未记录变化时间' : `变化时间：${modifiedTimeTitle}`}
+        title={modifiedTimeTitle === '-'
+          ? moduleT('diskGrowth.modifiedTimeMissing')
+          : moduleT('diskGrowth.modifiedTimeTitle', { time: modifiedTimeTitle })}
       >
         {modifiedTimeLabel}
       </span>
@@ -390,7 +396,7 @@ function ChangeRow({
         className={`text-[13px] font-medium tabular-nums w-24 text-right shrink-0 ${style.color} ${
           growth ? 'hover:underline underline-offset-4 cursor-pointer' : 'cursor-default'
         }`}
-        title={growth ? '查看该目录下一级变化明细' : undefined}
+        title={growth ? moduleT('diskGrowth.viewDetails') : undefined}
       >
         {diff === 0 ? '-' : formatDiff(diff)}
       </button>
@@ -399,14 +405,14 @@ function ChangeRow({
         <button
           onClick={() => onSearchPath(entry.path)}
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition"
-          title="搜索该路径有什么作用"
+          title={moduleT('diskGrowth.searchPath')}
         >
           <Search className="w-4 h-4" />
         </button>
         <button
           onClick={() => onOpenFolder(entry.path)}
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition"
-          title="打开目录"
+          title={moduleT('diskGrowth.openFolder')}
         >
           <FolderOpen className="w-4 h-4" />
         </button>
@@ -426,6 +432,7 @@ function DiskGrowthDetailsModal({
   onClose: () => void;
   onOpenFolder: (path: string) => void;
 }) {
+  const { t: moduleT } = useTranslation('modules');
   const [currentEntry, setCurrentEntry] = useState<DiskGrowthEntry | null>(entry);
   const [fileDetails, setFileDetails] = useState<DiskGrowthFileDetailsResponse | null>(null);
   const [directoryDetails, setDirectoryDetails] = useState<DiskGrowthDirectoryDetailsResponse | null>(null);
@@ -578,7 +585,7 @@ function DiskGrowthDetailsModal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">变化明细</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('diskGrowth.details')}</h3>
             <div className="mt-1 flex items-center gap-1 text-xs text-[var(--text-muted)] min-w-0">
               {breadcrumbItems.map((item, index) => (
                 <div key={item.path} className="flex items-center gap-1 min-w-0">
@@ -612,19 +619,19 @@ function DiskGrowthDetailsModal({
         <div className="p-5 space-y-4 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="grid grid-cols-3 gap-3 shrink-0">
             <div className="rounded-xl bg-[var(--bg-main)] px-3 py-2">
-              <p className="text-[11px] text-[var(--text-muted)]">上次大小</p>
+              <p className="text-[11px] text-[var(--text-muted)]">{moduleT('diskGrowth.previousSize')}</p>
               <p className="mt-1 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                 {formatSize(currentEntry.old_size)}
               </p>
             </div>
             <div className="rounded-xl bg-[var(--bg-main)] px-3 py-2">
-              <p className="text-[11px] text-[var(--text-muted)]">当前大小</p>
+              <p className="text-[11px] text-[var(--text-muted)]">{moduleT('diskGrowth.currentSize')}</p>
               <p className="mt-1 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                 {formatSize(currentEntry.new_size)}
               </p>
             </div>
             <div className="rounded-xl bg-[var(--bg-main)] px-3 py-2">
-              <p className="text-[11px] text-[var(--text-muted)]">变化量</p>
+              <p className="text-[11px] text-[var(--text-muted)]">{moduleT('diskGrowth.difference')}</p>
               <p className={`mt-1 text-sm font-semibold tabular-nums ${style.color}`}>
                 {formatDiff(currentEntry.diff)}
               </p>
@@ -634,9 +641,9 @@ function DiskGrowthDetailsModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
             <div className="rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] overflow-hidden min-w-0 min-h-0 flex flex-col">
               <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] shrink-0">
-                <span className="flex-1">子目录</span>
-                <span className="w-20 text-right">当前大小</span>
-                <span className="w-24 text-right">变化量</span>
+                <span className="flex-1">{moduleT('diskGrowth.subdirectories')}</span>
+                <span className="w-20 text-right">{moduleT('diskGrowth.currentSize')}</span>
+                <span className="w-24 text-right">{moduleT('diskGrowth.difference')}</span>
                 <span className="w-16" />
               </div>
               <div ref={directoryScrollRef} className="flex-1 min-h-0 overflow-auto">
@@ -661,10 +668,10 @@ function DiskGrowthDetailsModal({
                           <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(detail.new_size)}</span>
                           <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${detailStyle.color}`}>{formatDiff(detail.diff)}</span>
                           <div className="w-16 flex justify-end gap-0.5">
-                            <button onClick={() => onOpenFolder(detail.path)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title="打开目录">
+                            <button onClick={() => onOpenFolder(detail.path)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title={moduleT('diskGrowth.openFolder')}>
                               <FolderOpen className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleEnterDirectory(detail.path)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title="进入目录查看文件变化">
+                            <button onClick={() => handleEnterDirectory(detail.path)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title={moduleT('diskGrowth.enterDirectory')}>
                               <ChevronRight className="w-4 h-4" />
                             </button>
                           </div>
@@ -675,21 +682,21 @@ function DiskGrowthDetailsModal({
                 ) : directoryLoading ? (
                   <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-[var(--text-muted)]">
                     <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-green)]" />
-                    正在加载目录变化...
+                    {moduleT('diskGrowth.loadingDirectories')}
                   </div>
                 ) : (
-                  <div className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">暂无下一级变化明细</div>
+                  <div className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">{moduleT('diskGrowth.noDirectories')}</div>
                 )}
               </div>
               {directoryDetails && (
                 <div className="flex items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-2 text-xs text-[var(--text-faint)] shrink-0">
-                  <span>已显示 {directoryRows.length} / {directoryDetails.total_changed_dirs}</span>
+                  <span>{moduleT('diskGrowth.showing', { current: directoryRows.length, total: directoryDetails.total_changed_dirs })}</span>
                   {directoryDetails.has_more ? (
                     <button onClick={loadMoreDirectories} disabled={directoryLoading} className="text-[var(--brand-green)] hover:text-[var(--brand-green-hover)] disabled:opacity-60 transition-colors">
-                      {directoryLoading ? '加载中...' : '加载更多目录'}
+                      {directoryLoading ? moduleT('diskGrowth.loading') : moduleT('diskGrowth.loadMoreDirectories')}
                     </button>
                   ) : (
-                    <span>已全部加载</span>
+                    <span>{moduleT('diskGrowth.loadedAll')}</span>
                   )}
                 </div>
               )}
@@ -697,15 +704,15 @@ function DiskGrowthDetailsModal({
 
             <div className="rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] overflow-hidden min-w-0 min-h-0 flex flex-col">
               <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] shrink-0">
-                <span className="flex-1">文件变化</span>
-                <span className="w-20 text-right">当前大小</span>
-                <span className="w-24 text-right">变化量</span>
+                <span className="flex-1">{moduleT('diskGrowth.files')}</span>
+                <span className="w-20 text-right">{moduleT('diskGrowth.currentSize')}</span>
+                <span className="w-24 text-right">{moduleT('diskGrowth.difference')}</span>
                 <span className="w-10" />
               </div>
               <div ref={fileScrollRef} className="flex-1 min-h-0 overflow-auto">
                 {fileError ? (
                   <div className="px-4 py-8 text-center">
-                    <p className="text-sm text-[var(--text-muted)]">暂时无法查看文件级明细</p>
+                    <p className="text-sm text-[var(--text-muted)]">{moduleT('diskGrowth.fileDetailsUnavailable')}</p>
                     <p className="mt-1 text-xs text-[var(--text-faint)]">{fileError}</p>
                   </div>
                 ) : fileRows.length > 0 ? (
@@ -726,7 +733,7 @@ function DiskGrowthDetailsModal({
                           </div>
                           <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(file.new_size)}</span>
                           <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${fileStyle.color}`}>{formatDiff(file.diff)}</span>
-                          <button onClick={() => onOpenFolder(file.path)} className="w-10 flex justify-end p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title="打开所在位置">
+                          <button onClick={() => onOpenFolder(file.path)} className="w-10 flex justify-end p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title={moduleT('diskGrowth.openLocation')}>
                             <FolderOpen className="w-4 h-4" />
                           </button>
                         </div>
@@ -736,21 +743,21 @@ function DiskGrowthDetailsModal({
                 ) : fileLoading ? (
                   <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-[var(--text-muted)]">
                     <Loader2 className="w-4 h-4 animate-spin text-[var(--brand-green)]" />
-                    正在加载文件变化...
+                    {moduleT('diskGrowth.loadingFiles')}
                   </div>
                 ) : (
-                  <div className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">暂无文件级变化明细</div>
+                  <div className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">{moduleT('diskGrowth.noFiles')}</div>
                 )}
               </div>
               {fileDetails && (
                 <div className="flex items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-2 text-xs text-[var(--text-faint)] shrink-0">
-                  <span>已显示 {fileRows.length} / {fileDetails.total_changed_files}</span>
+                  <span>{moduleT('diskGrowth.showing', { current: fileRows.length, total: fileDetails.total_changed_files })}</span>
                   {fileDetails.has_more ? (
                     <button onClick={loadMoreFiles} disabled={fileLoading} className="text-[var(--brand-green)] hover:text-[var(--brand-green-hover)] disabled:opacity-60 transition-colors">
-                      {fileLoading ? '加载中...' : '加载更多文件'}
+                      {fileLoading ? moduleT('diskGrowth.loading') : moduleT('diskGrowth.loadMoreFiles')}
                     </button>
                   ) : (
-                    <span>已全部加载</span>
+                    <span>{moduleT('diskGrowth.loadedAll')}</span>
                   )}
                 </div>
               )}
@@ -758,7 +765,7 @@ function DiskGrowthDetailsModal({
           </div>
 
           <p className="text-[11px] text-[var(--text-faint)] shrink-0">
-            说明：目录与文件变化均按需加载，每次最多加载 {detailPageSize} 条；变化明细仅用于定位来源，不代表可以直接删除。
+            {moduleT('diskGrowth.detailNote', { count: detailPageSize })}
           </p>
         </div>
       </motion.div>
@@ -768,6 +775,8 @@ function DiskGrowthDetailsModal({
 }
 
 export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('diskGrowth');
   const { settings } = useSettings();
   const lastScanTriggerRef = useRef(0);
@@ -862,13 +871,13 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
     if (isAdmin === false) {
-      const message = `${selectedDriveLabel}全盘分析需要管理员权限读取 MFT，请以管理员身份启动应用后再扫描。`;
+      const message = moduleT('diskGrowth.adminScanError', { drive: selectedDriveLabel });
       setError(message);
       updateModuleState('diskGrowth', { status: 'error', error: message });
       return;
     }
     if (selectedDrive && !selectedDrive.is_ntfs) {
-      const message = `${selectedDriveLabel}当前文件系统为 ${selectedDrive.file_system || '未知'}，MFT 全盘分析仅支持 NTFS 分区。`;
+      const message = moduleT('diskGrowth.ntfsScanError', { drive: selectedDriveLabel, fileSystem: selectedDrive.file_system || moduleT('diskGrowth.unknownFileSystem') });
       setError(message);
       updateModuleState('diskGrowth', { status: 'error', error: message });
       return;
@@ -911,7 +920,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         scanningRef.current = false;
       }
     }
-  }, [isAdmin, selectedDrive, selectedDriveLabel, selectedDriveLetter, settings.diskGrowthMaxEntries, updateModuleState]);
+  }, [isAdmin, selectedDrive, selectedDriveLabel, selectedDriveLetter, settings.diskGrowthMaxEntries, updateModuleState, moduleT]);
 
   const handleStopScan = useCallback(async () => {
     cancelRequestedRef.current = true;
@@ -960,7 +969,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const handleSearchPath = useCallback(async (path: string) => {
     try {
       // 变化目录不等于可清理目录，搜索文案先确认用途，再辅助判断是否可删。
-      await openSearchUrl(`Windows 路径 ${path} 是什么 有什么作用 可以删除吗`);
+      await openSearchUrl(`${moduleT('diskGrowth.searchQueryPrefix')} ${path} ${moduleT('diskGrowth.searchQuerySuffix')}`);
     } catch (err) {
       console.error('搜索路径用途失败:', err);
     }
@@ -1008,49 +1017,49 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
       id="disk-growth"
-      title="磁盘变化分析"
-      description={`基于 MFT 快速扫描 ${selectedDriveLabel}，对比上次快照定位空间变化来源`}
+        title={navT('diskGrowth')}
+        description={`${navT('diskGrowthDesc')} (${selectedDriveLabel})`}
       icon={<HardDrive className="w-5 h-5 text-[var(--brand-green)]" />}
       status={moduleState.status}
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}
-      countLabel="个变化目录"
+      countLabel={moduleT('diskGrowth.countLabel')}
       expanded={isExpanded}
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'disk-growth')}
       onScan={handleScan}
-      scanButtonText="开始扫描"
+      scanButtonText={moduleT('diskGrowth.scan')}
       scanDisabled={isAdmin === false || Boolean(selectedDrive && !selectedDrive.is_ntfs)}
       titleExtra={driveSelector}
       error={error}
     >
       <div className="mx-4 mt-4 flex flex-col gap-2 rounded-xl bg-[var(--bg-main)] px-4 py-3 text-[12px] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
         <span title={selectedDrive ? driveOptionTitle(selectedDrive) : selectedDriveLabel}>
-          当前分析：{selectedDriveLabel}
+          {moduleT('diskGrowth.analyzingDrive', { drive: selectedDriveLabel })}
           {selectedDrive?.volume_name ? ` · ${selectedDrive.volume_name}` : ''}
           {selectedDrive?.file_system ? ` · ${selectedDrive.file_system}` : ''}
         </span>
         {selectedDrive ? (
           <span className="tabular-nums">
-            可用 {formatSize(selectedDrive.free_space)} / 总计 {formatSize(selectedDrive.total_space)}
+            {moduleT('diskGrowth.driveSpace', { free: formatSize(selectedDrive.free_space), total: formatSize(selectedDrive.total_space) })}
           </span>
         ) : drivesError ? (
-          <span className="text-amber-600 dark:text-amber-400">分区列表读取失败，已回退默认 C 盘</span>
+          <span className="text-amber-600 dark:text-amber-400">{moduleT('diskGrowth.drivesError')}</span>
         ) : (
-          <span>正在读取分区列表...</span>
+          <span>{moduleT('diskGrowth.loadingDrives')}</span>
         )}
       </div>
 
       {isAdmin === false && (
         <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>当前未检测到管理员权限。MFT 全盘分析需要管理员权限，请以管理员身份启动 LightC 或运行开发命令。</span>
+          <span>{moduleT('diskGrowth.adminHint')}</span>
         </div>
       )}
 
       {selectedDrive && !selectedDrive.is_ntfs && (
         <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>当前分区不是 NTFS，暂不支持 MFT 快速全盘分析，请切换到 NTFS 分区。</span>
+          <span>{moduleT('diskGrowth.ntfsHint')}</span>
         </div>
       )}
 
@@ -1058,8 +1067,8 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         <div className="p-4">
           <EmptyState
             icon={HardDrive}
-            title={`尚未扫描 ${selectedDriveLabel} 变化`}
-            description={`点击开始扫描，建立 ${selectedDriveLabel} 快照；再次扫描后会对比新增、减少和明显变化的目录。`}
+            title={moduleT('diskGrowth.idleTitle', { drive: selectedDriveLabel })}
+            description={moduleT('diskGrowth.idleDesc', { drive: selectedDriveLabel })}
           />
         </div>
       )}
@@ -1067,9 +1076,9 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       {moduleState.status === 'scanning' && (
         <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
-          <p className="text-sm">{scanProgress?.message ?? `正在通过 MFT 扫描 ${selectedDriveLabel}...`}</p>
+          <p className="text-sm">{scanProgress ? getPhaseLabel(scanProgress.stage) : i18n.t('scanStages.mftEnumerate', { ns: 'common', drive: selectedDriveLabel })}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
-            已用时 {scanElapsed}s
+            {i18n.t('scanStages.elapsed', { ns: 'common', time: `${scanElapsed}s` })}
           </p>
           {scanProgress && (
             <p className="text-xs text-[var(--text-faint)] mt-1 tabular-nums">
@@ -1077,7 +1086,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
             </p>
           )}
           <p className="text-xs text-[var(--text-faint)] mt-1">
-            首次扫描会建立快照，下次扫描开始展示新增和减少的目录
+            {moduleT('diskGrowth.firstScanHint')}
           </p>
           <button
             onClick={handleStopScan}
@@ -1086,7 +1095,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
               border border-red-200 dark:border-red-800/30 transition-colors"
           >
             <XCircle className="w-3.5 h-3.5" />
-            停止扫描
+            {moduleT('diskGrowth.stop')}
           </button>
         </div>
       )}
@@ -1097,8 +1106,8 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
           <DiagnosticBanner report={growthReport} />
 
           <div className="flex items-center justify-between">
-            <p className="text-[13px] text-[var(--text-muted)]">共 {entries.length} 个目录结果</p>
-            <span className="text-[12px] text-[var(--text-faint)]">{isAdmin ? '管理员模式' : '非管理员模式'}</span>
+            <p className="text-[13px] text-[var(--text-muted)]">{moduleT('diskGrowth.resultCount', { count: entries.length })}</p>
+            <span className="text-[12px] text-[var(--text-faint)]">{isAdmin ? moduleT('diskGrowth.adminMode') : moduleT('diskGrowth.nonAdminMode')}</span>
           </div>
           <DiskGrowthDiagnostics
             scanSummary={scanSummary}
@@ -1109,11 +1118,11 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
           <div className="bg-[var(--bg-main)] rounded-xl overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] uppercase tracking-wider">
               <div className="w-1.5 shrink-0" />
-              <div className="flex-1">路径</div>
-              <div className="w-20 shrink-0 text-center">变化时间</div>
-              <div className="w-24 shrink-0 text-right">变化级别</div>
-              <div className="w-20 shrink-0 text-right">当前大小</div>
-              <div className="w-24 shrink-0 text-right">变化量</div>
+              <div className="flex-1">{moduleT('diskGrowth.path')}</div>
+              <div className="w-20 shrink-0 text-center">{moduleT('diskGrowth.changeTime')}</div>
+              <div className="w-24 shrink-0 text-right">{moduleT('diskGrowth.changeLevel')}</div>
+              <div className="w-20 shrink-0 text-right">{moduleT('diskGrowth.currentSizeHeader')}</div>
+              <div className="w-24 shrink-0 text-right">{moduleT('diskGrowth.differenceHeader')}</div>
               <div className="w-16 shrink-0" />
             </div>
 
@@ -1136,7 +1145,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
                 onClick={() => setShowAll(true)}
                 className="w-full py-3 text-center text-[13px] text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                显示全部 {entries.length} 项
+                {moduleT('diskGrowth.showAll', { count: entries.length })}
               </button>
             )}
 
@@ -1144,8 +1153,8 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
               <div className="p-4">
                 <EmptyState
                   icon={HardDrive}
-                  title="已建立首次快照"
-                  description="下次扫描后会对比本次快照，并在这里显示新增、减少或明显变化的目录。"
+                  title={moduleT('diskGrowth.firstSnapshot')}
+                  description={moduleT('diskGrowth.firstSnapshotDesc')}
                   tone="success"
                   compact
                 />

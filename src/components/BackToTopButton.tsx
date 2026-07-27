@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 interface BackToTopButtonProps {
   /** 主内容滚动容器；使用传入 ref 是为了同时兼容卡片模式和页面模式的内部滚动区。 */
@@ -15,6 +16,7 @@ interface BackToTopButtonProps {
 }
 
 export function BackToTopButton({ scrollContainerRef, threshold = 360 }: BackToTopButtonProps) {
+  const { t } = useTranslation('common');
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -52,8 +54,8 @@ export function BackToTopButton({ scrollContainerRef, threshold = 360 }: BackToT
             hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)] hover:text-white
             active:scale-95
           "
-          title="回到顶部"
-          aria-label="回到顶部"
+          title={t('backToTop')}
+          aria-label={t('backToTop')}
           initial={{ opacity: 0, y: 16, scale: 0.92 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12, scale: 0.94 }}

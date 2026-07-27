@@ -2,11 +2,14 @@
 // 应用设置上下文 - 管理各种开关设置
 // ============================================================================
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { APP_MODULE_META, DEFAULT_ACTIVE_MODULE_ID, type AppModuleId, type LayoutMode } from '../config/moduleMeta';
+import i18n, { type Language } from '../i18n';
 
 /** 应用设置 */
 interface AppSettings {
+  /** 界面语言，手动选择并与其他应用设置一起持久化。 */
+  language: Language;
   /** 首页布局模式：卡片式适合快速总览，页面式适合传统 PC 软件用户。 */
   layoutMode: LayoutMode;
   /** 页面式布局下当前激活的功能模块，保存在全局设置里用于切换后保持位置。 */
@@ -39,6 +42,7 @@ const moduleIds = APP_MODULE_META.map(module => module.id);
 
 /** 默认设置 */
 const defaultSettings: AppSettings = {
+  language: 'zh',
   layoutMode: 'pages', // 布局设置 现已默认页面模式
   activeModuleId: DEFAULT_ACTIVE_MODULE_ID,
   hotspotDepth: 3,     // 默认分析深度 3 层
@@ -50,6 +54,7 @@ const defaultSettings: AppSettings = {
 };
 
 function normalizeSettings(settings: AppSettings): AppSettings {
+  const language: Language = settings.language === 'en' || settings.language === 'ja' ? settings.language : 'zh';
   const layoutMode: LayoutMode = settings.layoutMode === 'pages' ? 'pages' : 'cards';
   const activeModuleId = moduleIds.includes(settings.activeModuleId)
     ? settings.activeModuleId
@@ -57,6 +62,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
 
   return {
     ...settings,
+    language,
     // 布局设置来自本地缓存，读取时收敛到已注册模块，避免旧缓存或手动篡改导致空页面。
     layoutMode,
     activeModuleId,
@@ -88,6 +94,11 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }
     return defaultSettings;
   });
+
+  useEffect(() => {
+    // 设置可能来自旧版本缓存，统一在 Provider 生效后切换，避免首屏读取到非法语言。
+    void i18n.changeLanguage(settings.language);
+  }, [settings.language]);
 
   // 更新设置
   const updateSettings = useCallback((updates: Partial<AppSettings>) => {

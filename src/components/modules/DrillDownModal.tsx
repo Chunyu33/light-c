@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef, useMemo, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import {
   X, Loader2, FolderOpen, Clock, HardDrive, ChevronRight,
@@ -202,6 +203,7 @@ interface ModalEntryItemProps {
 const ModalEntryItem = memo(function ModalEntryItem({
   entry, rank, maxSize, onDrillDown, onOpenFolder, onCleanup, onSearch,
 }: ModalEntryItemProps) {
+  const { t: moduleT } = useTranslation('modules');
   const percentage = maxSize > 0 ? (entry.total_size / maxSize) * 100 : 0;
   const canCleanup = entry.is_safe_to_clean && entry.is_cache && !entry.is_program && !entry.is_protected;
 
@@ -234,13 +236,13 @@ const ModalEntryItem = memo(function ModalEntryItem({
             {entry.is_protected && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
                 <Shield className="w-3 h-3" />
-                系统保护
+                {moduleT('hotspot.systemProtected')}
               </span>
             )}
             {entry.is_cache && !entry.is_program && !entry.is_protected && (
               <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
                 <Trash2 className="w-3 h-3" />
-                临时缓存
+                {moduleT('hotspot.temporaryCache')}
               </span>
             )}
           </div>
@@ -250,7 +252,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
         <div className="flex-shrink-0 flex items-center gap-4 text-xs">
           <div className="hidden sm:flex items-center gap-1 text-[var(--text-muted)]">
             <HardDrive className="w-3 h-3" />
-            <span>{entry.file_count.toLocaleString()} 个</span>
+            <span>{moduleT('hotspot.fileCount', { count: entry.file_count.toLocaleString() })}</span>
           </div>
           <div className="hidden md:flex items-center gap-1 text-[var(--text-muted)]">
             <Clock className="w-3 h-3" />
@@ -268,7 +270,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             <button
               onClick={(e) => { e.stopPropagation(); onDrillDown(entry.path); }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
-              title="展开下级目录"
+              title={moduleT('drillDown.expand')}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -277,7 +279,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
               <button
                 onClick={(e) => { e.stopPropagation(); onCleanup(entry); }}
                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
-                title="清理缓存文件"
+                title={moduleT('drillDown.cleanup')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -286,7 +288,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             <button
               onClick={(e) => { e.stopPropagation(); onSearch(entry.path); }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
-              title="搜索该文件夹是否可以删除"
+              title={moduleT('drillDown.search')}
             >
               <Search className="w-4 h-4" />
             </button>
@@ -294,7 +296,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             <button
               onClick={(e) => { e.stopPropagation(); onOpenFolder(entry.path); }}
               className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
-              title="在文件资源管理器中打开"
+              title={moduleT('drillDown.open')}
             >
               <FolderOpen className="w-4 h-4" />
             </button>
@@ -319,6 +321,8 @@ interface DrillDownModalProps {
 }
 
 export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDownModalProps) {
+  const { t: moduleT } = useTranslation('modules');
+  const { t } = useTranslation('common');
   const { showToast } = useToast();
 
   // ====== 动画状态 ======
@@ -370,7 +374,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
       setScanResult(result);
     } catch (err) {
       console.error('下钻扫描失败:', err);
-      showToast({ type: 'error', title: '下钻扫描失败', description: String(err) });
+      showToast({ type: 'error', title: moduleT('drillDown.scanFailed'), description: String(err) });
     } finally {
       setLoading(false);
     }
@@ -447,20 +451,20 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
       if (result.deleted_count > 0) {
         showToast({
           type: 'success',
-          title: '清理完成',
-          description: `已删除 ${result.deleted_count} 项，释放 ${formatSize(result.freed_size)}`,
+          title: moduleT('drillDown.cleanupDone'),
+          description: moduleT('hotspot.cleanupDoneDesc', { count: result.deleted_count, size: formatSize(result.freed_size) }),
         });
         didCleanupRef.current = true;
         // 重新加载当前层
         fetchData(currentPath);
       } else if (result.failed_count > 0) {
-        showToast({ type: 'warning', title: '清理受阻', description: `${result.failed_count} 个文件被占用无法删除` });
+        showToast({ type: 'warning', title: moduleT('drillDown.cleanupBlocked'), description: moduleT('hotspot.cleanupBlockedDesc', { count: result.failed_count }) });
       } else {
-        showToast({ type: 'info', title: '目录已为空', description: '没有需要清理的文件' });
+        showToast({ type: 'info', title: moduleT('drillDown.empty'), description: moduleT('hotspot.emptyDesc') });
       }
     } catch (err) {
       console.error('清理失败:', err);
-      showToast({ type: 'error', title: '清理失败', description: String(err) });
+      showToast({ type: 'error', title: moduleT('drillDown.cleanupFailed'), description: String(err) });
     } finally {
       setIsCleaning(false);
       setCleanupTarget(null);
@@ -506,7 +510,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
           <button
             onClick={handleClose}
             className="flex-shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="关闭 (ESC)"
+            title={moduleT('drillDown.close') + ' (ESC)'}
           >
             <X className="w-4 h-4" />
           </button>
@@ -518,7 +522,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
           {loading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-[var(--brand-green)] mr-2" />
-              <span className="text-sm text-[var(--text-muted)]">正在扫描子目录...</span>
+              <span className="text-sm text-[var(--text-muted)]">{moduleT('drillDown.scanning')}</span>
             </div>
           )}
 
@@ -534,7 +538,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
                   <CornerLeftUp className="w-4 h-4 text-[var(--text-muted)]" />
                 </div>
                 <span className="text-sm text-[var(--text-muted)]">
-                  {pathStack.length <= 1 ? '关闭' : '返回上级目录'}
+                  {pathStack.length <= 1 ? moduleT('drillDown.close') : moduleT('drillDown.back')}
                 </span>
               </button>
 
@@ -558,7 +562,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
                   onClick={() => setShowAll(true)}
                   className="w-full flex items-center justify-center gap-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                 >
-                  <span>展示全部 {scanResult.entries.length} 项</span>
+                  <span>{moduleT('drillDown.showAll', { count: scanResult.entries.length })}</span>
                   <ChevronDown className="w-4 h-4" />
                 </button>
               )}
@@ -567,7 +571,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
               {scanResult.entries.length === 0 && (
                 <div className="text-center py-10 text-[var(--text-muted)]">
                   <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">该目录下没有子文件夹</p>
+                  <p className="text-sm">{moduleT('drillDown.noFolders')}</p>
                 </div>
               )}
             </>
@@ -578,10 +582,9 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
         {!loading && scanResult && scanResult.entries.length > 0 && (
           <div className="flex items-center justify-between px-5 py-2.5 border-t border-[var(--border-default)] text-xs text-[var(--text-muted)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
             <span>
-              共 <strong className="text-[var(--text-primary)]">{scanResult.entries.length}</strong> 个子目录，
-              总计 <strong className="text-[var(--brand-green)]">{formatSize(scanResult.scanned_total_size)}</strong>
+              {moduleT('drillDown.summary', { count: scanResult.entries.length, size: formatSize(scanResult.scanned_total_size) })}
             </span>
-            <span>耗时 {(scanResult.scan_duration_ms / 1000).toFixed(1)}s</span>
+            <span>{moduleT('drillDown.elapsed', { time: (scanResult.scan_duration_ms / 1000).toFixed(1) })}</span>
           </div>
         )}
       </div>
@@ -590,11 +593,11 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
       {cleanupTarget && (
         <ConfirmDialog
           isOpen={!!cleanupTarget}
-          title="确认清理"
-          description={`确定清理 "${cleanupTarget.name}" 的临时文件吗？此操作将删除该目录下的所有文件，但保留目录本身。`}
-          warning="被占用的文件将被跳过，不会影响正在运行的程序。"
-          confirmText={isCleaning ? '清理中...' : '确认清理'}
-          cancelText="取消"
+          title={moduleT('hotspot.confirmCleanup')}
+          description={moduleT('drillDown.confirmDesc', { name: cleanupTarget.name })}
+          warning={moduleT('drillDown.occupiedWarning')}
+          confirmText={isCleaning ? t('deleting') : moduleT('hotspot.confirmCleanup')}
+          cancelText={t('cancel')}
           onConfirm={handleCleanupConfirm}
           onCancel={() => setCleanupTarget(null)}
           isDanger={false}

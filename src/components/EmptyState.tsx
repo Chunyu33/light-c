@@ -4,6 +4,7 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { CheckCircle2, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface EmptyStateProps {
   /** 用图标承载当前状态，避免不同模块各自写一套空白占位。 */
@@ -18,13 +19,17 @@ interface EmptyStateProps {
 
 export function EmptyState({
   icon,
-  title = '暂无数据',
-  description = '开始扫描后，这里会展示可处理的结果。',
+  title,
+  description,
   action,
   tone = 'neutral',
   compact = false,
   className = '',
 }: EmptyStateProps) {
+  const { t } = useTranslation('common');
+  // 默认空状态由公共语言包提供，业务页面传入的专属标题仍然优先保留。
+  const resolvedTitle = title ?? t('noData');
+  const resolvedDescription = description ?? t('emptyDescription');
   const Icon = icon ?? (tone === 'success' ? CheckCircle2 : Sparkles);
   const iconClassName = tone === 'success'
     ? 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
@@ -42,10 +47,10 @@ export function EmptyState({
       <div className={`relative mb-3 flex h-14 w-14 items-center justify-center rounded-2xl shadow-sm ${iconClassName}`}>
         <Icon className="h-6 w-6" />
       </div>
-      <p className="relative text-sm font-semibold text-[var(--text-primary)]">{title}</p>
-      {description && (
+      <p className="relative text-sm font-semibold text-[var(--text-primary)]">{resolvedTitle}</p>
+      {resolvedDescription && (
         <p className="relative mt-1 max-w-sm text-xs leading-relaxed text-[var(--text-muted)]">
-          {description}
+          {resolvedDescription}
         </p>
       )}
       {action && <div className="relative mt-4">{action}</div>}

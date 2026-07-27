@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from 'react';
 import { HardDrive, Moon, Trash2, Zap, Square } from 'lucide-react';
 import { useDashboardActions, useDashboardSummary } from '../contexts/DashboardContext';
 import { formatSize } from '../utils/format';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // 数字跳动动画 Hook
@@ -64,21 +65,21 @@ function getScoreColor(score: number) {
       text: 'text-[#07C160]',      // 微信绿
       bg: 'bg-[#07C160]',
       bgLight: 'bg-[#07C160]/10',
-      label: '优秀',
+      labelKey: 'excellent',
     };
   } else if (score >= 60) {
     return {
       text: 'text-[#FA9D3B]',      // 柔和橙
       bg: 'bg-[#FA9D3B]',
       bgLight: 'bg-[#FA9D3B]/10',
-      label: '良好',
+      labelKey: 'good',
     };
   } else {
     return {
       text: 'text-[#FA5151]',      // 柔和红
       bg: 'bg-[#FA5151]',
       bgLight: 'bg-[#FA5151]/10',
-      label: '需优化',
+      labelKey: 'needsOptimization',
     };
   }
 }
@@ -103,6 +104,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickScan = false }: DashboardHeaderProps) {
   const { diskInfo, healthData, isLoadingHealth, isAnyScanning } = useDashboardSummary();
   const { stopAllScans } = useDashboardActions();
+  const { t } = useTranslation('common');
   
   // 动画数字
   const animatedScore = useAnimatedNumber(healthData?.score ?? 0);
@@ -153,10 +155,10 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[14px] font-bold text-[var(--text-primary)]">健康评分</span>
+              <span className="text-[14px] font-bold text-[var(--text-primary)]">{t('healthScore')}</span>
               {healthData && (
                 <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${scoreColor.bg} text-white`}>
-                  {scoreColor.label}
+                  {t(scoreColor.labelKey)}
                 </span>
               )}
             </div>
@@ -164,21 +166,21 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--text-muted)] tabular-nums">
                 <span 
                   className="flex items-center gap-1 cursor-help"
-                  title="磁盘空间评分（满分40）&#10;• 可用空间 ≥30%：40分&#10;• 可用空间 20-30%：30分&#10;• 可用空间 10-20%：20分&#10;• 可用空间 <10%：10分"
+                  title={t('scoreDetails.diskSpace')}
                 >
                   <HardDrive className="w-3.5 h-3.5" />
                   {healthData.disk_score}/40
                 </span>
                 <span 
                   className="flex items-center gap-1 cursor-help"
-                  title="休眠文件评分（满分30）&#10;• 已关闭休眠：30分&#10;• 休眠文件存在：0分&#10;休眠文件通常占用 8-32GB 空间"
+                  title={t('scoreDetails.hibernation')}
                 >
                   <Moon className="w-3.5 h-3.5" />
                   {healthData.hibernation_score}/30
                 </span>
                 <span 
                   className="flex items-center gap-1 cursor-help"
-                  title="垃圾文件评分（满分30）&#10;• 垃圾 <500MB：30分&#10;• 垃圾 500MB-2GB：20分&#10;• 垃圾 2-5GB：10分&#10;• 垃圾 >5GB：0分"
+                  title={t('scoreDetails.junk')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   {healthData.junk_score}/30
@@ -194,10 +196,10 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
         {/* 磁盘使用情况 */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">C 盘空间</span>
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">{t('diskSpace', { drive: 'C' })}</span>
             {diskInfo && (
               <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
-                {formatSize(diskInfo.free_space)} 可用 / {formatSize(diskInfo.total_space)}
+                {t('freeOfTotal', { free: formatSize(diskInfo.free_space), total: formatSize(diskInfo.total_space) })}
               </span>
             )}
           </div>
@@ -226,10 +228,10 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
                 <button
                   onClick={stopAllScans}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
-                  title="停止扫描"
+                  title={t('stopScan')}
                 >
                   <Square className="w-4 h-4" />
-                  停止扫描
+                  {t('stopScan')}
                 </button>
               ) : (
                 <button
@@ -237,7 +239,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
                   className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] active:scale-[0.98]"
                 >
                   <Zap className="w-4 h-4" />
-                  一键扫描
+                  {t('oneClickScan')}
                 </button>
               )}
             </div>

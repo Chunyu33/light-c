@@ -43,19 +43,19 @@ export interface AppModuleMeta {
 }
 
 export const APP_MODULE_META: AppModuleMeta[] = [
-  { id: 'junk-clean', label: '垃圾清理', icon: Trash2 },
-  { id: 'big-files', label: '大文件清理', icon: FileBox },
-  { id: 'social-clean', label: '社交软件专清', icon: MessageCircle },
-  { id: 'system-slim', label: '系统瘦身', icon: Layers },
-  { id: 'driver-cleanup', label: '旧驱动清理', icon: Cpu },
-  { id: 'leftovers', label: '卸载残留', icon: Package },
-  { id: 'registry', label: '注册表冗余', icon: Database },
-  { id: 'context-menu', label: '右键菜单清理', icon: MousePointerClick },
-  { id: 'hotspot', label: '大目录分析', icon: Flame },
-  { id: 'disk-growth', label: '磁盘变化分析', icon: HardDrive },
-  { id: 'shell-icons', label: '外壳图标管理', icon: HardDriveDownload },
+  { id: 'junk-clean', label: 'junkClean', icon: Trash2 },
+  { id: 'big-files', label: 'bigFiles', icon: FileBox },
+  { id: 'social-clean', label: 'socialClean', icon: MessageCircle },
+  { id: 'system-slim', label: 'systemSlim', icon: Layers },
+  { id: 'driver-cleanup', label: 'driverCleanup', icon: Cpu },
+  { id: 'leftovers', label: 'leftovers', icon: Package },
+  { id: 'registry', label: 'registry', icon: Database },
+  { id: 'context-menu', label: 'contextMenu', icon: MousePointerClick },
+  { id: 'hotspot', label: 'hotspot', icon: Flame },
+  { id: 'disk-growth', label: 'diskGrowth', icon: HardDrive },
+  { id: 'shell-icons', label: 'shellIcons', icon: HardDriveDownload },
   // AI 模型空间覆盖模型、LoRA、Embedding 和缓存，用“空间”强调这是占用分析而不是自动清理。
-  { id: 'ai-models', label: 'AI 模型空间', icon: BrainCircuit },
+  { id: 'ai-models', label: 'aiModels', icon: BrainCircuit },
 ];
 
 export const DEFAULT_ACTIVE_MODULE_ID: AppModuleId = 'junk-clean';

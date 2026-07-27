@@ -8,10 +8,12 @@ import { createPortal } from 'react-dom';
 import { Coffee, X } from 'lucide-react';
 import wechatQr from '../../assets/r_wechat_qr.jpg';
 import alipayQr from '../../assets/r_alipay_qr.jpg';
+import { useTranslation } from 'react-i18next';
 
 type PaymentType = 'wechat' | 'alipay';
 
 export function SupportAuthor() {
+  const { t } = useTranslation('common');
   const [paymentType, setPaymentType] = useState<PaymentType>('wechat');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -55,12 +57,12 @@ export function SupportAuthor() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <Coffee className="w-3.5 h-3.5" />
-          支持作者
+          {t('supportTitle')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
           {/* 文案说明 */}
           <p className="text-sm text-[var(--text-secondary)] text-center mb-4">
-            维护不易，如果软件对您有帮助，请我吃个猪脚饭~（自愿原则）
+            {t('supportDesc')}
           </p>
 
           {/* 赞赏码图片 - 可点击放大 */}
@@ -71,14 +73,14 @@ export function SupportAuthor() {
             >
               <img
                 src={paymentType === 'wechat' ? wechatQr : alipayQr}
-                alt={paymentType === 'wechat' ? '微信赞赏码' : '支付宝赞赏码'}
+                alt={paymentType === 'wechat' ? t('wechatQr') : t('alipayQr')}
                 className={`w-full h-full object-contain transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'
                   }`}
               />
               {/* 悬浮放大提示 */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
-                  点击放大
+                  {t('zoom')}
                 </div>
               </div>
             </div>
@@ -86,7 +88,7 @@ export function SupportAuthor() {
 
           {/* 点击提示文字 */}
           <p className="text-[10px] text-[var(--text-faint)] text-center mb-3">
-            点击图片可放大扫描
+            {t('zoomHint')}
           </p>
 
           {/* Segmented Control 切换开关 */}
@@ -99,7 +101,7 @@ export function SupportAuthor() {
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                   }`}
               >
-                微信
+                {t('wechat')}
               </button>
               <button
                 onClick={() => handlePaymentChange('alipay')}
@@ -108,7 +110,7 @@ export function SupportAuthor() {
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                   }`}
               >
-                支付宝
+                {t('alipay')}
               </button>
             </div>
           </div>
@@ -138,7 +140,7 @@ export function SupportAuthor() {
             {/* 高清大图 */}
             <img
               src={paymentType === 'wechat' ? wechatQr : alipayQr}
-              alt={paymentType === 'wechat' ? '微信赞赏码' : '支付宝赞赏码'}
+              alt={paymentType === 'wechat' ? t('wechatQr') : t('alipayQr')}
               className="w-72 h-72 object-contain"
             />
 
@@ -152,7 +154,7 @@ export function SupportAuthor() {
                       : 'text-gray-500 hover:text-gray-700'
                     }`}
                 >
-                  微信
+                  {t('wechat')}
                 </button>
                 <button
                   onClick={() => handlePaymentChange('alipay')}
@@ -161,7 +163,7 @@ export function SupportAuthor() {
                       : 'text-gray-500 hover:text-gray-700'
                     }`}
                 >
-                  支付宝
+                  {t('alipay')}
                 </button>
               </div>
             </div>
@@ -172,5 +174,4 @@ export function SupportAuthor() {
     </>
   );
 }
-
 

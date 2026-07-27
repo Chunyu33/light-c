@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useState, useCallback, useRef, memo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -42,8 +43,6 @@ import {
   type SocialCategoryStats,
   type RiskLevel,
   type CleanupLogEntryInput,
-  getRiskLevelDescription,
-  getRiskLevelTooltip
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
@@ -106,6 +105,9 @@ const riskLevelConfig: Record<RiskLevel, {
 // ============================================================================
 
 export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('social');
   const { showToast } = useToast();
 
@@ -238,20 +240,20 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       if (result.failed_count === 0) {
         showToast({
           type: 'success',
-          title: `成功清理 ${result.success_count} 个文件`,
-          description: `已释放 ${formatSize(result.freed_size)} 空间`,
+          title: moduleT('social.deleteSuccess', { count: result.success_count }),
+          description: moduleT('social.deleteSuccessDesc', { size: formatSize(result.freed_size) }),
         });
       } else if (result.success_count === 0) {
         showToast({
           type: 'error',
-          title: '清理失败',
-          description: `${result.failed_count} 个文件无法删除`,
+          title: moduleT('social.deleteFailed'),
+          description: moduleT('social.deleteFailedDesc', { count: result.failed_count }),
         });
       } else {
         showToast({
           type: 'warning',
-          title: '部分成功',
-          description: `${result.success_count} 个已删除，${result.failed_count} 个失败`,
+          title: moduleT('social.deletePartial'),
+          description: moduleT('social.deletePartialDesc', { success: result.success_count, failed: result.failed_count }),
         });
       }
 
@@ -261,7 +263,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       }
     } catch (err) {
       console.error('删除失败:', err);
-      showToast({ type: 'error', title: '删除失败', description: String(err) });
+      showToast({ type: 'error', title: moduleT('social.deleteFailed'), description: String(err) });
     } finally {
       setIsDeleting(false);
     }
@@ -307,9 +309,9 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                   <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold text-[var(--fg-primary)]">正在清理缓存</h3>
+                  <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{moduleT('social.deleting')}</h3>
                   <p className="text-sm text-[var(--fg-muted)] mt-1">
-                    正在清理 {selectedStats.files} 个文件，请稍候...
+                    {moduleT('social.deletingDesc', { count: selectedStats.files })}
                   </p>
                 </div>
               </motion.div>
@@ -335,8 +337,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="social"
-        title="社交软件专清"
-        description="清理微信、QQ、钉钉、飞书等软件的缓存文件"
+        title={navT('socialClean')}
+        description={navT('socialCleanDesc')}
         icon={<MessageCircle className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -345,35 +347,34 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'social')}
         onScan={handleScan}
         error={moduleState.error}
-        headerExtra={
-          scanResult && scanResult.total_files > 0 && (
-            <div className="flex items-center gap-2">
+        allowStickyContent
+      >
+        {/* 展开内容 */}
+        <div className="min-h-[300px]">
+          {scanResult && scanResult.total_files > 0 && (
+            // 结果较多时保持操作条可见，避免用户必须回到模块标题区操作。
+            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
               <button
                 onClick={toggleSelectAll}
                 className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
               >
-                {selectedPaths.size === scanResult.deletable_files ? '取消全选' : '全选'}
+                {selectedPaths.size === scanResult.deletable_files ? moduleT('social.deselectAll') : moduleT('social.selectAll')}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedPaths.size === 0}
-                className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                  ${selectedPaths.size === 0
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                  selectedPaths.size === 0
                     ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
                     : 'bg-rose-500 text-white hover:bg-rose-600'
-                  }
-                `}
+                }`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                清理 ({selectedStats.files})
+                {moduleT('social.clean')} ({selectedStats.files})
               </button>
             </div>
-          )
-        }
-      >
-        {/* 展开内容 */}
-        <div className="min-h-[300px]">
+          )}
+
           {/* 说明提示 */}
           {showTip && (
             <div className="mx-4 mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
@@ -381,11 +382,11 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                 <span className="text-amber-600 text-[10px] font-bold">!</span>
               </div>
               <p className="text-[11px] text-amber-600/80 leading-relaxed flex-1">
-                <span className="font-medium">智能风险分级：</span>
-                <span className="text-red-600">红色</span>为聊天记录（禁止删除），
-                <span className="text-amber-600">橙色</span>为传输文件（谨慎清理），
-                <span className="text-emerald-600">绿色</span>为图片视频（建议清理），
-                <span className="text-teal-600">青色</span>为临时缓存（安全清理）。
+                <span className="font-medium">{moduleT('social.riskGuide')}</span>
+                <span className="text-red-600">{moduleT('social.riskRed')}</span> {moduleT('social.riskRedDesc')}，
+                <span className="text-amber-600">{moduleT('social.riskOrange')}</span> {moduleT('social.riskOrangeDesc')}，
+                <span className="text-emerald-600">{moduleT('social.riskGreen')}</span> {moduleT('social.riskGreenDesc')}，
+                <span className="text-teal-600">{moduleT('social.riskCyan')}</span> {moduleT('social.riskCyanDesc')}。
               </p>
               <button onClick={() => setShowTip(false)} className="text-amber-500 hover:text-amber-700 transition shrink-0">
                 <X className="w-3.5 h-3.5" />
@@ -398,8 +399,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
             <div className="p-4">
               <EmptyState
                 icon={MessageCircle}
-                title="尚未检测社交缓存"
-                description="点击开始扫描，检测微信、QQ、钉钉、飞书等软件缓存。"
+              title={t('notScannedSocialCache')}
+                description={moduleT('social.idleDesc')}
               />
             </div>
           )}
@@ -410,8 +411,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
               <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-3">
                 <Loader2 className="w-7 h-7 text-emerald-500 animate-spin" />
               </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">正在扫描中...</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">正在智能检索社交软件缓存目录</p>
+              <p className="text-sm font-medium text-[var(--fg-secondary)]">{moduleT('social.scanning')}</p>
+              <p className="text-xs text-[var(--fg-muted)] mt-1">{moduleT('social.scanningDesc')}</p>
             </div>
           )}
 
@@ -421,8 +422,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
               <EmptyState
                 icon={CheckCircle2}
                 tone="success"
-                title="太棒了"
-                description="没有发现需要清理的社交软件缓存。"
+              title={t('nothingToClean')}
+                description={moduleT('social.emptyDesc')}
               />
             </div>
           )}
@@ -468,7 +469,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                             ? 'bg-emerald-500/50 border-emerald-500 cursor-pointer' 
                             : 'border-[var(--fg-faint)] cursor-pointer'
                       }`}
-                    title={isCriticalCategory ? '聊天记录不可删除' : undefined}
+                    title={isCriticalCategory ? moduleT('social.chatUndeletable') : undefined}
                   >
                     {isCriticalCategory ? (
                       <X className="w-2.5 h-2.5 text-red-500" />
@@ -485,26 +486,26 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[var(--fg-primary)]">{category.name}</p>
+                      <p className="text-sm font-semibold text-[var(--fg-primary)]">{moduleT(`social.category.${category.id}.name`)}</p>
                       {isCriticalCategory ? (
                         <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-red-500/10 text-red-600 flex items-center gap-0.5">
                           <ShieldAlert className="w-2.5 h-2.5" />
-                          禁止删除
+                          {moduleT('social.chatUndeletable')}
                         </span>
                       ) : (
                         <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${colors.bg} ${colors.text}`}>
-                          {hasFiles ? `可清理 ${category.deletable_count}` : '无文件'}
+                          {hasFiles ? `${moduleT('social.deletable')} ${category.deletable_count}` : t('noData')}
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-[var(--fg-muted)] mt-0.5 truncate">{category.description}</p>
+                    <p className="text-[11px] text-[var(--fg-muted)] mt-0.5 truncate">{moduleT(`social.category.${category.id}.description`)}</p>
                   </div>
 
                   <div className="text-right shrink-0">
                     <p className={`text-sm font-bold ${isCriticalCategory ? 'text-red-600' : 'text-emerald-600'}`}>
                       {formatSize(category.total_size)}
                     </p>
-                    <p className="text-[11px] text-[var(--fg-muted)]">{category.file_count.toLocaleString()} 个文件</p>
+                    <p className="text-[11px] text-[var(--fg-muted)]">{category.file_count.toLocaleString()} {moduleT('social.files')}</p>
                   </div>
                 </div>
 
@@ -532,10 +533,10 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                       </div>
                       {category.files.length > 20 && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setFileModalData({ name: category.name, files: category.files }); }}
+                          onClick={(e) => { e.stopPropagation(); setFileModalData({ name: moduleT(`social.category.${category.id}.name`), files: category.files }); }}
                           className="w-full px-4 py-2 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 border-t border-[var(--border-default)] transition"
                         >
-                          查看全部 {category.files.length.toLocaleString()} 个文件 →
+                          {moduleT('social.viewFiles')} ({category.files.length.toLocaleString()} {moduleT('social.files')}) →
                         </button>
                       )}
                     </motion.div>
@@ -579,6 +580,8 @@ function SocialDeleteConfirmModal({
   onConfirm,
   onCancel,
 }: SocialDeleteConfirmModalProps) {
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   return createPortal(
     <AnimatePresence>
       {isOpen && (
@@ -604,7 +607,7 @@ function SocialDeleteConfirmModal({
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
                 </div>
                 <h3 className="text-base font-semibold text-[var(--fg-primary)]">
-                  确认清理社交软件缓存
+                  {moduleT('social.confirmDelete')}
                 </h3>
               </div>
               <button
@@ -617,11 +620,11 @@ function SocialDeleteConfirmModal({
 
             <div className="px-5 py-4 space-y-4">
               <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
-                您即将清理 {selectedFiles.toLocaleString()} 个文件，共 {formatSize(selectedSize)}。此操作不可撤销。
+                {moduleT('social.confirmDeleteDesc', { count: selectedFiles.toLocaleString(), size: formatSize(selectedSize) })}
               </p>
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
                 <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
-                  注意：清理后可能需要重新下载聊天中的图片和文件。建议先备份重要数据。
+                  {moduleT('social.risk.mediumTip')}
                 </p>
               </div>
             </div>
@@ -631,13 +634,13 @@ function SocialDeleteConfirmModal({
                 onClick={onCancel}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 onClick={onConfirm}
                 className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25"
               >
-                确认清理
+                {moduleT('social.clean')}
               </button>
             </div>
           </motion.div>
@@ -655,7 +658,18 @@ interface FileRowProps {
   onToggle: () => void;
 }
 
+// 风险文案由稳定的风险枚举驱动，避免直接展示后端返回的中文文本。
+function getSocialRiskLabel(translate: (key: string) => string, level: RiskLevel): string {
+  return translate(`social.risk.${level}`);
+}
+
+function getSocialRiskTooltip(translate: (key: string) => string, level: RiskLevel): string {
+  return translate(`social.risk.${level}Tip`);
+}
+
 function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const riskConfig = riskLevelConfig[file.risk_level];
   const RiskIcon = riskConfig.icon;
   const isCritical = file.risk_level === 'critical';
@@ -676,7 +690,7 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
               ? 'bg-emerald-500 border-emerald-500' 
               : 'border-[var(--fg-faint)]'
           }`}
-        title={isCritical ? getRiskLevelTooltip(file.risk_level) : undefined}
+        title={isCritical ? getSocialRiskTooltip(moduleT, file.risk_level) : undefined}
       >
         {isCritical ? (
           <X className="w-2 h-2 text-red-500" />
@@ -693,7 +707,7 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
       {/* 风险等级图标 */}
       <div 
         className={`p-0.5 rounded ${riskConfig.bgColor}`}
-        title={getRiskLevelTooltip(file.risk_level)}
+        title={getSocialRiskTooltip(moduleT, file.risk_level)}
       >
         <RiskIcon className={`w-3 h-3 ${riskConfig.color}`} />
       </div>
@@ -710,7 +724,7 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
       
       {/* 风险标签 */}
       <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${riskConfig.bgColor} ${riskConfig.color}`}>
-        {getRiskLevelDescription(file.risk_level)}
+        {getSocialRiskLabel(moduleT, file.risk_level)}
       </span>
       
       {/* 文件大小 */}
@@ -723,14 +737,14 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
         <button 
           onClick={(e) => { e.stopPropagation(); openInFolder(file.path); }} 
           className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" 
-          title="打开所在文件夹"
+          title={t('openInFolder')}
         >
           <FolderOpen className="w-3 h-3" />
         </button>
         <button 
           onClick={(e) => { e.stopPropagation(); openFile(file.path); }} 
           className="p-1 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" 
-          title="打开文件"
+          title={t('openFile')}
         >
           <ExternalLink className="w-3 h-3" />
         </button>
@@ -753,6 +767,7 @@ interface FileListModalProps {
 }
 
 function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onClose }: FileListModalProps) {
+  const { t: moduleT } = useTranslation('modules');
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -785,9 +800,9 @@ function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onCl
               <div>
                 <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{title}</h3>
                 <p className="text-xs text-[var(--fg-muted)] mt-0.5">
-                  共 {files.length.toLocaleString()} 个文件，总计 {formatSize(files.reduce((sum, f) => sum + f.size, 0))}
+                  {files.length.toLocaleString()} {moduleT('social.files')}，{formatSize(files.reduce((sum, f) => sum + f.size, 0))}
                   <span className="mx-2">|</span>
-                  可删除 {files.filter(f => f.deletable).length} 个
+                  {moduleT('social.deletable')} {files.filter(f => f.deletable).length}
                 </p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition">
@@ -798,10 +813,10 @@ function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onCl
               <span className="w-8"></span>
               <span className="w-8 text-center">#</span>
               <span className="w-6"></span>
-              <span className="w-16">来源</span>
-              <span className="flex-1">文件路径</span>
-              <span className="w-20">风险</span>
-              <span className="w-20 text-right">大小</span>
+              <span className="w-16">{moduleT('social.source')}</span>
+              <span className="flex-1">{moduleT('social.path')}</span>
+              <span className="w-20">{moduleT('social.risk')}</span>
+              <span className="w-20 text-right">{moduleT('social.size')}</span>
               <span className="w-16"></span>
             </div>
             <div ref={parentRef} className="flex-1 overflow-auto">
@@ -849,6 +864,8 @@ interface VirtualFileRowProps {
 }
 
 const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, onToggle, style }: VirtualFileRowProps) {
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const riskConfig = riskLevelConfig[file.risk_level];
   const RiskIcon = riskConfig.icon;
   const isCritical = file.risk_level === 'critical';
@@ -869,7 +886,7 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
               ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
               : 'border-[var(--fg-faint)] cursor-pointer'
           }`}
-        title={isCritical ? getRiskLevelTooltip(file.risk_level) : undefined}
+        title={isCritical ? getSocialRiskTooltip(moduleT, file.risk_level) : undefined}
       >
         {isCritical ? (
           <X className="w-2.5 h-2.5 text-red-500" />
@@ -885,7 +902,7 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       {/* 风险图标 */}
       <div 
         className={`p-1 rounded ${riskConfig.bgColor}`}
-        title={getRiskLevelTooltip(file.risk_level)}
+        title={getSocialRiskTooltip(moduleT, file.risk_level)}
       >
         <RiskIcon className={`w-3.5 h-3.5 ${riskConfig.color}`} />
       </div>
@@ -901,7 +918,7 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       
       {/* 风险标签 */}
       <span className={`w-20 px-1.5 py-0.5 rounded text-[9px] font-medium text-center ${riskConfig.bgColor} ${riskConfig.color}`}>
-        {getRiskLevelDescription(file.risk_level)}
+        {getSocialRiskLabel(moduleT, file.risk_level)}
       </span>
       
       <span className={`w-20 text-right font-medium tabular-nums ${isCritical ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -909,10 +926,10 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       </span>
       
       <div className="w-16 flex items-center justify-end gap-0.5 shrink-0">
-        <button onClick={() => openInFolder(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开所在文件夹">
+        <button onClick={() => openInFolder(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title={t('openInFolder')}>
           <FolderOpen className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => openFile(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title="打开文件">
+        <button onClick={() => openFile(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title={t('openFile')}>
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>

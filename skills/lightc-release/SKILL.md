@@ -37,6 +37,7 @@ Follow this checklist when preparing a LightC release.
    - Keep feature descriptions aligned with the new release behavior.
    - Keep the release checklist accurate, including all version files.
    - Do not rewrite unrelated historical content.
+   - Updates are performed on an as-needed basis; they are not mandatory unless new features or functions have been added.
 
 6. Validate before finishing.
    - Run `npm run build`.

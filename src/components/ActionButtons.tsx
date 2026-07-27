@@ -7,6 +7,7 @@ import { memo } from 'react';
 import { Trash2, Loader2, RefreshCw, CheckSquare, Square, Sparkles, HardDrive } from 'lucide-react';
 import type { AppStatus } from '../types';
 import { openDiskCleanup } from '../api/commands';
+import { useTranslation } from 'react-i18next';
 
 // ============================================================================
 // 类型定义
@@ -156,6 +157,7 @@ export const ActionButtons = memo(function ActionButtons({
   onSelectAll,
   onDeselectAll,
 }: ActionButtonsProps) {
+  const { t } = useTranslation('common');
   // 状态判断
   const isScanning = status === 'scanning';
   const isDeleting = status === 'deleting';
@@ -175,7 +177,7 @@ export const ActionButtons = memo(function ActionButtons({
         {isScanning ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>扫描中...</span>
+            <span>{t('scanningShort')}</span>
           </>
         ) : (
           <>
@@ -184,7 +186,7 @@ export const ActionButtons = memo(function ActionButtons({
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
-            <span>{hasScanResult ? '重新扫描' : '开始扫描'}</span>
+            <span>{hasScanResult ? t('rescan') : t('startScan')}</span>
           </>
         )}
       </PrimaryButton>
@@ -200,12 +202,12 @@ export const ActionButtons = memo(function ActionButtons({
           {isDeleting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>清理中...</span>
+              <span>{t('deleting')}</span>
             </>
           ) : (
             <>
               <Trash2 className="w-4 h-4" />
-              <span>清理选中 ({selectedCount.toLocaleString()})</span>
+              <span>{t('cleanSelected', { count: selectedCount.toLocaleString() })}</span>
             </>
           )}
         </PrimaryButton>
@@ -223,13 +225,13 @@ export const ActionButtons = memo(function ActionButtons({
             onClick={onSelectAll}
             disabled={isBusy || isAllSelected}
             icon={<CheckSquare className="w-3.5 h-3.5" />}
-            label="全选"
+            label={t('selectAll')}
           />
           <SecondaryButton
             onClick={onDeselectAll}
             disabled={isBusy || !hasSelection}
             icon={<Square className="w-3.5 h-3.5" />}
-            label="取消全选"
+            label={t('deselectAll')}
           />
         </div>
       )}
@@ -242,7 +244,7 @@ export const ActionButtons = memo(function ActionButtons({
         onClick={() => openDiskCleanup()}
         disabled={isBusy}
         icon={<HardDrive className="w-3.5 h-3.5" />}
-        label="系统清理"
+        label={t('systemCleanup')}
       />
     </div>
   );

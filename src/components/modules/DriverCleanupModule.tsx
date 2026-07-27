@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Archive, CheckCheck, CheckCircle2, Cpu, FolderOpen, Loader2, RotateCcw, Search, ShieldAlert, Trash2 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -33,18 +34,18 @@ function findScrollParent(element: HTMLElement): HTMLElement | null {
   return null;
 }
 
-function getStatusLabel(packageInfo: DriverPackageInfo): string {
+function getStatusLabel(packageInfo: DriverPackageInfo, translate: (key: string) => string): string {
   switch (packageInfo.status) {
     case 'old_confirmed':
-      return '高置信旧驱动';
+      return translate('driverCleanup.highConfidence');
     case 'recommended':
-      return '可优先清理';
+      return translate('driverCleanup.recommended');
     case 'in_use':
-      return '正在使用';
+      return translate('driverCleanup.inUse');
     case 'no_newer_version':
-      return '未确认过时';
+      return translate('driverCleanup.unconfirmed');
     default:
-      return '信息不完整';
+      return translate('driverCleanup.incomplete');
   }
 }
 
@@ -65,7 +66,7 @@ function getPackageCardClass(): string {
   return 'border-[var(--border-default)] bg-[var(--bg-card)] hover:border-[var(--brand-green)]';
 }
 
-function getDriverClassLabel(className: string): string {
+function getDriverClassLabel(className: string, translate?: (key: string) => string): string {
   const normalizedClassName = className.trim().toLowerCase();
   const labels: Record<string, string> = {
     bluetooth: '蓝牙设备',
@@ -90,10 +91,11 @@ function getDriverClassLabel(className: string): string {
     'software component': '软件组件',
     usb: 'USB 设备',
   };
-  return labels[normalizedClassName] ?? className;
+  const deviceKey = labels[normalizedClassName] ? normalizedClassName : 'other';
+  return translate ? translate(`driverCleanup.device.${deviceKey}`) : labels[normalizedClassName] ?? className;
 }
 
-function getDriverClassBadge(className: string): { label: string; className: string; dotClassName: string } {
+function getDriverClassBadge(className: string, translate?: (key: string) => string): { label: string; className: string; dotClassName: string } {
   const normalizedClassName = className.trim().toLowerCase();
   const badgeClasses: Record<string, string> = {
     bluetooth: 'text-teal-600 dark:text-teal-400',
@@ -134,19 +136,19 @@ function getDriverClassBadge(className: string): { label: string; className: str
 
   // 分类使用 CHART_PALETTE 同源的颜色点，保持与 AI 模型空间图表一致。
   return {
-    label: getDriverClassLabel(className),
+    label: getDriverClassLabel(className, translate),
     className: badgeClasses[normalizedClassName] ?? 'text-[var(--text-muted)]',
     dotClassName: dotClasses[normalizedClassName] ?? 'bg-gray-400',
   };
 }
 
-function getReasonLabel(packageInfo: DriverPackageInfo): string {
+function getReasonLabel(packageInfo: DriverPackageInfo, translate: (key: string) => string): string {
   switch (packageInfo.status) {
-    case 'old_confirmed': return '已被更高排名驱动替代';
-    case 'recommended': return '同一驱动族存在更新版本';
-    case 'in_use': return '当前有设备正在使用';
-    case 'no_newer_version': return '暂未确认存在更新版本';
-    default: return '版本或驱动族信息不完整';
+    case 'old_confirmed': return translate('driverCleanup.oldConfirmed');
+    case 'recommended': return translate('driverCleanup.newer');
+    case 'in_use': return translate('driverCleanup.currentUse');
+    case 'no_newer_version': return translate('driverCleanup.noNewer');
+    default: return translate('driverCleanup.incompleteReason');
   }
 }
 
@@ -173,6 +175,9 @@ function getDriverSearchQuery(packageInfo: DriverPackageInfo): string {
 }
 
 export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('driverCleanup');
   const { showToast } = useToast();
   const lastScanTriggerRef = useRef(0);
@@ -267,7 +272,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       // 只使用精简后的厂商、驱动名和版本，避免日期字段干扰搜索结果。
       await openSearchUrl(getDriverSearchQuery(packageInfo));
     } catch (error) {
-      showToast({ title: '打开搜索失败', description: String(error), type: 'error' });
+      showToast({ title: t('openSearchFailed'), description: String(error), type: 'error' });
     }
   }, [showToast]);
 
@@ -282,21 +287,21 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         .map((detail) => `${detail.published_name}: ${detail.error_message}`)
         .join('；');
       showToast({
-        title: result.failed_count === 0 ? '驱动清理完成' : '驱动清理部分完成',
+        title: result.failed_count === 0 ? moduleT('driverCleanup.completed') : moduleT('driverCleanup.partial'),
         description: [
-          `成功 ${result.success_count} 个，失败 ${result.failed_count} 个。`,
-          failureMessages ? `失败原因：${failureMessages}` : '',
-          `备份位置：${result.backup_directory}。可重新检测确认结果。`,
+          moduleT('driverCleanup.resultSummary', { success: result.success_count, failed: result.failed_count }),
+          failureMessages ? moduleT('driverCleanup.failureReason', { reason: failureMessages }) : '',
+          moduleT('driverCleanup.backupSummary', { path: result.backup_directory }),
         ].filter(Boolean).join(' '),
         type: result.failed_count === 0 ? 'success' : 'warning',
       });
       if (result.needs_reboot) {
-        showToast({ title: '需要重启', description: '部分驱动变更可能需要重启 Windows 后完成。', type: 'info' });
+        showToast({ title: moduleT('driverCleanup.restart'), description: moduleT('driverCleanup.restartDesc'), type: 'info' });
       }
       setSelectedNames(new Set());
       await loadDrivers();
     } catch (error) {
-      showToast({ title: '驱动清理失败', description: String(error), type: 'error' });
+      showToast({ title: t('deleteFailed'), description: String(error), type: 'error' });
     } finally {
       setDeleting(false);
     }
@@ -308,16 +313,16 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
     try {
       const result = await restoreAllDriverBackups();
       showToast({
-        title: result.success ? '驱动恢复命令已执行' : '驱动恢复未完全成功',
-        description: `${result.message}。已重新检测驱动状态。`,
+        title: result.success ? moduleT('driverCleanup.restoreStarted') : moduleT('driverCleanup.restoreIncomplete'),
+        description: moduleT('driverCleanup.restoreDesc', { message: result.message }),
         type: result.success ? 'success' : 'warning',
       });
       if (result.needs_reboot) {
-        showToast({ title: '恢复可能需要重启', description: '部分驱动安装需要重启 Windows 后完成。', type: 'info' });
+        showToast({ title: moduleT('driverCleanup.restart'), description: moduleT('driverCleanup.restartDesc'), type: 'info' });
       }
       await loadDrivers();
     } catch (error) {
-      showToast({ title: '驱动恢复失败', description: String(error), type: 'error' });
+      showToast({ title: moduleT('driverCleanup.restoreFailed'), description: String(error), type: 'error' });
     } finally {
       setRestoring(false);
     }
@@ -339,21 +344,21 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
     <>
       <ModuleCard
         id="driver-cleanup"
-        title="旧驱动清理"
-        description="检测第三方驱动包，正在使用的驱动不可删除"
+        title={navT('driverCleanup')}
+        description={navT('driverCleanupDesc')}
         icon={<Cpu className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}
-        countLabel="个驱动包"
+        countLabel={moduleT('driverUi.packageCount')}
         hideTotalSize
         hideDoneBadge
-        emptyDoneBadgeText="未发现可处理项"
+        emptyDoneBadgeText={moduleT('driverUi.noActionable')}
         expanded={isExpanded}
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'driver-cleanup')}
         onScan={() => void loadDrivers()}
         scanDisabled={deleting || restoring}
-        scanButtonText={loading ? '检测中...' : scanResult ? '重新检测' : '检测驱动'}
+        scanButtonText={loading ? moduleT('driverUi.checking') : scanResult ? moduleT('driverUi.rescan') : moduleT('driverUi.scan')}
         error={moduleState.error}
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
@@ -361,26 +366,26 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         titleExtra={scanResult ? (
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-[var(--bg-hover)] px-2 py-1 text-xs font-medium text-[var(--brand-green)]">
-              高置信 {scanResult.high_confidence_count}
+              {moduleT('driverCleanup.highConfidence')} {scanResult.high_confidence_count}
             </span>
             <span className="rounded-full bg-[var(--bg-hover)] px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-              可处理 {scanResult.candidate_count}
+              {moduleT('driverUi.actionable')} {scanResult.candidate_count}
             </span>
             <span className={`rounded-full bg-[var(--bg-hover)] px-2 py-1 text-xs ${scanResult.is_admin ? 'text-[var(--brand-green)]' : 'text-orange-600 dark:text-orange-400'}`}>
-              {scanResult.is_admin ? '管理员' : '可检测，删除需管理员'}
+              {scanResult.is_admin ? moduleT('driverUi.administrator') : moduleT('driverUi.deleteAdminRequired')}
             </span>
           </div>
         ) : null}
       >
         <div className="p-4 space-y-3">
           {!scanResult && !loading && (
-            <EmptyState icon={Cpu} title="尚未检测驱动包" description="LightC 只会通过 Windows pnputil 检查第三方驱动包，不直接删除驱动文件。" />
+          <EmptyState icon={Cpu} title={t('notScannedDrivers')} description={t('driverScanDescription')} />
           )}
 
           {loading && !scanResult && (
             <div className="py-8 flex flex-col items-center justify-center text-[var(--fg-muted)]">
               <Loader2 className="w-7 h-7 text-emerald-500 animate-spin mb-2" />
-              <p className="text-sm">正在读取 Windows 驱动包信息...</p>
+              <p className="text-sm">{moduleT('driverUi.scanning')}</p>
             </div>
           )}
 
@@ -390,11 +395,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 ref={toolbarRef}
                 className={`sticky top-2 z-20 mx-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2 py-1.5 shadow-sm transition-[width,box-shadow,background-color] duration-200 ease-out ${isToolbarSticky ? 'w-fit shadow-md' : 'w-full'}`}
               >
-                <span className="inline-flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]" title="删除前自动备份，软件不保留删除历史。">
-                  <Archive className="h-3.5 w-3.5 text-[var(--brand-green)]" />备份
+                <span className="inline-flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]" title={moduleT('driverUi.backupHint')}>
+                  <Archive className="h-3.5 w-3.5 text-[var(--brand-green)]" />{moduleT('driverUi.backup')}
                 </span>
-                <span className={`px-1 text-xs ${scanResult.device_match_data_available ? 'text-[var(--brand-green)]' : 'text-orange-600 dark:text-orange-400'}`} title={scanResult.device_match_data_available ? '高置信旧驱动来自设备匹配排名，其他候选仍需人工确认。' : '未取得设备驱动排名数据，当前结果仅供参考。'}>
-                  {scanResult.device_match_data_available ? '排名已核验' : '排名未取得'}
+                <span className={`px-1 text-xs ${scanResult.device_match_data_available ? 'text-[var(--brand-green)]' : 'text-orange-600 dark:text-orange-400'}`} title={scanResult.device_match_data_available ? moduleT('driverUi.rankHint') : moduleT('driverUi.rankMissingHint')}>
+                  {scanResult.device_match_data_available ? moduleT('driverUi.rankVerified') : moduleT('driverUi.rankUnavailable')}
                 </span>
                 <button
                   type="button"
@@ -403,28 +408,28 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                     event.stopPropagation();
                     selectHighConfidenceDrivers();
                   }}
-                  title={allHighConfidenceSelected ? '取消选中全部高置信旧驱动' : '选中全部高置信旧驱动'}
+                  title={allHighConfidenceSelected ? moduleT('driverUi.deselectHigh') : moduleT('driverUi.selectHigh')}
                   className={`inline-flex items-center justify-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${allHighConfidenceSelected
                     ? 'border-[var(--brand-green)] bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)]'
                     : 'border-[var(--brand-green)] bg-[var(--brand-green)]/10 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20'
                   }`}
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
-                  旧驱动 {selectedHighConfidenceCount}/{highConfidenceNames.length}
+                  {moduleT('driverUi.oldDriverCount')} {selectedHighConfidenceCount}/{highConfidenceNames.length}
                 </button>
-                <button title="打开驱动备份目录" onClick={() => {
+                <button title={moduleT('driverUi.openBackup')} onClick={() => {
                     void openDriverBackupDir().catch((error) => {
-                      showToast({ title: '打开备份目录失败', description: String(error), type: 'error' });
+                      showToast({ title: moduleT('driverUi.openBackupFailed'), description: String(error), type: 'error' });
                     });
                   }} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2 py-1 text-xs font-medium text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]">
-                  <FolderOpen className="h-3.5 w-3.5" />备份
+                  <FolderOpen className="h-3.5 w-3.5" />{moduleT('driverUi.backup')}
                 </button>
-                <button title="恢复全部驱动备份" disabled={!scanResult.is_admin || deleting || restoring} onClick={() => setShowRestoreConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-400 bg-[var(--bg-card)] px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950">
-                  <RotateCcw className="h-3.5 w-3.5" />恢复
+                <button title={moduleT('driverUi.restoreAll')} disabled={!scanResult.is_admin || deleting || restoring} onClick={() => setShowRestoreConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-400 bg-[var(--bg-card)] px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950">
+                  <RotateCcw className="h-3.5 w-3.5" />{t('restore')}
                 </button>
-                <button title={deleting ? '正在删除驱动' : `删除选中的 ${selectedNames.size} 个驱动`} disabled={selectedNames.size === 0 || !scanResult.is_admin || deleting || restoring} onClick={() => setShowConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <button title={deleting ? moduleT('driverUi.deleting') : moduleT('driverUi.deleteSelected', { count: selectedNames.size })} disabled={selectedNames.size === 0 || !scanResult.is_admin || deleting || restoring} onClick={() => setShowConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
                   {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  {deleting ? '删除中' : `删除 ${selectedNames.size}`}
+                  {deleting ? moduleT('driverUi.deleting') : t('delete') + ` ${selectedNames.size}`}
                 </button>
               </div>
 
@@ -432,17 +437,17 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
               {!scanResult.is_admin && (
                 <div className="flex items-start gap-2 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
                   <ShieldAlert className="w-4 h-4 shrink-0" />
-                  <span>当前可以检测，但删除驱动包需要以管理员身份运行 LightC。</span>
+                  <span>{moduleT('driverUi.adminHint')}</span>
                 </div>
               )}
 
               {scanResult.packages.length === 0 ? (
-                <EmptyState icon={CheckCircle2} title="未发现第三方驱动包" description="pnputil 没有返回可分析的第三方驱动包。" tone="success" />
+        <EmptyState icon={CheckCircle2} title={t('noThirdPartyDrivers')} description={t('noDriversDescription')} tone="success" />
               ) : (
                 <div className="space-y-2">
                   {scanResult.packages.map((packageInfo) => {
                     const selected = selectedNames.has(packageInfo.published_name);
-                    const driverClassBadge = getDriverClassBadge(packageInfo.class_name || '类别未知');
+                    const driverClassBadge = getDriverClassBadge(packageInfo.class_name || 'unknown', moduleT);
                     return (
                       <label key={packageInfo.published_name} className={`block rounded-xl border p-2.5 transition ${getPackageCardClass()} ${packageInfo.actionable ? '' : 'opacity-80'}`}>
                         <div className="flex items-start gap-2.5">
@@ -455,32 +460,32 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 items-center gap-1.5">
-                              <span className="min-w-0 truncate font-semibold text-sm text-[var(--fg-primary)]" title={packageInfo.original_name || '未知 INF 文件'}>{packageInfo.original_name || '未知 INF 文件'}</span>
-                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${getStatusClass(packageInfo)}`}>{getStatusLabel(packageInfo)}</span>
+                              <span className="min-w-0 truncate font-semibold text-sm text-[var(--fg-primary)]" title={packageInfo.original_name || moduleT('driverUi.unknownInf')}>{packageInfo.original_name || moduleT('driverUi.unknownInf')}</span>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${getStatusClass(packageInfo)}`}>{getStatusLabel(packageInfo, moduleT)}</span>
                             </div>
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-[var(--fg-secondary)]" title={packageInfo.published_name}>{packageInfo.published_name}</span>
-                              <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || '未知厂商'}>{packageInfo.provider_name || '未知厂商'}</span>
-                              <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || '版本未知'}>版本 {packageInfo.driver_version || '未知'}</span>
+                              <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverCleanup.unknownVendor')}>{packageInfo.provider_name || moduleT('driverCleanup.unknownVendor')}</span>
+                              <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || moduleT('driverCleanup.unknownVersion')}>{moduleT('driverCleanup.version')} {packageInfo.driver_version || moduleT('driverCleanup.unknownVersion')}</span>
                               <span className={`inline-flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 ${driverClassBadge.className}`}>
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${driverClassBadge.dotClassName}`} />
                                 {driverClassBadge.label}
                               </span>
                             </div>
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
-                              <span className={`max-w-full truncate rounded-full px-1.5 py-0.5 ${getReasonClass(packageInfo)}`} title={packageInfo.reason}>{getReasonLabel(packageInfo)}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">设备 {packageInfo.device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">活动 {packageInfo.active_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">当前 {packageInfo.installed_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">替代 {packageInfo.outranked_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">文件 {packageInfo.file_count}</span>
+                              <span className={`max-w-full truncate rounded-full px-1.5 py-0.5 ${getReasonClass(packageInfo)}`} title={packageInfo.reason}>{getReasonLabel(packageInfo, moduleT)}</span>
+          <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.devices')} {packageInfo.device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.active')} {packageInfo.active_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.current')} {packageInfo.installed_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.replaced')} {packageInfo.outranked_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.files')} {packageInfo.file_count}</span>
                             </div>
                           </div>
                           <div className="flex shrink-0 self-center items-center gap-1">
                             <button
                               type="button"
-                              title="搜索该驱动信息"
-                              aria-label={`搜索 ${packageInfo.provider_name} ${packageInfo.original_name}`}
+        title={t('searchDriver')}
+                              aria-label={moduleT('driverUi.searchAria', { provider: packageInfo.provider_name, name: packageInfo.original_name })}
                               disabled={deleting || restoring}
                               onClick={(event) => {
                                 event.preventDefault();
@@ -493,15 +498,15 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             </button>
                             <button
                               type="button"
-                              title={packageInfo.driver_store_path ? '打开驱动所在目录' : '驱动目录信息不可用'}
-                              aria-label={`打开 ${packageInfo.provider_name} 驱动所在目录`}
+                              title={packageInfo.driver_store_path ? moduleT('driverUi.driverDirectory') : moduleT('driverUi.driverDirectoryUnavailable')}
+                              aria-label={moduleT('driverUi.openDriverAria', { provider: packageInfo.provider_name })}
                               disabled={!packageInfo.driver_store_path || deleting || restoring}
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
                                 if (!packageInfo.driver_store_path) return;
                                 void openInFolder(packageInfo.driver_store_path).catch((error) => {
-                                  showToast({ title: '打开驱动目录失败', description: String(error), type: 'error' });
+                                  showToast({ title: moduleT('driverUi.openFolderFailed'), description: String(error), type: 'error' });
                                 });
                               }}
                               className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] disabled:cursor-not-allowed disabled:opacity-40"
@@ -525,11 +530,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         isOpen={showConfirm}
         onCancel={() => setShowConfirm(false)}
         onConfirm={() => void handleDelete()}
-        title="确认删除旧驱动包"
-        description={`将备份并删除选中的 ${selectedNames.size} 个驱动包。删除前后后端都会重新校验设备绑定状态。`}
-        warning="正在使用的驱动不可选；其他未关联设备的驱动包均可删除，但‘未确认过时’或‘信息不完整’的条目并不代表一定无用。删除前会完整备份，备份失败会阻止删除；不会使用 /force，也不会直接删除 .sys 文件。"
-        confirmText="备份并删除"
-        cancelText="取消"
+        title={t('confirmDeleteDriver')}
+        description={moduleT('driverUi.confirmDeleteDesc', { count: selectedNames.size })}
+        warning={t('driverDeleteWarning')}
+        confirmText={t('backupAndDelete')}
+        cancelText={t('cancel')}
         isDanger
       />
 
@@ -537,11 +542,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         isOpen={showRestoreConfirm}
         onCancel={() => setShowRestoreConfirm(false)}
         onConfirm={() => void handleRestore()}
-        title="确认恢复全部驱动备份"
-        description="将读取当前数据目录 driver_backups 下的全部 INF 备份，并交由 Windows pnputil 递归安装。"
-        warning="该操作需要管理员权限，可能重新安装多个历史驱动版本；执行后建议重新检测，必要时重启 Windows。"
-        confirmText="确认恢复"
-        cancelText="取消"
+        title={t('confirmRestoreDrivers')}
+        description={moduleT('driverUi.confirmRestoreDesc')}
+        warning={t('driverRestoreWarning')}
+        confirmText={t('confirmRestore')}
+        cancelText={t('cancel')}
       />
     </>
   );

@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Database, Loader2, Trash2, CheckCircle2, Shield } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
@@ -29,6 +30,9 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 // ============================================================================
 
 export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+  const { t: navT } = useTranslation('nav');
+  const { t } = useTranslation('common');
+  const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('registry');
 
   const lastScanTriggerRef = useRef(0);
@@ -114,7 +118,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
       });
 
       if (result.errors.length > 0) {
-        setDeleteError(`${result.errors.length} 个条目删除失败`);
+        setDeleteError(`${result.errors.length} ${t('files')} ${t('errorState')}`);
         setDeleteErrors(result.errors);
       }
 
@@ -182,9 +186,9 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
               <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
             </div>
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">正在清理注册表</h3>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">{moduleT('registry.cleaning')}</h3>
               <p className="text-sm text-[var(--text-muted)] mt-1">
-                正在删除 {selectedCount} 个注册表条目，已创建备份文件...
+                {moduleT('registry.cleaningDesc', { count: selectedCount })}
               </p>
             </div>
             <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
@@ -199,8 +203,8 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
         id="registry"
-        title="注册表冗余"
-        description="检测已卸载程序遗留的孤立注册表引用"
+        title={navT('registry')}
+        description={navT('registryDesc')}
         icon={<Database className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
         fileCount={moduleState.fileCount}
@@ -214,8 +218,8 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
           <div className="p-5">
             <EmptyState
               icon={Database}
-              title="尚未扫描注册表冗余"
-              description="点击开始扫描，检测已卸载程序遗留的孤立注册表引用。"
+              title={t('notScannedRegistry')}
+              description={moduleT('registry.idleDesc')}
             />
           </div>
         )}
@@ -228,9 +232,9 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-green)]/10">
                   <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
                 </div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">正在扫描注册表冗余...</p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{t('scanningShort')}</p>
                 <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--text-muted)]">
-                  正在检查 HKCR\Applications 等文件关联引用，验证目标文件是否仍存在，并过滤系统路径与高风险系统进程。
+                  {moduleT('registry.idleDesc')}
                 </p>
               </div>
 
@@ -274,9 +278,9 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
               <div className="flex items-start gap-3">
                 <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">铁证过滤 · 真实备份</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{moduleT('registry.result')}</p>
                   <p className="text-xs text-[var(--text-muted)] mt-1">
-                    所有条目已通过安全验证（关联文件不存在、非系统路径、非系统进程）。删除前创建完整备份，可双击 .reg 文件恢复。
+                    {t('registryDeleteWarning')}
                   </p>
                 </div>
               </div>
@@ -284,20 +288,20 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 onClick={() => openRegistryBackupDir()}
                 className="shrink-0 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-white/50 hover:bg-white/80 rounded-lg border border-emerald-500/15 transition-colors"
               >
-                打开备份目录
+                {t('open')}
               </button>
             </div>
 
             {backupPath && (
               <div className="flex items-center justify-between p-3 bg-[var(--bg-main)] rounded-xl">
                 <span className="text-xs text-[var(--text-muted)]">
-                  备份已保存到: {backupPath}
+                  {moduleT('registry.backup')}: {backupPath}
                 </span>
                 <button
                   onClick={() => openRegistryBackupDir()}
                   className="text-xs text-emerald-600 hover:underline"
                 >
-                  打开目录
+                  {t('open')}
                 </button>
               </div>
             )}
@@ -306,10 +310,10 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button onClick={toggleSelectAll} className="text-sm text-[var(--brand-green)] hover:underline">
-                  {selectedEntries.size === scanResult.entries.length ? '取消全选' : '全选'}
+                  {selectedEntries.size === scanResult.entries.length ? t('deselectAll') : t('selectAll')}
                 </button>
                 <span className="text-sm text-[var(--text-muted)]">
-                  已选 {selectedCount} / {scanResult.entries.length} 项
+                  {moduleT('registry.selected', { count: selectedCount })} / {scanResult.entries.length}
                 </span>
               </div>
               <button
@@ -326,7 +330,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 ) : (
                   <Trash2 className="w-4 h-4" />
                 )}
-                删除选中
+                {moduleT('registry.deleteSelected')}
               </button>
             </div>
 
@@ -339,7 +343,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
                       onClick={() => setShowErrorDetails(!showErrorDetails)}
                       className="text-xs text-red-500 hover:underline"
                     >
-                      {showErrorDetails ? '收起详情' : '查看详情'}
+                      {showErrorDetails ? t('close') : t('viewDetails')}
                     </button>
                   )}
                 </div>
@@ -410,8 +414,8 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
           <div className="p-5">
             <EmptyState
               icon={CheckCircle2}
-              title="没有发现注册表冗余"
-              description="未检测到已卸载程序遗留的孤立注册表引用。"
+                title={t('noRegistryRedundancy')}
+              description={moduleT('registry.noResult')}
               tone="success"
             />
           </div>
@@ -422,11 +426,11 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         isOpen={showDeleteConfirm}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
-        title="确认删除注册表条目"
-        description={`确定要删除选中的 ${selectedCount} 个注册表条目吗？所有条目已通过安全验证。`}
-        warning="删除前已使用 reg.exe export 创建完整备份文件，您可以通过双击 .reg 文件恢复。"
-        confirmText="删除"
-        cancelText="取消"
+        title={t('confirmDeleteRegistry')}
+        description={moduleT('registry.confirmDesc', { count: selectedCount })}
+        warning={t('registryDeleteWarning')}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
         isDanger={true}
       />
     </>

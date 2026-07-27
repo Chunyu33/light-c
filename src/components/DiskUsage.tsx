@@ -6,6 +6,7 @@ import { useRef } from 'react';
 import { HardDrive } from 'lucide-react';
 import type { DiskInfo } from '../types';
 import { formatSize } from '../utils/format';
+import { useTranslation } from 'react-i18next';
 
 interface DiskUsageProps {
   diskInfo: DiskInfo | null;
@@ -16,6 +17,7 @@ interface DiskUsageProps {
 }
 
 export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsageProps) {
+  const { t } = useTranslation('common');
   // 三击检测
   const clickCountRef = useRef(0);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,10 +91,10 @@ export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsa
           <div className={`flex items-center justify-between ${compact ? 'mb-1.5' : 'mb-2'}`}>
             <div>
               <span className={compact ? 'text-xs font-medium text-[var(--fg-primary)]' : 'text-sm font-medium text-[var(--fg-primary)]'}>
-                {diskInfo.drive_letter} 盘
+                {t('driveLabel', { drive: diskInfo.drive_letter })}
               </span>
               <span className={compact ? 'text-[11px] text-[var(--fg-muted)] ml-2' : 'text-xs text-[var(--fg-muted)] ml-2'}>
-                系统盘
+                {t('systemDrive')}
               </span>
             </div>
             <div className="text-right">
@@ -113,13 +115,13 @@ export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsa
           {/* 统计信息 */}
           <div className={`flex items-center ${compact ? 'gap-3 text-[11px]' : 'gap-4 text-xs'}`}>
             <span className="text-[var(--fg-muted)]">
-              总容量 <span className="text-[var(--fg-secondary)] font-medium">{formatSize(diskInfo.total_space)}</span>
+              {t('totalCapacity')} <span className="text-[var(--fg-secondary)] font-medium">{formatSize(diskInfo.total_space)}</span>
             </span>
             <span className="text-[var(--fg-muted)]">
-              已用 <span className="text-orange-500 font-medium">{formatSize(diskInfo.used_space)}</span>
+              {t('usedSpace')} <span className="text-orange-500 font-medium">{formatSize(diskInfo.used_space)}</span>
             </span>
             <span className="text-[var(--fg-muted)]">
-              可用 <span className="text-emerald-500 font-medium">{formatSize(diskInfo.free_space)}</span>
+              {t('availableSpace')} <span className="text-emerald-500 font-medium">{formatSize(diskInfo.free_space)}</span>
             </span>
           </div>
         </div>

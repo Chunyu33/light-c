@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Shield, Zap, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface WelcomeModalProps {
   /** 是否显示弹窗 */
@@ -18,24 +19,10 @@ interface WelcomeModalProps {
 // ============================================================================
 // 可定制区域 - 修改以下内容来定制欢迎信息
 // ============================================================================
-const WELCOME_CONFIG = {
-  // 欢迎标题
-  title: '欢迎使用 LightC',
-  // 欢迎语
-  subtitle: '轻量 · 安全 · 高效',
-  // 描述文案
-  description: '专为 Windows 用户打造的智能 C 盘清理工具，帮助您轻松释放磁盘空间，让系统运行更流畅。',
-  // 功能亮点 - 体现核心价值
-  features: [
-    { icon: Sparkles, text: '轻量极速', desc: '小巧无广告，启动即用' },
-    { icon: Shield, text: '安全可靠', desc: '智能识别，保护系统' },
-    { icon: Zap, text: '高效清理', desc: '一键扫描，快速释放' },
-  ],
-};
-
 const STORAGE_KEY = 'lightc_welcome_dismissed';
 
 export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
+  const { t } = useTranslation('ui');
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -72,7 +59,11 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
   if (!isOpen && !isAnimating) return null;
 
-  const { title, subtitle, description, features } = WELCOME_CONFIG;
+  const features = [
+    { icon: Sparkles, text: t('welcomeLight'), desc: t('welcomeLightDesc') },
+    { icon: Shield, text: t('welcomeSafe'), desc: t('welcomeSafeDesc') },
+    { icon: Zap, text: t('welcomeFast'), desc: t('welcomeFastDesc') },
+  ];
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
@@ -106,17 +97,17 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
           {/* 标题 */}
           <h2 className="text-center text-xl font-bold text-[var(--text-primary)] mb-1">
-            {title}
+            {t('welcomeTitle')}
           </h2>
           
           {/* 副标题 - 核心价值 */}
           <p className="text-center text-sm font-medium text-[var(--brand-green)] mb-3">
-            {subtitle}
+            {t('welcomeSubtitle')}
           </p>
 
           {/* 描述 */}
           <p className="text-center text-sm text-[var(--text-muted)] leading-relaxed mb-5">
-            {description}
+            {t('welcomeDescription')}
           </p>
 
           {/* 功能亮点 - 简约卡片风格 */}
@@ -144,7 +135,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                 onChange={(e) => setDontShowAgain(e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-[var(--border-color)] text-[var(--brand-green)] focus:ring-[var(--brand-green)] focus:ring-offset-0 cursor-pointer"
               />
-              <span className="text-xs text-[var(--text-muted)]">不再显示</span>
+              <span className="text-xs text-[var(--text-muted)]">{t('welcomeDismiss')}</span>
             </label>
             <button
               onClick={handleStart}
@@ -152,7 +143,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                 isButtonPressed ? 'scale-95' : 'scale-100'
               }`}
             >
-              开始使用
+              {t('welcomeStart')}
             </button>
           </div>
         </div>

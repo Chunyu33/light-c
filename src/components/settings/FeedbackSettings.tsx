@@ -5,11 +5,13 @@
 import { useState } from 'react';
 import { CheckCircle, Copy, ExternalLink, HelpCircle, MessageCircle, MessageSquare } from 'lucide-react';
 import { SupportAuthor } from './SupportAuthor';
+import { useTranslation } from 'react-i18next';
 
 const QQ_GROUP = '834582563';
 
 export function FeedbackSettings() {
   const [copiedQQ, setCopiedQQ] = useState(false);
+  const { t } = useTranslation('settings');
 
   const handleCopyQQ = async () => {
     try {
@@ -27,12 +29,12 @@ export function FeedbackSettings() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <HelpCircle  className="w-3.5 h-3.5"/>
-          问题反馈
+          {t('feedback.title')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div>
             <p className="text-xs text-[var(--text-muted)] mt-1">
-              如果您在使用过程中遇到任何问题或有改进建议，欢迎通过以下方式联系我
+              {t('feedback.description')}
             </p>
           </div>
 
@@ -51,7 +53,7 @@ export function FeedbackSettings() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">GitHub Issues</p>
-                  <p className="text-xs text-[var(--text-muted)]">在 GitHub 上提交问题</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t('feedback.githubDesc')}</p>
                 </div>
               </div>
               <ExternalLink className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)]" />
@@ -66,7 +68,7 @@ export function FeedbackSettings() {
                   <MessageSquare className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">邮件反馈</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{t('feedback.email')}</p>
                   <p className="text-xs text-[var(--text-muted)]">1378813463@qq.com</p>
                 </div>
               </div>
@@ -80,13 +82,13 @@ export function FeedbackSettings() {
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
           <MessageCircle className="w-3.5 h-3.5" />
-          交流
+          {t('feedback.contact')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-4 space-y-3">
           {/* QQ群 */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]">QQ群：</span>
+              <span className="text-sm text-[var(--text-secondary)]">{t('feedback.qqGroup')}</span>
               <span className="text-sm font-medium text-[var(--text-primary)]">{QQ_GROUP}</span>
             </div>
             <button
@@ -97,16 +99,16 @@ export function FeedbackSettings() {
                 }`}
             >
               {copiedQQ ? (
-                <><CheckCircle className="w-3 h-3" />已复制</>
+                <><CheckCircle className="w-3 h-3" />{t('feedback.copied')}</>
               ) : (
-                <><Copy className="w-3 h-3" />复制</>
+                <><Copy className="w-3 h-3" />{t('feedback.copy')}</>
               )}
             </button>
           </div>
           {/* 微信号 */}
           {/* <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[var(--text-secondary)]"> 微 信：</span>
+              <span className="text-sm text-[var(--text-secondary)]">{t('feedback.wechat')}:</span>
               <span className="text-sm font-medium text-[var(--text-primary)]">{WECHAT_ID}</span>
             </div>
             <button
@@ -117,9 +119,9 @@ export function FeedbackSettings() {
                 }`}
             >
               {copiedWechat ? (
-                <><CheckCircle className="w-3 h-3" />已复制</>
+                <><CheckCircle className="w-3 h-3" />{t('feedback.copied')}</>
               ) : (
-                <><Copy className="w-3 h-3" />复制</>
+                <><Copy className="w-3 h-3" />{t('feedback.copy')}</>
               )}
             </button>
           </div> */}
