@@ -4,6 +4,8 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## Unreleased
 
+- Fixed local-data cleanup dialogs showing backend Chinese labels in English and Japanese; all allowlisted items and per-drive snapshots now use the active language.
+- Improved hibernation cleanup verification by calling `powercfg.exe` directly and confirming that Windows disables hibernation and removes `hiberfil.sys` before reporting success.
 - Fixed the disk information media label using a translation object instead of a string.
 - Constrained long disk metadata while allowing volume free-space values to use their available card width.
 
