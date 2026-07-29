@@ -4,10 +4,15 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## Unreleased
 
+- Reworked the startup screen into a lightweight same-window view with the main window size, theme-aware animated gradients, the LightC logo, and concise platform attribution.
+- Added a static pre-React startup fallback to prevent a white blank window while the WebView loads the application bundle.
+- Fixed the startup animation restarting after React loaded by hydrating the existing static screen, and added localized project slogans.
 - Fixed local-data cleanup dialogs showing backend Chinese labels in English and Japanese; all allowlisted items and per-drive snapshots now use the active language.
 - Improved hibernation cleanup verification by calling `powercfg.exe` directly and confirming that Windows disables hibernation and removes `hiberfil.sys` before reporting success.
+- Fixed large-file scans counting OneDrive Files On-Demand placeholders as local disk usage; only cloud-only placeholders are skipped, while locally available OneDrive files remain visible.
 - Fixed the disk information media label using a translation object instead of a string.
 - Constrained long disk metadata while allowing volume free-space values to use their available card width.
+- Tightened startup-screen spacing and synchronized static and React layout styles to prevent blank gaps and layout jumps.
 
 ## v2.15.0 (2026-07-27)
 

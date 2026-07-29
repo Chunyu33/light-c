@@ -10,6 +10,23 @@ use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use tauri::{Emitter, Window};
 use walkdir::WalkDir;
 
+#[cfg(target_os = "windows")]
+pub(crate) const CLOUD_PLACEHOLDER_ATTRIBUTES: u32 = 0x0004_0000 // FILE_ATTRIBUTE_RECALL_ON_OPEN
+    | 0x0040_0000; // FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+
+#[cfg(target_os = "windows")]
+pub(crate) fn has_cloud_placeholder_attributes(file_attributes: u32) -> bool {
+    (file_attributes & CLOUD_PLACEHOLDER_ATTRIBUTES) != 0
+}
+
+#[cfg(target_os = "windows")]
+fn is_cloud_placeholder(metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    // 仅依据“访问时需要从云端召回数据”的属性，避免误伤其他类型的离线文件。
+    has_cloud_placeholder_attributes(metadata.file_attributes())
+}
+
 // 全局取消标志，跨线程共享
 static LARGE_FILE_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 
@@ -249,6 +266,10 @@ pub fn scan(
             let path_str = path.to_string_lossy().to_string();
 
             if let Ok(metadata) = entry.metadata() {
+                if is_cloud_placeholder(&metadata) {
+                    continue;
+                }
+
                 let size = metadata.len();
                 let modified = metadata
                     .modified()

@@ -8,6 +8,145 @@
 /* @variant dark (&:where(.dark, .dark *)); */
 
 /* ============================================================================
+   单窗口启动屏
+   只动画 transform、opacity 和 background-position，避免启动阶段持续重排。
+   ============================================================================ */
+.splash-screen {
+  --splash-base: #f4faf6;
+  --splash-gradient-start: #e5f7eb;
+  --splash-gradient-end: #edf3ff;
+  --splash-orb-one: rgba(7, 193, 96, 0.18);
+  --splash-orb-two: rgba(71, 133, 255, 0.14);
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(135deg, var(--splash-base), var(--splash-gradient-start), var(--splash-gradient-end), var(--splash-base));
+  transition: opacity 220ms ease;
+}
+
+.splash-screen--dark {
+  --splash-base: #0d1512;
+  --splash-gradient-start: #112b21;
+  --splash-gradient-end: #131d37;
+  --splash-orb-one: rgba(7, 193, 96, 0.22);
+  --splash-orb-two: rgba(73, 118, 255, 0.18);
+}
+
+.splash-screen--exiting {
+  opacity: 0;
+}
+
+.splash-screen__aurora {
+  position: absolute;
+  z-index: -1;
+  width: 38vw;
+  height: 38vw;
+  min-width: 260px;
+  min-height: 260px;
+  border-radius: 9999px;
+  pointer-events: none;
+  will-change: transform;
+  background: radial-gradient(circle, var(--splash-orb-color) 0%, transparent 70%);
+}
+
+.splash-screen__aurora--one {
+  top: -18%;
+  left: -10%;
+  --splash-orb-color: var(--splash-orb-one);
+  animation: splash-orbit-one 9s ease-in-out infinite alternate;
+}
+
+.splash-screen__aurora--two {
+  right: -12%;
+  bottom: -20%;
+  --splash-orb-color: var(--splash-orb-two);
+  animation: splash-orbit-two 11s ease-in-out infinite alternate;
+}
+
+.splash-screen__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 收紧启动屏信息层级，避免 Logo、标语和平台信息之间出现过大空白。 */
+  gap: 14px;
+  transform: translateZ(0);
+}
+
+.splash-screen__logo {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 28px rgba(7, 193, 96, 0.24));
+  animation: splash-logo-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.splash-screen__slogan {
+  /* 显式清除段落默认外边距，确保静态首屏与 React 接管后的布局一致。 */
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  /* letter-spacing: 0.06em; */
+  text-align: center;
+  animation: splash-platform-in 520ms 80ms ease-out both;
+}
+
+.splash-screen__platform {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  animation: splash-platform-in 520ms 160ms ease-out both;
+}
+
+.splash-screen__author {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.splash-screen__channel {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+@keyframes splash-orbit-one {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(12vw, 8vh, 0) scale(1.12); }
+}
+
+@keyframes splash-orbit-two {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-10vw, -7vh, 0) scale(1.14); }
+}
+
+@keyframes splash-logo-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes splash-platform-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-screen,
+  .splash-screen__aurora,
+  .splash-screen__logo,
+  .splash-screen__slogan,
+  .splash-screen__platform {
+    animation: none;
+  }
+}
+
+/* ============================================================================
    CSS变量 - 浅色主题（微信设计语言）
    设计理念：
    - 品牌绿色 #07C160 仅用于主要操作按钮和强调元素

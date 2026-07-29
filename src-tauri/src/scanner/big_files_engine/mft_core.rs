@@ -64,6 +64,7 @@ pub struct MftEntry {
 pub struct MftFileMetadata {
     pub size: u64,
     pub modified: i64,
+    pub is_cloud_placeholder: bool,
 }
 
 #[derive(Clone)]
@@ -417,7 +418,8 @@ impl NtfsFileMetadataReader {
                     let mut record = record_bytes.to_vec();
                     if self.apply_fixup(&mut record).is_some() {
                         if let Some(metadata) = parse_active_file_record_metadata(&record) {
-                            if metadata.size > 0 {
+                            // 在进入 Top-N 堆之前过滤，避免云端占位文件挤掉真正占用本地空间的文件。
+                            if metadata.size > 0 && !metadata.is_cloud_placeholder {
                                 heap.push(Reverse((metadata.size, record_id, metadata.modified)));
                                 if heap.len() > top_limit {
                                     heap.pop();
@@ -585,6 +587,7 @@ fn parse_file_record_metadata(record: &[u8]) -> Option<MftFileMetadata> {
     let attributes_offset = read_u16(record, 20)? as usize;
     let mut offset = attributes_offset;
     let mut modified = 0i64;
+    let mut file_attributes = 0u32;
     let mut unnamed_data_size = None;
     let mut fallback_data_size = None;
 
@@ -600,7 +603,12 @@ fn parse_file_record_metadata(record: &[u8]) -> Option<MftFileMetadata> {
         }
 
         if attribute_type == 0x10 && modified == 0 {
-            modified = parse_standard_info_modified(record, offset).unwrap_or(0);
+            if let Some((standard_modified, standard_attributes)) =
+                parse_standard_info(record, offset)
+            {
+                modified = standard_modified;
+                file_attributes = standard_attributes;
+            }
         }
 
         if attribute_type == 0x80 {
@@ -619,14 +627,21 @@ fn parse_file_record_metadata(record: &[u8]) -> Option<MftFileMetadata> {
     }
 
     let size = unnamed_data_size.or(fallback_data_size)?;
-    Some(MftFileMetadata { size, modified })
+    Some(MftFileMetadata {
+        size,
+        modified,
+        is_cloud_placeholder: crate::scanner::big_files::has_cloud_placeholder_attributes(
+            file_attributes,
+        ),
+    })
 }
 
-fn parse_standard_info_modified(record: &[u8], attribute_offset: usize) -> Option<i64> {
+fn parse_standard_info(record: &[u8], attribute_offset: usize) -> Option<(i64, u32)> {
     let value_offset = read_u16(record, attribute_offset + 20)? as usize;
     let value_start = attribute_offset + value_offset;
     let modified_filetime = read_u64(record, value_start + 8)?;
-    Some(filetime_to_unix_seconds(modified_filetime))
+    let file_attributes = read_u32(record, value_start + 32)?;
+    Some((filetime_to_unix_seconds(modified_filetime), file_attributes))
 }
 
 fn parse_data_attribute_size(record: &[u8], attribute_offset: usize) -> Option<u64> {

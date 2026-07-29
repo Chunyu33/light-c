@@ -4,7 +4,6 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { motion } from 'framer-motion';
 import { 
   SettingsModal, 
@@ -174,20 +173,12 @@ function DashboardContent() {
 // ============================================================================
 
 function App() {
-  const [windowLabel, setWindowLabel] = useState<string | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
 
-  useEffect(() => {
-    getCurrentWindow().label && setWindowLabel(getCurrentWindow().label);
-  }, []);
-
-  // 等待窗口标签检测完成
-  if (windowLabel === null) {
-    return null;
-  }
-
-  // 启动屏幕窗口
-  if (windowLabel === 'splashscreen') {
-    return <SplashScreen />;
+  // 启动屏和主界面共用同一个 WebView，避免双窗口初始化和窗口切换开销。
+  if (showSplash) {
+    return <SplashScreen onComplete={handleSplashComplete} />;
   }
 
   // 主窗口
