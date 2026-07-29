@@ -25,7 +25,7 @@
     "fileList": "文件列表",
     "path": "文件路径",
     "source": "来源",
-    "risk": "风险",
+    "riskHeader": "风险",
     "size": "大小",
     "deleteSuccess": "成功清理 {{count}} 个文件",
     "deleteSuccessDesc": "已释放 {{size}} 空间",

@@ -50,12 +50,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.15.0'
+          releaseName: 'LightC v2.15.1'
           releaseBody: |
-            ## LightC v2.15.0
-            - 新增多语言支持，覆盖导航、设置、扫描过程、结果页和操作反馈
-            - 优化垃圾清理、大文件清理和社交软件专清的结果操作工具条与多语言布局适配
-            - 优化分类展示、删除失败反馈和重启待处理结果
+            ## LightC v2.15.1
+            - Improved multilingual coverage across cleanup dialogs, scan states, settings, and result pages.
+            - Improved social-app scanning coverage and modularized its Windows path adapters.
+            - Fixed OneDrive cloud-only files being counted as local large files and improved hibernation cleanup verification.
+            - Improved cleanup action controls so they remain accessible while browsing long results.
 
             See [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) for full details.
           releaseDraft: false

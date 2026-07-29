@@ -337,6 +337,8 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const selectableCount = files.filter((f) => f.risk_level <= 3).length;
 
   const isExpanded = expandedModule === 'bigFiles';
+  // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，确保操作区跟随各自结果。
+  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
   const isScanning = moduleState.status === 'scanning';
   const displayElapsedSeconds = isScanning
     ? scanElapsed
@@ -429,28 +431,25 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       >
         {/* 展开内容 */}
         <div>
-          {files.length > 0 && !isScanning && (
-            // 结果列表沿用页面原有滚动，操作条单独吸顶保证长列表中的可操作性。
-            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
+          {shouldShowOperationToolbar && files.length > 0 && !isScanning && createPortal(
+            // 挂载到 body，避免页面过渡容器的 transform 让 fixed 退化为局部定位。
+            <div className="module-operation-toolbar">
               <button
                 onClick={toggleSelectAll}
-                className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
+                className="module-operation-toolbar__button module-operation-toolbar__button--muted"
               >
                 {selectedFiles.size === selectableCount && selectableCount > 0 ? t('deselectAll') : t('selectAll')}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedFiles.size === 0}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  selectedFiles.size === 0
-                    ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
-                    : 'bg-rose-500 text-white hover:bg-rose-600'
-                }`}
+                className="module-operation-toolbar__button module-operation-toolbar__button--danger"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 {t('cleanSelected', { count: selectedFiles.size })}
               </button>
-            </div>
+            </div>,
+            document.body,
           )}
 
           {/* 扫描进度 + 引擎 + 时长（扫描中 & 扫描完成后都显示） */}

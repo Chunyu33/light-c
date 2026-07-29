@@ -25,7 +25,7 @@
     "fileList": "ファイル一覧",
     "path": "ファイルパス",
     "source": "場所",
-    "risk": "リスク",
+    "riskHeader": "リスク",
     "size": "サイズ",
     "deleteSuccess": "{{count}} 件を整理しました",
     "deleteSuccessDesc": "{{size}} を解放しました",

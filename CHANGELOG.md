@@ -2,17 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.15.1 (2026-07-29)
 
-- Reworked the startup screen into a lightweight same-window view with the main window size, theme-aware animated gradients, the LightC logo, and concise platform attribution.
-- Added a static pre-React startup fallback to prevent a white blank window while the WebView loads the application bundle.
-- Fixed the startup animation restarting after React loaded by hydrating the existing static screen, and added localized project slogans.
-- Fixed local-data cleanup dialogs showing backend Chinese labels in English and Japanese; all allowlisted items and per-drive snapshots now use the active language.
-- Improved hibernation cleanup verification by calling `powercfg.exe` directly and confirming that Windows disables hibernation and removes `hiberfil.sys` before reporting success.
-- Fixed large-file scans counting OneDrive Files On-Demand placeholders as local disk usage; only cloud-only placeholders are skipped, while locally available OneDrive files remain visible.
-- Fixed the disk information media label using a translation object instead of a string.
-- Constrained long disk metadata while allowing volume free-space values to use their available card width.
-- Tightened startup-screen spacing and synchronized static and React layout styles to prevent blank gaps and layout jumps.
+- Improved multilingual coverage across cleanup dialogs, scan states, settings, and result pages.
+- Improved social-app scanning coverage and modularized its Windows path adapters.
+- Fixed OneDrive cloud-only files being counted as local large files and improved hibernation cleanup verification.
+- Improved the startup screen, disk-information layout, and cleanup action controls for long results.
 
 ## v2.15.0 (2026-07-27)
 
@@ -29,7 +24,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ### User Experience
 
-- Restored compact module headers and moved junk, large-file, and social-cache actions into compact sticky toolbars without changing result scrolling.
+- Restored compact module headers and moved junk, large-file, and social-cache actions into compact, right-aligned fixed controls below the scan buttons without changing result scrolling.
 - Improved multilingual layout handling, shared language selection, and release documentation.
 
 ## v2.14.0 (2026-07-23)

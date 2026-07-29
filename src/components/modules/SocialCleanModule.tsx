@@ -279,6 +279,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
     }), { files: 0, size: 0 }) || { files: 0, size: 0 };
 
   const isExpanded = expandedModule === 'social';
+  // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，避免误判为共用操作区。
+  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
 
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm && !fileModalData) {
     return null;
@@ -351,28 +353,25 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       >
         {/* 展开内容 */}
         <div className="min-h-[300px]">
-          {scanResult && scanResult.total_files > 0 && (
-            // 结果较多时保持操作条可见，避免用户必须回到模块标题区操作。
-            <div className="sticky top-2 z-20 ml-auto flex w-fit max-w-full flex-wrap items-center justify-end gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-2 shadow-md">
+          {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && createPortal(
+            // 挂载到 body，避免页面过渡容器的 transform 让 fixed 退化为局部定位。
+            <div className="module-operation-toolbar">
               <button
                 onClick={toggleSelectAll}
-                className="text-xs text-[var(--fg-muted)] hover:text-emerald-600 transition"
+                className="module-operation-toolbar__button module-operation-toolbar__button--muted"
               >
                 {selectedPaths.size === scanResult.deletable_files ? moduleT('social.deselectAll') : moduleT('social.selectAll')}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedPaths.size === 0}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  selectedPaths.size === 0
-                    ? 'bg-[var(--bg-hover)] text-[var(--fg-faint)] cursor-not-allowed'
-                    : 'bg-rose-500 text-white hover:bg-rose-600'
-                }`}
+                className="module-operation-toolbar__button module-operation-toolbar__button--danger"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 {moduleT('social.clean')} ({selectedStats.files})
               </button>
-            </div>
+            </div>,
+            document.body,
           )}
 
           {/* 说明提示 */}
@@ -815,7 +814,7 @@ function FileListModal({ title, files, selectedPaths, onToggleFile, isOpen, onCl
               <span className="w-6"></span>
               <span className="w-16">{moduleT('social.source')}</span>
               <span className="flex-1">{moduleT('social.path')}</span>
-              <span className="w-20">{moduleT('social.risk')}</span>
+              <span className="w-20">{moduleT('social.riskHeader')}</span>
               <span className="w-20 text-right">{moduleT('social.size')}</span>
               <span className="w-16"></span>
             </div>

@@ -116,6 +116,67 @@
   letter-spacing: 0.03em;
 }
 
+/* 固定在模块扫描按钮下方，滚动结果时仍保持可见且不占用内容流空间。 */
+.module-operation-toolbar {
+  position: fixed;
+  /* 固定在视口右侧，避免结果容器滚动或过渡动画影响操作区。 */
+  top: 244px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: fit-content;
+  max-width: calc(100vw - 76px);
+  margin: 0;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-elevated) 78%, transparent);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.module-operation-toolbar__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.module-operation-toolbar__button--muted {
+  color: var(--fg-muted);
+}
+
+.module-operation-toolbar__button--muted:hover {
+  background: color-mix(in srgb, var(--bg-hover) 78%, transparent);
+  color: var(--fg-secondary);
+}
+
+.module-operation-toolbar__button--danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
+.module-operation-toolbar__button--danger:hover {
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+}
+
+.module-operation-toolbar__button:disabled {
+  cursor: not-allowed;
+  color: var(--fg-faint);
+  background: color-mix(in srgb, var(--bg-hover) 68%, transparent);
+  opacity: 0.78;
+}
+
 @keyframes splash-orbit-one {
   from { transform: translate3d(0, 0, 0) scale(1); }
   to { transform: translate3d(12vw, 8vh, 0) scale(1.12); }
