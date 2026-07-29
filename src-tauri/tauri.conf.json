@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LightC",
-  "version": "2.15.0",
+  "version": "2.15.1",
   "identifier": "com.chunyu.LightC",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -20,19 +20,7 @@
         "minHeight": 610,
         "center": true,
         "decorations": false,
-        "visible": false
-      },
-      {
-        "label": "splashscreen",
-        "title": "LightC",
-        "width": 400,
-        "height": 320,
-        "center": true,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "resizable": false,
-        "skipTaskbar": true
+        "visible": true
       }
     ],
     "security": {

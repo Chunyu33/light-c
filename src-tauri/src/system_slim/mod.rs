@@ -145,13 +145,13 @@ fn check_hibernation_enabled() -> bool {
     {
         use winreg::{enums::*, RegKey};
 
-        // 主检测：注册表 HibernateEnabled 值（powercfg -h 的权威来源）
+        // 主检测：注册表 HibernateEnabled 值（powercfg /hibernate 的权威来源）。
+        // 读取成功后必须直接返回，避免旧的 hiberfil.sys 让“已关闭”再次被误判为启用。
         if let Ok(hklm) = RegKey::predef(HKEY_LOCAL_MACHINE)
             .open_subkey_with_flags(r"SYSTEM\CurrentControlSet\Control\Power", KEY_READ)
         {
-            let value: u32 = hklm.get_value("HibernateEnabled").unwrap_or(0);
-            if value == 1 {
-                return true;
+            if let Ok(value) = hklm.get_value::<u32, _>("HibernateEnabled") {
+                return value == 1;
             }
         }
 
@@ -652,6 +652,34 @@ fn run_hidden_utf8_command(program: &str, args: &[&str]) -> Result<std::process:
 }
 
 #[cfg(target_os = "windows")]
+fn run_powercfg_hibernation_command(mode: &str) -> Result<std::process::Output, String> {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    // 休眠配置应直接交给 powercfg.exe，避免经过 cmd 后命令解析或代码页切换影响状态变更。
+    Command::new("powercfg.exe")
+        .args(["/hibernate", mode])
+        .creation_flags(0x08000000)
+        .output()
+        .map_err(|e| format!("执行 powercfg 失败: {}", e))
+}
+
+#[cfg(target_os = "windows")]
+fn wait_for_hibernation_disabled() -> bool {
+    let hiberfil_path = std::path::Path::new("C:\\hiberfil.sys");
+
+    // powercfg 删除系统文件可能需要短暂时间，轮询可以避免成功后立即重检造成误报。
+    for _ in 0..20 {
+        if !check_hibernation_enabled() && !hiberfil_path.exists() {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    false
+}
+
+#[cfg(target_os = "windows")]
 fn quote_cmd_arg(arg: &str) -> String {
     if arg
         .chars()
@@ -683,15 +711,19 @@ pub fn disable_hibernation() -> Result<String, String> {
     {
         info!("正在关闭休眠功能...");
 
-        let output = run_hidden_utf8_command("powercfg", &["-h", "off"])?;
+        let output = run_powercfg_hibernation_command("off")?;
 
         if output.status.success() {
-            info!("休眠功能已关闭");
-            Ok("休眠功能已成功关闭，hiberfil.sys 文件将被删除".to_string())
+            if wait_for_hibernation_disabled() {
+                info!("休眠功能已关闭");
+                Ok("休眠功能已成功关闭，hiberfil.sys 文件将被删除".to_string())
+            } else {
+                Err("关闭休眠命令已返回成功，但系统状态或 hiberfil.sys 文件仍未完成更新，请重新检测后再试".to_string())
+            }
         } else {
             Err(format!(
                 "关闭休眠失败: {}",
-                decode_command_output(&output.stderr)
+                decode_command_output(&output.stderr).trim()
             ))
         }
     }
@@ -712,15 +744,19 @@ pub fn enable_hibernation() -> Result<String, String> {
     {
         info!("正在开启休眠功能...");
 
-        let output = run_hidden_utf8_command("powercfg", &["-h", "on"])?;
+        let output = run_powercfg_hibernation_command("on")?;
 
         if output.status.success() {
-            info!("休眠功能已开启");
-            Ok("休眠功能已成功开启".to_string())
+            if check_hibernation_enabled() {
+                info!("休眠功能已开启");
+                Ok("休眠功能已成功开启".to_string())
+            } else {
+                Err("开启休眠命令已返回成功，但系统状态尚未更新，请重新检测后再试".to_string())
+            }
         } else {
             Err(format!(
                 "开启休眠失败: {}",
-                decode_command_output(&output.stderr)
+                decode_command_output(&output.stderr).trim()
             ))
         }
     }

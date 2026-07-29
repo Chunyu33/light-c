@@ -2,10 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.15.1 (2026-07-29)
 
-- Fixed the disk information media label using a translation object instead of a string.
-- Constrained long disk metadata while allowing volume free-space values to use their available card width.
+- Improved multilingual coverage across cleanup dialogs, scan states, settings, and result pages.
+- Improved social-app scanning coverage and modularized its Windows path adapters.
+- Fixed OneDrive cloud-only files being counted as local large files and improved hibernation cleanup verification.
+- Improved the startup screen, disk-information layout, and cleanup action controls for long results.
 
 ## v2.15.0 (2026-07-27)
 
@@ -22,7 +24,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ### User Experience
 
-- Restored compact module headers and moved junk, large-file, and social-cache actions into compact sticky toolbars without changing result scrolling.
+- Restored compact module headers and moved junk, large-file, and social-cache actions into compact, right-aligned fixed controls below the scan buttons without changing result scrolling.
 - Improved multilingual layout handling, shared language selection, and release documentation.
 
 ## v2.14.0 (2026-07-23)

@@ -20,29 +20,8 @@ mod system_slim;
 
 // 导出命令模块
 use commands::*;
-use tauri::Manager;
 
 // ============================================================================
-// 启动屏幕窗口管理
-// ============================================================================
-
-/// 关闭启动屏幕并显示主窗口
-#[tauri::command]
-async fn close_splashscreen(app: tauri::AppHandle) -> Result<(), String> {
-    // 关闭 splashscreen 窗口
-    if let Some(splash) = app.get_webview_window("splashscreen") {
-        splash.close().map_err(|e| e.to_string())?;
-    }
-
-    // 显示主窗口
-    if let Some(main) = app.get_webview_window("main") {
-        main.show().map_err(|e| e.to_string())?;
-        main.set_focus().map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
-}
-
 /// 应用程序入口点
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -76,8 +55,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // 启动屏幕
-            close_splashscreen,
             // 磁盘信息
             get_disk_info,
             get_local_drives,

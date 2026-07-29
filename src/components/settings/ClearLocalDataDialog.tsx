@@ -9,6 +9,36 @@ import type { ClearableDataItem } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { useTranslation } from 'react-i18next';
 
+const DATA_ITEM_TRANSLATION_KEYS: Record<string, string> = {
+  install_history: 'clearDataItems.installHistory',
+  logs: 'clearDataItems.logs',
+  reg_backups: 'clearDataItems.registryBackups',
+  shell_icon_logs: 'clearDataItems.shellIconLogs',
+  shell_icon_backups: 'clearDataItems.shellIconBackups',
+  driver_backups: 'clearDataItems.driverBackups',
+};
+
+// 使用后端稳定 ID 映射翻译，避免把当前语言状态传入数据目录和清理逻辑。
+function localizeDataItem(item: ClearableDataItem, translate: (key: string, options?: Record<string, unknown>) => string) {
+  const fixedKey = DATA_ITEM_TRANSLATION_KEYS[item.id];
+  const snapshotPrefix = 'disk_growth_snapshots_';
+  const drive = item.id.startsWith(snapshotPrefix)
+    ? item.id.slice(snapshotPrefix.length).toUpperCase()
+    : undefined;
+  const translationKey = fixedKey ?? (drive ? 'clearDataItems.diskGrowthSnapshot' : undefined);
+
+  if (!translationKey) {
+    return { label: item.id, description: '', warning: undefined };
+  }
+
+  const options = drive ? { drive } : undefined;
+  return {
+    label: translate(`${translationKey}.label`, options),
+    description: translate(`${translationKey}.description`, options),
+    warning: translate(`${translationKey}.warning`, options),
+  };
+}
+
 export function ClearLocalDataDialog({
   isOpen,
   items,
@@ -86,6 +116,7 @@ export function ClearLocalDataDialog({
                 {items.map(item => {
                   const selected = selectedIds.includes(item.id);
                   const disabled = !item.exists || item.file_count === 0;
+                  const localizedItem = localizeDataItem(item, t);
 
                   return (
                     <button
@@ -107,18 +138,18 @@ export function ClearLocalDataDialog({
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{item.label}</p>
+                            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{localizedItem.label}</p>
                             <span className="shrink-0 text-xs font-semibold tabular-nums text-[var(--brand-green)]">
                               {formatSize(item.size)}
                             </span>
                           </div>
-                          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{item.description}</p>
+                          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{localizedItem.description}</p>
                           <p className="mt-1 truncate text-[11px] text-[var(--text-faint)]" title={item.path}>
                             {item.item_type === 'directory' ? t('clearData.directory') : t('clearData.file')} · {t('clearData.fileCount', { count: item.file_count.toLocaleString() })} · {item.path}
                           </p>
-                          {item.warning && (
+                          {localizedItem.warning && (
                             <p className="mt-2 text-[11px] leading-relaxed text-amber-600 dark:text-amber-400">
-                              {item.warning}
+                              {localizedItem.warning}
                             </p>
                           )}
                         </div>
