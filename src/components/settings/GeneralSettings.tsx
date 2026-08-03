@@ -17,6 +17,7 @@ import { FONT_SIZE_CONFIGS, FONT_SIZE_OPTIONS, LAYOUT_MODE_OPTIONS, THEME_OPTION
 
 const LANGUAGE_OPTIONS: { value: Language; labelKey: string }[] = [
   { value: 'zh', labelKey: 'language.zh' },
+  { value: 'zh-TW', labelKey: 'language.zhTW' },
   { value: 'en', labelKey: 'language.en' },
   { value: 'ja', labelKey: 'language.ja' },
 ];

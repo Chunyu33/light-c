@@ -24,14 +24,22 @@ import jaSettings from './locales/ja/settings.json';
 import jaJunkClean from './locales/ja/junkClean.json';
 import jaModules from './locales/ja/modules.json';
 import jaUi from './locales/ja/ui.json';
+import zhTWCommon from './locales/zh-TW/common.json';
+import zhTWNav from './locales/zh-TW/nav.json';
+import zhTWSettings from './locales/zh-TW/settings.json';
+import zhTWJunkClean from './locales/zh-TW/junkClean.json';
+import zhTWModules from './locales/zh-TW/modules.json';
+import zhTWUi from './locales/zh-TW/ui.json';
 
-export type Language = 'zh' | 'en' | 'ja';
+export type Language = 'zh' | 'zh-TW' | 'en' | 'ja';
 
 function getInitialLanguage(): Language {
   if (typeof window === 'undefined') return 'zh';
   try {
     const savedSettings = JSON.parse(localStorage.getItem('c-cleanup-settings') ?? '{}') as { language?: unknown };
-    return savedSettings.language === 'en' || savedSettings.language === 'ja' ? savedSettings.language : 'zh';
+    return savedSettings.language === 'en' || savedSettings.language === 'ja' || savedSettings.language === 'zh-TW'
+      ? savedSettings.language
+      : 'zh';
   } catch {
     // 本地设置损坏时回落中文，避免阻断应用启动。
     return 'zh';
@@ -43,12 +51,13 @@ void i18n
   .init({
     resources: {
       zh: { common: zhCommon, nav: zhNav, settings: zhSettings, junkClean: zhJunkClean, modules: zhModules, ui: zhUi },
+      'zh-TW': { common: zhTWCommon, nav: zhTWNav, settings: zhTWSettings, junkClean: zhTWJunkClean, modules: zhTWModules, ui: zhTWUi },
       en: { common: enCommon, nav: enNav, settings: enSettings, junkClean: enJunkClean, modules: enModules, ui: enUi },
       ja: { common: jaCommon, nav: jaNav, settings: jaSettings, junkClean: jaJunkClean, modules: jaModules, ui: jaUi },
     },
     lng: getInitialLanguage(),
     fallbackLng: 'zh',
-    supportedLngs: ['zh', 'en', 'ja'],
+    supportedLngs: ['zh', 'zh-TW', 'en', 'ja'],
     ns: ['common', 'nav', 'settings', 'junkClean', 'modules', 'ui'],
     defaultNS: 'common',
     interpolation: { escapeValue: false },

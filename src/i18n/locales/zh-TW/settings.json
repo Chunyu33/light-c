@@ -1,0 +1,398 @@
+{
+  "title": "設定",
+  "about": {
+    "appInfo": "應用資訊",
+    "appDescription": "Windows C盤智慧清理工具",
+    "version": "版本 {{version}}",
+    "portable": "便攜版",
+    "installer": "安裝版",
+    "authorDownload": "作者渠道下載",
+    "checkUpdates": "檢查更新",
+    "portableUpdateHint": "便攜版不會自動安裝更新，推薦從作者網盤下載新版 zip 後覆蓋當前目錄，GitHub Releases 作為官方備用渠道。",
+    "updateHint": "溫馨提示：更新源為 GitHub，國內可能會出現間歇性 DNS 汙染，如果失敗可以稍後重試。",
+    "systemInfo": "系統資訊",
+    "loadingSystemInfo": "正在獲取系統資訊...",
+    "operatingSystem": "作業系統",
+    "architecture": "系統架構",
+    "processor": "處理器",
+    "cpuCores": "CPU 核心數",
+    "memory": "記憶體",
+    "memoryValue": "{{free}} 可用 / {{total}} 總計",
+    "computerName": "計算機名",
+    "currentUser": "當前使用者",
+    "uptime": "系統執行時間",
+    "uptimeValue": "{{days}} 天 {{hours}} 小時 {{minutes}} 分鐘",
+    "systemInfoFailed": "無法獲取系統資訊",
+    "nameSection": "為什麼叫 LightC",
+    "nameDescription": "Light 代表輕量、輕快，C 即 C 盤。LightC 致力於幫助您安全、高效地清理系統垃圾檔案，釋放磁碟空間。",
+    "developer": "開發者",
+    "author": "作者",
+    "source": "原始碼地址",
+    "license": "原始碼許可證",
+    "changelog": "更新日誌",
+    "changelogDesc": "檢視版本更新歷史"
+  },
+  "close": "關閉設定",
+  "tabs": {
+    "general": "通用",
+    "features": "功能設定",
+    "diskInfo": "磁碟資訊",
+    "guide": "使用說明",
+    "security": "安全與校驗",
+    "feedback": "意見反饋",
+    "about": "關於"
+  },
+  "sections": {
+    "general": "常規設定",
+    "dataManagement": "資料管理",
+    "systemTools": "系統快捷工具"
+  },
+  "theme": {
+    "label": "主題模式",
+    "desc": "選擇應用的外觀主題",
+    "light": "淺色模式",
+    "dark": "深色模式",
+    "system": "跟隨系統"
+  },
+  "language": {
+    "label": "語言",
+    "desc": "選擇介面顯示語言",
+    "zh": "簡體中文",
+    "zhTW": "繁體中文",
+    "en": "English",
+    "ja": "日本語"
+  },
+  "fontSize": {
+    "label": "字型大小",
+    "desc": "調整應用內文字大小",
+    "standard": "標準",
+    "medium": "適中",
+    "large": "較大",
+    "custom": "自定義",
+    "customLabel": "自定義字號",
+    "customRange": "範圍 {{min}}-{{max}}px",
+    "customTitle": "自定義字號，範圍 {{min}}-{{max}}px"
+  },
+  "layout": {
+    "label": "佈局設定",
+    "desc": "調整頁面佈局模式",
+    "cards": "卡片模式",
+    "cardsDesc": "所有功能集中在同一頁，適合快速總覽",
+    "pages": "頁面模式",
+    "pagesDesc": "左側選單切換單功能頁，更接近傳統 PC 軟體"
+  },
+  "searchEngine": {
+    "label": "搜尋引擎",
+    "desc": "設定各模組搜尋按鈕開啟的預設搜尋引擎"
+  },
+  "logRetention": {
+    "label": "清理日誌保留",
+    "desc": "超過數量後自動刪除最舊日誌，範圍 1-100 條",
+    "unit": "條",
+    "title": "清理日誌最多保留條數"
+  },
+  "dataDir": {
+    "configLocation": "配置位置",
+    "webviewData": "介面資料",
+    "dataLocation": "資料位置",
+    "loadingPath": "載入中...",
+    "cannotWrite": "當前儲存位置不可寫，請將便攜包解壓到具有寫入許可權的目錄。",
+    "migrationDone": "舊版 AppData 資料已相容遷移，原資料未刪除。",
+    "migrateBtn": "遷移舊版 AppData 資料",
+    "migratingBtn": "遷移中...",
+    "changeDir": "更改資料目錄",
+    "changeDirDesc": "選擇獨立空資料夾儲存清理日誌和快取資料，配置檔案不會遷移",
+    "viewLogs": "檢視清理日誌",
+    "viewLogsDesc": "檢視歷史清理記錄與詳細檔案清單",
+    "clearData": "清空本地資料",
+    "clearDataDesc": "選擇性清理日誌、備份、快照、歷史快取和虛擬磁碟記錄",
+    "changeDirSuccess": "資料目錄已更改",
+    "changeDirFailed": "更改資料目錄失敗",
+    "clearSuccess": "資料已清空",
+    "clearSuccessDesc": "已刪除 {{files}} 個檔案，釋放 {{size}}",
+    "clearFailed": "清空失敗",
+    "readItemsFailed": "讀取清理項失敗",
+    "noItemsSelected": "未選擇清理項",
+    "migrateSuccess": "舊版資料遷移完成",
+    "migrateSuccessDesc": "原 AppData 資料未刪除，便攜版現在優先使用程式目錄。",
+    "migrateFailed": "舊版資料遷移失敗",
+    "openFailed": "開啟{{label}}失敗"
+  },
+  "systemTools": {
+    "startup": "開機啟動管理",
+    "startupDesc": "開啟工作管理員，禁用不必要的自啟動軟體",
+    "storage": "儲存感知",
+    "storageDesc": "呼叫 Windows 原生的磁碟清理與空間管理"
+  },
+  "units": {
+    "items": "個",
+    "layers": "{{count}} 層"
+  },
+  "feedback": {
+    "title": "問題反饋",
+    "description": "如果您在使用過程中遇到任何問題或有改進建議，歡迎透過以下方式聯絡我",
+    "githubDesc": "在 GitHub 上提交問題",
+    "email": "郵件反饋",
+    "contact": "交流",
+    "qqGroup": "QQ群：",
+    "copied": "已複製",
+    "copy": "複製"
+  },
+  "clearData": {
+    "title": "清理本地資料",
+    "subtitle": "只清理下列白名單資料，應用配置獨立保留",
+    "warning": "這些資料可以安全清理，不會刪除應用配置。磁碟變化分析快照已按磁碟機代號拆分，可單獨保留某個磁碟的基線；被清理的磁碟下次掃描會重新建立基線，第二次掃描後才會重新顯示變化對比。",
+    "directory": "目錄內容",
+    "file": "檔案",
+    "fileCount": "{{count}} 個檔案",
+    "summary": "將刪除 {{count}} 個檔案，預計釋放 {{size}}",
+    "cancel": "取消",
+    "confirm": "確認清理"
+  },
+  "clearDataItems": {
+    "installHistory": {
+      "label": "安裝歷史快取",
+      "description": "用於輔助解除安裝殘留識別，刪除後會重新學習歷史安裝路徑。",
+      "warning": "可安全清理，但解除安裝殘留模組的歷史識別訊號會重新建立。"
+    },
+    "logs": {
+      "label": "清理日誌",
+      "description": "記錄歷史清理明細，僅用於回看操作記錄。",
+      "warning": ""
+    },
+    "registryBackups": {
+      "label": "登錄檔備份",
+      "description": "右鍵選單和登錄檔清理前生成的備份檔案。",
+      "warning": "刪除後無法再透過這些備份回溯舊登錄檔清理操作。"
+    },
+    "shellIconLogs": {
+      "label": "虛擬磁碟操作記錄",
+      "description": "記錄虛擬磁碟刪除、恢復和防復活操作，便於確認處理過哪些入口。",
+      "warning": ""
+    },
+    "shellIconBackups": {
+      "label": "虛擬磁碟登錄檔備份",
+      "description": "外殼圖示清理操作前儲存的登錄檔和許可權備份，可用於恢復入口。",
+      "warning": "刪除後無法透過備份恢復已移除的虛擬磁碟入口。"
+    },
+    "driverBackups": {
+      "label": "驅動備份",
+      "description": "舊驅動清理前匯出的驅動包備份，檔案可能較大。",
+      "warning": "刪除後將無法使用這些備份手動恢復已清理的驅動包。預設不會勾選。"
+    },
+    "diskGrowthSnapshot": {
+      "label": "{{drive}} 盤磁碟變化分析快照",
+      "description": "用於 {{drive}} 盤磁碟變化分析的增長對比基線和分片明細。",
+      "warning": "可安全清理；下次對應磁碟分析會重新建立基線，第二次掃描後才會重新顯示變化對比。"
+    }
+  },
+  "features": {
+    "bigFiles": {
+      "title": "大檔案清理",
+      "scanLimit": "掃描檔案數",
+      "scanLimitDesc": "控制每次掃描返回的最大檔案數量。數量越大越容易發現更多候選檔案，但列表渲染和確認成本也會增加。",
+      "range": "邊界範圍：{{min}} - {{max}} 個。切換磁碟後會清空舊結果，避免不同磁碟的檔案混在同一份清理列表裡。"
+    },
+    "hotspot": {
+      "title": "大目錄分析",
+      "depth": "展示深度",
+      "depthDesc": "結果列表中展示的目錄層數",
+      "minSize": "最低展示大小",
+      "minSizeDesc": "低於此大小的目錄不參與掃描（減少噪音）",
+      "ignoreSystem": "深度掃描忽略系統目錄",
+      "ignoreSystemDesc": "關閉後可發現藏在系統保護目錄下的異常大檔案（如日誌爆滿），但掃描時間將增加數倍",
+      "autoIgnored": "自動忽略的目錄",
+      "autoIgnoredDesc": "以下目錄掃描時自動跳過或標記為保護，不會出現在清理候選列表中：",
+      "systemCore": "C:\\Windows — 系統核心目錄，刪除會導致系統崩潰",
+      "programFiles": "Program Files / Program Files (x86) — 軟體安裝目錄，僅檢視不清理",
+      "windowsComponents": "WinSxS / System32 / SysWOW64 — Windows 元件儲存，由系統管理",
+      "systemReserved": "$Recycle.Bin / System Volume Information — 系統保留目錄",
+      "appCache": "DriverStore / WindowsApps / assembly — 驅動和應用商店快取"
+    },
+    "diskGrowth": {
+      "title": "磁碟變化分析",
+      "maxEntries": "最多展示變化目錄",
+      "maxEntriesDesc": "限制與上次快照對比後返回的變化目錄數量。數值越大，軟體介面渲染和排序壓力越高，建議保持 300 以內。",
+      "range": "邊界範圍：50 - 1000 項。首次掃描或無變化時仍顯示佔用基線列表，不受此項影響。",
+      "details": "變化明細",
+      "detailDesc": "點選變化量可開啟明細彈窗，左側展示當前目錄的下一級變化目錄，右側展示當前目錄內變化檔案。明細透過後端介面按需分頁載入，每次最多 200 條，並使用虛擬列表渲染。",
+      "snapshotDesc": "快照按磁碟磁碟機代號獨立儲存，每個磁碟最多保留 3 組；最近兩組用於變化對比，額外一組用於異常排查。",
+      "speed": "掃描速度",
+      "speedDesc": "掃描速度主要受檔案數量、硬碟型別、MFT 體積和安全軟體實時掃描影響。",
+      "mftWarmup": "首次 MFT 預熱",
+      "mftWarmupDesc": "應用啟動後的第一次 MFT 掃描可能較慢，這是檔案系統快取和安全軟體檢查尚未預熱導致的正常現象。",
+      "colors": "顏色指標",
+      "newColor": "藍色：新增，上次快照不存在、本次出現",
+      "growthColor": "紅色：顯著增長，增加 1GB 及以上",
+      "fastColor": "橙色：快速增長，增加 300MB 及以上",
+      "minorColor": "黃色：輕微增長，增加 1B 及以上",
+      "reducedColor": "綠色：相比上次快照減少",
+      "stableColor": "灰色：基本穩定，無明顯變化"
+    }
+  },
+  "diskInfo": {
+    "title": "磁碟資訊",
+    "description": "檢視物理磁碟基礎資訊、分割槽空間和 Windows 報告的健康狀態。",
+    "loading": "讀取中...",
+    "reload": "重新讀取",
+    "read": "讀取資訊",
+    "healthNotice": "健康狀態來自 Windows Storage 與裝置報告，不代表完整 SMART 檢測；顯示“未知”不等於健康或故障。",
+    "reading": "正在讀取本機磁碟資訊...",
+    "readFailed": "讀取失敗",
+    "retry": "重試",
+    "notRead": "尚未讀取磁碟資訊",
+    "notReadDesc": "點選右上角“讀取資訊”後獲取本機物理磁碟資料。",
+    "none": "未發現可讀取的物理磁碟",
+    "noneDesc": "請稍後重新讀取，或檢查 Windows Storage 服務是否可用。",
+    "health": {
+      "healthy": "健康",
+      "warning": "警告",
+      "unhealthy": "異常",
+      "unknown": "未知"
+    },
+    "unnamedDisk": "未命名物理磁碟",
+    "diskNumber": "磁碟 {{number}}",
+    "notProvided": "未提供",
+    "unknownMedia": "未知介質",
+    "mediaLabel": "介質",
+    "media": {
+      "ssd": "固態硬碟",
+      "hdd": "機械硬碟",
+      "scm": "儲存類記憶體"
+    },
+    "available": "可用",
+    "unassignedDrive": "未分配磁碟機代號",
+    "unknownBus": "未知匯流排",
+    "capacity": "容量",
+    "bus": "匯流排",
+    "unknown": "未知",
+    "operationalStatus": "工作狀態",
+    "firmware": "韌體版本",
+    "serial": "序列號",
+    "diskNumberLabel": "磁碟編號",
+    "volumeCount": "分割槽數量",
+    "unit": "個",
+    "volumes": "分割槽與空間"
+  },
+  "security": {
+    "title": "官方原版校驗",
+    "verifyTitle": "校驗檔案完整性",
+    "verifyDesc": "使用官方公鑰讀取簽名來驗證當前執行的 LightC.exe。",
+    "verifying": "正在校驗...",
+    "verifyPassed": "校驗透過",
+    "verifyFailed": "校驗未透過",
+    "verifyFailedDesc": "當前檔案未匹配到對應版本的官方 exe 簽名。",
+    "networkTitle": "無法連線 GitHub",
+    "networkDesc": "請檢查網路後重試。",
+    "networkRetry": "請檢查網路後重試，或稍後再進行完整性校驗。",
+    "releaseTitle": "簽名資產未釋出",
+    "releaseDesc": "當前版本需要等 Release 完成後才能校驗。",
+    "releaseCardTitle": "當前版本暫未釋出官方簽名資產",
+    "signatureTitle": "簽名資產異常",
+    "signatureDesc": "官方簽名檔案格式異常，請等待作者修復釋出資產。",
+    "signatureCardTitle": "官方簽名資產格式異常",
+    "officialVersion": "當前為官方原版 v{{version}}",
+    "signaturePassed": "簽名驗證透過",
+    "downloadTitle": "官方下載渠道",
+    "downloadDesc": "LightC 的官方檔案僅透過以下渠道釋出，其他來源均為第三方轉載。",
+    "githubDesc": "唯一的原始釋出地址，所有版本均可在此獲取",
+    "netDisk": "網盤下載",
+    "netDiskDesc": "作者本人分享的、安全的網盤渠道。",
+    "socialTitle": "作者本人社交平臺",
+    "socialDesc": "B站 / 抖音同名賬號「Evan的畫素空間」釋出的網盤連結",
+    "openBilibili": "開啟 B站 @Evan的畫素空間",
+    "openDouyin": "在抖音搜尋 Evan的畫素空間",
+    "thirdPartyTitle": "第三方渠道的風險",
+    "thirdPartyDesc": "公眾號、論壇、網盤分享等第三方渠道釋出的 LightC 檔案，可能存在版本滯後、二次打包、捆綁推廣軟體或廣告程式等問題。",
+    "thirdPartyDesc2": "部分網盤連結需要積分或關注，屬於藉助本軟體的商業引流行為。以上風險與作者無關，作者對第三方渠道分發的檔案內容不承擔任何責任。",
+    "recommendVerify": "建議使用上方“校驗檔案完整性”功能，驗證當前執行的檔案是否為官方原版。",
+    "mismatchTitle": "簽名與當前檔案不匹配",
+    "mismatchDesc": "可能原因包括：檔案來源不一致、檔案被修改，或當前 Release 的 exe 簽名資產需要作者重新上傳。",
+    "githubReleases": "官方 GitHub Releases"
+  },
+  "guide": {
+    "title": "功能說明",
+    "items": {
+      "scan": {
+        "title": "一鍵掃描",
+        "desc": "掃描系統臨時檔案、瀏覽器快取和 Windows 更新快取等常見垃圾檔案。掃描不會刪除檔案，您可以在結果中選擇要清理的專案。"
+      },
+      "bigFiles": {
+        "title": "大檔案清理",
+        "desc": "選擇目標分割槽，掃描體積最大的檔案。請檢查路徑和型別，避免刪除系統檔案或重要資料。"
+      },
+      "diskInfo": {
+        "title": "磁碟資訊",
+        "desc": "只讀檢視物理磁碟型號、容量、分割槽空間和 Windows 健康狀態。未知不代表健康或故障。"
+      },
+      "social": {
+        "title": "社交軟體專清",
+        "desc": "識別主流社交軟體快取，並透過登錄檔讀取自定義儲存路徑。聊天資料庫自動鎖定，傳輸檔案需謹慎，圖片影片快取通常可以清理。"
+      },
+      "systemSlim": {
+        "title": "系統瘦身",
+        "desc": "管理休眠檔案、Windows 元件儲存和虛擬記憶體等系統功能。需要管理員許可權，ResetBase 會影響更新回滾。"
+      },
+      "drivers": {
+        "title": "舊驅動清理",
+        "desc": "正在使用的驅動不可選。刪除前會備份到當前資料目錄，頂部支援恢復備份。"
+      },
+      "leftovers": {
+        "title": "解除安裝殘留",
+        "desc": "透過置信度模型識別 AppData、ProgramData 等位置中疑似解除安裝殘留的目錄。結果需要結合路徑、大小和使用情況確認。"
+      },
+      "registry": {
+        "title": "登錄檔冗餘",
+        "desc": "掃描孤立鍵值和無效引用。刪除前會自動備份，便於恢復。"
+      },
+      "contextMenu": {
+        "title": "右鍵選單清理",
+        "desc": "查詢指向不存在可執行檔案的右鍵選單項。HKLM 專案需要管理員許可權，刪除前會備份登錄檔。"
+      },
+      "hotspot": {
+        "title": "大目錄分析",
+        "desc": "分析 AppData 熱點和指定磁碟的大目錄。結果用於定位空間來源，系統保護目錄不會作為可刪除項。"
+      },
+      "diskGrowth": {
+        "title": "磁碟變化分析",
+        "desc": "建立每個磁碟的 MFT 基線，比較新增、減少和顯著變化的目錄。此功能只定位變化，不提供一鍵刪除。"
+      },
+      "shellIcons": {
+        "title": "外殼圖示清理",
+        "desc": "識別此電腦中的第三方虛擬磁碟入口。清理只移除資源管理器入口，不會刪除網盤檔案，並會備份登錄檔。"
+      },
+      "aiModels": {
+        "title": "AI 模型空間",
+        "desc": "分析 Ollama、LM Studio、ComfyUI、HuggingFace 等平臺的模型資產；需要時可開啟深度發現。"
+      }
+    },
+    "permissionsTitle": "許可權說明",
+    "permissionsHeading": "為什麼需要管理員許可權？",
+    "permissionsDesc": "管理員許可權用於讀取 NTFS MFT 記錄和訪問受保護的臨時目錄。即使以管理員執行，LightC 仍執行路徑白名單、系統保護和檔案佔用檢查。",
+    "securityTitle": "刪除安全機制",
+    "securityDesc": "普通刪除會跳過包含可執行檔案的目錄；深度清理會執行系統路徑白名單、可執行檔案檢查和重啟刪除回退。",
+    "riskTitle": "檔案風險等級",
+    "risk": {
+      "safe": "安全",
+      "safeDesc": "臨時檔案、快取和日誌，刪除後通常不影響系統。",
+      "low": "低風險",
+      "lowDesc": "媒體檔案和下載內容，請確認不再需要。",
+      "medium": "中等",
+      "mediumDesc": "資料庫、文件和壓縮包，可能包含重要資料。",
+      "high": "較高",
+      "highDesc": "程式和配置檔案，刪除可能影響軟體執行。",
+      "critical": "高風險",
+      "criticalDesc": "系統核心檔案，刪除可能導致系統無法啟動。"
+    },
+    "notesTitle": "注意事項",
+    "notes": [
+      "刪除操作不可撤銷，請在清理前確認檔案內容。",
+      "定期備份重要資料，避免誤刪造成損失。",
+      "系統瘦身涉及系統級操作，請先了解影響。",
+      "深度清理會繞過回收站，永久刪除檔案。",
+      "登錄檔清理前會自動建立 .reg 備份檔案。"
+    ],
+    "disclaimerTitle": "免責宣告",
+    "disclaimer": "本軟體提供掃描和刪除功能，所有刪除操作均由使用者主動確認。開發者不對因使用本軟體造成的資料丟失、系統故障或其他損失承擔責任。"
+  }
+}

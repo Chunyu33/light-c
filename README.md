@@ -18,7 +18,7 @@ LightC is a Windows desktop utility for safe junk cleanup, disk analysis, and sy
 - **Disk Growth Analysis** — Compare disk snapshots to locate changed files and directories over time.
 - **Shell Icons** — Manage third-party This PC shell icons with registry/ACL backup, restore, and anti-respawn protection.
 - **AI Model Storage** — Analyze local model, LoRA, embedding, and related cache storage, then remove selected model data.
-- **Localization** — Switch between Simplified Chinese, English, and Japanese; module pages, scan stages, settings, and stable backend labels follow the selected language.
+- **Localization** — Switch between Simplified Chinese, Traditional Chinese, English, and Japanese; module pages, scan stages, settings, and stable backend labels follow the selected language.
 ## Screenshots
 
 <p align="center">
