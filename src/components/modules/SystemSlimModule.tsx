@@ -289,7 +289,11 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                       {/* 内容 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-[var(--fg-primary)]">{moduleT(`systemSlim.items.${item.id}.name`, { defaultValue: item.name })}</h4>
+                          <h4 className="text-sm font-semibold text-[var(--fg-primary)]">
+                            {moduleT(`systemSlim.items.${item.id}.name`, { defaultValue: item.name })}
+                            {/* 搜索索引重建依赖本机 SearchAPI.dll，尚未在真实环境充分验证，临时标注 Beta */}
+                            {item.id === 'search_index' && <span className="ml-1">（Beta）</span>}
+                          </h4>
                           {item.enabled && item.size > 0 && (
                             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
                               {formatSize(item.size)}
@@ -305,15 +309,18 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                         {item.status_text && (
                           <p className="text-[11px] text-[var(--fg-muted)] mt-1">
                             {item.id === 'search_index' ? (
-                              // 搜索索引的 itemStatus 键是固定文案，这里直接展示动态状态（服务状态 + 数据库大小）
-                              <>
-                                {item.actionable
-                                  ? moduleT('systemSlim.searchIndexServiceRunning')
-                                  : moduleT('systemSlim.searchIndexServiceStopped')}
-                                {item.actionable && item.size > 0 && (
-                                  <> · {moduleT('systemSlim.searchIndexDbSize', { size: formatSize(item.size) })}</>
-                                )}
-                              </>
+                              // 搜索索引的 itemStatus 键是固定文案；可操作时展示动态状态（服务 + 数据库大小），
+                              // 不可操作时直接展示后端细分的置灰原因（服务停止/已禁用/未安装）
+                              item.actionable ? (
+                                <>
+                                  {moduleT('systemSlim.searchIndexServiceRunning')}
+                                  {item.size > 0 && (
+                                    <> · {moduleT('systemSlim.searchIndexDbSize', { size: formatSize(item.size) })}</>
+                                  )}
+                                </>
+                              ) : (
+                                item.status_text
+                              )
                             ) : (
                               moduleT('systemSlim.itemStatus', { defaultValue: item.status_text })
                             )}
@@ -347,7 +354,12 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                             </>
                           ) : (
                             <>
-                              <span>{moduleT(`systemSlim.items.${item.id}.action`, { defaultValue: item.action_text })}</span>
+                              <span>
+                                {/* 搜索索引置灰时按钮直接显示后端细分原因（服务停止/已禁用/未安装），避免误导为可重建 */}
+                                {item.id === 'search_index' && !item.actionable
+                                  ? item.action_text
+                                  : moduleT(`systemSlim.items.${item.id}.action`, { defaultValue: item.action_text })}
+                              </span>
                               <ChevronRight className="w-3 h-3" />
                             </>
                           )}

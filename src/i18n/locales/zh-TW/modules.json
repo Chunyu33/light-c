@@ -197,7 +197,6 @@
     "itemStatus": "操作已完成，請重新檢測重新整理當前狀態",
     "executing": "執行中",
     "searchIndexServiceRunning": "搜尋服務執行中",
-    "searchIndexServiceStopped": "搜尋服務未執行，無法重建",
     "searchIndexDbSize": "索引資料庫 {{size}}",
     "searchIndexRebuildStartedTitle": "重建已開始",
     "searchIndexRebuildStarted": "已開始重建 Windows 搜尋索引，重建在背景進行，完成後搜尋結果將恢復正常。",
