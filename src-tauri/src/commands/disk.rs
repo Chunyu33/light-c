@@ -37,7 +37,8 @@ pub fn get_disk_info() -> Result<DiskInfo, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let drive = query_drive_info('C')?;
+        // 默认统计系统盘（%SYSTEMDRIVE%），兼容系统盘不叫 C 的机器
+        let drive = query_drive_info(crate::system_info::system_drive_letter())?;
 
         Ok(DiskInfo {
             total_space: drive.total_space,

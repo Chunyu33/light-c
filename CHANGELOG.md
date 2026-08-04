@@ -6,6 +6,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 - Added Traditional Chinese (zh-TW) UI as a selectable language in General Settings, translated with Taiwan conventions.
 - Added Windows Search index rebuild (Beta) to System Slim: detects the WSearch service state and Windows.db size, and rebuilds the index via the official SearchManager COM API when the database grows abnormally large.
+- Detected the system drive via the `%SYSTEMDRIVE%`/`%SystemRoot%` environment variables (falling back to C:) for disk statistics, the health score, and the header disk display, fixing incorrect detection on machines whose system drive is not C: (e.g. dual-boot setups).
 
 ## v2.15.1 (2026-07-29)
 

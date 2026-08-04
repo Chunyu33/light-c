@@ -76,7 +76,9 @@ fn calculate_disk_score() -> (f64, u32) {
             ) -> i32;
         }
 
-        let path: Vec<u16> = OsStr::new("C:\\")
+        // 评分针对系统盘（%SYSTEMDRIVE%），兼容系统盘不叫 C 的机器
+        let drive_root = format!("{}:\\", crate::system_info::system_drive_letter());
+        let path: Vec<u16> = OsStr::new(&drive_root)
             .encode_wide()
             .chain(std::iter::once(0))
             .collect();
@@ -150,8 +152,15 @@ fn calculate_junk_score() -> (u64, u32) {
             "{}\\AppData\\Local\\Temp",
             std::env::var("USERPROFILE").unwrap_or_default()
         ),
-        "C:\\Windows\\Temp".to_string(),
-        "C:\\Windows\\Prefetch".to_string(),
+        // 系统目录跟随 %SystemRoot%，兼容系统盘不叫 C 的机器
+        crate::system_info::system_root_dir()
+            .join("Temp")
+            .to_string_lossy()
+            .into_owned(),
+        crate::system_info::system_root_dir()
+            .join("Prefetch")
+            .to_string_lossy()
+            .into_owned(),
     ];
 
     for path_str in &junk_paths {
