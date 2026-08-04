@@ -196,7 +196,8 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
         {/* 磁盘使用情况 */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">{t('diskSpace', { drive: 'C' })}</span>
+            {/* 磁盘使用情况（盘符取后端返回的系统盘，兼容非 C 盘场景） */}
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">{t('diskSpace', { drive: diskInfo?.drive_letter ?? 'C' })}</span>
             {diskInfo && (
               <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
                 {t('freeOfTotal', { free: formatSize(diskInfo.free_space), total: formatSize(diskInfo.total_space) })}

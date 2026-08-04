@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "LightC"
-version = "2.15.1"
+version = "2.16.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -33,6 +33,7 @@ dependencies = [
  "trash",
  "walkdir",
  "winapi",
+ "windows 0.61.3",
  "winreg",
 ]
 

@@ -10,6 +10,7 @@ import {
   Moon, 
   Package, 
   MemoryStick,
+  Search,
   AlertTriangle,
   Loader2,
   CheckCircle2,
@@ -28,6 +29,7 @@ import {
   cleanupWinsxs,
   cleanupWinsxsResetbase,
   openVirtualMemorySettings,
+  rebuildSearchIndex,
   SlimItemStatus,
   SystemSlimStatus
 } from '../../api/commands';
@@ -43,6 +45,7 @@ const itemIcons: Record<string, typeof Moon> = {
   winsxs: Package,
   winsxs_resetbase: Package,
   pagefile: MemoryStick,
+  search_index: Search,
 };
 
 const itemColors: Record<string, { bg: string; text: string }> = {
@@ -50,6 +53,7 @@ const itemColors: Record<string, { bg: string; text: string }> = {
   winsxs: { bg: 'bg-amber-500/10', text: 'text-amber-500' },
   winsxs_resetbase: { bg: 'bg-orange-500/10', text: 'text-orange-500' },
   pagefile: { bg: 'bg-cyan-500/10', text: 'text-cyan-500' },
+  search_index: { bg: 'bg-blue-500/10', text: 'text-blue-500' },
 };
 
 function buildWinsxsResultMessage(item: SlimItemStatus, translate: (key: string, options?: Record<string, unknown>) => string): string {
@@ -169,6 +173,10 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
           await openVirtualMemorySettings();
           showToast({ title: moduleT('systemSlim.settingsOpened'), description: moduleT('systemSlim.pagefileOpened'), type: 'info' });
           break;
+        case 'search_index':
+          await rebuildSearchIndex();
+          showToast({ title: moduleT('systemSlim.searchIndexRebuildStartedTitle'), description: moduleT('systemSlim.searchIndexRebuildStarted'), type: 'success' });
+          break;
       }
 
       if (item.id === 'hibernation' || item.id === 'winsxs' || item.id === 'winsxs_resetbase') {
@@ -281,7 +289,11 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                       {/* 内容 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-[var(--fg-primary)]">{moduleT(`systemSlim.items.${item.id}.name`, { defaultValue: item.name })}</h4>
+                          <h4 className="text-sm font-semibold text-[var(--fg-primary)]">
+                            {moduleT(`systemSlim.items.${item.id}.name`, { defaultValue: item.name })}
+                            {/* 搜索索引重建依赖本机 SearchAPI.dll，尚未在真实环境充分验证，临时标注 Beta */}
+                            {item.id === 'search_index' && <span className="ml-1">（Beta）</span>}
+                          </h4>
                           {item.enabled && item.size > 0 && (
                             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
                               {formatSize(item.size)}
@@ -295,7 +307,24 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                         </div>
                         <p className="text-xs text-[var(--fg-secondary)] mt-0.5">{moduleT(`systemSlim.items.${item.id}.description`, { defaultValue: item.description })}</p>
                         {item.status_text && (
-                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">{moduleT('systemSlim.itemStatus', { defaultValue: item.status_text })}</p>
+                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">
+                            {item.id === 'search_index' ? (
+                              // 搜索索引的 itemStatus 键是固定文案；可操作时展示动态状态（服务 + 数据库大小），
+                              // 不可操作时直接展示后端细分的置灰原因（服务停止/已禁用/未安装）
+                              item.actionable ? (
+                                <>
+                                  {moduleT('systemSlim.searchIndexServiceRunning')}
+                                  {item.size > 0 && (
+                                    <> · {moduleT('systemSlim.searchIndexDbSize', { size: formatSize(item.size) })}</>
+                                  )}
+                                </>
+                              ) : (
+                                item.status_text
+                              )
+                            ) : (
+                              moduleT('systemSlim.itemStatus', { defaultValue: item.status_text })
+                            )}
+                          </p>
                         )}
 
                         {/* 风险提示 */}
@@ -325,7 +354,12 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                             </>
                           ) : (
                             <>
-                              <span>{moduleT(`systemSlim.items.${item.id}.action`, { defaultValue: item.action_text })}</span>
+                              <span>
+                                {/* 搜索索引置灰时按钮直接显示后端细分原因（服务停止/已禁用/未安装），避免误导为可重建 */}
+                                {item.id === 'search_index' && !item.actionable
+                                  ? item.action_text
+                                  : moduleT(`systemSlim.items.${item.id}.action`, { defaultValue: item.action_text })}
+                              </span>
                               <ChevronRight className="w-3 h-3" />
                             </>
                           )}

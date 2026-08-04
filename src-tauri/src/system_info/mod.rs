@@ -30,6 +30,24 @@ pub struct SystemInfo {
     pub uptime_seconds: u64,
 }
 
+/// 获取系统盘盘符（如 C）。读取 %SYSTEMDRIVE% 环境变量，读取失败时回退 C，
+/// 兼容系统盘不叫 C 的双系统/定制盘符场景。
+pub fn system_drive_letter() -> char {
+    std::env::var("SYSTEMDRIVE")
+        .ok()
+        .and_then(|drive| drive.chars().find(|ch| ch.is_ascii_alphabetic()))
+        .map(|ch| ch.to_ascii_uppercase())
+        .unwrap_or('C')
+}
+
+/// 获取系统目录（如 C:\Windows）。读取 %SystemRoot% 环境变量，读取失败时回退 C:\Windows。
+pub fn system_root_dir() -> std::path::PathBuf {
+    std::env::var("SystemRoot")
+        .ok()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(r"C:\Windows"))
+}
+
 /// 获取系统信息
 pub fn gather() -> Result<SystemInfo, String> {
     #[cfg(target_os = "windows")]

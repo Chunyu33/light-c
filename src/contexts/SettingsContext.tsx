@@ -54,7 +54,8 @@ const defaultSettings: AppSettings = {
 };
 
 function normalizeSettings(settings: AppSettings): AppSettings {
-  const language: Language = settings.language === 'en' || settings.language === 'ja' ? settings.language : 'zh';
+  const language: Language =
+    settings.language === 'en' || settings.language === 'ja' || settings.language === 'zh-TW' ? settings.language : 'zh';
   const layoutMode: LayoutMode = settings.layoutMode === 'pages' ? 'pages' : 'cards';
   const activeModuleId = moduleIds.includes(settings.activeModuleId)
     ? settings.activeModuleId

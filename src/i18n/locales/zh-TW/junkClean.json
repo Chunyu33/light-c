@@ -1,0 +1,149 @@
+{
+  "title": "垃圾清理",
+  "desc": "清理系統快取、臨時檔案、日誌等垃圾檔案",
+  "deepDiscovery": "深度發現",
+  "deepDiscoveryTitle": "掃描所有固定分割槽，NTFS 分割槽使用 MFT 快速識別明確的快取目錄",
+  "cleanBtn": "清理 ({{count}})",
+  "selectAllDeepTitle": "當前頁全部選中；執行清理時會包含這些分類的完整掃描結果",
+  "searchQuery": "Windows 檔案 {{path}} 可以刪除嗎",
+  "confirmTitle": "確認清理",
+  "confirmDesc": "您即將刪除 {{count}} 個檔案，預計釋放 {{size}} 空間。此操作不可撤銷。",
+  "scanStages": {
+    "quick": "檢查已知垃圾目錄",
+    "discover": "發現本地分割槽",
+    "mft": "列舉 NTFS 檔案記錄",
+    "path": "重建候選檔案路徑",
+    "filter": "匹配安全清理規則",
+    "metadata": "讀取檔案大小與時間",
+    "result": "整理掃描結果",
+    "summary": "彙總掃描結果",
+    "default": "準備掃描"
+  },
+  "scanning": {
+    "quickTitle": "正在檢查系統垃圾",
+    "deepTitle": "正在進行全盤深度發現",
+    "quickBadge": "快速掃描",
+    "deepBadge": "MFT / 多分割槽",
+    "starting": "正在啟動掃描",
+    "partition": "當前分割槽",
+    "processedRecords": "已處理記錄",
+    "candidateFiles": "候選檔案",
+    "elapsed": "掃描耗時",
+    "preparing": "準備中",
+    "safetyNote": "僅匹配明確的快取、臨時檔案和錯誤報告目錄，系統檔案與持久化使用者資料會自動跳過"
+  },
+  "drives": {
+    "mft": "MFT",
+    "walkdir": "常規遍歷"
+  },
+  "deleteProgress": {
+    "preparing": "正在準備清理任務",
+    "cleaning": "正在清理垃圾檔案",
+    "processed": "已處理 {{current}} / {{total}} 個檔案",
+    "freed": "已釋放 {{size}}",
+    "failed": "失敗 {{count}}",
+    "speed": "速度 {{speed}}",
+    "doNotClose": "請勿關閉視窗，清理完成後可繼續使用其他功能"
+  },
+  "verification": {
+    "title": "清理已完成，正在同步最新結果",
+    "desc": "後臺核驗不會阻塞當前頁面操作，完成後會自動更新分類統計。"
+  },
+  "toast": {
+    "stopScanFailed": "停止掃描失敗",
+    "scanStopped": "掃描已停止",
+    "scanStoppedDesc": "已取消本次深度垃圾掃描",
+    "listenProgressFailed": "深度掃描進度監聽失敗",
+    "listenDeleteProgressFailed": "刪除進度監聽失敗",
+    "cleanDone": "垃圾清理完成",
+    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}{{refreshing}}",
+    "blocked": "，{{count}} 個檔案清理失敗",
+    "reboot": "，{{count}} 個檔案將在重啟後刪除",
+    "refreshing": "，正在後臺核驗最新結果",
+    "cleanBlocked": "清理受阻",
+    "cleanBlockedDesc": "部分檔案未能刪除：{{path}}",
+    "cleanBlockedReboot": "部分檔案將在重啟後刪除",
+    "noFileCleaned": "沒有檔案被清理",
+    "noFileCleanedDesc": "所選檔案未發生變化",
+    "cleanFailed": "垃圾清理失敗",
+    "refreshFailed": "清理已完成，但核驗失敗",
+    "refreshFailedDesc": "最新掃描結果未能同步，請稍後手動重新掃描。",
+    "logFailed": "清理完成，但日誌記錄失敗",
+    "loadDeepPageFailed": "載入深度掃描結果失敗",
+    "openSearchFailed": "開啟搜尋失敗"
+  },
+  "categories": {
+    "WindowsTemp": {
+      "name": "Windows臨時檔案",
+      "description": "系統和應用程式產生的臨時檔案，可安全刪除"
+    },
+    "SystemCache": {
+      "name": "系統快取",
+      "description": "Windows系統預讀取和分發快取檔案"
+    },
+    "BrowserCache": {
+      "name": "瀏覽器快取",
+      "description": "瀏覽器儲存的網頁資源快取（不含 Cookie 和登入狀態），刪除後網頁首次訪問較慢"
+    },
+    "RecycleBin": {
+      "name": "回收站",
+      "description": "已刪除但未徹底清除的檔案"
+    },
+    "WindowsUpdate": {
+      "name": "Windows更新快取",
+      "description": "Windows更新下載的安裝包快取"
+    },
+    "DeliveryOptimization": {
+      "name": "傳遞最佳化檔案",
+      "description": "Windows傳遞最佳化下載和分發過程中產生的可重建快取"
+    },
+    "WindowsDefenderCache": {
+      "name": "Microsoft Defender 防病毒",
+      "description": "Microsoft Defender生成的非關鍵日誌和臨時檔案，刪除後會自動重建"
+    },
+    "ThumbnailCache": {
+      "name": "縮圖快取",
+      "description": "資料夾中圖片和影片的縮圖快取"
+    },
+    "LogFiles": {
+      "name": "日誌檔案",
+      "description": "系統和應用程式的日誌記錄檔案"
+    },
+    "MemoryDump": {
+      "name": "記憶體轉儲檔案",
+      "description": "系統崩潰時產生的記憶體轉儲檔案"
+    },
+    "OldWindowsInstallation": {
+      "name": "舊版Windows安裝",
+      "description": "系統升級後保留的舊版Windows檔案"
+    },
+    "AppCache": {
+      "name": "應用程式快取",
+      "description": "各類應用程式產生的快取檔案"
+    },
+    "FontCache": {
+      "name": "字型快取",
+      "description": "Windows字型渲染快取，刪除後會自動重建"
+    },
+    "WindowsErrorReports": {
+      "name": "Windows錯誤報告",
+      "description": "系統和應用崩潰時生成的錯誤報告檔案"
+    },
+    "InstallerTemp": {
+      "name": "安裝程式臨時檔案",
+      "description": "軟體安裝過程中產生的臨時檔案"
+    },
+    "ClipboardCache": {
+      "name": "剪貼簿快取",
+      "description": "剪貼簿歷史記錄快取檔案"
+    },
+    "ShaderCache": {
+      "name": "DirectX Shader 快取",
+      "description": "GPU著色器編譯快取，刪除後遊戲和應用首次執行時會重新生成"
+    }
+  },
+  "emptyTitle": "沒有發現可清理的垃圾檔案",
+  "emptyDesc": "常見臨時檔案、快取和日誌都很乾淨。",
+  "idleTitle": "尚未掃描垃圾檔案",
+  "idleDesc": "點選開始掃描，查詢系統快取、臨時檔案和日誌等可清理內容。"
+}

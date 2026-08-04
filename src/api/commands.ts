@@ -309,6 +309,10 @@ export async function openVirtualMemorySettings(): Promise<void> {
   return invoke<void>('open_virtual_memory_settings');
 }
 
+export async function rebuildSearchIndex(): Promise<string> {
+  return invoke<string>('rebuild_search_index');
+}
+
 // ============================================================================
 // 旧驱动清理 API
 // ============================================================================
