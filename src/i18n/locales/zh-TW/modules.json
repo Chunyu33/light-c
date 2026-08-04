@@ -196,6 +196,11 @@
     "disabled": "已關閉",
     "itemStatus": "操作已完成，請重新檢測重新整理當前狀態",
     "executing": "執行中",
+    "searchIndexServiceRunning": "搜尋服務執行中",
+    "searchIndexServiceStopped": "搜尋服務未執行，無法重建",
+    "searchIndexDbSize": "索引資料庫 {{size}}",
+    "searchIndexRebuildStartedTitle": "重建已開始",
+    "searchIndexRebuildStarted": "已開始重建 Windows 搜尋索引，重建在背景進行，完成後搜尋結果將恢復正常。",
     "tip": "提示：",
     "tipDesc": "系統瘦身操作會修改 Windows 系統配置，建議在執行前瞭解各項功能的作用。",
     "items": {
@@ -222,6 +227,12 @@
         "description": "開啟 Windows 設定以調整分頁檔案位置。",
         "warning": "調整虛擬記憶體前請確保目標磁碟有足夠空間。",
         "action": "開啟設定"
+      },
+      "search_index": {
+        "name": "Windows 搜尋索引",
+        "description": "Windows 搜尋索引資料庫（Windows.db）異常膨脹時可重建釋放數 GB 空間，重建在背景進行。",
+        "warning": "重建期間搜尋結果可能不完整，重建需數小時且會重新索引全部檔案；膨脹問題可能再次出現。",
+        "action": "重建索引"
       }
     }
   },

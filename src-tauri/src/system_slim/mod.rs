@@ -87,16 +87,18 @@ pub fn check_admin() -> bool {
 pub async fn get_status() -> SystemSlimStatus {
     let is_admin = check_admin();
 
-    // 并发运行三项检测，互不阻塞
-    let (hibernation, winsxs_items, pagefile) = tokio::join!(
+    // 并发运行多项检测，互不阻塞
+    let (hibernation, winsxs_items, pagefile, search_index) = tokio::join!(
         async { get_hibernation_status() },
         get_winsxs_status(),
         async { get_pagefile_status() },
+        async { get_search_index_status() },
     );
 
     let mut items = vec![hibernation];
     items.extend(winsxs_items);
     items.push(pagefile);
+    items.push(search_index);
     let total_reclaimable = items.iter().filter(|i| i.enabled).map(|i| i.size).sum();
 
     SystemSlimStatus {
@@ -920,6 +922,225 @@ pub fn open_virtual_memory_settings() -> Result<(), String> {
             .map_err(|e| format!("无法打开系统设置: {}", e))?;
 
         Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("此功能仅支持 Windows 系统".to_string())
+    }
+}
+
+// ============================================================================
+// Windows 搜索索引（Windows.db 膨胀时重建，官方 SearchManager COM 接口）
+// ============================================================================
+
+/// Windows Search 服务状态
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SearchServiceState {
+    Running,
+    Stopped,
+    Disabled,
+    NotInstalled,
+}
+
+/// 查询 Windows Search 服务状态（服务控制管理器 + 注册表启动类型）
+fn get_wsearch_service_state() -> SearchServiceState {
+    use winapi::um::winsvc::{
+        CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatus, SC_MANAGER_CONNECT,
+        SERVICE_QUERY_STATUS, SERVICE_RUNNING, SERVICE_STATUS,
+    };
+
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use std::os::windows::ffi::OsStrExt;
+        // 注册表启动类型：4 = 已禁用，禁用状态下无法通过 COM 调用重建接口
+        let start_disabled = {
+            use winreg::{enums::*, RegKey};
+            if let Ok(key) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(
+                r"SYSTEM\CurrentControlSet\Services\WSearch",
+                KEY_READ,
+            ) {
+                key.get_value::<u32, _>("Start")
+                    .map(|v| v == 4)
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        };
+        if start_disabled {
+            return SearchServiceState::Disabled;
+        }
+
+        let scm = OpenSCManagerW(std::ptr::null_mut(), std::ptr::null_mut(), SC_MANAGER_CONNECT);
+        if scm.is_null() {
+            return SearchServiceState::NotInstalled;
+        }
+
+        let service_name: Vec<u16> = std::ffi::OsStr::new("WSearch")
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let service = OpenServiceW(scm, service_name.as_ptr(), SERVICE_QUERY_STATUS);
+        if service.is_null() {
+            CloseServiceHandle(scm);
+            return SearchServiceState::NotInstalled;
+        }
+
+        let mut status: SERVICE_STATUS = std::mem::zeroed();
+        let ok = QueryServiceStatus(service, &mut status);
+        CloseServiceHandle(service);
+        CloseServiceHandle(scm);
+
+        if ok == 0 {
+            return SearchServiceState::Stopped;
+        }
+        match status.dwCurrentState {
+            SERVICE_RUNNING => SearchServiceState::Running,
+            _ => SearchServiceState::Stopped,
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        SearchServiceState::NotInstalled
+    }
+}
+
+/// Windows 搜索索引数据库路径（默认位于 ProgramData，实际路径跟随环境变量）
+fn search_index_db_path() -> Option<std::path::PathBuf> {
+    let program_data =
+        std::env::var("ProgramData").unwrap_or_else(|_| r"C:\ProgramData".to_string());
+    let path = std::path::Path::new(&program_data)
+        .join(r"Microsoft\Search\Data\Applications\Windows\Windows.db");
+    if path.exists() {
+        Some(path)
+    } else {
+        None
+    }
+}
+
+/// 获取搜索索引瘦身项状态
+/// 注意：不把数据库大小计入可回收总量（size 仅用于展示），因为重建后索引会重新生成。
+fn get_search_index_status() -> SlimItemStatus {
+    let service_state = get_wsearch_service_state();
+    let db_size = search_index_db_path()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let (actionable, action_text, status_text) = match service_state {
+        SearchServiceState::Running => (
+            true,
+            "重建索引".to_string(),
+            format!(
+                "Windows Search 服务运行中，索引数据库约 {}",
+                format_bytes(db_size)
+            ),
+        ),
+        SearchServiceState::Stopped => (
+            false,
+            "服务未运行".to_string(),
+            "Windows Search 服务已停止，启动服务后可重建索引".to_string(),
+        ),
+        SearchServiceState::Disabled => (
+            false,
+            "服务已禁用".to_string(),
+            "Windows Search 服务已被禁用，无法重建索引".to_string(),
+        ),
+        SearchServiceState::NotInstalled => (
+            false,
+            "未安装搜索服务".to_string(),
+            "未检测到 Windows Search 服务".to_string(),
+        ),
+    };
+
+    SlimItemStatus {
+        id: "search_index".to_string(),
+        name: "Windows 搜索索引".to_string(),
+        description:
+            "Windows 搜索索引数据库（Windows.db）异常膨胀时，重建可释放数 GB 空间，重建在后台进行"
+                .to_string(),
+        warning:
+            "重建期间搜索结果可能不完整，重建需数小时且会重新索引全部文件；膨胀问题可能再次出现"
+                .to_string(),
+        status_text,
+        enabled: false,
+        size: db_size,
+        actionable,
+        action_text,
+    }
+}
+
+/// 重建 Windows 搜索索引（通过官方 SearchManager COM 接口，与系统"索引选项"中的重建等效）
+pub fn rebuild_search_index() -> Result<String, String> {
+    if !check_admin() {
+        return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use windows::core::HSTRING;
+        use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
+        };
+        use windows::Win32::System::Search::{
+            CatalogPausedReason, CatalogStatus, CSearchManager, ISearchManager,
+            CATALOG_STATUS_FULL_CRAWL, CATALOG_STATUS_RECOVERING,
+        };
+
+        info!("开始重建 Windows 搜索索引...");
+
+        // COM 初始化：S_OK(0) 表示本次初始化成功，结束时需 CoUninitialize；
+        // S_FALSE(1) / RPC_E_CHANGED_MODE 表示线程已有 COM 状态，直接复用。
+        let co_result = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        let mut need_uninitialize = false;
+        match co_result.0 {
+            0 => need_uninitialize = true,
+            1 => {}
+            code if code == RPC_E_CHANGED_MODE.0 => {}
+            code => {
+                return Err(format!("COM 初始化失败: 0x{:08X}", code as u32));
+            }
+        }
+
+        // 索引已在重建/恢复时直接返回提示，避免重复触发
+        let mut already_rebuilding = false;
+        let rebuild_result = (|| -> windows::core::Result<()> {
+            // CSearchManager 为 SearchAPI.dll 中 SearchManager coclass 的 CLSID
+            let manager: ISearchManager =
+                unsafe { CoCreateInstance(&CSearchManager, None, CLSCTX_ALL)? };
+            let catalog = unsafe { manager.GetCatalog(&HSTRING::from("SystemIndex")) }?;
+
+            let mut status = CatalogStatus::default();
+            let mut paused_reason = CatalogPausedReason::default();
+            unsafe { catalog.GetCatalogStatus(&mut status, &mut paused_reason) }?;
+            if status == CATALOG_STATUS_FULL_CRAWL || status == CATALOG_STATUS_RECOVERING {
+                already_rebuilding = true;
+                return Ok(());
+            }
+
+            unsafe { catalog.Reindex() }
+        })();
+
+        if need_uninitialize {
+            unsafe { CoUninitialize() };
+        }
+
+        match rebuild_result {
+            Ok(()) if already_rebuilding => {
+                Err("搜索索引正在重建中，请稍后再试".to_string())
+            }
+            Ok(()) => {
+                info!("搜索索引重建已启动");
+                Ok("已开始重建 Windows 搜索索引，重建在后台进行，完成后搜索结果将恢复正常"
+                    .to_string())
+            }
+            Err(e) => Err(format!(
+                "重建索引失败: {}（请确认 Windows Search 服务已启用）",
+                e.message()
+            )),
+        }
     }
 
     #[cfg(not(target_os = "windows"))]

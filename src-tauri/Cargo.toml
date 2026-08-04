@@ -38,7 +38,9 @@ tokio = { version = "1", features = ["full"] }
 # 日期时间处理
 chrono = { version = "0.4", features = ["serde"] }
 # Windows系统API
-winapi = { version = "0.3", features = ["fileapi", "winbase", "handleapi", "errhandlingapi", "sysinfoapi", "processenv", "ioapiset", "winnt", "processthreadsapi", "securitybaseapi", "sddl", "aclapi", "accctrl", "shellapi", "stringapiset", "winnls"] }
+winapi = { version = "0.3", features = ["fileapi", "winbase", "handleapi", "errhandlingapi", "sysinfoapi", "processenv", "ioapiset", "winnt", "processthreadsapi", "securitybaseapi", "sddl", "aclapi", "accctrl", "shellapi", "stringapiset", "winnls", "winsvc"] }
+# Windows 搜索索引重建（COM 接口），复用 tauri 已引入的 windows crate 版本
+windows = { version = "0.61", features = ["Win32_System_Search", "Win32_System_Com", "Win32_Foundation"] }
 # Windows注册表操作
 winreg = "0.55"
 # 错误处理

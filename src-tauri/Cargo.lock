@@ -33,6 +33,7 @@ dependencies = [
  "trash",
  "walkdir",
  "winapi",
+ "windows 0.61.3",
  "winreg",
 ]
 

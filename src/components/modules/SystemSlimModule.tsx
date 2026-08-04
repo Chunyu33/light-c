@@ -10,6 +10,7 @@ import {
   Moon, 
   Package, 
   MemoryStick,
+  Search,
   AlertTriangle,
   Loader2,
   CheckCircle2,
@@ -28,6 +29,7 @@ import {
   cleanupWinsxs,
   cleanupWinsxsResetbase,
   openVirtualMemorySettings,
+  rebuildSearchIndex,
   SlimItemStatus,
   SystemSlimStatus
 } from '../../api/commands';
@@ -43,6 +45,7 @@ const itemIcons: Record<string, typeof Moon> = {
   winsxs: Package,
   winsxs_resetbase: Package,
   pagefile: MemoryStick,
+  search_index: Search,
 };
 
 const itemColors: Record<string, { bg: string; text: string }> = {
@@ -50,6 +53,7 @@ const itemColors: Record<string, { bg: string; text: string }> = {
   winsxs: { bg: 'bg-amber-500/10', text: 'text-amber-500' },
   winsxs_resetbase: { bg: 'bg-orange-500/10', text: 'text-orange-500' },
   pagefile: { bg: 'bg-cyan-500/10', text: 'text-cyan-500' },
+  search_index: { bg: 'bg-blue-500/10', text: 'text-blue-500' },
 };
 
 function buildWinsxsResultMessage(item: SlimItemStatus, translate: (key: string, options?: Record<string, unknown>) => string): string {
@@ -168,6 +172,10 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         case 'pagefile':
           await openVirtualMemorySettings();
           showToast({ title: moduleT('systemSlim.settingsOpened'), description: moduleT('systemSlim.pagefileOpened'), type: 'info' });
+          break;
+        case 'search_index':
+          await rebuildSearchIndex();
+          showToast({ title: moduleT('systemSlim.searchIndexRebuildStartedTitle'), description: moduleT('systemSlim.searchIndexRebuildStarted'), type: 'success' });
           break;
       }
 
@@ -295,7 +303,21 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                         </div>
                         <p className="text-xs text-[var(--fg-secondary)] mt-0.5">{moduleT(`systemSlim.items.${item.id}.description`, { defaultValue: item.description })}</p>
                         {item.status_text && (
-                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">{moduleT('systemSlim.itemStatus', { defaultValue: item.status_text })}</p>
+                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">
+                            {item.id === 'search_index' ? (
+                              // 搜索索引的 itemStatus 键是固定文案，这里直接展示动态状态（服务状态 + 数据库大小）
+                              <>
+                                {item.actionable
+                                  ? moduleT('systemSlim.searchIndexServiceRunning')
+                                  : moduleT('systemSlim.searchIndexServiceStopped')}
+                                {item.actionable && item.size > 0 && (
+                                  <> · {moduleT('systemSlim.searchIndexDbSize', { size: formatSize(item.size) })}</>
+                                )}
+                              </>
+                            ) : (
+                              moduleT('systemSlim.itemStatus', { defaultValue: item.status_text })
+                            )}
+                          </p>
                         )}
 
                         {/* 风险提示 */}

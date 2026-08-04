@@ -56,6 +56,12 @@ pub fn open_virtual_memory_settings() -> Result<(), String> {
     crate::system_slim::open_virtual_memory_settings()
 }
 
+/// 重建 Windows 搜索索引
+#[tauri::command]
+pub fn rebuild_search_index() -> Result<String, String> {
+    crate::system_slim::rebuild_search_index()
+}
+
 // ============================================================================
 // 健康评分
 // ============================================================================

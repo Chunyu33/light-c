@@ -85,6 +85,7 @@ pub fn run() {
             cleanup_winsxs,
             cleanup_winsxs_resetbase,
             open_virtual_memory_settings,
+            rebuild_search_index,
             // 旧驱动清理
             scan_old_drivers,
             delete_old_drivers,
