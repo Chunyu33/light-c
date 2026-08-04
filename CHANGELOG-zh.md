@@ -2,7 +2,7 @@
 
 简体中文版本。查看 [English](CHANGELOG.md)。
 
-## 未发布
+## v2.16.0（2026-08-03）
 
 - 新增繁体中文（zh-TW）界面，可在通用设置中选择；译文采用台湾习惯用语（如快取、檔案、登錄檔、解除安裝）。
 - 系统瘦身新增 Windows 搜索索引重建（Beta）：检测 WSearch 服务状态与 Windows.db 大小，数据库异常膨胀时可通过官方 SearchManager COM 接口一键重建。

@@ -2,7 +2,7 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.16.0 (2026-08-03)
 
 - Added Traditional Chinese (zh-TW) UI as a selectable language in General Settings, translated with Taiwan conventions.
 - Added Windows Search index rebuild (Beta) to System Slim: detects the WSearch service state and Windows.db size, and rebuilds the index via the official SearchManager COM API when the database grows abnormally large.

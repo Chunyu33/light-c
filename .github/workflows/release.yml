@@ -50,15 +50,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.15.1'
+          releaseName: 'LightC v2.16.0'
           releaseBody: |
-            ## LightC v2.15.1
-            - Improved multilingual coverage across cleanup dialogs, scan states, settings, and result pages.
-            - Improved social-app scanning coverage and modularized its Windows path adapters.
-            - Fixed OneDrive cloud-only files being counted as local large files and improved hibernation cleanup verification.
-            - Improved cleanup action controls so they remain accessible while browsing long results.
+            ## LightC v2.16.0
+            - 新增繁体中文（zh-TW）界面，可在通用设置中选择；译文采用台湾习惯用语（如快取、檔案、登錄檔）。
+            - 系统瘦身新增 Windows 搜索索引重建（Beta）：检测 WSearch 服务状态与 Windows.db 大小，数据库异常膨胀时可一键重建，释放数 GB 空间。
+            - 磁盘统计、健康评分和顶部盘符显示改为读取 %SYSTEMDRIVE%/%SystemRoot% 确定系统盘，修复双系统等系统盘不叫 C 的机器上检测不正确的问题。
 
-            See [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md) for full details.
+            完整变更见 [CHANGELOG.md](https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md)。
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
