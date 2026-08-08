@@ -1,76 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- 
-    BinlockX 应用图标
-    设计理念：结合锁和盾牌元素，体现安全、加密的核心功能
-    主色调：微信绿 #07C160
-  -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="BinlockX icon">
+  <!-- BinlockX 图标：文件折角表达本地文件处理，B 字母和锁孔表达品牌、安全与隐私保护。 -->
   <defs>
-    <!-- 主渐变 - 微信绿色调 -->
-    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0AD06A;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#07C160;stop-opacity:1" />
+    <linearGradient id="paperGradient" x1="48" y1="24" x2="464" y2="488" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f3f5f2"/>
     </linearGradient>
-    <!-- 深色渐变 - 用于阴影效果 -->
-    <linearGradient id="darkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#06a854;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#058f48;stop-opacity:1" />
+    <linearGradient id="inkGradient" x1="128" y1="88" x2="388" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2b2d2b"/>
+      <stop offset="1" stop-color="#171917"/>
     </linearGradient>
-    <!-- 高光渐变 -->
-    <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
-      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    <linearGradient id="foldGradient" x1="312" y1="96" x2="410" y2="194" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f3f4f1"/>
+      <stop offset="1" stop-color="#cfd3cd"/>
     </linearGradient>
+    <clipPath id="cardClip">
+      <rect x="24" y="24" width="464" height="464" rx="104"/>
+    </clipPath>
   </defs>
-  
-  <!-- 背景圆角矩形 -->
-  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="url(#mainGradient)"/>
-  
-  <!-- 盾牌外形 -->
-  <path d="M256 96 
-           C 160 96 96 128 96 128 
-           L 96 256 
-           C 96 352 176 416 256 432 
-           C 336 416 416 352 416 256 
-           L 416 128 
-           C 416 128 352 96 256 96 Z" 
-        fill="url(#darkGradient)" 
-        opacity="0.3"/>
-  
-  <!-- 盾牌主体 -->
-  <path d="M256 112 
-           C 168 112 112 140 112 140 
-           L 112 256 
-           C 112 344 184 400 256 416 
-           C 328 400 400 344 400 256 
-           L 400 140 
-           C 400 140 344 112 256 112 Z" 
-        fill="#ffffff" 
-        opacity="0.95"/>
-  
-  <!-- 锁图标 - 锁体 -->
-  <rect x="208" y="248" width="96" height="80" rx="12" ry="12" fill="url(#mainGradient)"/>
-  
-  <!-- 锁图标 - 锁环 -->
-  <path d="M224 248 
-           L 224 208 
-           C 224 176 240 160 256 160 
-           C 272 160 288 176 288 208 
-           L 288 248" 
-        fill="none" 
-        stroke="url(#mainGradient)" 
-        stroke-width="20" 
-        stroke-linecap="round"/>
-  
-  <!-- 锁孔 -->
-  <circle cx="256" cy="284" r="12" fill="#ffffff"/>
-  <rect x="252" y="284" width="8" height="24" rx="4" fill="#ffffff"/>
-  
-  <!-- 高光效果 -->
-  <path d="M256 112 
-           C 168 112 112 140 112 140 
-           L 112 200 
-           C 200 180 312 180 400 200 
-           L 400 140 
-           C 400 140 344 112 256 112 Z" 
-        fill="url(#highlightGradient)"/>
+
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#paperGradient)"/>
+
+  <g clip-path="url(#cardClip)" transform="translate(256 256) scale(1.1154) translate(-256 -256)">
+    <!-- 右上折角的轻微灰面用于暗示文件语义，小尺寸下也不会变成噪点。 -->
+    <path d="M308 96h22c12 0 24 5 33 14l45 45c9 9 14 21 14 33v22H338c-17 0-30-13-30-30V96Z" fill="url(#foldGradient)"/>
+
+    <!-- 主体文件轮廓与品牌 B 融合，保持参考图的厚重黑色视觉。 -->
+    <path fill="url(#inkGradient)" fill-rule="evenodd" d="
+      M151 96
+      C133 96 120 109 120 127
+      V385
+      C120 403 133 416 151 416
+      H318
+      C371 416 416 375 416 322
+      C416 285 397 255 368 240
+      C392 226 408 201 408 170
+      C408 129 375 96 334 96
+      H151
+      Z
+
+      M227 198
+      H315
+      C337 198 354 216 354 238
+      C354 260 337 278 315 278
+      H227
+      C216 278 208 270 208 259
+      V217
+      C208 206 216 198 227 198
+      Z
+
+      M227 298
+      H326
+      C348 298 365 316 365 338
+      C365 360 348 378 326 378
+      H227
+      C216 378 208 370 208 359
+      V317
+      C208 306 216 298 227 298
+      Z
+    "/>
+
+    <!-- 用白色内腔形成 B 的负形，同时作为“清理/脱敏后的安全副本”视觉留白。 -->
+    <rect x="208" y="198" width="138" height="80" rx="16" fill="#ffffff"/>
+    <rect x="208" y="298" width="151" height="80" rx="16" fill="#ffffff"/>
+
+    <!-- 锁孔放在 B 的中心留白里，强调加密、隐私空间、脱敏和元数据清理的统一安全属性。 -->
+    <path fill="#1a1c1a" d="
+      M274 258
+      C274 237 291 220 312 220
+      C333 220 350 237 350 258
+      C350 272 342 284 331 291
+      L340 334
+      C342 343 335 352 326 352
+      H298
+      C289 352 282 343 284 334
+      L293 291
+      C282 284 274 272 274 258
+      Z
+      M312 241
+      C303 241 296 248 296 257
+      C296 266 303 273 312 273
+      C321 273 328 266 328 257
+      C328 248 321 241 312 241
+      Z
+    "/>
+
+    <!-- 折角压在主体上方，保留“文件被折起”的识别点。 -->
+    <path d="M308 96v76c0 21 17 38 38 38h76L308 96Z" fill="url(#foldGradient)"/>
+    <path d="M308 96v76c0 21 17 38 38 38h76" fill="none" stroke="#bfc5bf" stroke-width="2"/>
+  </g>
 </svg>
