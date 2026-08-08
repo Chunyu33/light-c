@@ -89,7 +89,8 @@
     "WindowsErrorReports": { "name": "Windows error reports", "description": "Error reports created after Windows or application crashes" },
     "InstallerTemp": { "name": "Installer temporary files", "description": "Temporary files created during software installation" },
     "ClipboardCache": { "name": "Clipboard cache", "description": "Clipboard history cache files" },
-    "ShaderCache": { "name": "DirectX shader cache", "description": "GPU shader compilation cache; games and apps rebuild it on first launch" }
+    "ShaderCache": { "name": "DirectX shader cache", "description": "GPU shader compilation cache; games and apps rebuild it on first launch" },
+    "ThirdPartyAppCache": { "name": "Third-party app cache", "description": "Rebuildable caches from apps like Discord, Teams and NetEase CloudMusic; apps recreate them automatically" }
   },
   "emptyTitle": "No junk files found",
   "emptyDesc": "Common temp files, cache and logs are all clean.",

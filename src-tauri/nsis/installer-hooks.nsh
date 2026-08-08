@@ -32,7 +32,7 @@ Function LightC_CheckWebView2Runtime
   Pop $1
   StrCmp $1 "1" done
 
-  MessageBox MB_OK|MB_ICONSTOP "当前系统未检测到 Microsoft Edge WebView2 Runtime。$\r$\n$\r$\n常规安装包不会再联网自动安装 WebView2，以避免创建额外 Edge 快捷方式或触发异常安装。$\r$\n$\r$\n请从官方 Release 下载 LightC_webview2_offline_x64.exe，或先安装 Microsoft Edge WebView2 Runtime 后再运行常规安装包。"
+  MessageBox MB_OK|MB_ICONSTOP "当前系统未检测到 Microsoft Edge WebView2 Runtime。$\r$\n$\r$\n常规安装包不会再联网自动安装 WebView2，以避免创建额外 Edge 快捷方式或触发异常安装。$\r$\n$\r$\n请从官方 Release 下载带版本号的 WebView2 离线安装包，或先安装 Microsoft Edge WebView2 Runtime 后再运行常规安装包。"
   Abort
 
   done:

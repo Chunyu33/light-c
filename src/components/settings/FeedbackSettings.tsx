@@ -60,7 +60,7 @@ export function FeedbackSettings() {
             </a>
 
             <a
-              href="mailto:1378813463@qq.com"
+              href="mailto:evanlua.hh@qq.com"
               className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-colors group"
             >
               <div className="flex items-center gap-3">
@@ -69,7 +69,7 @@ export function FeedbackSettings() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[var(--text-primary)]">{t('feedback.email')}</p>
-                  <p className="text-xs text-[var(--text-muted)]">1378813463@qq.com</p>
+                  <p className="text-xs text-[var(--text-muted)]">evanlua.hh@qq.com</p>
                 </div>
               </div>
               <ExternalLink className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)]" />

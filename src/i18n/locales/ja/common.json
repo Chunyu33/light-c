@@ -146,6 +146,7 @@
   "confirmRestoreDrivers": "すべてのドライバーバックアップを復元",
   "driverRestoreWarning": "管理者権限が必要で、複数の過去のドライバーバージョンを再インストールする場合があります。完了後に再確認し、必要なら Windows を再起動してください。",
   "confirmRestore": "復元を確認",
+  "restore": "復元",
   "associatedApp": "関連アプリ",
   "unknownApp": "不明なアプリ",
   "shellRemoveTitle": "バックアップ後にレジストリノードを削除。ソフトウェアが再作成する場合があります",

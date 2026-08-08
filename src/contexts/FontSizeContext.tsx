@@ -8,7 +8,8 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 export type FontSizeLevel = 'standard' | 'medium' | 'large' | 'custom';
 
 export const CUSTOM_FONT_SIZE_MIN = 10;
-export const CUSTOM_FONT_SIZE_MAX = 18;
+// 放宽自定义字号上限，满足大屏和视力辅助场景，同时保留整数像素便于布局稳定。
+export const CUSTOM_FONT_SIZE_MAX = 36;
 export const DEFAULT_CUSTOM_FONT_SIZE = 14;
 
 /** 字体大小配置 */

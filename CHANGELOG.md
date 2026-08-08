@@ -2,7 +2,15 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## v2.16.0 (2026-08-03)
+## v2.16.1
+
+- Expanded junk-cleanup coverage: added a new "Third-party app cache" category (Discord, Slack, Teams, Steam, Epic Games Launcher, NetEase CloudMusic, QQ Music) and extended deep-scan cache-name matching to variants such as `Cache2`, `.cache`, and `Cache Data`, while keeping persistent app data excluded.
+- Simplified the junk-cleanup result flow: after cleaning, scan categories and metrics (files found, cleanable size, selection, scan time) are cleared and only the cleanup result (space freed, files deleted, failures) is shown until the next scan. The result card uses a success theme and expands to fill most of the module space; failure details keep their warning color.
+- Fixed context-menu cleanup showing an invalid-item count while hiding entries whose executable path could not be parsed.
+- Expanded the custom font-size range to 10–36 px.
+- Fixed the old-driver restore button showing the untranslated `restore` key.
+
+## v2.16.0 
 
 - Added Traditional Chinese (zh-TW) UI as a selectable language in General Settings, translated with Taiwan conventions.
 - Added Windows Search index rebuild (Beta) to System Slim: detects the WSearch service state and Windows.db size, and rebuilds the index via the official SearchManager COM API when the database grows abnormally large.
