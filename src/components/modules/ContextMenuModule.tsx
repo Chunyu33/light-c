@@ -52,6 +52,11 @@ function getScopeStyle(scope: string, translate: (key: string) => string): { lab
   }
 }
 
+/** 与后端保持同一失效判定，避免统计数量和结果列表使用不同条件。 */
+function isInvalidContextMenuEntry(entry: Pick<ContextMenuEntry, 'exe_exists'>): boolean {
+  return !entry.exe_exists;
+}
+
 // ============================================================================
 // 子组件：条目行
 // ============================================================================
@@ -67,7 +72,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
   const { t: moduleT } = useTranslation('modules');
   const [expanded, setExpanded] = useState(false);
   const scope = getScopeStyle(entry.scope, moduleT);
-  const isInvalid = !entry.exe_exists && entry.exe_path !== null;
+  const isInvalid = isInvalidContextMenuEntry(entry);
   const isProtected = entry.is_system_protected;
 
   return (
@@ -290,7 +295,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
   const filteredEntries = useMemo(() => {
     if (!scanResult) return [];
     if (showInvalidOnly) {
-      return scanResult.entries.filter((e) => !e.exe_exists && e.exe_path !== null);
+      return scanResult.entries.filter(isInvalidContextMenuEntry);
     }
     return scanResult.entries;
   }, [scanResult, showInvalidOnly]);
@@ -328,7 +333,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         result.entries
           .filter(
             (e) =>
-              !e.exe_exists &&
+              isInvalidContextMenuEntry(e) &&
               e.exe_path !== null &&
               !e.is_system_protected
           )
@@ -460,7 +465,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
       );
       const remainingEntries = scanResult.entries.filter((e) => !successIds.has(e.id));
       const newInvalidCount = remainingEntries.filter(
-        (e) => !e.exe_exists && e.exe_path !== null
+        isInvalidContextMenuEntry
       ).length;
 
       setScanResult({

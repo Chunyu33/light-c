@@ -146,6 +146,7 @@
   "confirmRestoreDrivers": "Restore all driver backups",
   "driverRestoreWarning": "Administrator access is required and several historical driver versions may be reinstalled. Scan again afterward and restart Windows if needed.",
   "confirmRestore": "Restore",
+  "restore": "Restore",
   "associatedApp": "Associated app",
   "unknownApp": "Unknown app",
   "shellRemoveTitle": "Back up and remove this registry node; software may recreate it later",
