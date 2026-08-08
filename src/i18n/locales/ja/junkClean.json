@@ -89,7 +89,8 @@
     "WindowsErrorReports": { "name": "Windows エラーレポート", "description": "Windows やアプリのクラッシュ時に作成されるエラーレポート" },
     "InstallerTemp": { "name": "インストーラー一時ファイル", "description": "ソフトウェアのインストール中に作成される一時ファイル" },
     "ClipboardCache": { "name": "クリップボードキャッシュ", "description": "クリップボード履歴のキャッシュファイル" },
-    "ShaderCache": { "name": "DirectX シェーダーキャッシュ", "description": "GPU シェーダーのコンパイルキャッシュ。削除後、ゲームやアプリの初回起動時に再生成されます" }
+    "ShaderCache": { "name": "DirectX シェーダーキャッシュ", "description": "GPU シェーダーのコンパイルキャッシュ。削除後、ゲームやアプリの初回起動時に再生成されます" },
+    "ThirdPartyAppCache": { "name": "サードパーティ製アプリのキャッシュ", "description": "Discord、Teams、網易雲音楽などのアプリが自動再生成するキャッシュ。削除後、アプリ起動時に再作成されます" }
   },
   "emptyTitle": "ジャンクファイルが見つかりません",
   "emptyDesc": "一般的な一時ファイル、キャッシュ、ログは全てクリーンです。",

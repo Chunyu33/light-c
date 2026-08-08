@@ -140,6 +140,10 @@
     "ShaderCache": {
       "name": "DirectX Shader 快取",
       "description": "GPU著色器編譯快取，刪除後遊戲和應用首次執行時會重新生成"
+    },
+    "ThirdPartyAppCache": {
+      "name": "第三方應用程式快取",
+      "description": "Discord、Teams、網易雲音樂等應用程式的可重建快取，刪除後應用會自動重新產生"
     }
   },
   "emptyTitle": "沒有發現可清理的垃圾檔案",

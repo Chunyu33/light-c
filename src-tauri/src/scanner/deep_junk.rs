@@ -769,6 +769,11 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
         // 不把整个 AppData 当作垃圾，也不触碰 MSIX/WebView 持久化数据。
         return Some(JunkCategory::AppCache);
     }
+    if is_third_party_app_cache(&normalized) {
+        // 补充已知应用的非常规缓存目录名（如 Steam htmlcache、Epic webcache），
+        // 这些目录删除后应用会自动重建，归入独立分类便于用户识别。
+        return Some(JunkCategory::ThirdPartyAppCache);
+    }
     if contains_any(
         &normalized,
         &["\\windows\\softwaredistribution\\download\\"],
@@ -925,9 +930,14 @@ fn is_user_profile_cache(path: &str) -> bool {
         return false;
     };
     let segments = profile_path.split('\\').collect::<Vec<_>>();
+    // 只匹配明确表达"缓存"语义的目录名；覆盖常见大小写与变体（Cache2/.cache/Cache Data），
+    // 不匹配 Data、Settings、Local Storage 等持久化目录名。
     let cache_names = [
         "cache",
         "caches",
+        "cache2",
+        ".cache",
+        "cache data",
         "code cache",
         "gpucache",
         "shadercache",
@@ -943,6 +953,40 @@ fn is_user_profile_cache(path: &str) -> bool {
                 .iter()
                 .any(|name| segment.eq_ignore_ascii_case(name))
         })
+}
+
+/// 已知第三方应用的可重建缓存目录（白名单组合匹配）
+/// 深度扫描中 AppCache 只匹配目录段恰好为 cache 等精确词；这里补充
+/// "已知应用目录 + 明确缓存目录名"的组合，覆盖 Steam htmlcache、Epic webcache
+/// 等非常规缓存名。缓存目录删除后应用会自动重建，不触碰持久化数据目录。
+fn is_third_party_app_cache(path: &str) -> bool {
+    // 先做应用目录快速过滤，避免对全盘路径做无谓的缓存词匹配（深度扫描热路径）
+    let app_dir = contains_any(
+        path,
+        &[
+            "\\discord\\",
+            "\\slack\\",
+            "\\microsoft\\teams\\",
+            "\\steam\\",
+            "\\epicgameslauncher\\saved\\",
+            "\\netease\\cloudmusic\\",
+            "\\tencent\\qqmusic\\",
+        ],
+    );
+    if !app_dir {
+        return false;
+    }
+    contains_any(
+        path,
+        &[
+            "\\cache\\",
+            "\\code cache\\",
+            "\\gpucache\\",
+            "\\shadercache\\",
+            "\\htmlcache\\",
+            "\\webcache\\",
+        ],
+    )
 }
 
 fn is_thumbnail_cache(path: &str) -> bool {
@@ -1014,6 +1058,38 @@ mod tests {
     fn keeps_shader_cache_as_a_known_system_exception() {
         assert!(is_deep_junk_path(
             r"C:\Windows\System32\d3d_cache\shader.bin"
+        ));
+    }
+
+    #[test]
+    fn matches_cache_name_variants() {
+        // 缓存目录名变体（cache2/.cache/Cache Data）应命中 AppCache
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Mozilla\Firefox\Profiles\abc\cache2\entries"
+        ));
+        assert!(is_deep_junk_path(r"D:\Users\Alice\AppData\Local\SomeApp\.cache\data"));
+        assert!(is_deep_junk_path(r"D:\Users\Alice\AppData\Roaming\SomeApp\Cache Data\file"));
+    }
+
+    #[test]
+    fn matches_known_third_party_app_caches() {
+        // 非常规缓存目录名（htmlcache/webcache）命中第三方应用缓存
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Steam\htmlcache\index.html"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\EpicGamesLauncher\Saved\webcache\data"
+        ));
+        // 标准 Cache 目录仍走 AppCache 分类，同样命中
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Roaming\discord\Cache\data_1"
+        ));
+        // 持久化数据与游戏文件不命中
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Roaming\discord\Local Storage\leveldb\data"
+        ));
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Steam\steamapps\common\game\data.bin"
         ));
     }
 

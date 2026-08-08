@@ -89,7 +89,8 @@
     "WindowsErrorReports": { "name": "Windows错误报告", "description": "系统和应用崩溃时生成的错误报告文件" },
     "InstallerTemp": { "name": "安装程序临时文件", "description": "软件安装过程中产生的临时文件" },
     "ClipboardCache": { "name": "剪贴板缓存", "description": "剪贴板历史记录缓存文件" },
-    "ShaderCache": { "name": "DirectX Shader 缓存", "description": "GPU着色器编译缓存，删除后游戏和应用首次运行时会重新生成" }
+    "ShaderCache": { "name": "DirectX Shader 缓存", "description": "GPU着色器编译缓存，删除后游戏和应用首次运行时会重新生成" },
+    "ThirdPartyAppCache": { "name": "第三方应用缓存", "description": "Discord、Teams、网易云音乐等应用的可重建缓存，删除后应用会自动重新生成" }
   },
   "emptyTitle": "没有发现可清理的垃圾文件",
   "emptyDesc": "常见临时文件、缓存和日志都很干净。",

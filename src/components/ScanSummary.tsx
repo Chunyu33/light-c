@@ -18,7 +18,6 @@ interface ScanSummaryProps {
   deleteResult: EnhancedDeleteResult | null;
   selectedCount: number;
   selectedSize: number;
-  onClearDeleteResult?: () => void;
 }
 
 // 失败明细弹窗组件
@@ -165,20 +164,22 @@ export function ScanSummary({
   deleteResult,
   selectedCount,
   selectedSize,
-  onClearDeleteResult,
 }: ScanSummaryProps) {
   const { t } = useTranslation('common');
   const [showFailedModal, setShowFailedModal] = useState(false);
   
   // 待重启条目也是本次删除尝试的结果，必须保留在明细中供用户核对。
   const failedFiles = deleteResult?.file_results.filter(f => !f.success) || [];
-  
-  if (!scanResult) return null;
+
+  // 清理完成后 scanResult 会被清空；此时若仍有删除结果，单独展示结果卡，
+  // 扫描统计（发现/可清理/已选/耗时）仅在存在扫描数据时渲染。
+  if (!scanResult && !deleteResult) return null;
 
   return (
     <div className="space-y-3">
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* 统计卡片（仅扫描数据存在时显示） */}
+      {scanResult && (
+        <div className="grid grid-cols-4 gap-3">
         {/* 发现文件 */}
         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -224,60 +225,48 @@ export function ScanSummary({
           </p>
         </div>
       </div>
+      )}
 
-      {/* 删除结果提示 - WeChat 风格真实释放量显示 */}
+      {/* 删除结果提示 - 成功色主题，主体表达"成功释放"语义；
+          未完成的记录（失败/待重启）仅在各自明细区使用警告色/蓝色 */}
       {deleteResult && (
-        <div className={`rounded-lg border p-3 ${
-          deleteResult.failed_count === 0 && deleteResult.reboot_pending_count === 0
-            ? 'bg-emerald-500/10 border-emerald-500/30'
-            : 'bg-amber-500/10 border-amber-500/30'
-        }`}>
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className={`w-5 h-5 shrink-0 ${
-              deleteResult.failed_count === 0 ? 'text-emerald-500' : 'text-amber-500'
-            }`} />
-            <div className="flex-1">
-              <span className={`text-sm font-medium ${
-                deleteResult.failed_count === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
-              }`}>
-                {deleteResult.summary_message || t('cleanCompleted')}
-              </span>
-              {/* 详细统计 */}
-              <div className="text-xs text-[var(--fg-muted)] mt-1">
-                {t('deleteStats', { success: deleteResult.success_count, size: formatSize(deleteResult.freed_physical_size) })}
-                {deleteResult.skipped_size > 0 && (
-                  <>{t('skippedSize', { size: formatSize(deleteResult.skipped_size) })}</>
-                )}
-                {deleteResult.reboot_pending_count > 0 && (
-                  <>{t('rebootPending', { count: deleteResult.reboot_pending_count })}</>
-                )}
-              </div>
+        <div
+          className="flex flex-col rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5"
+          style={scanResult ? undefined : { minHeight: '65vh' }}
+        >
+          {/* 主信息区：清理完成后（无扫描数据）撑满卡片居中展示，避免底部留白 */}
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+            <div className="w-14 h-14 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-7 h-7 text-emerald-500" />
             </div>
-            {/* 关闭按钮 */}
-            {onClearDeleteResult && (
-              <button
-                onClick={onClearDeleteResult}
-                className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-                title={t('close')}
-              >
-                <X className="w-4 h-4 text-[var(--fg-muted)]" />
-              </button>
-            )}
+            <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+              {deleteResult.summary_message || t('cleanCompleted')}
+            </span>
+            {/* 详细统计 */}
+            <div className="text-sm text-[var(--fg-muted)]">
+              {t('deleteStats', { success: deleteResult.success_count, size: formatSize(deleteResult.freed_physical_size) })}
+              {deleteResult.skipped_size > 0 && (
+                <>{t('skippedSize', { size: formatSize(deleteResult.skipped_size) })}</>
+              )}
+              {deleteResult.reboot_pending_count > 0 && (
+                <>{t('rebootPending', { count: deleteResult.reboot_pending_count })}</>
+              )}
+            </div>
           </div>
-          
-          {/* 需要重启提示 */}
+
+          {/* 需要重启提示（待完成记录，使用蓝色区分） */}
           {deleteResult.needs_reboot && (
-            <div className="mt-3 pt-3 border-t border-blue-500/20 flex items-center gap-2">
+            <div className="mt-4 pt-4 border-t border-blue-500/20 flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-blue-500" />
               <span className="text-xs text-blue-500">
                 {t('rebootPendingDesc')}
               </span>
             </div>
           )}
-          
-          {/* 失败原因详情 */}
+
+          {/* 失败原因详情（未完成记录，使用警告色） */}
           {failedFiles.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-amber-500/20">
+            <div className="mt-4 pt-4 border-t border-amber-500/20">
               <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
                 {t('incompleteReason')}
               </p>
@@ -288,7 +277,7 @@ export function ScanSummary({
                     <span className="truncate flex-1" title={item.path}>
                       {item.path.split('\\').pop()}
                     </span>
-                    <span 
+                    <span
                       className={`${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'} shrink-0 cursor-help`}
                       title={getFailureReasonTooltip(item.failure_reason)}
                     >

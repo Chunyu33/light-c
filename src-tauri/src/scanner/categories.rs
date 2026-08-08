@@ -32,6 +32,8 @@ pub enum JunkCategory {
     OldWindowsInstallation,
     /// 应用程序缓存
     AppCache,
+    /// 第三方应用缓存（Discord、Teams、网易云音乐等）
+    ThirdPartyAppCache,
     /// 字体缓存
     FontCache,
     /// Windows错误报告
@@ -60,6 +62,7 @@ impl JunkCategory {
             JunkCategory::MemoryDump => "内存转储文件",
             JunkCategory::OldWindowsInstallation => "旧版Windows安装",
             JunkCategory::AppCache => "应用程序缓存",
+            JunkCategory::ThirdPartyAppCache => "第三方应用缓存",
             JunkCategory::FontCache => "字体缓存",
             JunkCategory::WindowsErrorReports => "Windows错误报告",
             JunkCategory::InstallerTemp => "安装程序临时文件",
@@ -89,6 +92,9 @@ impl JunkCategory {
             JunkCategory::MemoryDump => "系统崩溃时产生的内存转储文件",
             JunkCategory::OldWindowsInstallation => "系统升级后保留的旧版Windows文件",
             JunkCategory::AppCache => "各类应用程序产生的缓存文件",
+            JunkCategory::ThirdPartyAppCache => {
+                "Discord、Teams、网易云音乐等第三方应用的可重建缓存，删除后应用会自动重新生成"
+            }
             JunkCategory::FontCache => "Windows字体渲染缓存，删除后会自动重建",
             JunkCategory::WindowsErrorReports => "系统和应用崩溃时生成的错误报告文件",
             JunkCategory::InstallerTemp => "软件安装过程中产生的临时文件",
@@ -115,6 +121,7 @@ impl JunkCategory {
             JunkCategory::RecycleBin => 3,
             JunkCategory::SystemCache => 3,
             JunkCategory::AppCache => 3,
+            JunkCategory::ThirdPartyAppCache => 2,
             JunkCategory::MemoryDump => 3,
             JunkCategory::OldWindowsInstallation => 3,
         }
@@ -239,6 +246,28 @@ impl JunkCategory {
                 // 不再泛扫 Packages\*\LocalCache：MSIX 桌面应用会把 WebView2 用户 Profile、
                 // 会话索引和应用状态放在这里，直接按 "*" 清理会误删 Claude 等应用的持久化数据。
             ],
+            JunkCategory::ThirdPartyAppCache => vec![
+                // Chromium 系桌面应用的标准缓存目录（Cache/Code Cache/GPUCache/ShaderCache），
+                // 删除后应用启动时会自动重建；glob 模式在应用未安装时自动跳过，无扫描开销。
+                // Discord
+                ScanPath::glob_path("APPDATA", "discord\\Cache"),
+                ScanPath::glob_path("APPDATA", "discord\\Code Cache"),
+                ScanPath::glob_path("APPDATA", "discord\\GPUCache"),
+                ScanPath::glob_path("APPDATA", "discord\\ShaderCache"),
+                // Slack
+                ScanPath::glob_path("APPDATA", "Slack\\Cache"),
+                // Microsoft Teams
+                ScanPath::glob_path("APPDATA", "Microsoft\\Teams\\Cache"),
+                ScanPath::glob_path("APPDATA", "Microsoft\\Teams\\GPUCache"),
+                // Steam 内置浏览器缓存
+                ScanPath::glob_path("LOCALAPPDATA", "Steam\\htmlcache"),
+                // Epic Games Launcher 内置浏览器缓存
+                ScanPath::glob_path("LOCALAPPDATA", "EpicGamesLauncher\\Saved\\webcache"),
+                // 网易云音乐
+                ScanPath::glob_path("LOCALAPPDATA", "Netease\\CloudMusic\\Cache"),
+                // QQ音乐
+                ScanPath::glob_path("APPDATA", "Tencent\\QQMusic\\Cache"),
+            ],
             JunkCategory::FontCache => vec![ScanPath::fixed_path(
                 "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache",
             )],
@@ -292,6 +321,7 @@ impl JunkCategory {
             JunkCategory::MemoryDump => vec!["*.dmp", "MEMORY.DMP"],
             JunkCategory::OldWindowsInstallation => vec!["*"],
             JunkCategory::AppCache => vec!["*"],
+            JunkCategory::ThirdPartyAppCache => vec!["*"],
             JunkCategory::FontCache => vec!["*"],
             JunkCategory::WindowsErrorReports => vec!["*"],
             JunkCategory::InstallerTemp => vec!["*"],
@@ -315,6 +345,7 @@ impl JunkCategory {
             JunkCategory::MemoryDump,
             JunkCategory::OldWindowsInstallation,
             JunkCategory::AppCache,
+            JunkCategory::ThirdPartyAppCache,
             JunkCategory::FontCache,
             JunkCategory::WindowsErrorReports,
             JunkCategory::InstallerTemp,
@@ -458,7 +489,7 @@ mod tests {
 
     #[test]
     fn test_all_categories_covered() {
-        const JUNK_CATEGORY_VARIANT_COUNT: usize = 17;
+        const JUNK_CATEGORY_VARIANT_COUNT: usize = 18;
         assert_eq!(JunkCategory::all().len(), JUNK_CATEGORY_VARIANT_COUNT);
     }
 

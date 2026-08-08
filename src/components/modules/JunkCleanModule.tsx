@@ -154,7 +154,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<EnhancedDeleteProgress | null>(null);
-  const [deleteVerificationPending, setDeleteVerificationPending] = useState(false);
   // 深度分类首屏分页展示，但分类勾选必须保留“整类清理”的明确语义。
   const [selectedCategoryNames, setSelectedCategoryNames] = useState<Set<string>>(new Set());
   const [deepScanEnabled, setDeepScanEnabled] = useState(loadDeepScanPreference);
@@ -163,7 +162,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [scanMode, setScanMode] = useState<'quick' | 'deep' | null>(null);
   const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);
   const scanningRef = useRef(false);
-  const deleteVerificationRef = useRef(false);
   const cancelRequestedRef = useRef(false);
   const scanStageIndex = scanProgress ? getScanStageIndex(scanProgress.stage) : 0;
   const scanProgressPercent = scanMode === 'deep'
@@ -268,8 +266,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 开始扫描
   const handleScan = useCallback(async () => {
-    // 核验阶段仍在同步扫描结果，禁止并发启动新扫描覆盖即将落地的数据。
-    if (scanningRef.current || deleteVerificationRef.current) return;
+    // 删除命令执行中禁止并发启动新扫描覆盖即将落地的数据。
+    if (scanningRef.current) return;
 
     scanningRef.current = true;
     cancelRequestedRef.current = false;
@@ -337,41 +335,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     }
   }, [scanMode, showToast, t]);
 
-  const refreshScanResultAfterDelete = useCallback(async (
-    currentScanMode: 'quick' | 'deep',
-    deletedPaths: Set<string>,
-  ): Promise<boolean> => {
-    try {
-      // 删除结果只代表删除接口的处理结果，展示状态必须以重新扫描到的真实文件为准。
-      const refreshedResult = currentScanMode === 'deep'
-        ? await scanDeepJunkFiles()
-        : await scanJunkFiles();
-      const visiblePaths = new Set(
-        refreshedResult.categories.flatMap((category) => category.files.map((file) => file.path)),
-      );
-      setScanResult(refreshedResult);
-      if (currentScanMode === 'deep') setDeepScanResult(refreshedResult as DeepJunkScanResult);
-      updateModuleState('junk', {
-        status: 'done',
-        fileCount: refreshedResult.total_file_count,
-        totalSize: refreshedResult.total_size,
-        error: null,
-      });
-      // 失败或未处理的条目只有在重扫仍能看到时才保留选中状态。
-      setSelectedPaths((previous) => new Set(
-        Array.from(previous).filter((path) => visiblePaths.has(path) && !deletedPaths.has(path)),
-      ));
-      setSelectedCategoryNames(new Set());
-      setScanProgress(null);
-      triggerHealthRefresh();
-      return true;
-    } catch (refreshError) {
-      // 删除结果仍然有效，但核验失败时不能把旧的扫描统计冒充为最新状态。
-      console.warn('清理后刷新扫描失败:', refreshError);
-      return false;
-    }
-  }, [triggerHealthRefresh, updateModuleState]);
-
   // 顶部全局停止按钮复用深度扫描取消命令。
   useEffect(() => {
     if (stopScanTrigger > 0 && moduleState.status === 'scanning') {
@@ -433,42 +396,18 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         });
       }
 
-      // 删除命令返回后，文件操作已经完成；核验扫描改为后台执行，避免用户被长时间遮罩阻塞。
-      let refreshStarted = false;
-      if (result.success_count > 0 && scanMode) {
-        const deletedPaths = new Set(
-          result.file_results.filter((file) => file.success).map((file) => file.path),
-        );
-        refreshStarted = true;
-        deleteVerificationRef.current = true;
-        setDeleteVerificationPending(true);
-        setDeleteProgress({
-          phase: 'cleaning',
-          processed_count: result.success_count + result.failed_count + result.reboot_pending_count,
-          total_count: selectedFileCount,
-          success_count: result.success_count,
-          failed_count: result.failed_count,
-          reboot_pending_count: result.reboot_pending_count,
-          freed_physical_size: result.freed_physical_size,
-          elapsed_ms: 0,
-        });
-        void refreshScanResultAfterDelete(scanMode, deletedPaths).then((refreshSucceeded) => {
-          if (!refreshSucceeded) {
-            showToast({
-              type: 'warning',
-              title: t('toast.refreshFailed'),
-              description: t('toast.refreshFailedDesc'),
-            });
-          }
-        }).finally(() => {
-          // 核验结束后解除并发保护；失败时保留当前结果，避免用旧统计覆盖界面。
-          deleteVerificationRef.current = false;
-          setDeleteVerificationPending(false);
-          setDeleteProgress(null);
-        });
-      }
-
+      // 清理完成：清空扫描与选择状态，只保留清理结果供界面展示。
+      // 删除接口的 file_results 已包含真实成功/失败/待重启明细，无需重扫核验。
       setDeleteResult(result);
+      setScanResult(null);
+      setDeepScanResult(null);
+      setSelectedPaths(new Set());
+      setSelectedCategoryNames(new Set());
+      setScanProgress(null);
+      setDeleteProgress(null);
+      updateModuleState('junk', { status: 'done', fileCount: 0, totalSize: 0, error: null });
+      triggerHealthRefresh();
+
       if (result.success_count > 0) {
         // 后端 summary_message 固定为中文，因此使用结构化结果在前端生成当前语言的摘要。
         const releasedText = result.freed_physical_size > 0
@@ -491,7 +430,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             summary: `${releasedText}${skippedText}`,
             blocked: blockedText,
             reboot: rebootText,
-            refreshing: refreshStarted ? t('toast.refreshing') : '',
           }),
         });
       } else if (result.failed_count > 0 || result.reboot_pending_count > 0) {
@@ -516,9 +454,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       showToast({ type: 'error', title: t('toast.cleanFailed'), description: String(err) });
     } finally {
       setIsDeleting(false);
-      if (!deleteVerificationRef.current) setDeleteProgress(null);
+      setDeleteProgress(null);
     }
-  }, [deepScanResult, excludedDeepPaths, fullySelectedDeepCategoryNames, refreshScanResultAfterDelete, scanMode, selectedFileCount, selectedPaths, selectedCategoryNames, showToast, t]);
+  }, [deepScanResult, excludedDeepPaths, fullySelectedDeepCategoryNames, scanMode, selectedFileCount, selectedPaths, selectedCategoryNames, showToast, t, triggerHealthRefresh, updateModuleState]);
 
   // 垃圾文件默认使用完整路径搜索，回收站条目则搜索原始路径，避免把内部 $R 文件名交给搜索引擎。
   const handleSearchFile = useCallback(async (file: FileInfo) => {
@@ -535,8 +473,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 切换文件选中状态
   const toggleFileSelection = useCallback((path: string) => {
-    // 后台核验会重建分类统计，期间冻结选择状态，避免用户操作被异步刷新覆盖。
-    if (deleteVerificationRef.current) return;
     // 整类选择保持到删除结束，单项取消通过 excludedPaths 传给后端，避免漏删分页之外的文件。
     setSelectedPaths((prev) => {
       const newSet = new Set(prev);
@@ -551,8 +487,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 切换分类选中状态
   const toggleCategorySelection = useCallback((categoryName: string, files: FileInfo[], selected: boolean) => {
-    // 后台核验期间不允许改变选择集合，保证核验完成后的选中状态与新结果一致。
-    if (deleteVerificationRef.current) return;
     setSelectedCategoryNames((previous) => {
       const next = new Set(previous);
       if (selected) next.add(categoryName);
@@ -574,7 +508,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 全选/取消全选
   const toggleAllSelection = useCallback((selected: boolean) => {
-    if (!scanResult || deleteVerificationRef.current) return;
+    if (!scanResult) return;
     if (selected) {
       const allPaths = new Set<string>();
       scanResult.categories.forEach((category) => {
@@ -608,7 +542,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   }, [updateModuleState]);
 
   const handleLoadMoreDeepCategory = useCallback(async (categoryName: string) => {
-    if (scanMode !== 'deep' || !deepScanResult || loadingDeepCategory || deleteVerificationRef.current) return;
+    if (scanMode !== 'deep' || !deepScanResult || loadingDeepCategory) return;
     const category = scanResult?.categories.find((item) => item.display_name === categoryName);
     if (!category || !category.has_more) return;
 
@@ -645,7 +579,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     ? Math.min(100, Math.round((deleteProcessedCount / deleteTotalCount) * 100))
     : 0;
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm && !deleteVerificationPending) {
+  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
     return null;
   }
 
@@ -765,7 +699,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                disabled={deleteVerificationPending || (selectedPaths.size === 0 && selectedCategoryNames.size === 0)}
+                disabled={selectedPaths.size === 0 && selectedCategoryNames.size === 0}
                 className="module-operation-toolbar__button module-operation-toolbar__button--danger"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -775,25 +709,15 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             document.body,
           )}
 
-          {/* 扫描结果摘要 */}
-          {scanResult && (
+          {/* 扫描结果摘要：有扫描数据时展示统计卡；清理完成后 scanResult 被清空，
+              此时仅有 deleteResult 时仍展示清理结果卡 */}
+          {(scanResult || deleteResult) && (
             <ScanSummary
               scanResult={scanResult}
               deleteResult={deleteResult}
               selectedCount={selectedPaths.size}
               selectedSize={selectedSize}
-              onClearDeleteResult={() => setDeleteResult(null)}
             />
-          )}
-
-          {deleteVerificationPending && (
-            <div className="flex items-center gap-3 rounded-xl border border-[var(--brand-green-20)] bg-[var(--brand-green-10)] px-4 py-3">
-              <Loader2 className="w-4 h-4 shrink-0 text-[var(--brand-green)] animate-spin" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--fg-primary)]">{t('verification.title')}</p>
-                <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{t('verification.desc')}</p>
-              </div>
-            </div>
           )}
 
           {moduleState.status === 'scanning' && (
