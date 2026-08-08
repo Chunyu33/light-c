@@ -1,6 +1,6 @@
 // ============================================================================
-// 这里的“虚拟磁盘”是 Explorer 外壳命名空间图标，不是磁盘驱动器本身。
-// 后端负责重新校验 CLSID、Hive、视图和系统保护边界，前端只维护选择与交互状态。
+// 外壳入口包含“此电脑”和左侧导航窗格，不涉及真实磁盘驱动器。
+// 后端负责重新校验 CLSID、Hive、入口类型和系统保护边界，前端只维护选择与交互状态。
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +12,7 @@ import {
   HardDriveDownload,
   Loader2,
   Lock,
+  PanelLeft,
   RefreshCw,
   Shield,
   Trash2,
@@ -25,6 +26,7 @@ import {
   openShellIconLog,
   openShellIconRegistry,
   removeShellIcon,
+  restoreShellIcon,
   restartExplorer,
   scanShellIcons,
   type ShellIconInfo,
@@ -33,7 +35,7 @@ import {
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 
-type PendingAction = { target: ShellIconTarget; mode: 'remove' | 'lock' };
+type PendingAction = { target: ShellIconTarget; mode: 'remove' | 'lock' | 'restore' };
 
 function getRiskStyle(entry: ShellIconInfo, translate: (key: string) => string): { label: string; className: string } {
   if (entry.isSystemProtected || entry.riskLevel === 'protected') {
@@ -49,7 +51,8 @@ function getRiskStyle(entry: ShellIconInfo, translate: (key: string) => string):
 }
 
 function targetOf(entry: ShellIconInfo): ShellIconTarget {
-  return { clsid: entry.clsid, hive: entry.hive, registryView: entry.registryView };
+  // 入口类型参与后端固定路径校验，不能仅凭 CLSID 推断，以免同一 CLSID 的不同挂载点互相影响。
+  return { clsid: entry.clsid, hive: entry.hive, registryView: entry.registryView, entryKind: entry.entryKind as ShellIconTarget['entryKind'] };
 }
 
 function ShellIconRow({
@@ -67,17 +70,20 @@ function ShellIconRow({
   const { t: moduleT } = useTranslation('modules');
   const risk = getRiskStyle(entry, moduleT);
   const protectedEntry = entry.isSystemProtected || entry.riskLevel === 'unknown';
+  const isNavigationEntry = entry.entryKind === 'navigationPane';
+  const isRemovedEntry = isNavigationEntry && entry.isLocked;
 
   return (
     <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-green-10)]">
-          {protectedEntry ? <Shield className="h-5 w-5 text-[var(--color-warning)]" /> : <HardDriveDownload className="h-5 w-5 text-[var(--brand-green)]" />}
+          {protectedEntry ? <Shield className="h-5 w-5 text-[var(--color-warning)]" /> : isNavigationEntry ? <PanelLeft className="h-5 w-5 text-[var(--brand-green)]" /> : <HardDriveDownload className="h-5 w-5 text-[var(--brand-green)]" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-semibold text-[var(--text-primary)]" title={entry.name}>{entry.name}</p>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${risk.className}`}>{risk.label}</span>
+            <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{moduleT(isNavigationEntry ? 'shellIcons.navigationPane' : 'shellIcons.myComputer')}</span>
             <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{entry.hive} / {entry.registryView}</span>
           </div>
           <p className="mt-1 break-all font-mono text-[11px] text-[var(--text-muted)]">{entry.clsid}</p>
@@ -85,16 +91,17 @@ function ShellIconRow({
           <p className="mt-1 break-all text-xs text-[var(--text-faint)]">{moduleT('shellIcons.component')}: {entry.sourcePath || entry.riskReason}</p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-          {!protectedEntry && (
+          {!protectedEntry && !isRemovedEntry && (
             <>
               <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'remove' })} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('shellRemoveTitle')}>
                 <Trash2 className="h-3.5 w-3.5" />{moduleT('shellIcons.remove')}
               </button>
-              <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'lock' })} className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50" title={t('shellLockTitle')}>
+              {!isNavigationEntry && <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'lock' })} className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50" title={t('shellLockTitle')}>
                 <Lock className="h-3.5 w-3.5" />{moduleT('shellIcons.lock')}
-              </button>
+              </button>}
             </>
           )}
+          {isRemovedEntry && <button type="button" disabled={busy} onClick={() => onAction({ target: targetOf(entry), mode: 'restore' })} className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-green)] px-2 py-1 text-xs text-white hover:opacity-90 disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />{moduleT('shellIcons.restore')}</button>}
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2">
@@ -104,6 +111,37 @@ function ShellIconRow({
         </button>
       </div>
     </div>
+  );
+}
+
+function ShellEntrySection({
+  title,
+  entries,
+  busy,
+  onAction,
+  onOpenRegistry,
+}: {
+  title: string;
+  entries: ShellIconInfo[];
+  busy: boolean;
+  onAction: (action: PendingAction) => void;
+  onOpenRegistry: (target: ShellIconTarget) => void;
+}) {
+  return (
+    <section className="space-y-2">
+      <h3 className="text-xs font-semibold text-[var(--text-secondary)]">{title}</h3>
+      <div className="space-y-2">
+        {entries.map(entry => (
+          <ShellIconRow
+            key={`${entry.entryKind}-${entry.hive}-${entry.registryView}-${entry.clsid}`}
+            entry={entry}
+            busy={busy}
+            onAction={onAction}
+            onOpenRegistry={onOpenRegistry}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -140,6 +178,8 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 旧版本遗留的空锁定节点仍保留操作入口，重新执行时会物理删除并校验结果。
   const actionableCount = useMemo(() => entries?.filter(entry => !entry.isSystemProtected && entry.riskLevel !== 'unknown').length ?? 0, [entries]);
+  const myComputerEntries = useMemo(() => entries?.filter(entry => entry.entryKind !== 'navigationPane') ?? [], [entries]);
+  const navigationEntries = useMemo(() => entries?.filter(entry => entry.entryKind === 'navigationPane') ?? [], [entries]);
 
   const executeAction = useCallback(async (action: PendingAction) => {
     const key = `${action.target.hive}:${action.target.registryView}:${action.target.clsid}`;
@@ -147,7 +187,9 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
     try {
       const result = action.mode === 'remove'
         ? await removeShellIcon(action.target, 1)
-        : await removeShellIcon(action.target, 2);
+        : action.mode === 'lock'
+          ? await removeShellIcon(action.target, 2)
+          : await restoreShellIcon(action.target);
       showToast({ type: 'success', title: moduleT('shellIcons.actionCompleted'), description: result.message });
       await scan();
     } catch (error) {
@@ -202,7 +244,10 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
                   <button type="button" onClick={() => void restartExplorer().then(() => showToast({ type: 'success', title: moduleT('shellIcons.explorerRefreshed'), description: moduleT('shellIcons.explorerRefreshedDesc') })).catch(error => showToast({ type: 'error', title: moduleT('shellIcons.refreshFailed'), description: String(error) }))} className="inline-flex items-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2.5 py-1.5 text-xs text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]"><RefreshCw className="h-3.5 w-3.5" />{moduleT('shellIcons.refresh')}</button>
                 </div>
               </div>
-              {entries.length === 0 ? <EmptyState icon={CheckCircle2} title={t('noThirdPartyShellIcons')} description={t('noShellIconsDescription')} tone="success" compact /> : <div className="space-y-2">{entries.map(entry => <ShellIconRow key={`${entry.hive}-${entry.registryView}-${entry.clsid}`} entry={entry} busy={busyTarget !== null} onAction={setPendingAction} onOpenRegistry={(target) => { void openShellIconRegistry(target).catch(error => showToast({ type: 'error', title: t('registryLocationFailed'), description: String(error) })); }} />)}</div>}
+              {entries.length === 0 ? <EmptyState icon={CheckCircle2} title={t('noThirdPartyShellIcons')} description={t('noShellIconsDescription')} tone="success" compact /> : <div className="space-y-4">
+                {myComputerEntries.length > 0 && <ShellEntrySection title={moduleT('shellIcons.myComputer')} entries={myComputerEntries} busy={busyTarget !== null} onAction={setPendingAction} onOpenRegistry={(target) => { void openShellIconRegistry(target).catch(error => showToast({ type: 'error', title: t('registryLocationFailed'), description: String(error) })); }} />}
+                {navigationEntries.length > 0 && <ShellEntrySection title={moduleT('shellIcons.navigationPane')} entries={navigationEntries} busy={busyTarget !== null} onAction={setPendingAction} onOpenRegistry={(target) => { void openShellIconRegistry(target).catch(error => showToast({ type: 'error', title: t('registryLocationFailed'), description: String(error) })); }} />}
+              </div>}
             </>
           )}
         </div>
@@ -212,10 +257,10 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         isOpen={pendingAction !== null}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => { if (pendingAction) void executeAction(pendingAction); }}
-        title={pendingAction?.mode === 'lock' ? moduleT('shellIcons.confirmLock') : moduleT('shellIcons.confirmRemove')}
-        description={pendingAction?.mode === 'lock' ? moduleT('shellIcons.confirmLockDesc') : moduleT('shellIcons.confirmRemoveDesc')}
+        title={pendingAction?.mode === 'lock' ? moduleT('shellIcons.confirmLock') : pendingAction?.mode === 'restore' ? moduleT('shellIcons.confirmRestore') : moduleT('shellIcons.confirmRemove')}
+        description={pendingAction?.mode === 'lock' ? moduleT('shellIcons.confirmLockDesc') : pendingAction?.mode === 'restore' ? moduleT('shellIcons.confirmRestoreDesc') : pendingAction?.target.entryKind === 'navigationPane' ? moduleT('shellIcons.confirmNavigationRemoveDesc') : moduleT('shellIcons.confirmRemoveDesc')}
         warning={t('shellDeleteWarning')}
-        confirmText={pendingAction?.mode === 'lock' ? moduleT('shellIcons.lock') : moduleT('shellIcons.remove')}
+        confirmText={pendingAction?.mode === 'lock' ? moduleT('shellIcons.lock') : pendingAction?.mode === 'restore' ? moduleT('shellIcons.restore') : moduleT('shellIcons.remove')}
         isDanger
       />
     </>

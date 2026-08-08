@@ -1520,6 +1520,7 @@ export async function deleteAiModel(path: string): Promise<EnhancedDeleteResult>
 // ============================================================================
 
 export interface ShellIconInfo {
+  entryKind: 'myComputer' | 'navigationPane' | string;
   clsid: string;
   name: string;
   applicationName?: string | null;
@@ -1537,6 +1538,7 @@ export interface ShellIconTarget {
   clsid: string;
   hive: string;
   registryView: string;
+  entryKind: 'myComputer' | 'navigationPane';
 }
 
 export interface ShellIconOperationResult {
@@ -1546,7 +1548,7 @@ export interface ShellIconOperationResult {
   needsExplorerRefresh: boolean;
 }
 
-/** 扫描 Explorer 此电脑下的第三方外壳图标；后端会同时检查系统保护和关联组件。 */
+/** 扫描 Explorer 中的第三方外壳入口，并按挂载位置返回分类。 */
 export async function scanShellIcons(): Promise<ShellIconInfo[]> {
   return invoke<ShellIconInfo[]>('scan_shell_icons');
 }

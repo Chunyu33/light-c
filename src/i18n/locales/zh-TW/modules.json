@@ -245,6 +245,7 @@
     "confirmDesc": "確定要刪除選中的 {{count}} 個外殼圖示節點嗎？",
     "remove": "刪除節點",
     "lock": "徹底刪除",
+    "restore": "恢復入口",
     "backup": "備份位置",
     "risk": "風險等級",
     "riskProtected": "系統保護",
@@ -257,6 +258,8 @@
     "actionFailed": "外殼節點操作失敗",
     "nodes": "個節點",
     "caution": "需謹慎操作",
+    "myComputer": "此電腦入口",
+    "navigationPane": "導覽窗格入口",
     "scannedNodes": "掃描節點",
     "actionableNodes": "可操作節點",
     "lockedNodes": "已鎖定",
@@ -272,8 +275,11 @@
     "refresh": "重新整理外殼",
     "confirmLock": "確認徹底刪除",
     "confirmRemove": "確認刪除",
+    "confirmRestore": "確認恢復入口",
     "confirmLockDesc": "將先儲存備份，物理刪除外殼節點，並鎖定父級登錄檔目錄，阻止普通許可權的軟體重新建立該節點。",
-    "confirmRemoveDesc": "將先儲存備份，再物理刪除當前外殼節點；相關軟體之後可能重新建立圖示。"
+    "confirmRemoveDesc": "將先儲存備份，再物理刪除當前外殼節點；相關軟體之後可能重新建立圖示。",
+    "confirmNavigationRemoveDesc": "將先儲存登錄檔備份，再取消第三方入口在左側導覽窗格中的固定狀態；不會刪除應用程式或 CLSID。",
+    "confirmRestoreDesc": "根據 LightC 保存的備份恢復該入口在左側導覽窗格中的固定狀態。"
   },
   "driverCleanup": {
     "highConfidence": "高置信舊驅動",
