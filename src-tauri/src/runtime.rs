@@ -97,7 +97,9 @@ pub fn current_executable_path() -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|error| format!("无法读取当前程序路径: {}", error))
 }
 
-/// 获取当前发行包根目录。便携版根目录必须跟随 exe，安装版根目录仍使用 LocalAppData。
+/// 获取当前发行包根目录。便携版根目录必须跟随 exe（数据随包携带），
+/// 安装版根目录仍使用 LocalAppData——安装版通过 NSIS 更新时会覆盖安装目录，
+/// 若数据放在安装目录会在更新/卸载时丢失，因此安装版必须落在 AppData。
 pub fn current_application_root() -> Option<PathBuf> {
     let executable_path = current_executable_path().ok()?;
     match detect_distribution_channel(&executable_path) {
