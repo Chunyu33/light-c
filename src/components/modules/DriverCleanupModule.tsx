@@ -289,9 +289,9 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       showToast({
         title: result.failed_count === 0 ? moduleT('driverCleanup.completed') : moduleT('driverCleanup.partial'),
         description: [
-          moduleT('driverCleanup.resultSummary', { success: result.success_count, failed: result.failed_count }),
-          failureMessages ? moduleT('driverCleanup.failureReason', { reason: failureMessages }) : '',
-          moduleT('driverCleanup.backupSummary', { path: result.backup_directory }),
+          moduleT('driverUi.resultSummary', { success: result.success_count, failed: result.failed_count }),
+          failureMessages ? moduleT('driverUi.failureReason', { reason: failureMessages }) : '',
+          moduleT('driverUi.backupSummary', { path: result.backup_directory }),
         ].filter(Boolean).join(' '),
         type: result.failed_count === 0 ? 'success' : 'warning',
       });

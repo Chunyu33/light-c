@@ -432,6 +432,11 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             reboot: rebootText,
           }),
         });
+
+        // 深度扫描会话失效时后端降级为只清理当前页，需明确提示避免用户以为整类已清理。
+        if (result.warning) {
+          showToast({ type: 'warning', title: t('toast.cleanDone'), description: t('toast.degradedClean') });
+        }
       } else if (result.failed_count > 0 || result.reboot_pending_count > 0) {
         const firstFailure = result.file_results.find((f) => !f.success && !f.marked_for_reboot);
         showToast({

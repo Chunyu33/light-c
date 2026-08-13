@@ -63,6 +63,7 @@
     "cleanBlocked": "Cleanup blocked",
     "cleanBlockedDesc": "Some files could not be deleted: {{path}}",
     "cleanBlockedReboot": "Some files will be deleted on reboot",
+    "degradedClean": "Scan results have expired. Only the currently visible files were cleaned; rescan to clean the full category",
     "noFileCleaned": "No files cleaned",
     "noFileCleanedDesc": "Selected files were not changed",
     "cleanFailed": "Cleanup failed",

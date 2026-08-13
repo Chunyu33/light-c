@@ -111,6 +111,7 @@
   "rebootPendingDesc": "Some files are in use and will be deleted after the next restart",
   "incompleteReason": "Reason for incomplete items:",
   "incompleteMore": "...{{count}} more incomplete items; click to view all",
+  "incompleteSummary": "{{count}} files could not be deleted; click to view",
   "confirmDelete": "Delete",
   "confirmDeleteLargeFiles": "Delete large files",
   "largeFileDeleteWarning": "Deleting large files may affect Windows or applications. Confirm their purpose before continuing.",

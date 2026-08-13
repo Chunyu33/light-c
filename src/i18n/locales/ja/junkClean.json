@@ -63,6 +63,7 @@
     "cleanBlocked": "クリーンがブロックされました",
     "cleanBlockedDesc": "一部のファイルを削除できませんでした: {{path}}",
     "cleanBlockedReboot": "一部のファイルは再起動後に削除されます",
+    "degradedClean": "スキャン結果の有効期限が切れました。表示中のファイルのみクリーンしました。完全な分類をクリーンするには再スキャンしてください",
     "noFileCleaned": "クリーンされたファイルなし",
     "noFileCleanedDesc": "選択したファイルに変更がありませんでした",
     "cleanFailed": "クリーンに失敗しました",

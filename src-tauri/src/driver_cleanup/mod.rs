@@ -210,9 +210,11 @@ pub fn delete(published_names: Vec<String>) -> Result<DriverDeleteResult, String
     let mut needs_reboot = false;
     for package in selected_packages {
         let published_name = package.published_name;
-        // /uninstall 只解除该包与已断开设备的关联；正在运行的设备在扫描和后端复核中仍会被拦截。
+        // 只使用 /force：旧驱动包（Outranked）仍被设备驱动匹配列表引用，pnputil 不带
+        // /force 会拒绝删除；而 /uninstall 与 /force 一起使用时 /force 会被忽略，且
+        // /uninstall 会因"设备仍安装该 INF"而失败。删除前已确认无活动设备，/force 安全。
         let command_result =
-            run_pnputil(&["/delete-driver", published_name.as_str(), "/uninstall"]);
+            run_pnputil(&["/delete-driver", published_name.as_str(), "/force"]);
         let (command_success, output_text) = match command_result {
             Ok(output) => (output.status_success, format_command_output(&output.output)),
             Err(error) => (false, error),
@@ -246,7 +248,11 @@ pub fn delete(published_names: Vec<String>) -> Result<DriverDeleteResult, String
             for detail in &mut details {
                 detail.verified_removed =
                     !remaining_names.contains(&detail.published_name.to_ascii_lowercase());
-                if detail.success && !detail.verified_removed {
+                if !detail.success && detail.verified_removed {
+                    // pnputil 命令返回失败码但复核确认包已被移除，以实际结果为准。
+                    detail.success = true;
+                    detail.error_message = None;
+                } else if detail.success && !detail.verified_removed {
                     detail.success = false;
                     detail.error_message =
                         Some("pnputil 已执行，但重新检测仍发现该驱动包".to_string());

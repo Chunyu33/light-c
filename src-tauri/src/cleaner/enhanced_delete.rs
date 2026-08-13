@@ -320,6 +320,8 @@ pub struct EnhancedDeleteResult {
     pub needs_reboot: bool,
     /// 汇总消息（WeChat 风格）
     pub summary_message: String,
+    /// 清理过程的警告提示（如深度扫描会话过期导致的降级），正常删除时为 None。
+    pub warning: Option<String>,
 }
 
 /// 增强删除过程的批量进度。
@@ -362,6 +364,7 @@ impl EnhancedDeleteResult {
             file_results: Vec::new(),
             needs_reboot: false,
             summary_message: String::new(),
+            warning: None,
         }
     }
 
@@ -431,16 +434,26 @@ const SAFE_OWNERSHIP_PATHS: &[&str] = &[
     "\\appdata\\local\\temp",
     "\\appdata\\local\\microsoft\\windows\\temporary internet files",
     "\\appdata\\local\\microsoft\\windows\\inetcache",
+    "\\appdata\\local\\microsoft\\windows\\caches",
     "\\appdata\\local\\microsoft\\windows\\explorer",
+    "\\appdata\\local\\microsoft\\windows\\webcache",
+    "\\appdata\\local\\microsoft\\windows\\clipboard",
     "\\windows\\temp",
     "\\windows\\prefetch",
     "\\windows\\softwaredistribution\\download",
     "\\windows\\softwaredistribution\\deliveryoptimization",
     "\\windows\\serviceprofiles\\networkservice\\appdata\\local\\microsoft\\windows\\deliveryoptimization",
+    "\\windows\\serviceprofiles\\localservice\\appdata\\local\\fontcache",
     "\\programdata\\microsoft\\windows defender\\localcopy",
     "\\programdata\\microsoft\\windows defender\\support",
+    "\\programdata\\microsoft\\windows defender\\scans\\history\\service",
     "\\windows\\system32\\d3d_cache",
     "\\appdata\\local\\d3dscache",
+    "\\appdata\\local\\amd\\dxcache",
+    "\\appdata\\local\\nvidia\\dxcache",
+    "\\appdata\\local\\nvidia\\glcache",
+    "\\appdata\\local\\nvidia\\dxc",
+    "\\appdata\\local\\intel\\shadercache",
     "\\$recycle.bin",
 ];
 
@@ -1088,6 +1101,20 @@ mod tests {
             "C:\\ProgramData\\Microsoft\\Windows Defender\\Support2\\MPLog.log"
         )));
         assert!(!engine.is_safe_for_ownership(Path::new("C:\\Windows\\System32\\test.dll")));
+        // 深度扫描扩展的缓存目录（Defender 扫描历史、字体缓存、剪贴板、NVIDIA shader 变体）
+        // 也应允许安全提权删除。
+        assert!(engine.is_safe_for_ownership(Path::new(
+            "C:\\ProgramData\\Microsoft\\Windows Defender\\Scans\\History\\Service\\entry.bin"
+        )));
+        assert!(engine.is_safe_for_ownership(Path::new(
+            "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\font.bin"
+        )));
+        assert!(engine.is_safe_for_ownership(Path::new(
+            "C:\\Users\\Test\\AppData\\Local\\Microsoft\\Windows\\Clipboard\\entry.bin"
+        )));
+        assert!(engine.is_safe_for_ownership(Path::new(
+            "C:\\Users\\Test\\AppData\\Local\\NVIDIA\\GLCache\\shader.bin"
+        )));
     }
 
     #[test]

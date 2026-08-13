@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Junk cleanup: deep scan adds a supplementary pass over system cache roots, broadens browser/shader cache coverage, and extends the Defender scan-history whitelist.
+- Junk cleanup: deep cleanup takes ownership (safe dirs only) and expands the ownership whitelist to reduce "access denied" failures; the result view highlights only deleted count and freed space, with failures collapsed.
+- Fixed deep-scan whole-category "result expired" errors and old-driver deletion failures with untranslated messages.
+
 ## v2.16.1
 
 - Expanded junk-cleanup coverage: added a new "Third-party app cache" category (Discord, Slack, Teams, Steam, Epic Games Launcher, NetEase CloudMusic, QQ Music) and extended deep-scan cache-name matching to variants such as `Cache2`, `.cache`, and `Cache Data`, while keeping persistent app data excluded.
