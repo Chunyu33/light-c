@@ -50,13 +50,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.16.1'
+          releaseName: 'LightC v2.16.2'
           releaseBody: |
-            LightC v2.16.1 发布说明
-            扩大垃圾清理覆盖范围，新增第三方应用缓存识别，并优化清理完成后的结果展示。
-            修复右键菜单清理统计数量与结果列表不一致的问题。
-            自定义字号范围扩展至 10–36px，并修复旧驱动恢复按钮的多语言显示。
-            完整变更请查看 CHANGELOG.md：https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md
+            LightC v2.16.2 发布说明
+            深度扫描增强：移除24小时时间过滤，覆盖全部分区与全部用户，结果始终不少于快速扫描
+            深度扫描新增系统缓存补扫，扩大浏览器与着色器缓存识别范围
+            深度清理支持提权删除，减少权限不足导致的删除失败
+            修复深度扫描整类清理报错及旧驱动删除失败问题
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
@@ -116,7 +116,7 @@ jobs:
         run: |
           $ConfigPath = "tauri.webview2-offline.conf.json"
           # 外部 Release 资产带版本号；内部运行文件仍保持 LightC.exe，避免破坏完整性校验和运行时路径识别。
-          $OutputName = "LightC_webview2_offline_x64_v2.16.1.exe"
+          $OutputName = "LightC_webview2_offline_x64_v2.16.2.exe"
 
           Write-Host "Creating WebView2 offline installer..." -ForegroundColor Cyan
 
@@ -196,7 +196,7 @@ jobs:
           $ReleaseDir = "src-tauri\target\release"
           $PortableDir = "portable_temp"
           # 压缩包带版本号；压缩包内部仍使用 LightC.exe，签名对象和便携模式识别保持不变。
-          $ZipName = "LightC_portable_x64_v2.16.1.zip"
+          $ZipName = "LightC_portable_x64_v2.16.2.zip"
           $PreservedInstallerExe = "LightC_installer_runtime.exe"
 
           Write-Host "Creating portable package..." -ForegroundColor Cyan
@@ -290,12 +290,12 @@ jobs:
       - name: Upload extra assets to release
         shell: pwsh
         run: |
-          $ZipPath = "LightC_portable_x64_v2.16.1.zip"
+          $ZipPath = "LightC_portable_x64_v2.16.2.zip"
           $InstallerSigPath = "LightC_installer_exe.sig"
           $WebView2OfflineSigPath = "LightC_webview2_offline_exe.sig"
           $PortableSigPath = "LightC_portable_exe.sig"
           $DownloadConfigPath = "download.json"
-          $WebView2OfflineInstallerPath = "LightC_webview2_offline_x64_v2.16.1.exe"
+          $WebView2OfflineInstallerPath = "LightC_webview2_offline_x64_v2.16.2.exe"
           if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $WebView2OfflineSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath) -and (Test-Path $WebView2OfflineInstallerPath)) {
             Write-Host "Uploading extra assets to release..." -ForegroundColor Cyan
             gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $WebView2OfflineSigPath $PortableSigPath $DownloadConfigPath $WebView2OfflineInstallerPath --clobber
