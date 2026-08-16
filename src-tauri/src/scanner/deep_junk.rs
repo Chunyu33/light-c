@@ -1,8 +1,11 @@
 // ============================================================================
 // 垃圾清理深度扫描器
 //
-// 深度扫描只识别高置信度的临时文件、缓存和报告目录，不使用全盘扩展名泛匹配，
-// 避免把用户的日志、下载文件或项目文件误判为垃圾。
+// 深度扫描在快速扫描的已知垃圾目录基础上，覆盖全部分区、全部用户，并通过
+// MFT/USN 与受控遍历补扫缓存目录；命中规则只识别高置信度的临时文件、缓存
+// 和报告目录，不使用全盘扩展名泛匹配，避免把用户的日志、下载文件或项目
+// 文件误判为垃圾。深度扫描与快速扫描一样不按文件修改时间过滤，保证深度
+// 扫描结果（数量与体积）始终是快速扫描的超集。
 // ============================================================================
 
 use std::collections::{HashMap, HashSet};
@@ -18,7 +21,6 @@ use walkdir::WalkDir;
 
 use super::{CategoryScanResult, FileInfo, JunkCategory};
 
-const DEEP_JUNK_MIN_AGE_SECONDS: i64 = 24 * 60 * 60;
 const DEEP_JUNK_PAGE_SIZE: usize = 500;
 // 深度扫描耗时长，用户扫描后还需浏览分类和翻页，会话保留 60 分钟避免过早失效。
 const DEEP_JUNK_SESSION_TTL: Duration = Duration::from_secs(60 * 60);
@@ -481,15 +483,11 @@ fn scan_ntfs_drive(
         true
     })?;
 
-    let current_time = current_unix_timestamp();
     let mut files = Vec::new();
     for (mft_id, category, path) in candidates {
         let Some(file_metadata) = metadata.get(&mft_id) else {
             continue;
         };
-        if file_metadata.size == 0 || !is_old_enough(file_metadata.modified, current_time) {
-            continue;
-        }
         let name = Path::new(&path)
             .file_name()
             .map(|value| value.to_string_lossy().into_owned())
@@ -547,7 +545,6 @@ fn scan_non_ntfs_drive(
     let drive_label = format!("{}:", drive_letter);
     let mut files = Vec::new();
     let mut visited = HashSet::new();
-    let current_time = current_unix_timestamp();
 
     emit_progress(
         window,
@@ -595,9 +592,6 @@ fn scan_non_ntfs_drive(
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
                 .map(|value| value.as_secs() as i64)
                 .unwrap_or(0);
-            if metadata.len() == 0 || !is_old_enough(modified, current_time) {
-                continue;
-            }
             let name = entry.file_name().to_string_lossy().into_owned();
             files.push((
                 category.clone(),
@@ -757,7 +751,6 @@ fn scan_supplement_roots(
         .iter()
         .map(|(_, file)| file.path.to_ascii_lowercase())
         .collect::<HashSet<_>>();
-    let current_time = current_unix_timestamp();
 
     emit_progress(
         window,
@@ -805,9 +798,6 @@ fn scan_supplement_roots(
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
                 .map(|value| value.as_secs() as i64)
                 .unwrap_or(0);
-            if metadata.len() == 0 || !is_old_enough(modified, current_time) {
-                continue;
-            }
             let name = entry.file_name().to_string_lossy().into_owned();
             results.push((
                 category.clone(),
@@ -844,13 +834,6 @@ fn current_unix_timestamp() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|value| value.as_secs() as i64)
         .unwrap_or(0)
-}
-
-fn is_old_enough(modified: i64, current_time: i64) -> bool {
-    if modified <= 0 {
-        return false;
-    }
-    current_time.saturating_sub(modified) >= DEEP_JUNK_MIN_AGE_SECONDS
 }
 
 /// 判断路径是否属于深度清理允许的高置信度目录。
