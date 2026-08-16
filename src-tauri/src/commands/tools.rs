@@ -77,7 +77,11 @@ pub fn open_file(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        let quoted_path = format!("\"{}\"", path);
+        // cmd 的 start 会把路径中的正斜杠当作开关分隔符解析，混用分隔符的路径会被拆坏
+        // （例如 "...\Local/Programs\Zed\Zed.exe" 会报"Windows 找不到文件"），
+        // 与 open_in_folder 保持一致，先统一成反斜杠再交给 cmd。
+        let windows_path = path.replace('/', "\\");
+        let quoted_path = format!("\"{}\"", windows_path);
         Command::new("cmd")
             .args(["/C", "start", "", &quoted_path])
             .spawn()

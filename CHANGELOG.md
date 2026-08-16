@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Fixed "Windows cannot find the file" when opening a file whose path mixes forward slashes: the path is now normalized to backslashes before handing it to the shell.
+
 ## v2.16.2
 
 - Junk cleanup: enhanced the deep scan by removing the 24-hour modification-time filter and the zero-byte exclusion so it uses the same filtering as the quick scan; deep scan covers all partitions and all users, so its results (count and size) are always a superset of the quick scan, fixing quick scan reporting more junk than deep scan.
