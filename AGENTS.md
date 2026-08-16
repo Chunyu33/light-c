@@ -140,11 +140,12 @@ If output contains unreadable characters, inspect the exit code first.
 
 ---
 
-## 14. Git 相关（如果涉及）
+## 14. Git 相关
 
 - 变更应具备清晰 commit 粒度
 - commit message 简洁说明变更内容
 - 不提交无关文件
+- 提交信息默认英文
 
 ---
 
