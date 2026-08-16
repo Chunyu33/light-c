@@ -126,7 +126,7 @@ function DashboardContent() {
       <main className="flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)]">
         <div className="h-full min-h-0 flex flex-col">
           <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-            <div className={`${isPageMode ? 'max-w-6xl min-h-full box-border' : 'max-w-5xl space-y-5'} relative w-full mx-auto p-6`}>
+            <div className={`${isPageMode ? 'min-h-full box-border' : 'space-y-5'} relative p-6 dashboard-container`}>
               {APP_MODULES.map((moduleConfig) => {
                 const ModuleComponent = moduleConfig.component;
                 const isActivePage = visibleModuleId === moduleConfig.id;

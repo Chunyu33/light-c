@@ -133,7 +133,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
 
   return (
     <div className="bg-[var(--bg-card)] border-b border-[var(--border-color)] px-5 py-2.5 sticky top-0 z-10">
-      <div className="max-w-5xl mx-auto flex items-center gap-5">
+      <div className="dashboard-container flex items-center gap-5">
         {/* 健康评分 - 微信风格圆环进度 */}
         <div 
           className="flex items-center gap-3 cursor-pointer min-w-[230px]"
