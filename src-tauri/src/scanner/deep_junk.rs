@@ -1,8 +1,11 @@
 // ============================================================================
 // 垃圾清理深度扫描器
 //
-// 深度扫描只识别高置信度的临时文件、缓存和报告目录，不使用全盘扩展名泛匹配，
-// 避免把用户的日志、下载文件或项目文件误判为垃圾。
+// 深度扫描在快速扫描的已知垃圾目录基础上，覆盖全部分区、全部用户，并通过
+// MFT/USN 与受控遍历补扫缓存目录；命中规则只识别高置信度的临时文件、缓存
+// 和报告目录，不使用全盘扩展名泛匹配，避免把用户的日志、下载文件或项目
+// 文件误判为垃圾。深度扫描与快速扫描一样不按文件修改时间过滤，保证深度
+// 扫描结果（数量与体积）始终是快速扫描的超集。
 // ============================================================================
 
 use std::collections::{HashMap, HashSet};
@@ -18,10 +21,11 @@ use walkdir::WalkDir;
 
 use super::{CategoryScanResult, FileInfo, JunkCategory};
 
-const DEEP_JUNK_MIN_AGE_SECONDS: i64 = 24 * 60 * 60;
 const DEEP_JUNK_PAGE_SIZE: usize = 500;
-const DEEP_JUNK_SESSION_TTL: Duration = Duration::from_secs(10 * 60);
-const MAX_DEEP_JUNK_SESSIONS: usize = 2;
+// 深度扫描耗时长，用户扫描后还需浏览分类和翻页，会话保留 60 分钟避免过早失效。
+const DEEP_JUNK_SESSION_TTL: Duration = Duration::from_secs(60 * 60);
+// 允许保留的深度扫描会话数，避免用户连续多次扫描时旧会话被立即挤出。
+const MAX_DEEP_JUNK_SESSIONS: usize = 4;
 
 static DEEP_JUNK_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 
@@ -479,15 +483,11 @@ fn scan_ntfs_drive(
         true
     })?;
 
-    let current_time = current_unix_timestamp();
     let mut files = Vec::new();
     for (mft_id, category, path) in candidates {
         let Some(file_metadata) = metadata.get(&mft_id) else {
             continue;
         };
-        if file_metadata.size == 0 || !is_old_enough(file_metadata.modified, current_time) {
-            continue;
-        }
         let name = Path::new(&path)
             .file_name()
             .map(|value| value.to_string_lossy().into_owned())
@@ -504,6 +504,10 @@ fn scan_ntfs_drive(
             ),
         ));
     }
+
+    // MFT/USN 枚举只覆盖变更日志中尚存的记录，老且长期未变的系统缓存文件会被跳过；
+    // 这里对所有白名单缓存根目录做一次受控遍历，与 MFT 结果按小写路径去重后补齐缺口。
+    scan_supplement_roots(drive_letter, window, started_at, &mut files);
 
     files.sort_by(|left, right| left.1.path.cmp(&right.1.path));
     let matched_size = files.iter().map(|(_, file)| file.size).sum();
@@ -541,7 +545,6 @@ fn scan_non_ntfs_drive(
     let drive_label = format!("{}:", drive_letter);
     let mut files = Vec::new();
     let mut visited = HashSet::new();
-    let current_time = current_unix_timestamp();
 
     emit_progress(
         window,
@@ -589,9 +592,6 @@ fn scan_non_ntfs_drive(
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
                 .map(|value| value.as_secs() as i64)
                 .unwrap_or(0);
-            if metadata.len() == 0 || !is_old_enough(modified, current_time) {
-                continue;
-            }
             let name = entry.file_name().to_string_lossy().into_owned();
             files.push((
                 category.clone(),
@@ -653,9 +653,8 @@ fn fixed_drive_letters() -> Result<Vec<char>, String> {
 }
 
 #[cfg(windows)]
-fn non_ntfs_scan_roots(drive_letter: char) -> Vec<PathBuf> {
-    let root = PathBuf::from(format!("{}:\\", drive_letter));
-    let mut roots = vec![
+fn system_level_cache_roots(root: &Path) -> Vec<PathBuf> {
+    vec![
         root.join("Windows\\Temp"),
         root.join("Windows\\Prefetch"),
         root.join("Windows\\SoftwareDistribution\\Download"),
@@ -669,8 +668,42 @@ fn non_ntfs_scan_roots(drive_letter: char) -> Vec<PathBuf> {
         root.join("ProgramData\\Microsoft\\Windows\\WER"),
         root.join("ProgramData\\Microsoft\\Windows Defender\\LocalCopy"),
         root.join("ProgramData\\Microsoft\\Windows Defender\\Support"),
-    ];
+        // Defender 扫描历史目录（扫描结束后自动重建），与 Windows 清理向导的 Defender 项一致。
+        root.join("ProgramData\\Microsoft\\Windows Defender\\Scans\\History\\Service"),
+        root.join("Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache"),
+        root.join("Windows\\Installer\\$PatchCache$"),
+        root.join("Windows\\System32\\d3d_cache"),
+    ]
+}
 
+/// 每个用户配置目录下的明确高置信缓存子目录。
+/// 只遍历可重建缓存，避免触碰 WebView/Chromium 持久化 Profile 数据。
+#[cfg(windows)]
+fn user_level_cache_roots(profile: &Path) -> Vec<PathBuf> {
+    let local = profile.join("AppData\\Local");
+    vec![
+        local.join("Temp"),
+        local.join("CrashDumps"),
+        local.join("Downloaded Installations"),
+        local.join("D3DSCache"),
+        local.join("AMD\\DxCache"),
+        local.join("NVIDIA\\DXCache"),
+        local.join("Intel\\ShaderCache"),
+        local.join("Microsoft\\Windows\\INetCache"),
+        local.join("Microsoft\\Windows\\Caches"),
+        local.join("Microsoft\\Windows\\Explorer"),
+        local.join("Microsoft\\Windows\\WebCache"),
+        local.join("Microsoft\\Windows\\Clipboard"),
+        local.join("Microsoft\\Windows\\WER"),
+    ]
+}
+
+#[cfg(windows)]
+fn non_ntfs_scan_roots(drive_letter: char) -> Vec<PathBuf> {
+    let root = PathBuf::from(format!("{}:\\", drive_letter));
+    let mut roots = system_level_cache_roots(&root);
+
+    // 非 NTFS 分区无 MFT，需要覆盖整个 AppData\Local 才能发现 AppCache 等分散缓存。
     let users_root = root.join("Users");
     if let Ok(users) = std::fs::read_dir(users_root) {
         for user in users.filter_map(Result::ok) {
@@ -681,6 +714,97 @@ fn non_ntfs_scan_roots(drive_letter: char) -> Vec<PathBuf> {
         }
     }
     roots
+}
+
+/// NTFS 深度扫描的补扫根目录。
+/// MFT/USN 枚举只返回变更日志中尚存的记录，老且长期未变、或祖先目录记录被淘汰的
+/// 系统缓存文件会被静默跳过；这里对每个用户只列出明确的高置信缓存子目录做受控遍历，
+/// 与 MFT 结果去重合并，保证传递优化、更新缓存、缩略图等系统目录稳定覆盖。
+#[cfg(windows)]
+fn supplement_ntfs_scan_roots(drive_letter: char) -> Vec<PathBuf> {
+    let root = PathBuf::from(format!("{}:\\", drive_letter));
+    let mut roots = system_level_cache_roots(&root);
+
+    let users_root = root.join("Users");
+    if let Ok(users) = std::fs::read_dir(users_root) {
+        for user in users.filter_map(Result::ok) {
+            let profile = user.path();
+            if profile.is_dir() {
+                roots.extend(user_level_cache_roots(&profile));
+            }
+        }
+    }
+    roots
+}
+
+/// 对补扫根目录做受控遍历，把 MFT 枚举遗漏的高置信缓存文件补充进结果。
+/// 已存在于 results 中的路径（小写比较）直接跳过，避免与 MFT 结果重复统计。
+#[cfg(windows)]
+fn scan_supplement_roots(
+    drive_letter: char,
+    window: &Window,
+    started_at: std::time::Instant,
+    results: &mut Vec<(JunkCategory, FileInfo)>,
+) {
+    let drive_label = format!("{}:", drive_letter);
+    let mut visited = results
+        .iter()
+        .map(|(_, file)| file.path.to_ascii_lowercase())
+        .collect::<HashSet<_>>();
+
+    emit_progress(
+        window,
+        "walkdir",
+        &drive_label,
+        "正在补扫系统缓存目录，兜底 MFT 未覆盖的文件",
+        results.len(),
+        results.len(),
+        started_at,
+    );
+
+    for root in supplement_ntfs_scan_roots(drive_letter) {
+        if is_cancelled() {
+            break;
+        }
+        if !root.exists() {
+            continue;
+        }
+
+        for entry in WalkDir::new(root)
+            .max_depth(12)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if is_cancelled() {
+                break;
+            }
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path().to_string_lossy().into_owned();
+            if !visited.insert(path.to_ascii_lowercase()) {
+                continue;
+            }
+            let Some(category) = match_deep_junk_category(&path) else {
+                continue;
+            };
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+                .map(|value| value.as_secs() as i64)
+                .unwrap_or(0);
+            let name = entry.file_name().to_string_lossy().into_owned();
+            results.push((
+                category.clone(),
+                FileInfo::new(path, name, metadata.len(), modified, false, category),
+            ));
+        }
+    }
 }
 
 fn emit_progress(
@@ -710,13 +834,6 @@ fn current_unix_timestamp() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|value| value.as_secs() as i64)
         .unwrap_or(0)
-}
-
-fn is_old_enough(modified: i64, current_time: i64) -> bool {
-    if modified <= 0 {
-        return false;
-    }
-    current_time.saturating_sub(modified) >= DEEP_JUNK_MIN_AGE_SECONDS
 }
 
 /// 判断路径是否属于深度清理允许的高置信度目录。
@@ -871,6 +988,9 @@ fn is_shader_cache(path: &str) -> bool {
             "\\appdata\\local\\d3dscache\\",
             "\\appdata\\local\\amd\\dxcache\\",
             "\\appdata\\local\\nvidia\\dxcache\\",
+            // NVIDIA OpenGL 着色器缓存与 DX 编译缓存，删除后自动重建
+            "\\appdata\\local\\nvidia\\glcache\\",
+            "\\appdata\\local\\nvidia\\dxc\\",
             "\\appdata\\local\\intel\\shadercache\\",
         ],
     )
@@ -882,6 +1002,8 @@ fn is_defender_cache(path: &str) -> bool {
         &[
             "\\programdata\\microsoft\\windows defender\\localcopy\\",
             "\\programdata\\microsoft\\windows defender\\support\\",
+            // Defender 扫描历史目录，扫描完成后自动重建，与 Windows 清理向导的 Defender 项一致。
+            "\\programdata\\microsoft\\windows defender\\scans\\history\\service\\",
         ],
     )
 }
@@ -895,6 +1017,19 @@ fn is_browser_cache(path: &str) -> bool {
             "\\bravesoftware\\brave-browser\\user data\\",
             "\\mozilla\\firefox\\profiles\\",
             "\\opera software\\opera stable\\",
+            // 国产 Chromium 系浏览器（缓存目录与 Chrome 一致，删除后自动重建）
+            "\\tencent\\qqbrowser\\",
+            "\\360chrome\\chrome\\user data\\",
+            "\\360se6\\user data\\",
+            "\\sogouexplorer\\",
+            "\\ucbrowser\\user data\\",
+            "\\2345explorer\\",
+            "\\liebao\\user data\\",
+            // 其他国际 Chromium 系浏览器
+            "\\vivaldi\\user data\\",
+            "\\yandexbrowser\\user data\\",
+            "\\opera software\\opera gx stable\\",
+            "\\centbrowser\\user data\\",
         ],
     );
     known_browser
@@ -906,6 +1041,11 @@ fn is_browser_cache(path: &str) -> bool {
                 "\\gpucache\\",
                 "\\shadercache\\",
                 "\\cache2\\",
+                // Chrome/Edge 新版本 GPU 着色器缓存目录，删除后自动重建
+                "\\grshadercache\\",
+                "\\graphitedawncache\\",
+                "\\dawngraphitecache\\",
+                "\\dawnwebgpucache\\",
             ],
         )
 }
@@ -1094,6 +1234,43 @@ mod tests {
     }
 
     #[test]
+    fn matches_extended_browser_and_shader_caches() {
+        // 国产与国际 Chromium 系浏览器缓存应命中，且不误伤非缓存数据。
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Tencent\QQBrowser\User Data\Default\Cache\data_1"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\360Chrome\Chrome\User Data\Default\Code Cache\js\cache"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Vivaldi\User Data\Default\GPUCache\data_0"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\CentBrowser\User Data\Default\Cache\data_1"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\YandexBrowser\User Data\Default\Cache\data_1"
+        ));
+        // Chrome/Edge 新版 GPU 缓存目录命中，但非缓存目录不命中。
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\GrShaderCache\GPUCache\data_0"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Microsoft\Edge\User Data\Default\DawnGraphiteCache\data_0"
+        ));
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\Local Storage\leveldb\data"
+        ));
+        // NVIDIA 着色器缓存变体命中。
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\NVIDIA\GLCache\shader.bin"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\NVIDIA\DXC\compiled.bin"
+        ));
+    }
+
+    #[test]
     fn matches_windows_cleanup_wizard_cache_categories() {
         assert!(is_deep_junk_path(
             r"C:\ProgramData\Microsoft\Windows Defender\Support\MPLog-old.log"
@@ -1101,8 +1278,37 @@ mod tests {
         assert!(is_deep_junk_path(
             r"C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\payload.bin"
         ));
+        // Defender 扫描历史目录（扫描后自动重建）应命中，隔离区等关键数据仍被保护。
+        assert!(is_deep_junk_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Scans\History\Service\DetectionHistory\00000000-0000-0000-0000-000000000000\entry.bin"
+        ));
         assert!(!is_deep_junk_path(
             r"C:\ProgramData\Microsoft\Windows Defender\Quarantine\entry.bin"
+        ));
+        // 仿冒目录名（History 后面加字符）不得命中，避免放行嵌套伪造路径。
+        assert!(!is_deep_junk_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Scans\History\ServiceEvil\entry.bin"
+        ));
+    }
+
+    #[test]
+    fn supplement_roots_only_cover_high_confidence_cache_dirs() {
+        // 补扫根覆盖的系统级缓存目录应命中深度规则（与 cleanmgr 对齐）。
+        assert!(is_deep_junk_path(
+            r"C:\Windows\SoftwareDistribution\Download\update.cab"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Windows\SoftwareDistribution\DeliveryOptimization\payload.bin"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Windows\Temp\old.tmp"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Windows\Logs\setupapi\setupapi.dev.log"
+        ));
+        // 补扫根只覆盖明确缓存子目录，不放大到整个 AppData\Local。
+        assert!(!is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Local\Microsoft\Windows\Explorer\data\something.bin"
         ));
     }
 

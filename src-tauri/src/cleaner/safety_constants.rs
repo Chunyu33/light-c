@@ -74,6 +74,7 @@ pub fn is_rebuildable_system_cache_path(path: &str) -> bool {
         "\\windows\\system32\\d3d_cache",
         "\\programdata\\microsoft\\windows defender\\localcopy",
         "\\programdata\\microsoft\\windows defender\\support",
+        "\\programdata\\microsoft\\windows defender\\scans\\history\\service",
     ]
     .iter()
     .any(|marker| {
@@ -97,8 +98,15 @@ mod tests {
         assert!(is_rebuildable_system_cache_path(
             r"C:\ProgramData\Microsoft\Windows Defender\Support\MPLog.log"
         ));
+        assert!(is_rebuildable_system_cache_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Scans\History\Service\DetectionHistory\entry.bin"
+        ));
         assert!(!is_rebuildable_system_cache_path(
             r"C:\ProgramData\Microsoft\Windows Defender\Support2\MPLog.log"
+        ));
+        // 仿冒目录名不得放行删除。
+        assert!(!is_rebuildable_system_cache_path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Scans\History\ServiceEvil\entry.bin"
         ));
         assert!(!is_rebuildable_system_cache_path(
             r"C:\ProgramData\Microsoft\Windows Defender\Quarantine\entry.bin"

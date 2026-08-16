@@ -196,6 +196,22 @@ impl JunkCategory {
                 ),
                 // Opera 浏览器
                 ScanPath::env_path("APPDATA", Some("Opera Software\\Opera Stable\\Cache")),
+                // 国产与国际 Chromium 系浏览器（缓存结构与 Chrome 一致，删除后自动重建）
+                ScanPath::glob_path("LOCALAPPDATA", "Tencent\\QQBrowser\\User Data\\Default\\Cache"),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "Tencent\\QQBrowser\\User Data\\Default\\Code Cache",
+                ),
+                ScanPath::glob_path("LOCALAPPDATA", "360Chrome\\Chrome\\User Data\\Default\\Cache"),
+                ScanPath::glob_path(
+                    "LOCALAPPDATA",
+                    "360Chrome\\Chrome\\User Data\\Default\\Code Cache",
+                ),
+                ScanPath::glob_path("LOCALAPPDATA", "360se6\\User Data\\Default\\Cache"),
+                ScanPath::glob_path("LOCALAPPDATA", "UCBrowser\\User Data\\Default\\Cache"),
+                ScanPath::glob_path("LOCALAPPDATA", "Vivaldi\\User Data\\Default\\Cache"),
+                ScanPath::glob_path("LOCALAPPDATA", "YandexBrowser\\User Data\\Default\\Cache"),
+                ScanPath::glob_path("LOCALAPPDATA", "CentBrowser\\User Data\\Default\\Cache"),
             ],
             JunkCategory::RecycleBin => get_all_drive_letters()
                 .into_iter()
@@ -216,7 +232,7 @@ impl JunkCategory {
                 ),
             ],
             JunkCategory::WindowsDefenderCache => vec![
-                // Windows 清理向导的 Defender 项只指向这两个目录，不泛扫 Defender 数据根目录。
+                // Windows 清理向导的 Defender 项只指向这几个非关键目录，不泛扫 Defender 数据根目录。
                 ScanPath::env_path(
                     "PROGRAMDATA",
                     Some("Microsoft\\Windows Defender\\LocalCopy"),
@@ -224,6 +240,11 @@ impl JunkCategory {
                 ScanPath::env_path(
                     "PROGRAMDATA",
                     Some("Microsoft\\Windows Defender\\Support"),
+                ),
+                // Defender 扫描历史目录（扫描完成后自动重建），与 Windows 清理向导的 Defender 项一致。
+                ScanPath::env_path(
+                    "PROGRAMDATA",
+                    Some("Microsoft\\Windows Defender\\Scans\\History\\Service"),
                 ),
             ],
             JunkCategory::LogFiles => vec![

@@ -208,7 +208,7 @@ fn app_local_root_dir() -> Option<PathBuf> {
     dirs::data_local_dir().map(|dir| dir.join(APP_ROOT_DIR_NAME))
 }
 
-/// 当前发行包的存储根目录；便携版必须以 exe 所在目录为根。
+/// 当前发行包的存储根目录；便携版以 exe 所在目录为根，安装版以 AppData 为根。
 fn storage_root_dir() -> Option<PathBuf> {
     current_application_root()
 }

@@ -674,8 +674,10 @@ export interface EnhancedDeleteResult {
   file_results: FileDeleteResult[];
   /** 鏄惁闇€瑕侀噸鍚畬鎴愭竻鐞?*/
   needs_reboot: boolean;
-  /** 姹囨€绘秷鎭紙WeChat 椋庢牸锛?*/
+  /** 汇总消息（WeChat 风格） */
   summary_message: string;
+  /** 清理过程的警告提示（如深度扫描会话过期导致的降级），正常删除时为 null */
+  warning?: string | null;
 }
 
 /**
@@ -735,7 +737,9 @@ export function getFailureReasonMessage(reason: DeleteFailureReason | null): str
     case 'SystemProtected': return '系统保护文件';
     case 'OutOfScope': return '不在清理范围内';
     case 'MarkedForReboot': return '已标记重启后删除';
-    default: return typeof reason === 'object' && 'Other' in reason ? reason.Other : '删除失败';
+    // Other 携带后端逐层尝试的原始错误（如 os error 5），仅在 tooltip 展示；
+    // 列表内统一显示简短"删除失败"，避免冗长的系统错误打扰用户。
+    default: return '删除失败';
   }
 }
 
@@ -1520,6 +1524,7 @@ export async function deleteAiModel(path: string): Promise<EnhancedDeleteResult>
 // ============================================================================
 
 export interface ShellIconInfo {
+  entryKind: 'myComputer' | 'navigationPane' | string;
   clsid: string;
   name: string;
   applicationName?: string | null;
@@ -1537,6 +1542,7 @@ export interface ShellIconTarget {
   clsid: string;
   hive: string;
   registryView: string;
+  entryKind: 'myComputer' | 'navigationPane';
 }
 
 export interface ShellIconOperationResult {
@@ -1546,7 +1552,7 @@ export interface ShellIconOperationResult {
   needsExplorerRefresh: boolean;
 }
 
-/** 扫描 Explorer 此电脑下的第三方外壳图标；后端会同时检查系统保护和关联组件。 */
+/** 扫描 Explorer 中的第三方外壳入口，并按挂载位置返回分类。 */
 export async function scanShellIcons(): Promise<ShellIconInfo[]> {
   return invoke<ShellIconInfo[]>('scan_shell_icons');
 }

@@ -63,6 +63,7 @@
     "cleanBlocked": "清理受阻",
     "cleanBlockedDesc": "部分檔案未能刪除：{{path}}",
     "cleanBlockedReboot": "部分檔案將在重啟後刪除",
+    "degradedClean": "掃描結果已過期，本次僅清理目前顯示的檔案，建議重新掃描後再次清理完整分類",
     "noFileCleaned": "沒有檔案被清理",
     "noFileCleanedDesc": "所選檔案未發生變化",
     "cleanFailed": "垃圾清理失敗",

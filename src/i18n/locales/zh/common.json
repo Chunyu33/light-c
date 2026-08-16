@@ -111,6 +111,7 @@
   "rebootPendingDesc": "部分文件被系统占用，将在下次重启后自动删除",
   "incompleteReason": "未立即完成原因：",
   "incompleteMore": "...还有 {{count}} 个未立即完成项，点击查看全部",
+  "incompleteSummary": "另有 {{count}} 个文件未能删除，点击查看",
   "confirmDelete": "确认删除",
   "confirmDeleteLargeFiles": "确认删除大文件",
   "largeFileDeleteWarning": "免责声明：大文件删除可能影响系统或软件正常运行，请确认文件用途后再执行。",

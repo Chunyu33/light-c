@@ -1,8 +1,7 @@
 // ============================================================================
-// 虚拟磁盘 / 外壳图标扫描与处理
+// 外壳入口扫描与处理
 //
-// 这里只处理 Explorer\MyComputer\NameSpace 下的 CLSID 节点。
-// 该范围比 DelegateFolders 更收敛，能降低把真实系统 Shell 扩展误判为“虚拟磁盘”的风险。
+// 此电脑入口和导航窗格入口使用不同的注册表挂载机制，必须按入口类型分别校验和操作。
 // ============================================================================
 
 use chrono::Local;
@@ -33,8 +32,12 @@ use winapi::um::winnt::{
 use winreg::enums::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use winreg::{RegKey, HKEY};
 
-const NAMESPACE_PATH: &str =
+const MY_COMPUTER_NAMESPACE_PATH: &str =
     r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\MyComputer\NameSpace";
+const DESKTOP_NAMESPACE_PATH: &str =
+    r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace";
+const NAVIGATION_CLSID_PATH: &str = r"Software\Classes\CLSID";
+const NAVIGATION_PIN_VALUE: &str = "System.IsPinnedToNameSpaceTree";
 const SHCNE_ASSOCCHANGED: u32 = 0x0800_0000;
 const SHCNF_IDLIST: u32 = 0x0000;
 
@@ -49,11 +52,29 @@ const SYSTEM_CLSIDS: &[&str] = &[
     "{645FF040-5081-101B-9F08-00AA002F954E}",
     "{59031A47-3F72-44A7-89C5-5595FE6B30EE}",
     "{374DE290-123F-4565-9164-39C4925E467B}",
+    // Linux 是 Windows 功能入口，不应因使用导航窗格固定标记被识别为第三方项目。
+    "{B2B4A4D1-2754-4140-A2EB-9A76D9D7CDC6}",
 ];
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ShellEntryKind {
+    #[serde(rename = "myComputer")]
+    MyComputer,
+    #[serde(rename = "navigationPane")]
+    NavigationPane,
+}
+
+impl Default for ShellEntryKind {
+    fn default() -> Self {
+        Self::MyComputer
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShellIconInfo {
+    pub entry_kind: ShellEntryKind,
     pub clsid: String,
     pub name: String,
     pub application_name: Option<String>,
@@ -73,6 +94,9 @@ pub struct ShellIconTarget {
     pub clsid: String,
     pub hive: String,
     pub registry_view: String,
+    /// 旧版备份没有该字段，默认按原有“此电脑入口”兼容处理。
+    #[serde(default)]
+    pub entry_kind: ShellEntryKind,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,6 +128,9 @@ struct ShellIconBackup {
     /// 彻底删除会锁定父级 Namespace，必须保存原 ACL 才能完整恢复。
     #[serde(default)]
     namespace_acl_sddl: Option<String>,
+    /// 导航窗格只修改固定标记，备份原始值即可避免恢复时覆盖应用其他注册信息。
+    #[serde(default)]
+    navigation_pin_value: Option<u32>,
     created_at: String,
 }
 
@@ -144,24 +171,42 @@ pub fn scan_shell_icons() -> Result<Vec<ShellIconInfo>, String> {
     let mut entries = Vec::new();
 
     for (hive, view, context) in scan_targets {
-        let namespace_key = match RegKey::predef(context.root)
-            .open_subkey_with_flags(NAMESPACE_PATH, KEY_READ | context.view_flags)
+        if let Ok(namespace_key) = RegKey::predef(context.root)
+            .open_subkey_with_flags(MY_COMPUTER_NAMESPACE_PATH, KEY_READ | context.view_flags)
         {
-            Ok(key) => key,
-            Err(_) => continue,
-        };
-
-        for raw_clsid in namespace_key.enum_keys().filter_map(Result::ok) {
-            let Some(clsid) = normalize_clsid(&raw_clsid) else {
-                continue;
-            };
-            // 某个第三方节点权限异常不应阻断其他分区视图的扫描结果。
-            match build_shell_icon_info(&namespace_key, &clsid, hive, view, context) {
-                Ok(info) if info.risk_level == "safe" || info.risk_level == "locked" => {
-                    entries.push(info)
+            for raw_clsid in namespace_key.enum_keys().filter_map(Result::ok) {
+                let Some(clsid) = normalize_clsid(&raw_clsid) else {
+                    continue;
+                };
+                // 某个第三方节点权限异常不应阻断其他分区视图的扫描结果。
+                match build_shell_icon_info(&namespace_key, &clsid, hive, view, context) {
+                    Ok(info) if info.risk_level == "safe" || info.risk_level == "locked" => {
+                        entries.push(info)
+                    }
+                    Ok(_) => {}
+                    Err(error) => log::debug!("跳过无法读取的外壳节点 {}: {}", clsid, error),
                 }
-                Ok(_) => {}
-                Err(error) => log::debug!("跳过无法读取的外壳节点 {}: {}", clsid, error),
+            }
+        }
+
+        // 先从 Desktop\NameSpace 获取候选 CLSID，再读取固定标记，避免遍历整个 Classes\CLSID。
+        if let (Ok(navigation_namespace), Ok(clsid_root)) = (
+            RegKey::predef(context.root)
+                .open_subkey_with_flags(DESKTOP_NAMESPACE_PATH, KEY_READ | context.view_flags),
+            RegKey::predef(context.root)
+                .open_subkey_with_flags(NAVIGATION_CLSID_PATH, KEY_READ | context.view_flags),
+        ) {
+            for raw_clsid in navigation_namespace.enum_keys().filter_map(Result::ok) {
+                let Some(clsid) = normalize_clsid(&raw_clsid) else {
+                    continue;
+                };
+                match build_navigation_info(&clsid_root, &clsid, hive, view, context) {
+                    Ok(Some(info)) if info.risk_level == "safe" || info.risk_level == "locked" => {
+                        entries.push(info)
+                    }
+                    Ok(_) => {}
+                    Err(error) => log::debug!("跳过无法读取的导航窗格入口 {}: {}", clsid, error),
+                }
             }
         }
     }
@@ -171,9 +216,10 @@ pub fn scan_shell_icons() -> Result<Vec<ShellIconInfo>, String> {
     let mut unique_entries: HashMap<String, ShellIconInfo> = HashMap::new();
     for entry in entries {
         let key = format!(
-            "{}:{}:{}",
+            "{}:{}:{}:{}",
             entry.hive.to_ascii_lowercase(),
             entry.registry_view.to_ascii_lowercase(),
+            format!("{:?}", entry.entry_kind).to_ascii_lowercase(),
             entry.clsid.to_ascii_lowercase()
         );
         unique_entries.entry(key).or_insert(entry);
@@ -252,10 +298,11 @@ fn build_shell_icon_info(
     };
 
     Ok(ShellIconInfo {
+        entry_kind: ShellEntryKind::MyComputer,
         clsid: clsid.to_string(),
         name,
         application_name,
-        reg_path: format!(r"{}\{}\{}", hive, NAMESPACE_PATH, clsid),
+        reg_path: format!(r"{}\{}\{}", hive, MY_COMPUTER_NAMESPACE_PATH, clsid),
         hive: hive.to_string(),
         registry_view: registry_view.to_string(),
         source_path,
@@ -264,6 +311,74 @@ fn build_shell_icon_info(
         is_system_protected,
         is_locked,
     })
+}
+
+/// 读取固定到 Explorer 左侧导航窗格的第三方 CLSID；返回 None 表示未固定或不适合展示。
+fn build_navigation_info(
+    clsid_root: &RegKey,
+    clsid: &str,
+    hive: &str,
+    registry_view: &str,
+    context: RegistryTargetContext,
+) -> Result<Option<ShellIconInfo>, String> {
+    let clsid_key = clsid_root
+        .open_subkey_with_flags(clsid, KEY_READ | context.view_flags)
+        .map_err(|error| format!("打开导航窗格 CLSID 失败 {}: {}", clsid, error))?;
+    let pin_value = clsid_key.get_value::<u32, _>(NAVIGATION_PIN_VALUE).ok();
+    let is_pinned = pin_value.is_some_and(|value| value != 0);
+    let target = ShellIconTarget {
+        clsid: clsid.to_string(),
+        hive: hive.to_string(),
+        registry_view: registry_view.to_string(),
+        entry_kind: ShellEntryKind::NavigationPane,
+    };
+    // 只把 LightC 已备份并隐藏的入口带回结果，确保扫描不会膨胀成整个 CLSID 列表。
+    if !is_pinned && !has_navigation_backup(&target)? {
+        return Ok(None);
+    }
+
+    let raw_name = clsid_key
+        .get_value::<String, _>("")
+        .ok()
+        .filter(|value| !value.trim().is_empty());
+    let name = raw_name
+        .as_deref()
+        .map(resolve_indirect_string)
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| clsid.to_string());
+    let source_path = find_source_path(&clsid_key);
+    let known_application = identify_known_application(clsid, &name, source_path.as_deref());
+    let application_name = identify_application(clsid, &name, source_path.as_deref());
+    let system_by_clsid = SYSTEM_CLSIDS
+        .iter()
+        .any(|item| item.eq_ignore_ascii_case(clsid));
+    let system_by_source = source_path
+        .as_deref()
+        .is_some_and(is_system_component_path)
+        && known_application.is_none();
+    let is_system_protected = system_by_clsid || system_by_source;
+    if is_system_protected || application_name.is_none() {
+        return Ok(None);
+    }
+
+    Ok(Some(ShellIconInfo {
+        entry_kind: ShellEntryKind::NavigationPane,
+        clsid: clsid.to_string(),
+        name,
+        application_name,
+        reg_path: format!(r"{}\{}\{}", hive, NAVIGATION_CLSID_PATH, clsid),
+        hive: hive.to_string(),
+        registry_view: registry_view.to_string(),
+        source_path,
+        risk_level: if is_pinned { "safe" } else { "locked" }.to_string(),
+        risk_reason: if is_pinned {
+            "已确认第三方导航窗格入口，操作前会自动备份固定状态".to_string()
+        } else {
+            "该导航窗格入口已由 LightC 移除，可从备份恢复".to_string()
+        },
+        is_system_protected: false,
+        is_locked: !is_pinned,
+    }))
 }
 
 /// 通过 CLSID、注册表显示名和组件文件名识别用户真正安装的应用。
@@ -333,6 +448,12 @@ pub fn remove_shell_icon(
         return Err("不支持的清理模式".to_string());
     }
     let target = normalize_target(target)?;
+    if matches!(target.entry_kind, ShellEntryKind::NavigationPane) {
+        if mode == 2 {
+            return Err("导航窗格入口不支持防复活锁定，只能移除固定状态".to_string());
+        }
+        return remove_navigation_entry(&target);
+    }
     let context = target_context(&target)?;
     // 先只申请读取和修改 ACL 的权限，兼容之前由 LightC 添加拒绝 ACE 后无法申请 FullControl 的节点。
     let initial_key = open_target_key(
@@ -482,6 +603,9 @@ pub fn remove_shell_icon(
 /// 解锁只恢复原 ACL，不自动重新导入内容，避免用户只想允许软件重新注册时被意外恢复图标。
 pub fn unlock_shell_icon(target: &ShellIconTarget) -> Result<ShellIconOperationResult, String> {
     let target = normalize_target(target)?;
+    if matches!(target.entry_kind, ShellEntryKind::NavigationPane) {
+        return Err("导航窗格入口不支持防复活锁定".to_string());
+    }
     let context = target_context(&target)?;
     let backup =
         find_latest_backup(&target)?.ok_or_else(|| "未找到该节点的 ACL 备份".to_string())?;
@@ -517,6 +641,9 @@ pub fn unlock_shell_icon(target: &ShellIconTarget) -> Result<ShellIconOperationR
 /// 从最近一次备份导入注册表内容，并恢复原始 ACL，覆盖普通删除和强力清理两种场景。
 pub fn restore_shell_icon(target: &ShellIconTarget) -> Result<ShellIconOperationResult, String> {
     let target = normalize_target(target)?;
+    if matches!(target.entry_kind, ShellEntryKind::NavigationPane) {
+        return restore_navigation_entry(&target);
+    }
     let context = target_context(&target)?;
     let backup =
         find_latest_backup(&target)?.ok_or_else(|| "未找到该节点的注册表备份".to_string())?;
@@ -661,15 +788,14 @@ pub fn open_shell_icon_registry(target: &ShellIconTarget) -> Result<(), String> 
         .map_err(|error| format!("写入注册表编辑器定位信息失败: {}", error))?;
     let root_name = regedit_root_name(&regedit_config);
     let registry_path = format!(
-        r"{}\HKEY_{}\{}\{}",
+        r"{}\HKEY_{}\{}",
         root_name,
         if target.hive == "HKCU" {
             "CURRENT_USER"
         } else {
             "LOCAL_MACHINE"
         },
-        NAMESPACE_PATH,
-        target.clsid
+        target_registry_subkey_path(&target)
     );
     regedit_config
         .set_value("LastKey", &registry_path)
@@ -718,7 +844,7 @@ fn build_shell_icon_info_from_key(
     context: RegistryTargetContext,
 ) -> Result<ShellIconInfo, String> {
     let namespace_root = RegKey::predef(context.root)
-        .open_subkey_with_flags(NAMESPACE_PATH, KEY_READ | context.view_flags)
+        .open_subkey_with_flags(MY_COMPUTER_NAMESPACE_PATH, KEY_READ | context.view_flags)
         .map_err(|error| format!("打开 Namespace 根键失败: {}", error))?;
     build_shell_icon_info(
         &namespace_root,
@@ -733,6 +859,7 @@ fn build_shell_icon_info_from_key(
             .iter()
             .any(|item| item.eq_ignore_ascii_case(&target.clsid));
         Ok(ShellIconInfo {
+            entry_kind: target.entry_kind.clone(),
             clsid: target.clsid.clone(),
             name: target.clsid.clone(),
             application_name: None,
@@ -748,6 +875,44 @@ fn build_shell_icon_info_from_key(
                 .flatten()
                 .is_some_and(is_lightc_lock_sddl),
         })
+    })
+}
+
+fn build_navigation_info_from_key(
+    key: &RegKey,
+    target: &ShellIconTarget,
+) -> Result<ShellIconInfo, String> {
+    let name = key
+        .get_value::<String, _>("")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| resolve_indirect_string(&value))
+        .unwrap_or_else(|| target.clsid.clone());
+    let source_path = find_source_path(key);
+    let application_name = identify_application(&target.clsid, &name, source_path.as_deref());
+    let has_application = application_name.is_some();
+    let is_system_protected = SYSTEM_CLSIDS
+        .iter()
+        .any(|item| item.eq_ignore_ascii_case(&target.clsid))
+        || (source_path.as_deref().is_some_and(is_system_component_path)
+            && identify_known_application(&target.clsid, &name, source_path.as_deref()).is_none());
+    Ok(ShellIconInfo {
+        entry_kind: ShellEntryKind::NavigationPane,
+        clsid: target.clsid.clone(),
+        name,
+        application_name,
+        reg_path: registry_path(target),
+        hive: target.hive.clone(),
+        registry_view: target.registry_view.clone(),
+        source_path,
+        risk_level: if is_system_protected || !has_application {
+            "unknown".to_string()
+        } else {
+            "safe".to_string()
+        },
+        risk_reason: "目标状态发生变化，请重新扫描".to_string(),
+        is_system_protected,
+        is_locked: false,
     })
 }
 
@@ -775,6 +940,7 @@ fn normalize_target(target: &ShellIconTarget) -> Result<ShellIconTarget, String>
         clsid,
         hive: target.hive.clone(),
         registry_view: target.registry_view.clone(),
+        entry_kind: target.entry_kind.clone(),
     })
 }
 
@@ -799,13 +965,13 @@ fn open_target_key(
     flags: u32,
 ) -> Result<RegKey, String> {
     RegKey::predef(context.root)
-        .open_subkey_with_flags(format!(r"{}\{}", NAMESPACE_PATH, target.clsid), flags)
+        .open_subkey_with_flags(target_registry_subkey_path(target), flags)
         .map_err(|error| format!("打开目标注册表节点失败: {}", error))
 }
 
 fn open_namespace_key(context: RegistryTargetContext, flags: u32) -> Result<RegKey, String> {
     RegKey::predef(context.root)
-        .open_subkey_with_flags(NAMESPACE_PATH, flags | context.view_flags)
+        .open_subkey_with_flags(MY_COMPUTER_NAMESPACE_PATH, flags | context.view_flags)
         .map_err(|error| format!("打开 Namespace 父键失败: {}", error))
 }
 
@@ -846,7 +1012,7 @@ fn verify_target_absent(
     target: &ShellIconTarget,
     context: RegistryTargetContext,
 ) -> Result<(), String> {
-    let path = format!(r"{}\{}", NAMESPACE_PATH, target.clsid);
+    let path = target_registry_subkey_path(target);
     match RegKey::predef(context.root).open_subkey_with_flags(path, KEY_READ | context.view_flags) {
         Ok(_) => {
             Err("删除操作已返回，但注册表节点仍然存在，请关闭占用该节点的软件后重试".to_string())
@@ -906,6 +1072,7 @@ fn create_backup(
         backup_path: backup_path.to_string_lossy().to_string(),
         acl_sddl: read_acl_sddl(key)?,
         namespace_acl_sddl: read_acl_sddl(namespace_key)?,
+        navigation_pin_value: None,
         created_at: Local::now().to_rfc3339(),
     };
     let metadata_path = backup_path.with_extension("json");
@@ -916,9 +1083,138 @@ fn create_backup(
     Ok(metadata)
 }
 
+/// 导航窗格只备份 CLSID 节点和固定值，避免把整个 CLSID 注册信息误当成可删除对象。
+fn remove_navigation_entry(
+    target: &ShellIconTarget,
+) -> Result<ShellIconOperationResult, String> {
+    let context = target_context(target)?;
+    let key = open_target_key(target, context, KEY_READ | KEY_SET_VALUE | context.view_flags)?;
+    let info = build_navigation_info_from_key(&key, target)?;
+    if info.is_system_protected || info.risk_level == "unknown" {
+        return Err("该节点无法确认是第三方导航窗格入口，已阻止操作".to_string());
+    }
+    let pin_value = key
+        .get_value::<u32, _>(NAVIGATION_PIN_VALUE)
+        .map_err(|error| format!("读取导航窗格固定状态失败: {}", error))?;
+    let backup = create_navigation_backup(target, &key, pin_value, context)?;
+    key.set_value(NAVIGATION_PIN_VALUE, &0u32)
+        .map_err(|error| format!("移除导航窗格固定状态失败: {}", error))?;
+    let current_value = key
+        .get_value::<u32, _>(NAVIGATION_PIN_VALUE)
+        .map_err(|error| format!("核验导航窗格固定状态失败: {}", error))?;
+    if current_value != 0 {
+        return Err("导航窗格固定状态未成功移除".to_string());
+    }
+    let message = match restart_explorer() {
+        Ok(()) => "导航窗格入口已移除，已刷新 Explorer".to_string(),
+        Err(error) => format!("导航窗格入口已移除，但 Explorer 刷新失败，请手动刷新：{}", error),
+    };
+    Ok(ShellIconOperationResult {
+        success: true,
+        message,
+        backup_path: Some(backup.backup_path),
+        needs_explorer_refresh: true,
+    })
+}
+
+fn restore_navigation_entry(
+    target: &ShellIconTarget,
+) -> Result<ShellIconOperationResult, String> {
+    let context = target_context(target)?;
+    let backup = find_latest_backup(target)?
+        .ok_or_else(|| "未找到该导航窗格入口的注册表备份".to_string())?;
+    let key = open_target_key(target, context, KEY_READ | KEY_SET_VALUE | context.view_flags)?;
+    let pin_value = backup
+        .navigation_pin_value
+        .ok_or_else(|| "导航窗格备份缺少固定状态，无法恢复".to_string())?;
+    key.set_value(NAVIGATION_PIN_VALUE, &pin_value)
+        .map_err(|error| format!("恢复导航窗格固定状态失败: {}", error))?;
+    let current_value = key
+        .get_value::<u32, _>(NAVIGATION_PIN_VALUE)
+        .map_err(|error| format!("核验导航窗格固定状态失败: {}", error))?;
+    if current_value != pin_value {
+        return Err("导航窗格固定状态恢复后核验不一致".to_string());
+    }
+    let message = match restart_explorer() {
+        Ok(()) => "导航窗格入口已恢复，已刷新 Explorer".to_string(),
+        Err(error) => format!("导航窗格入口已恢复，但 Explorer 刷新失败，请手动刷新：{}", error),
+    };
+    Ok(ShellIconOperationResult {
+        success: true,
+        message,
+        backup_path: Some(backup.backup_path),
+        needs_explorer_refresh: true,
+    })
+}
+
+fn create_navigation_backup(
+    target: &ShellIconTarget,
+    key: &RegKey,
+    pin_value: u32,
+    context: RegistryTargetContext,
+) -> Result<ShellIconBackup, String> {
+    let directory = backup_dir();
+    fs::create_dir_all(&directory).map_err(|error| format!("创建备份目录失败: {}", error))?;
+    let canonical_path = directory.join(format!("shell_icon_{}.reg", backup_stem(target)));
+    if let Some(existing) = find_backups(target)?.into_iter().find(|backup| {
+        Path::new(&backup.backup_path).is_file()
+    }) {
+        return consolidate_navigation_backup(target, context, &existing, pin_value);
+    }
+    export_registry_key(target, &canonical_path)?;
+    let metadata = ShellIconBackup {
+        target: target.clone(),
+        backup_path: canonical_path.to_string_lossy().to_string(),
+        acl_sddl: read_acl_sddl(key)?,
+        namespace_acl_sddl: None,
+        navigation_pin_value: Some(pin_value),
+        created_at: Local::now().to_rfc3339(),
+    };
+    write_backup_metadata(&canonical_path, &metadata)?;
+    Ok(metadata)
+}
+
+fn consolidate_navigation_backup(
+    target: &ShellIconTarget,
+    context: RegistryTargetContext,
+    original: &ShellIconBackup,
+    pin_value: u32,
+) -> Result<ShellIconBackup, String> {
+    let directory = backup_dir();
+    let canonical_path = directory.join(format!("shell_icon_{}.reg", backup_stem(target)));
+    if original.backup_path != canonical_path.to_string_lossy()
+        && Path::new(&original.backup_path).is_file()
+        && !canonical_path.is_file()
+    {
+        fs::copy(&original.backup_path, &canonical_path)
+            .map_err(|error| format!("整理注册表备份失败: {}", error))?;
+    }
+    let mut canonical = original.clone();
+    canonical.backup_path = canonical_path.to_string_lossy().to_string();
+    canonical.navigation_pin_value = Some(pin_value);
+    write_backup_metadata(&canonical_path, &canonical)?;
+    let _ = context;
+    Ok(canonical)
+}
+
+fn write_backup_metadata(
+    backup_path: &Path,
+    metadata: &ShellIconBackup,
+) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(metadata)
+        .map_err(|error| format!("序列化备份信息失败: {}", error))?;
+    fs::write(backup_path.with_extension("json"), json)
+        .map_err(|error| format!("写入备份信息失败: {}", error))
+}
+
 fn backup_stem(target: &ShellIconTarget) -> String {
+    let entry_kind = match target.entry_kind {
+        ShellEntryKind::MyComputer => "my_computer",
+        ShellEntryKind::NavigationPane => "navigation_pane",
+    };
     format!(
-        "{}_{}_{}",
+        "{}_{}_{}_{}",
+        entry_kind,
         target.hive,
         target.registry_view,
         target.clsid.trim_matches(['{', '}'])
@@ -1049,6 +1345,12 @@ fn find_backups(target: &ShellIconTarget) -> Result<Vec<ShellIconBackup>, String
     Ok(candidates)
 }
 
+fn has_navigation_backup(target: &ShellIconTarget) -> Result<bool, String> {
+    Ok(find_backups(target)?.iter().any(|backup| {
+        backup.navigation_pin_value.is_some() && Path::new(&backup.backup_path).is_file()
+    }))
+}
+
 fn find_source_path(clsid_key: &RegKey) -> Option<String> {
     for subkey_name in ["InProcServer32", "LocalServer32"] {
         let Ok(key) = clsid_key.open_subkey_with_flags(subkey_name, KEY_READ) else {
@@ -1143,7 +1445,18 @@ fn normalize_clsid(raw: &str) -> Option<String> {
 }
 
 fn registry_path(target: &ShellIconTarget) -> String {
-    format!(r"{}\{}\{}", target.hive, NAMESPACE_PATH, target.clsid)
+    format!(r"{}\{}", target.hive, target_registry_subkey_path(target))
+}
+
+fn target_registry_subkey_path(target: &ShellIconTarget) -> String {
+    match target.entry_kind {
+        ShellEntryKind::MyComputer => {
+            format!(r"{}\{}", MY_COMPUTER_NAMESPACE_PATH, target.clsid)
+        }
+        ShellEntryKind::NavigationPane => {
+            format!(r"{}\{}", NAVIGATION_CLSID_PATH, target.clsid)
+        }
+    }
 }
 
 fn read_acl_sddl(key: &RegKey) -> Result<Option<String>, String> {
@@ -1451,7 +1764,7 @@ mod tests {
     use super::{
         identify_application, identify_known_application, is_lightc_lock_sddl,
         is_system_component_path, normalize_clsid, registry_path,
-        remove_lightc_lock_aces_from_sddl, ShellIconTarget,
+        remove_lightc_lock_aces_from_sddl, ShellEntryKind, ShellIconTarget,
     };
 
     #[test]
@@ -1469,9 +1782,23 @@ mod tests {
             clsid: "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}".to_string(),
             hive: "HKCU".to_string(),
             registry_view: "default".to_string(),
+            entry_kind: ShellEntryKind::MyComputer,
         };
         assert!(registry_path(&target)
             .contains("MyComputer\\NameSpace\\{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}"));
+    }
+
+    #[test]
+    fn builds_fixed_navigation_registry_path() {
+        let target = ShellIconTarget {
+            clsid: "{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}".to_string(),
+            hive: "HKLM".to_string(),
+            registry_view: "64".to_string(),
+            entry_kind: ShellEntryKind::NavigationPane,
+        };
+        // 导航窗格目标必须固定到 CLSID 根路径，不能被前端传入的内容改写。
+        assert!(registry_path(&target)
+            .contains("Software\\Classes\\CLSID\\{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}"));
     }
 
     #[test]

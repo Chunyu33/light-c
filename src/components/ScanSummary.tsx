@@ -3,8 +3,9 @@
 // 支持增强删除结果显示（物理大小、跳过原因、重启待删除）
 // ============================================================================
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { ScanResult } from '../types';
@@ -32,9 +33,7 @@ function FailedFilesModal({
 }) {
   const { t } = useTranslation('common');
   const parentRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  
+
   const virtualizer = useVirtualizer({
     count: failedFiles.length,
     getScrollElement: () => parentRef.current,
@@ -42,119 +41,122 @@ function FailedFilesModal({
     overscan: 10,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      setIsAnimating(true);
-      requestAnimationFrame(() => {
-        setIsVisible(true);
-      });
-    } else {
-      setIsVisible(false);
-      const timer = setTimeout(() => {
-        setIsAnimating(false);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  if (!isOpen && !isAnimating) return null;
-
   return createPortal(
-    <div className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-      {/* 遮罩层 */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* 弹窗 */}
-      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-        {/* 头部 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-[var(--fg-primary)]">
-                {t('incompleteDetails')}
-              </h3>
-              <p className="text-xs text-[var(--fg-muted)]">
-                {t('incompleteCount', { count: failedFiles.length.toLocaleString() })}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 列表头部 */}
-        <div className="flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
-          <span className="flex-1">{t('filePath')}</span>
-          <span className="w-32 text-right">{t('processingResult')}</span>
-        </div>
-
-        {/* 虚拟滚动列表 */}
-        <div 
-          ref={parentRef}
-          className="overflow-auto"
-          style={{ height: '400px', maxHeight: 'calc(80vh - 180px)' }}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
         >
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {virtualizer.getVirtualItems().map((virtualItem) => {
-              const item = failedFiles[virtualItem.index];
-              return (
-                <div
-                  key={virtualItem.key}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualItem.size}px`,
-                    transform: `translateY(${virtualItem.start}px)`,
-                  }}
-                  className="flex items-center px-5 py-2 border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)]"
-                >
-                  <span 
-                    className="flex-1 text-xs text-[var(--fg-secondary)] truncate pr-4" 
-                    title={item.path}
-                  >
-                    {item.path}
-                  </span>
-                  <span 
-                    className={`w-40 text-xs text-right shrink-0 ${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'}`}
-                    title={getFailureReasonTooltip(item.failure_reason)}
-                  >
-                    {getFailureReasonMessage(item.failure_reason)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 底部 */}
-        <div className="flex items-center justify-end px-5 py-3 border-t border-[var(--border-default)] bg-[var(--bg-card)] shrink-0">
-          <button
+          {/* 遮罩层 */}
+          <motion.div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--bg-hover)] text-[var(--fg-primary)] hover:bg-[var(--bg-base)] transition-colors"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          />
+          
+          {/* 弹窗 */}
+          <motion.div
+            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden"
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
           >
-            {t('close')}
-          </button>
-        </div>
-      </div>
-    </div>,
+            {/* 头部 */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--fg-primary)]">
+                    {t('incompleteDetails')}
+                  </h3>
+                  <p className="text-xs text-[var(--fg-muted)]">
+                    {t('incompleteCount', { count: failedFiles.length.toLocaleString() })}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 列表头部 */}
+            <div className="flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
+              <span className="flex-1">{t('filePath')}</span>
+              <span className="w-32 text-right">{t('processingResult')}</span>
+            </div>
+
+            {/* 虚拟滚动列表 */}
+            <div 
+              ref={parentRef}
+              className="overflow-auto"
+              style={{ height: '400px', maxHeight: 'calc(80vh - 180px)' }}
+            >
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const item = failedFiles[virtualItem.index];
+                  return (
+                    <div
+                      key={virtualItem.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualItem.size}px`,
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                      className="flex items-center px-5 py-2 border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)]"
+                    >
+                      <span 
+                        className="flex-1 text-xs text-[var(--fg-secondary)] truncate pr-4" 
+                        title={item.path}
+                      >
+                        {item.path}
+                      </span>
+                      <span 
+                        className={`w-40 text-xs text-right shrink-0 ${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'}`}
+                        title={getFailureReasonTooltip(item.failure_reason)}
+                      >
+                        {getFailureReasonMessage(item.failure_reason)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 底部 */}
+            <div className="flex items-center justify-end px-5 py-3 border-t border-[var(--border-default)] bg-[var(--bg-card)] shrink-0">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--bg-hover)] text-[var(--fg-primary)] hover:bg-[var(--bg-base)] transition-colors"
+              >
+                {t('close')}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body
   );
 }
@@ -264,36 +266,17 @@ export function ScanSummary({
             </div>
           )}
 
-          {/* 失败原因详情（未完成记录，使用警告色） */}
+          {/* 失败原因详情：默认折叠为一行聚合提示，点击展开明细，
+              避免冗长的系统错误（如 os error 5）逐条铺满结果卡打扰用户 */}
           {failedFiles.length > 0 && (
             <div className="mt-4 pt-4 border-t border-amber-500/20">
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
-                {t('incompleteReason')}
-              </p>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {failedFiles.slice(0, 10).map((item, index) => (
-                  <div key={index} className="text-xs text-[var(--fg-muted)] flex gap-2 items-center">
-                    <span className={`${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'} shrink-0`}>•</span>
-                    <span className="truncate flex-1" title={item.path}>
-                      {item.path.split('\\').pop()}
-                    </span>
-                    <span
-                      className={`${item.marked_for_reboot ? 'text-blue-500' : 'text-amber-500'} shrink-0 cursor-help`}
-                      title={getFailureReasonTooltip(item.failure_reason)}
-                    >
-                      {getFailureReasonMessage(item.failure_reason)}
-                    </span>
-                  </div>
-                ))}
-                {failedFiles.length > 10 && (
-                  <button
-                    onClick={() => setShowFailedModal(true)}
-                    className="text-xs text-amber-500 hover:text-amber-400 underline underline-offset-2 cursor-pointer transition-colors"
-                  >
-                    {t('incompleteMore', { count: failedFiles.length - 10 })}
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={() => setShowFailedModal(true)}
+                className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>{t('incompleteSummary', { count: failedFiles.length })}</span>
+              </button>
             </div>
           )}
         </div>

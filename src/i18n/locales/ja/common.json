@@ -111,6 +111,7 @@
   "rebootPendingDesc": "一部のファイルは使用中のため、次回再起動後に削除されます",
   "incompleteReason": "未完了の理由：",
   "incompleteMore": "…未完了の項目がさらに {{count}} 件あります。すべて表示",
+  "incompleteSummary": "さらに {{count}} 件のファイルを削除できませんでした。クリックして表示",
   "confirmDelete": "削除",
   "confirmDeleteLargeFiles": "大容量ファイルを削除",
   "largeFileDeleteWarning": "大容量ファイルの削除は Windows やアプリに影響する場合があります。用途を確認してから実行してください。",
