@@ -59,6 +59,8 @@ use walkdir::WalkDir;
 use winreg::enums::*;
 use winreg::RegKey;
 
+use super::leftover_whitelist;
+
 // ============================================================================
 // 安装历史持久化（用于检测"曾经安装但现已卸载"的残留文件夹）
 // 使用统一数据目录管理模块 (crate::data_dir) 获取存储路径
@@ -858,12 +860,26 @@ impl LeftoverScanner {
 
     /// 执行卸载残留扫描
     pub fn scan(&self) -> LeftoverScanResult {
+        // 白名单在一次扫描开始时只读取一次，避免目录枚举时产生重复磁盘 IO。
+        let user_whitelist = leftover_whitelist::list_entries().unwrap_or_else(|error| {
+            log::warn!(
+                "读取卸载残留用户白名单失败，将按空白名单继续扫描: {}",
+                error
+            );
+            Vec::new()
+        });
+        self.scan_with_paths(self.get_scan_paths(), &user_whitelist)
+    }
+
+    /// 使用给定根目录扫描，测试可通过临时目录验证规则而不触及真实用户数据。
+    fn scan_with_paths(
+        &self,
+        scan_paths: Vec<(PathBuf, LeftoverSource)>,
+        user_whitelist: &[leftover_whitelist::LeftoverWhitelistEntry],
+    ) -> LeftoverScanResult {
         let start_time = std::time::Instant::now();
         let mut leftovers = Vec::new();
         let mut total_size = 0u64;
-
-        // 获取扫描路径
-        let scan_paths = self.get_scan_paths();
 
         for (base_path, source) in &scan_paths {
             if !base_path.exists() {
@@ -889,7 +905,10 @@ impl LeftoverScanner {
                     };
 
                     // 白名单检查（硬性排除）
-                    if self.is_whitelisted(&folder_name) {
+                    // 用户白名单优先于评分逻辑，确保误报路径不会继续出现在结果中。
+                    if leftover_whitelist::contains_path(user_whitelist, &path)
+                        || self.is_whitelisted(&folder_name)
+                    {
                         continue;
                     }
 
@@ -1051,7 +1070,7 @@ impl LeftoverScanner {
         // 【深度扫描】扫描虚拟磁盘文件
         if self.deep_scan {
             log::info!("执行深度扫描: 搜索孤立虚拟磁盘文件...");
-            let virtual_disks = self.scan_virtual_disk_files();
+            let virtual_disks = self.scan_virtual_disk_files(user_whitelist);
             for entry in virtual_disks {
                 total_size += entry.size;
                 leftovers.push(entry);
@@ -1147,7 +1166,10 @@ impl LeftoverScanner {
     }
 
     /// 【深度扫描】扫描孤立虚拟磁盘文件
-    fn scan_virtual_disk_files(&self) -> Vec<LeftoverEntry> {
+    fn scan_virtual_disk_files(
+        &self,
+        user_whitelist: &[leftover_whitelist::LeftoverWhitelistEntry],
+    ) -> Vec<LeftoverEntry> {
         let mut results = Vec::new();
 
         // 扫描路径：用户目录下的常见位置
@@ -1173,6 +1195,11 @@ impl LeftoverScanner {
 
                     // 只处理文件
                     if !path.is_file() {
+                        continue;
+                    }
+
+                    // 用户白名单可以保护虚拟磁盘文件本身或其上级目录。
+                    if leftover_whitelist::contains_path(user_whitelist, path) {
                         continue;
                     }
 
@@ -1388,6 +1415,30 @@ fn has_executables_shallow(path: &Path) -> Option<String> {
 /// 包含可执行文件的文件夹不会被删除，而是标记为 skipped_executables，
 /// 引导用户通过深度清理（含人工审核机制）处理。
 pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
+    let whitelist_entries = match leftover_whitelist::list_entries() {
+        Ok(entries) => entries,
+        Err(error) => {
+            // 白名单无法读取时拒绝删除，宁可要求用户修复配置，也不能让保护规则失效。
+            return LeftoverDeleteResult {
+                deleted_count: 0,
+                deleted_size: 0,
+                failed_paths: paths.clone(),
+                errors: paths
+                    .iter()
+                    .map(|path| format!("无法读取用户白名单，已拒绝删除 {}: {}", path, error))
+                    .collect(),
+                skipped_executables: Vec::new(),
+            };
+        }
+    };
+    delete_folders_with_whitelist(paths, &whitelist_entries)
+}
+
+/// 供正常删除和测试复用，保证过期扫描结果也不能绕过用户保护规则。
+fn delete_folders_with_whitelist(
+    paths: Vec<String>,
+    whitelist_entries: &[leftover_whitelist::LeftoverWhitelistEntry],
+) -> LeftoverDeleteResult {
     let mut deleted_count = 0u32;
     let mut deleted_size = 0u64;
     let mut failed_paths = Vec::new();
@@ -1396,6 +1447,13 @@ pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
 
     for path in paths {
         let path_buf = std::path::PathBuf::from(&path);
+
+        // 删除前重新检查，避免白名单更新后仍被旧扫描结果删除。
+        if leftover_whitelist::contains_path(whitelist_entries, &path_buf) {
+            failed_paths.push(path.clone());
+            errors.push(format!("路径受用户白名单保护: {}", path));
+            continue;
+        }
 
         // 安全检查 1: 路径在允许范围内
         if !is_safe_leftover_path(&path_buf) {
@@ -1496,6 +1554,53 @@ fn is_safe_leftover_path(path: &std::path::Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_whitelist_entry(path: &Path) -> leftover_whitelist::LeftoverWhitelistEntry {
+        leftover_whitelist::LeftoverWhitelistEntry {
+            path: path.to_string_lossy().to_string(),
+            added_at: "2026-01-01T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn user_whitelist_excludes_synthetic_leftover_and_blocks_normal_deletion() {
+        let root = std::env::temp_dir().join(format!(
+            "lightc-leftover-scan-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("读取测试时间失败")
+                .as_nanos()
+        ));
+        let candidate = root.join("leidian_whitelist_fixture");
+        fs::create_dir_all(&candidate).expect("创建模拟残留目录失败");
+        // 模拟器特征和超过阈值的内容确保夹具能经过真实扫描器的筛选，而非只测试字符串过滤。
+        fs::write(candidate.join("uninstall.exe"), vec![0u8; 1024 * 1024])
+            .expect("创建模拟卸载程序失败");
+
+        let mut scanner = LeftoverScanner::new();
+        scanner.deep_scan = false;
+        let scan_paths = vec![(root.clone(), LeftoverSource::LocalAppData)];
+        let unprotected_result = scanner.scan_with_paths(scan_paths.clone(), &[]);
+        assert!(unprotected_result
+            .leftovers
+            .iter()
+            .any(|entry| entry.path == candidate.to_string_lossy()));
+
+        let whitelist = vec![test_whitelist_entry(&candidate)];
+        let protected_result = scanner.scan_with_paths(scan_paths, &whitelist);
+        assert!(protected_result.leftovers.is_empty());
+
+        let deletion = delete_folders_with_whitelist(
+            vec![candidate.to_string_lossy().to_string()],
+            &whitelist,
+        );
+        assert_eq!(deletion.deleted_count, 0);
+        assert_eq!(deletion.failed_paths.len(), 1);
+        assert!(candidate.exists());
+
+        let _ = fs::remove_dir_all(root);
+    }
 
     #[test]
     fn test_whitelist_exact() {

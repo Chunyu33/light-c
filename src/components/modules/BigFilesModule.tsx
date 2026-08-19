@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
-import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, ExternalLink, StopCircle, Search } from 'lucide-react';
+import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -21,7 +21,7 @@ import {
 } from '../ui/DriveSelect';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { useSettings } from '../../contexts';
-import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, openFile, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
+import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, recordCleanupAction, type CleanupLogEntryInput } from '../../api/commands';
 import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelKey } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
 import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
@@ -78,6 +78,16 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [currentPath, setCurrentPath] = useState('');
   const [scanBackend, setScanBackend] = useState(''); // "mft" | "walkdir"
+
+  // 复制路径比打开文件更适合清理列表：用户可以先在其他工具中确认文件用途，再决定是否删除。
+  const copyFilePath = useCallback(async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+      showToast({ type: 'success', title: t('copyFilePathSuccess') });
+    } catch (error) {
+      showToast({ type: 'error', title: t('copyFilePathFailed'), description: String(error) });
+    }
+  }, [showToast, t]);
   const [scanStage, setScanStage] = useState('');
   const [backendElapsedMs, setBackendElapsedMs] = useState(0);
   const [scannedCount, setScannedCount] = useState(0);
@@ -619,12 +629,12 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openFile(file.path);
+                          void copyFilePath(file.path);
                         }}
                         className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition text-[var(--fg-muted)] hover:text-emerald-600"
-                  title={t('openFile')}
+                  title={t('copyFilePath')}
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        <Copy className="w-4 h-4" />
                       </button>
                     </div>
                   </div>

@@ -104,7 +104,15 @@
       "suspicious": "可疑",
       "possibly_in_use": "可能在用",
       "system_shared": "系统共享"
-    }
+    },
+    "whitelistManage": "白名单管理",
+    "whitelistDesc": "受保护路径及其子项不会再出现在扫描结果中，也无法通过本模块删除。",
+    "whitelistEmpty": "暂无受保护路径",
+    "whitelistAddedAt": "添加时间：{{time}}",
+    "addToWhitelist": "加入白名单",
+    "removeFromWhitelist": "移除保护",
+    "whitelistConfirmDesc": "将保护此路径及其全部子项：{{path}}",
+    "whitelistConfirmWarning": "保护后，该路径会立即从当前结果中移除；后续扫描和删除都会拦截它。"
   },
   "contextMenu": { "systemProtected": "系统保护", "caution": "需谨慎", "missing": "文件不存在", "admin": "需管理员", "comWarning": "此条目为系统 COM 处理器，不建议清理", "registryPath": "注册表路径", "command": "命令", "icon": "图标", "highRisk": "中风险", "cleaning": "正在清理右键菜单", "cleaningDesc": "正在删除 {{count}} 个注册表条目，请稍候...", "idleDesc": "点击开始扫描，检查注册表中失效或指向不存在文件的右键菜单项。", "safetyTitle": "操作安全提示", "safetyDesc": "默认仅勾选“文件不存在”的无效菜单项。标记为“系统保护”的 COM 处理器条目无法选中删除。HKLM 条目需要管理员权限，删除前会自动导出 .reg 备份文件。", "scanned": "扫描到的条目", "invalid": "无效条目", "duration": "扫描耗时", "invalidOnly": "仅显示无效", "selected": "已选 {{count}} 项", "deleteSelected": "删除选中", "noInvalid": "当前没有无效的右键菜单项", "noEntries": "没有扫描到右键菜单条目", "validOnly": "所有可见菜单项都指向有效文件。", "empty": "注册表中没有发现可展示的右键菜单项。", "allValid": "所有右键菜单项均指向有效的可执行文件。", "confirmDesc": "确定要从注册表中删除选中的 {{count}} 个右键菜单条目吗？", "scope": { "file": "任意文件", "folder": "文件夹", "desktop": "桌面背景", "drive": "磁盘", "library": "库文件夹" } },
   "registry": { "cleaning": "正在清理注册表冗余", "cleaningDesc": "正在删除 {{count}} 个注册表条目，请稍候...", "idleDesc": "点击开始扫描，检查 Windows 注册表中的孤立键值和无效引用。", "scanned": "扫描到的条目", "invalid": "无效条目", "duration": "扫描耗时", "selected": "已选 {{count}} 项", "deleteSelected": "删除选中", "noResult": "没有发现注册表冗余", "confirmDesc": "确定要删除选中的 {{count}} 个注册表条目吗？", "result": "清理结果", "backup": "备份位置" },

@@ -84,7 +84,15 @@
     "pendingReboot": "再起動後に削除",
     "deleteFailed": "削除失敗",
     "source": { "local": "ローカルアプリデータ", "roaming": "ローミングアプリデータ", "localLow": "LocalLow データ", "programData": "ProgramData", "virtualDisk": "仮想ディスク" },
-    "category": { "high_confidence": "高信頼度", "suspicious": "疑わしい", "possibly_in_use": "使用中の可能性", "system_shared": "システム共有" }
+    "category": { "high_confidence": "高信頼度", "suspicious": "疑わしい", "possibly_in_use": "使用中の可能性", "system_shared": "システム共有" },
+    "whitelistManage": "ホワイトリスト管理",
+    "whitelistDesc": "保護したパスとその子項目はスキャン結果から除外され、このモジュールでは削除できません。",
+    "whitelistEmpty": "保護したパスはありません",
+    "whitelistAddedAt": "追加日時: {{time}}",
+    "addToWhitelist": "ホワイトリストに追加",
+    "removeFromWhitelist": "保護を解除",
+    "whitelistConfirmDesc": "このパスとすべての子項目を保護します: {{path}}",
+    "whitelistConfirmWarning": "保護すると現在の結果から直ちに除外され、今後のスキャンと削除でもブロックされます。"
   },
   "contextMenu": { "systemProtected": "システム保護", "caution": "要注意", "missing": "ファイルなし", "admin": "管理者権限が必要", "comWarning": "システム COM ハンドラーのため整理非推奨", "registryPath": "レジストリパス", "command": "コマンド", "icon": "アイコン", "highRisk": "中リスク", "cleaning": "コンテキストメニューを整理中", "cleaningDesc": "{{count}} 件のレジストリエントリを削除しています...", "idleDesc": "スキャンを開始して、無効または存在しないファイルを指すコンテキストメニューを確認します。", "safetyTitle": "安全上の注意", "safetyDesc": "初期状態では「ファイルなし」の項目だけを選択します。システム保護 COM ハンドラーは選択できません。HKLM の項目には管理者権限が必要で、削除前に .reg ファイルへバックアップします。", "scanned": "スキャン項目", "invalid": "無効な項目", "duration": "スキャン時間", "invalidOnly": "無効のみ", "selected": "{{count}} 件選択", "deleteSelected": "選択項目を削除", "noInvalid": "無効な項目はありません", "noEntries": "コンテキストメニュー項目がありません", "validOnly": "表示中の項目はすべて有効なファイルを指しています。", "empty": "表示できるコンテキストメニュー項目はありません。", "allValid": "すべての項目が有効な実行ファイルを指しています。", "confirmDesc": "選択した {{count}} 件をレジストリから削除しますか？", "scope": { "file": "任意のファイル", "folder": "フォルダー", "desktop": "デスクトップ背景", "drive": "ドライブ", "library": "ライブラリフォルダー" } },
   "registry": { "cleaning": "レジストリの冗長項目を整理中", "cleaningDesc": "{{count}} 件のレジストリ項目を削除しています...", "idleDesc": "Windows レジストリの孤立した値と無効な参照を確認します。", "scanned": "スキャン項目", "invalid": "無効な項目", "duration": "スキャン時間", "selected": "{{count}} 件選択", "deleteSelected": "選択項目を削除", "noResult": "冗長なレジストリ項目はありません", "confirmDesc": "選択した {{count}} 件のレジストリ項目を削除しますか？", "result": "整理結果", "backup": "バックアップ場所" },

@@ -84,7 +84,15 @@
     "pendingReboot": "Pending reboot",
     "deleteFailed": "Delete failed",
     "source": { "local": "Local app data", "roaming": "Roaming app data", "localLow": "LocalLow data", "programData": "Program data", "virtualDisk": "Virtual disk" },
-    "category": { "high_confidence": "High confidence", "suspicious": "Suspicious", "possibly_in_use": "Possibly in use", "system_shared": "System shared" }
+    "category": { "high_confidence": "High confidence", "suspicious": "Suspicious", "possibly_in_use": "Possibly in use", "system_shared": "System shared" },
+    "whitelistManage": "Whitelist management",
+    "whitelistDesc": "Protected paths and their descendants are excluded from scans and cannot be deleted here.",
+    "whitelistEmpty": "No protected paths",
+    "whitelistAddedAt": "Added: {{time}}",
+    "addToWhitelist": "Add to whitelist",
+    "removeFromWhitelist": "Remove protection",
+    "whitelistConfirmDesc": "This path and all of its descendants will be protected: {{path}}",
+    "whitelistConfirmWarning": "The item is removed from the current results immediately. Future scans and deletions will block it."
   },
   "contextMenu": { "systemProtected": "System protected", "caution": "Review carefully", "missing": "File missing", "admin": "Administrator required", "comWarning": "This is a system COM handler and should not be cleaned", "registryPath": "Registry path", "command": "Command", "icon": "Icon", "highRisk": "Medium risk", "cleaning": "Cleaning context menus", "cleaningDesc": "Deleting {{count}} registry entries. Please wait...", "idleDesc": "Start a scan to find invalid context-menu entries or entries pointing to missing files.", "safetyTitle": "Safety notice", "safetyDesc": "Only entries marked “File missing” are selected by default. System-protected COM handlers cannot be selected. HKLM entries require administrator access and are backed up to a .reg file first.", "scanned": "Entries scanned", "invalid": "Invalid entries", "duration": "Scan time", "invalidOnly": "Invalid only", "selected": "{{count}} selected", "deleteSelected": "Delete selected", "noInvalid": "No invalid context-menu entries", "noEntries": "No context-menu entries scanned", "validOnly": "All visible menu entries point to valid files.", "empty": "No displayable context-menu entries were found in the registry.", "allValid": "All context-menu entries point to valid executables.", "confirmDesc": "Delete {{count}} selected context-menu entries from the registry?", "scope": { "file": "Any file", "folder": "Folder", "desktop": "Desktop background", "drive": "Drive", "library": "Library folder" } },
   "registry": { "cleaning": "Cleaning registry redundancy", "cleaningDesc": "Deleting {{count}} registry entries. Please wait...", "idleDesc": "Start a scan to find orphaned values and invalid references in the Windows registry.", "scanned": "Entries scanned", "invalid": "Invalid entries", "duration": "Scan time", "selected": "{{count}} selected", "deleteSelected": "Delete selected", "noResult": "No registry redundancy found", "confirmDesc": "Delete {{count}} selected registry entries?", "result": "Cleanup result", "backup": "Backup location" },

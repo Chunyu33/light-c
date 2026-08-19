@@ -10,6 +10,7 @@ pub(crate) mod deep_junk;
 mod file_info;
 mod hotspot;
 pub(crate) mod hotspot_engine;
+pub(crate) mod leftover_whitelist;
 mod leftovers;
 mod recycle_bin;
 mod registry;

@@ -119,7 +119,15 @@
       "suspicious": "可疑",
       "possibly_in_use": "可能在用",
       "system_shared": "系統共享"
-    }
+    },
+    "whitelistManage": "白名單管理",
+    "whitelistDesc": "受保護路徑及其子項不會再出現在掃描結果中，也無法透過此模組刪除。",
+    "whitelistEmpty": "暫無受保護路徑",
+    "whitelistAddedAt": "新增時間：{{time}}",
+    "addToWhitelist": "加入白名單",
+    "removeFromWhitelist": "移除保護",
+    "whitelistConfirmDesc": "將保護此路徑及其全部子項：{{path}}",
+    "whitelistConfirmWarning": "保護後，該路徑會立即從目前結果中移除；後續掃描和刪除都會攔截它。"
   },
   "contextMenu": {
     "systemProtected": "系統保護",

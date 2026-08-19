@@ -2,6 +2,14 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.3
+
+- UI: content area, header bar, and footer now scale with the window width for 4K/large displays (capped at 1600px) instead of a fixed 1024/1152px column.
+- UI: empty-state placeholders are ~100px taller so page mode no longer leaves a large blank area below them.
+- Fixed "Windows cannot find the file" when opening a file whose path mixes forward slashes: the path is now normalized to backslashes before handing it to the shell.
+- Large-file cleanup: changed the result-list "Open file" action to copy the full file path for review before cleanup.
+- Uninstall leftovers: added a persistent exact-path whitelist. Protected paths and their descendants are excluded from scans and blocked by both normal and permanent deletion; the module now provides per-result protection and whitelist management.
+
 ## v2.16.2
 
 - Junk cleanup: enhanced the deep scan by removing the 24-hour modification-time filter and the zero-byte exclusion so it uses the same filtering as the quick scan; deep scan covers all partitions and all users, so its results (count and size) are always a superset of the quick scan, fixing quick scan reporting more junk than deep scan.
