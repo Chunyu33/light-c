@@ -29,6 +29,7 @@ jobs:
         id: release_metadata
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $ChangelogPath = "CHANGELOG-zh.md"
           if (-not (Test-Path $ChangelogPath)) {
             Write-Host "Error: changelog not found: $ChangelogPath" -ForegroundColor Red
@@ -82,7 +83,7 @@ jobs:
           "release_body<<$OutputDelimiter" >> $env:GITHUB_OUTPUT
           $ReleaseBody >> $env:GITHUB_OUTPUT
           $OutputDelimiter >> $env:GITHUB_OUTPUT
-          Write-Host "Release metadata loaded from $ChangelogPath: v$Version" -ForegroundColor Green
+          Write-Host ("Release metadata loaded from {0}: v{1}" -f $ChangelogPath, $Version) -ForegroundColor Green
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
