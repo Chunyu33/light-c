@@ -7,6 +7,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 - UI: content area, header bar, and footer now scale with the window width for 4K/large displays (capped at 1600px) instead of a fixed 1024/1152px column.
 - UI: empty-state placeholders are ~100px taller so page mode no longer leaves a large blank area below them.
 - Fixed "Windows cannot find the file" when opening a file whose path mixes forward slashes: the path is now normalized to backslashes before handing it to the shell.
+- Large-file cleanup: changed the result-list "Open file" action to copy the full file path for review before cleanup.
 
 ## v2.16.2
 
