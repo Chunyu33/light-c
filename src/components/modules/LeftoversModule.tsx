@@ -6,21 +6,26 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
-import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
+import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle, ShieldCheck, ShieldPlus } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
+import { LeftoverWhitelistModal } from './LeftoverWhitelistModal';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import {
   scanUninstallLeftovers,
   deleteLeftoverFolders,
   deleteLeftoversPermanent,
+  addLeftoverWhitelistEntry,
+  listLeftoverWhitelist,
+  removeLeftoverWhitelistEntry,
   openInFolder,
   recordCleanupAction,
   type LeftoverScanResult,
   type LeftoverEntry,
   type PermanentDeleteResult,
   type CleanupLogEntryInput,
+  type LeftoverWhitelistEntry,
   getSafetyCheckMessage,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -52,6 +57,11 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   const [showDeepCleanConfirm, setShowDeepCleanConfirm] = useState(false); // 深度清理确认
   const [deepCleanResult, setDeepCleanResult] = useState<PermanentDeleteResult | null>(null); // 深度清理结果
   const [showDeepCleanResult, setShowDeepCleanResult] = useState(false); // 显示深度清理结果
+  const [whitelistEntries, setWhitelistEntries] = useState<LeftoverWhitelistEntry[]>([]);
+  const [showWhitelistManager, setShowWhitelistManager] = useState(false);
+  const [whitelistCandidate, setWhitelistCandidate] = useState<LeftoverEntry | null>(null);
+  const [isUpdatingWhitelist, setIsUpdatingWhitelist] = useState(false);
+  const [whitelistError, setWhitelistError] = useState<string | null>(null);
 
   // 动画状态 - 删除进度遮罩
   const [isDeletingVisible, setIsDeletingVisible] = useState(false);
@@ -108,6 +118,67 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       .filter(l => selectedPaths.has(l.path))
       .reduce((sum, l) => sum + l.size, 0);
   }, [scanResult, selectedPaths]);
+
+  const loadWhitelist = useCallback(async () => {
+    try {
+      const entries = await listLeftoverWhitelist();
+      setWhitelistEntries(entries);
+      setWhitelistError(null);
+    } catch (error) {
+      // 白名单是删除安全边界的一部分，加载失败时明确提示，避免用户误以为保护已生效。
+      setWhitelistError(String(error));
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadWhitelist();
+  }, [loadWhitelist]);
+
+  const handleAddToWhitelist = useCallback(async () => {
+    if (!whitelistCandidate) return;
+
+    setIsUpdatingWhitelist(true);
+    try {
+      const entry = await addLeftoverWhitelistEntry(whitelistCandidate.path);
+      setWhitelistEntries((entries) => {
+        const withoutDuplicate = entries.filter((item) => item.path.toLowerCase() !== entry.path.toLowerCase());
+        return [...withoutDuplicate, entry];
+      });
+
+      // 立即移除当前结果，避免用户在同一次扫描中继续误删已保护路径。
+      setScanResult((result) => {
+        if (!result) return result;
+        const leftovers = result.leftovers.filter((item) => item.path !== whitelistCandidate.path);
+        const totalSize = leftovers.reduce((sum, item) => sum + item.size, 0);
+        updateModuleState('leftovers', { fileCount: leftovers.length, totalSize });
+        return { ...result, leftovers, total_size: totalSize };
+      });
+      setSelectedPaths((paths) => {
+        const next = new Set(paths);
+        next.delete(whitelistCandidate.path);
+        return next;
+      });
+      setWhitelistCandidate(null);
+      setWhitelistError(null);
+    } catch (error) {
+      setWhitelistError(String(error));
+    } finally {
+      setIsUpdatingWhitelist(false);
+    }
+  }, [updateModuleState, whitelistCandidate]);
+
+  const handleRemoveWhitelist = useCallback(async (path: string) => {
+    setIsUpdatingWhitelist(true);
+    try {
+      await removeLeftoverWhitelistEntry(path);
+      setWhitelistEntries((entries) => entries.filter((entry) => entry.path !== path));
+      setWhitelistError(null);
+    } catch (error) {
+      setWhitelistError(String(error));
+    } finally {
+      setIsUpdatingWhitelist(false);
+    }
+  }, []);
 
   // 开始扫描
   const handleScan = useCallback(async () => {
@@ -446,6 +517,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'leftovers')}
         onScan={handleScan}
         error={moduleState.error}
+        headerExtra={
+          <button
+            onClick={() => {
+              setShowWhitelistManager(true);
+              void loadWhitelist();
+            }}
+            className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+            title={moduleT('leftovers.whitelistManage')}
+          >
+            <ShieldCheck className="w-4 h-4" />
+          </button>
+        }
       >
         {moduleState.status === 'idle' && !scanResult && (
           <div className="p-5">
@@ -733,6 +816,16 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                   >
                     <FolderOpen className="w-4 h-4" />
                   </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setWhitelistCandidate(leftover);
+                    }}
+                    className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                    title={moduleT('leftovers.addToWhitelist')}
+                  >
+                    <ShieldPlus className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -764,6 +857,31 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         cancelText={t('cancel')}
         isDanger={true}
       />
+
+      <ConfirmDialog
+        isOpen={whitelistCandidate !== null}
+        onCancel={() => setWhitelistCandidate(null)}
+        onConfirm={handleAddToWhitelist}
+        title={moduleT('leftovers.addToWhitelist')}
+        description={moduleT('leftovers.whitelistConfirmDesc', { path: whitelistCandidate?.path ?? '' })}
+        warning={moduleT('leftovers.whitelistConfirmWarning')}
+        confirmText={moduleT('leftovers.addToWhitelist')}
+        cancelText={t('cancel')}
+      />
+
+      {showWhitelistManager && createPortal(
+        <LeftoverWhitelistModal
+          entries={whitelistEntries}
+          error={whitelistError}
+          isUpdating={isUpdatingWhitelist}
+          onClose={() => setShowWhitelistManager(false)}
+          onOpen={openInFolder}
+          onRemove={handleRemoveWhitelist}
+          t={moduleT}
+          commonT={t}
+        />,
+        document.body
+      )}
 
       {/* 深度清理警告弹窗 - 微信风格 */}
       {isWarningAnimating && createPortal(

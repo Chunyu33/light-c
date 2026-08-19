@@ -562,6 +562,12 @@ export interface LeftoverDeleteResult {
   skipped_executables: string[];
 }
 
+/** 用户确认保留的卸载残留路径 */
+export interface LeftoverWhitelistEntry {
+  path: string;
+  addedAt: string;
+}
+
 /**
  * 鎵弿鍗歌浇娈嬬暀
  * 鎵弿 AppData 鍜?ProgramData 涓凡鍗歌浇杞欢閬楃暀鐨勫绔嬫枃浠跺す
@@ -574,6 +580,21 @@ export async function scanUninstallLeftovers(deepScan?: boolean): Promise<Leftov
  * 鍒犻櫎鍗歌浇娈嬬暀鏂囦欢澶? * @param paths 瑕佸垹闄ょ殑鏂囦欢澶硅矾寰勫垪琛? */
 export async function deleteLeftoverFolders(paths: string[]): Promise<LeftoverDeleteResult> {
   return invoke<LeftoverDeleteResult>('delete_leftover_folders', { paths });
+}
+
+/** 获取卸载残留用户白名单 */
+export async function listLeftoverWhitelist(): Promise<LeftoverWhitelistEntry[]> {
+  return invoke<LeftoverWhitelistEntry[]>('list_leftover_whitelist');
+}
+
+/** 将扫描结果路径加入卸载残留白名单 */
+export async function addLeftoverWhitelistEntry(path: string): Promise<LeftoverWhitelistEntry> {
+  return invoke<LeftoverWhitelistEntry>('add_leftover_whitelist_entry', { path });
+}
+
+/** 移除卸载残留路径保护 */
+export async function removeLeftoverWhitelistEntry(path: string): Promise<void> {
+  return invoke<void>('remove_leftover_whitelist_entry', { path });
 }
 
 // ============================================================================

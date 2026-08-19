@@ -2,6 +2,7 @@
 // 卸载残留扫描与删除命令
 // ============================================================================
 
+use crate::scanner::leftover_whitelist::{self, LeftoverWhitelistEntry};
 use crate::scanner::{LeftoverScanResult, LeftoverScanner};
 use log::info;
 
@@ -47,4 +48,28 @@ pub async fn delete_leftover_folders(
     );
 
     Ok(result)
+}
+
+/// 获取用户手动保护的卸载残留路径。
+#[tauri::command]
+pub async fn list_leftover_whitelist() -> Result<Vec<LeftoverWhitelistEntry>, String> {
+    tokio::task::spawn_blocking(leftover_whitelist::list_entries)
+        .await
+        .map_err(|error| format!("读取卸载残留白名单任务失败: {}", error))?
+}
+
+/// 将当前扫描结果加入白名单，后续扫描和删除都会重新校验该保护规则。
+#[tauri::command]
+pub async fn add_leftover_whitelist_entry(path: String) -> Result<LeftoverWhitelistEntry, String> {
+    tokio::task::spawn_blocking(move || leftover_whitelist::add_entry(&path))
+        .await
+        .map_err(|error| format!("添加卸载残留白名单任务失败: {}", error))?
+}
+
+/// 移除用户配置的路径保护。
+#[tauri::command]
+pub async fn remove_leftover_whitelist_entry(path: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || leftover_whitelist::remove_entry(&path))
+        .await
+        .map_err(|error| format!("移除卸载残留白名单任务失败: {}", error))?
 }

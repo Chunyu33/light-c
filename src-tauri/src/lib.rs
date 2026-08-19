@@ -96,6 +96,9 @@ pub fn run() {
             // 卸载残留和注册表清理
             scan_uninstall_leftovers,
             delete_leftover_folders,
+            list_leftover_whitelist,
+            add_leftover_whitelist_entry,
+            remove_leftover_whitelist_entry,
             scan_registry_redundancy,
             delete_registry_entries,
             open_registry_backup_dir,

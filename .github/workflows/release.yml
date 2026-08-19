@@ -25,6 +25,65 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Read release metadata from Chinese changelog
+        id: release_metadata
+        shell: pwsh
+        run: |
+          $ChangelogPath = "CHANGELOG-zh.md"
+          if (-not (Test-Path $ChangelogPath)) {
+            Write-Host "Error: changelog not found: $ChangelogPath" -ForegroundColor Red
+            exit 1
+          }
+
+          $ChangelogLines = Get-Content -Path $ChangelogPath -Encoding utf8
+          $Version = $null
+          $VersionHeaderIndex = -1
+          for ($Index = 0; $Index -lt $ChangelogLines.Count; $Index++) {
+            if ($ChangelogLines[$Index] -match '^## v(\d+\.\d+\.\d+)\s*$') {
+              $Version = $Matches[1]
+              $VersionHeaderIndex = $Index
+              break
+            }
+          }
+
+          if (-not $Version) {
+            Write-Host "Error: no versioned section found in $ChangelogPath" -ForegroundColor Red
+            exit 1
+          }
+
+          # 发布说明使用中文 CHANGELOG 的最新版本段落，但去掉列表符号，保持 Release 为纯文本。
+          $ReleaseLines = @("LightC v$Version 发布说明")
+          for ($Index = $VersionHeaderIndex + 1; $Index -lt $ChangelogLines.Count; $Index++) {
+            $Line = $ChangelogLines[$Index]
+            if ($Line -match '^##\s+') {
+              break
+            }
+            if ([string]::IsNullOrWhiteSpace($Line)) {
+              continue
+            }
+            $ReleaseLines += ($Line -replace '^\s*-\s+', '')
+          }
+
+          if ($ReleaseLines.Count -le 1) {
+            Write-Host "Error: latest changelog section is empty" -ForegroundColor Red
+            exit 1
+          }
+
+          $TagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($TagVersion -ne $Version) {
+            Write-Host "Error: tag version v$TagVersion does not match changelog version v$Version" -ForegroundColor Red
+            exit 1
+          }
+
+          $ReleaseBody = $ReleaseLines -join "`n"
+          $OutputDelimiter = "RELEASE_BODY_$([guid]::NewGuid().ToString('N'))"
+          "version=$Version" >> $env:GITHUB_OUTPUT
+          "release_name=LightC v$Version" >> $env:GITHUB_OUTPUT
+          "release_body<<$OutputDelimiter" >> $env:GITHUB_OUTPUT
+          $ReleaseBody >> $env:GITHUB_OUTPUT
+          $OutputDelimiter >> $env:GITHUB_OUTPUT
+          Write-Host "Release metadata loaded from $ChangelogPath: v$Version" -ForegroundColor Green
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
@@ -50,13 +109,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'LightC v2.16.2'
-          releaseBody: |
-            LightC v2.16.2 发布说明
-            深度扫描增强：移除24小时时间过滤，覆盖全部分区与全部用户，结果始终不少于快速扫描
-            深度扫描新增系统缓存补扫，扩大浏览器与着色器缓存识别范围
-            深度清理支持提权删除，减少权限不足导致的删除失败
-            修复深度扫描整类清理报错及旧驱动删除失败问题
+          releaseName: ${{ steps.release_metadata.outputs.release_name }}
+          releaseBody: ${{ steps.release_metadata.outputs.release_body }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
@@ -109,6 +163,7 @@ jobs:
       - name: Create WebView2 offline installer
         shell: pwsh
         env:
+          RELEASE_VERSION: ${{ steps.release_metadata.outputs.version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -116,7 +171,7 @@ jobs:
         run: |
           $ConfigPath = "tauri.webview2-offline.conf.json"
           # 外部 Release 资产带版本号；内部运行文件仍保持 LightC.exe，避免破坏完整性校验和运行时路径识别。
-          $OutputName = "LightC_webview2_offline_x64_v2.16.2.exe"
+          $OutputName = "LightC_webview2_offline_x64_v$env:RELEASE_VERSION.exe"
 
           Write-Host "Creating WebView2 offline installer..." -ForegroundColor Cyan
 
@@ -188,6 +243,7 @@ jobs:
       - name: Create portable package
         shell: pwsh
         env:
+          RELEASE_VERSION: ${{ steps.release_metadata.outputs.version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -196,7 +252,7 @@ jobs:
           $ReleaseDir = "src-tauri\target\release"
           $PortableDir = "portable_temp"
           # 压缩包带版本号；压缩包内部仍使用 LightC.exe，签名对象和便携模式识别保持不变。
-          $ZipName = "LightC_portable_x64_v2.16.2.zip"
+          $ZipName = "LightC_portable_x64_v$env:RELEASE_VERSION.zip"
           $PreservedInstallerExe = "LightC_installer_runtime.exe"
 
           Write-Host "Creating portable package..." -ForegroundColor Cyan
@@ -289,13 +345,16 @@ jobs:
 
       - name: Upload extra assets to release
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.release_metadata.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $ZipPath = "LightC_portable_x64_v2.16.2.zip"
+          $ZipPath = "LightC_portable_x64_v$env:RELEASE_VERSION.zip"
           $InstallerSigPath = "LightC_installer_exe.sig"
           $WebView2OfflineSigPath = "LightC_webview2_offline_exe.sig"
           $PortableSigPath = "LightC_portable_exe.sig"
           $DownloadConfigPath = "download.json"
-          $WebView2OfflineInstallerPath = "LightC_webview2_offline_x64_v2.16.2.exe"
+          $WebView2OfflineInstallerPath = "LightC_webview2_offline_x64_v$env:RELEASE_VERSION.exe"
           if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $WebView2OfflineSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath) -and (Test-Path $WebView2OfflineInstallerPath)) {
             Write-Host "Uploading extra assets to release..." -ForegroundColor Cyan
             gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $WebView2OfflineSigPath $PortableSigPath $DownloadConfigPath $WebView2OfflineInstallerPath --clobber
@@ -304,5 +363,3 @@ jobs:
             Write-Host "Error: portable zip, exe signatures, download config or WebView2 offline installer not found" -ForegroundColor Red
             exit 1
           }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

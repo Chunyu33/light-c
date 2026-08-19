@@ -40,6 +40,8 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
+use crate::scanner::leftover_whitelist::{self, LeftoverWhitelistEntry};
+
 #[cfg(windows)]
 use crate::cleaner::enhanced_delete::windows_api;
 
@@ -183,6 +185,8 @@ const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "dll", "sys", "drv", "ocx", "cpl
 pub struct PermanentDeleteEngine {
     /// 是否启用重启删除回退
     enable_reboot_fallback: bool,
+    /// 构建删除引擎时固定白名单快照，批量并发删除无需为每个路径重复读取磁盘。
+    user_whitelist: Result<Vec<LeftoverWhitelistEntry>, String>,
 }
 
 impl PermanentDeleteEngine {
@@ -192,6 +196,7 @@ impl PermanentDeleteEngine {
 
         PermanentDeleteEngine {
             enable_reboot_fallback: true,
+            user_whitelist: leftover_whitelist::list_entries(),
         }
     }
 
@@ -206,6 +211,22 @@ impl PermanentDeleteEngine {
     /// 这是保护用户数据安全的核心机制。
     pub fn perform_safety_checks(&self, path: &Path) -> SafetyCheckResult {
         let path_str = path.to_string_lossy().to_string();
+
+        // 无法加载保护规则时默认拒绝，避免配置异常削弱永久删除的安全边界。
+        let user_whitelist = match &self.user_whitelist {
+            Ok(entries) => entries,
+            Err(error) => {
+                return SafetyCheckResult::InProtectedPath {
+                    reason: format!("无法读取用户白名单，已拒绝删除: {}", error),
+                };
+            }
+        };
+
+        if leftover_whitelist::contains_path(user_whitelist, path) {
+            return SafetyCheckResult::InProtectedPath {
+                reason: format!("路径受用户白名单保护: {}", path_str),
+            };
+        }
 
         // ====================================================================
         // Check 1: 核心白名单检查（最先执行，最严格）
@@ -593,6 +614,21 @@ impl Default for PermanentDeleteEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_whitelist_blocks_permanent_deletion_before_other_checks() {
+        let protected_path = Path::new(r"C:\Fixture\App");
+        let engine = PermanentDeleteEngine {
+            enable_reboot_fallback: true,
+            user_whitelist: Ok(vec![LeftoverWhitelistEntry {
+                path: protected_path.to_string_lossy().to_string(),
+                added_at: "2026-01-01T00:00:00Z".to_string(),
+            }]),
+        };
+
+        let result = engine.perform_safety_checks(Path::new(r"c:\fixture\app\cache"));
+        assert!(matches!(result, SafetyCheckResult::InProtectedPath { .. }));
+    }
 
     #[test]
     fn test_protected_path_check() {

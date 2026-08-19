@@ -45,8 +45,10 @@ const PORTABLE_MIGRATION_DIR: &str = ".migration";
 const PORTABLE_MIGRATION_STATE_FILE: &str = "legacy_appdata_v1.json";
 
 /// 迁移数据目录时只复制 LightC 明确拥有的数据，避免用户误选磁盘根目录后把无关文件继续带到新位置。
-const MIGRATABLE_DATA_ENTRIES: [&str; 5] = [
+const MIGRATABLE_DATA_ENTRIES: [&str; 6] = [
     "install_history.json",
+    // 用户主动确认的误报保护规则必须随自定义数据目录一起迁移。
+    "leftover_whitelist.json",
     "logs",
     "reg_backups",
     "disk_growth_snapshots",
