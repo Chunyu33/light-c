@@ -2,6 +2,11 @@
 
 简体中文版本。查看 [English](CHANGELOG.md)。
 
+## 未发布
+
+- 垃圾清理：将旧版 IE/WinINet 的 `INetCache` 目录归入浏览器缓存，快速扫描可覆盖其中的可重建缓存；继续排除 `INetCookies` 和 Recent 最近访问记录。
+- 垃圾清理：快速扫描不再硬编码 `C:\Windows`，改用 `SYSTEMROOT`/`SYSTEMDRIVE` 动态解析，兼容 Windows 安装在其他盘符的情况。
+
 ## v2.16.3
 
 - 界面适配 4K 大屏：主内容区、顶部统计栏、底部宽度随窗口动态调整（封顶 1600px），不再固定 1024/1152px。

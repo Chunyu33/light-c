@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Junk cleanup: classify the legacy IE/WinINet `INetCache` path as browser cache so quick scan covers its rebuildable contents, while keeping `INetCookies` and Recent items excluded.
+- Junk cleanup: replace hardcoded `C:\Windows` quick-scan paths with `SYSTEMROOT`/`SYSTEMDRIVE` resolution to support Windows installations on other drive letters.
+
 ## v2.16.3
 
 - UI: content area, header bar, and footer now scale with the window width for 4K/large displays (capped at 1600px) instead of a fixed 1024/1152px column.
