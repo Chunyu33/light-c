@@ -290,8 +290,8 @@ function DiskGrowthDiagnostics({
           </span>
           <span className="truncate text-[var(--text-primary)]">
             {resultMode === 'change'
-              ? moduleT('diskGrowth.changeSummary', { count: maxEntries })
-              : moduleT('diskGrowth.baselineSummary')}
+              ? moduleT('diskGrowthExtra.changeSummary', { count: maxEntries })
+              : moduleT('diskGrowthExtra.baselineSummary')}
           </span>
         </div>
         <div className="flex items-center justify-start md:justify-end gap-4 text-[var(--text-muted)] tabular-nums">

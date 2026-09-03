@@ -4,7 +4,8 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## Unreleased
 
-- Disk growth analysis: export the current scan as an offline HTML report with up to three collapsible levels of changed directories; the first scan exports the current usage baseline when no history exists.
+- Settings: added the LightC official website description and one-click link to both About and Security & Integrity.
+- Disk growth analysis: export the current scan as an offline HTML report with up to three collapsible levels of changed directories; the first scan exports the current usage baseline when no history exists. Fixed the module summary translation path and renamed the action button to “Export data”.
 - Junk cleanup: classify the legacy IE/WinINet `INetCache` path as browser cache so quick scan covers its rebuildable contents, while keeping `INetCookies` and Recent items excluded.
 - Junk cleanup: replace hardcoded `C:\Windows` quick-scan paths with `SYSTEMROOT`/`SYSTEMDRIVE` resolution to support Windows installations on other drive letters.
 

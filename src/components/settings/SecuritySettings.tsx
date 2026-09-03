@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle, Download, ExternalLink, Info, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 import { useToast } from '../Toast';
 import { getOfficialDownloadConfig, type OfficialDownloadConfig } from '../../utils/downloadConfig';
-import { LIGHTC_DEFAULT_DOWNLOAD_CONFIG } from '../../config/officialLinks';
+import { LIGHTC_DEFAULT_DOWNLOAD_CONFIG, LIGHTC_OFFICIAL_WEBSITE_URL } from '../../config/officialLinks';
 import { verifyIntegrity, type VerifyIntegrityResult } from '../../api/commands';
 import { useTranslation } from 'react-i18next';
 
@@ -99,6 +99,20 @@ export function SecuritySettings() {
           <p className="text-xs text-[var(--text-muted)] leading-relaxed">
             {t('security.downloadDesc')}
           </p>
+
+          {/* 安全页同时展示官网，帮助用户从可信入口了解项目和下载来源。 */}
+          <a
+            href={LIGHTC_OFFICIAL_WEBSITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between rounded-xl bg-[var(--bg-card)] px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] group"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t('security.officialWebsite')}</p>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{t('security.officialWebsiteDesc')}</p>
+            </div>
+            <ExternalLink className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--brand-green)]" />
+          </a>
 
           <a
             href={downloadConfig?.githubReleasesUrl ?? LIGHTC_DEFAULT_DOWNLOAD_CONFIG.githubReleasesUrl}

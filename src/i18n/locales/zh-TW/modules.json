@@ -408,7 +408,7 @@
     "resultCount": "共 {{count}} 個目錄結果",
     "showAll": "顯示全部 {{count}} 項",
     "firstSnapshotDesc": "下次掃描後會對比本次快照，並在這裡顯示新增、減少或明顯變化的目錄",
-    "exportHtml": "匯出 HTML",
+    "exportHtml": "匯出資料",
     "exportHtmlTitle": "磁碟空間變化分析報告",
     "exportHtmlSuccess": "HTML 報告已儲存",
     "exportHtmlFailed": "HTML 報告匯出失敗",

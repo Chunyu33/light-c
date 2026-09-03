@@ -12,6 +12,9 @@ export interface OfficialProjectLinks {
   githubReleasesUrl?: string;
 }
 
+/** 官方网站统一从配置读取，避免设置页重复硬编码并确保入口保持一致。 */
+export const LIGHTC_OFFICIAL_WEBSITE_URL = 'https://lightc.app/';
+
 /** 作者维护的项目下载入口，后续新增项目只需在这里补充。 */
 export const OFFICIAL_PROJECT_LINKS: Record<string, OfficialProjectLinks> = {
   lightc: {
