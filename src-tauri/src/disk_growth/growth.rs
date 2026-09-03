@@ -22,6 +22,7 @@ const DEFAULT_MAX_CHANGE_ENTRIES: usize = 300;
 const MIN_CHANGE_ENTRIES: usize = 50;
 const MAX_CHANGE_ENTRIES: usize = 1000;
 const MAX_DETAIL_ENTRIES: usize = 50;
+const MAX_EXPORT_TREE_NODES: usize = 20_000;
 const DEFAULT_DETAIL_PAGE_SIZE: usize = 200;
 const MAX_DETAIL_PAGE_SIZE: usize = 1000;
 const DETAIL_SUBTREE_FALLBACK_DEPTH: u8 = 4;
@@ -66,6 +67,29 @@ pub struct DiskGrowthEntry {
     pub explanation: String,
     pub suggestion: String,
     pub details: Vec<DiskGrowthDetailEntry>,
+}
+
+/// HTML 导出专用的目录变化树节点。
+/// 将多级明细在后端一次性构造，避免前端为每个目录重复发起分页 IPC 请求。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskGrowthExportNode {
+    pub path: String,
+    pub name: String,
+    pub old_size: u64,
+    pub new_size: u64,
+    pub diff: i64,
+    pub modified: i64,
+    pub level: DiskGrowthLevel,
+    pub children: Vec<DiskGrowthExportNode>,
+}
+
+/// HTML 导出目录树响应。
+/// 显式返回截断状态，避免极端目录数量超出保护上限时让用户误以为报告包含全部明细。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskGrowthExportTreeResponse {
+    pub nodes: Vec<DiskGrowthExportNode>,
+    pub total_nodes: usize,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -384,6 +408,131 @@ pub fn get_directory_change_details(
         offset,
         entries: paged_entries,
     })
+}
+
+/// 为导出报告构造最多三级目录变化明细。
+/// 快照只读取一次，并在内存中复用父子索引，避免导出操作放大磁盘 IO 和 IPC 次数。
+pub fn get_export_directory_tree(
+    paths: Vec<String>,
+    max_depth: Option<usize>,
+    drive_letter: Option<String>,
+) -> Result<DiskGrowthExportTreeResponse, String> {
+    let drive_letter = normalize_growth_drive_letter(drive_letter.as_deref())?;
+    let manager = DiskSnapshotManager::for_drive(&drive_letter)?;
+    let Some((previous_handle, current_handle)) = manager.load_latest_two_snapshot_handles()?
+    else {
+        return Ok(DiskGrowthExportTreeResponse {
+            nodes: Vec::new(),
+            total_nodes: 0,
+            truncated: false,
+        });
+    };
+
+    let max_depth = max_depth.unwrap_or(3).clamp(1, 3);
+    let previous_map = snapshot_map(&previous_handle.snapshot.entries);
+    let current_map = snapshot_map(&current_handle.snapshot.entries);
+    let previous_children = direct_child_map(&previous_handle.snapshot.entries);
+    let current_children = direct_child_map(&current_handle.snapshot.entries);
+    let mut remaining_nodes = MAX_EXPORT_TREE_NODES;
+    let mut truncated = false;
+
+    let nodes: Vec<DiskGrowthExportNode> = paths
+        .into_iter()
+        .map(|path| normalize_query_path(&path))
+        .filter(|path| !path.is_empty())
+        .filter_map(|path| {
+            let old_size = previous_map.get(&path).map(|value| value.size).unwrap_or(0);
+            let new_size = current_map.get(&path).map(|value| value.size).unwrap_or(0);
+            let modified = current_map
+                .get(&path)
+                .or_else(|| previous_map.get(&path))
+                .map(|value| value.modified)
+                .unwrap_or(0);
+            build_export_node(
+                path,
+                old_size,
+                new_size,
+                modified,
+                0,
+                max_depth,
+                &previous_children,
+                &current_children,
+                &mut remaining_nodes,
+                &mut truncated,
+            )
+        })
+        .collect();
+    let total_nodes = count_export_nodes(&nodes);
+
+    Ok(DiskGrowthExportTreeResponse {
+        nodes,
+        total_nodes,
+        truncated,
+    })
+}
+
+fn build_export_node(
+    path: String,
+    old_size: u64,
+    new_size: u64,
+    modified: i64,
+    depth: usize,
+    max_depth: usize,
+    previous_children: &HashMap<String, HashMap<String, SnapshotValue>>,
+    current_children: &HashMap<String, HashMap<String, SnapshotValue>>,
+    remaining_nodes: &mut usize,
+    truncated: &mut bool,
+) -> Option<DiskGrowthExportNode> {
+    let diff = new_size as i64 - old_size as i64;
+    if diff == 0 {
+        return None;
+    }
+    if *remaining_nodes == 0 {
+        *truncated = true;
+        return None;
+    }
+    // 极端目录结构也不能无限制放大导出报告的内存占用和文件体积。
+    *remaining_nodes -= 1;
+
+    let children = if depth < max_depth {
+        build_detail_entries_unlimited(&path, previous_children, current_children)
+            .into_iter()
+            .filter_map(|detail| {
+                build_export_node(
+                    detail.path,
+                    detail.old_size,
+                    detail.new_size,
+                    detail.modified,
+                    depth + 1,
+                    max_depth,
+                    previous_children,
+                    current_children,
+                    remaining_nodes,
+                    truncated,
+                )
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    Some(DiskGrowthExportNode {
+        name: display_name_from_path(&path),
+        path,
+        old_size,
+        new_size,
+        diff,
+        modified,
+        level: determine_level(diff, old_size),
+        children,
+    })
+}
+
+fn count_export_nodes(nodes: &[DiskGrowthExportNode]) -> usize {
+    nodes
+        .iter()
+        .map(|node| 1 + count_export_nodes(&node.children))
+        .sum()
 }
 
 pub fn compare_snapshots(

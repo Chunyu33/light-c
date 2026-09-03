@@ -407,7 +407,21 @@
     "firstScanHint": "首次掃描會建立快照，下次掃描開始展示新增和減少的目錄",
     "resultCount": "共 {{count}} 個目錄結果",
     "showAll": "顯示全部 {{count}} 項",
-    "firstSnapshotDesc": "下次掃描後會對比本次快照，並在這裡顯示新增、減少或明顯變化的目錄"
+    "firstSnapshotDesc": "下次掃描後會對比本次快照，並在這裡顯示新增、減少或明顯變化的目錄",
+    "exportHtml": "匯出 HTML",
+    "exportHtmlTitle": "磁碟空間變化分析報告",
+    "exportHtmlSuccess": "HTML 報告已儲存",
+    "exportHtmlFailed": "HTML 報告匯出失敗",
+    "exportScanMode": "分析模式",
+    "exportChangeMode": "空間變化報告",
+    "exportBaselineMode": "首次掃描基線",
+    "exportDrive": "分析磁碟",
+    "exportGeneratedAt": "產生時間",
+    "exportCurrentScan": "本次掃描",
+    "exportExplanation": "變化說明",
+    "exportResultCount": "匯出目錄總數",
+    "exportTruncatedNote": "部分目錄因資料量保護上限未能匯出。",
+    "exportDepthNote": "報告中的目錄明細最多展示三層，資料來自本次分析結果。"
   },
   "hotspot": {
     "scanning": "正在掃描大目錄",

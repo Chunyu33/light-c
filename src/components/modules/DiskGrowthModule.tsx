@@ -25,6 +25,7 @@ import {
   Sparkles,
   TrendingDown,
   TrendingUp,
+  Download,
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { EmptyState } from '../EmptyState';
@@ -44,9 +45,11 @@ import {
   checkAdminPrivilege,
   cancelDiskGrowthScan,
   getDiskGrowthDirectoryDetails,
+  getDiskGrowthExportTree,
   getDiskGrowthFileDetails,
   openInFolder,
   scanDiskGrowth,
+  saveDiskGrowthHtml,
   type DiskGrowthAnalyzeEntry,
   type DiskGrowthDetailEntry,
   type DiskGrowthDirectoryDetailsResponse,
@@ -58,6 +61,8 @@ import {
   type DiskGrowthScanResponse,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import { useToast } from '../Toast';
+import { buildDiskGrowthHtml } from '../../utils/diskGrowthHtml';
 
 function simplifyPath(path: string): string {
   const normalized = path.replace(/\\/g, '/');
@@ -123,6 +128,13 @@ function buildPathTitle(path: string, modified?: number | null, extraLine?: stri
 
 function normalizeDiskPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
+}
+
+function isDescendantPath(path: string, parentPath: string): boolean {
+  const normalizedPath = normalizeDiskPath(path);
+  const normalizedParentPath = normalizeDiskPath(parentPath);
+  // 仅按完整路径段判断父子关系，避免 C:/data 与 C:/database 发生错误嵌套。
+  return normalizedPath.startsWith(`${normalizedParentPath}/`);
 }
 
 function buildChildGrowthEntry(parent: DiskGrowthEntry, path: string): DiskGrowthEntry | null {
@@ -779,6 +791,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('diskGrowth');
   const { settings } = useSettings();
+  const { showToast } = useToast();
   const lastScanTriggerRef = useRef(0);
   const scanningRef = useRef(false);
   const cancelRequestedRef = useRef(false);
@@ -983,6 +996,83 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
     setDetailEntry(null);
   }, []);
 
+  const handleExportHtml = useCallback(async () => {
+    if (!scanSummary || !growthReport) return;
+
+    try {
+      // 只为当前结果一次性获取多级目录树，避免逐条请求造成不必要的 IPC 和快照读取。
+      const exportTree = growthReport.entries.length > 0
+        ? await getDiskGrowthExportTree(
+            growthReport.entries
+              .filter((entry) => !growthReport.entries.some((parent) => parent !== entry && isDescendantPath(entry.path, parent.path)))
+              .map((entry) => entry.path),
+            3,
+            scanSummary.drive_letter,
+          )
+        : { nodes: [], total_nodes: 0, truncated: false };
+      const labels = {
+        title: moduleT('diskGrowth.exportHtmlTitle'),
+        generatedAt: moduleT('diskGrowth.exportGeneratedAt'),
+        drive: moduleT('diskGrowth.exportDrive'),
+        scanMode: moduleT('diskGrowth.exportScanMode'),
+        changeMode: moduleT('diskGrowth.exportChangeMode'),
+        baselineMode: moduleT('diskGrowth.exportBaselineMode'),
+        currentSize: moduleT('diskGrowth.currentSize'),
+        netChange: moduleT('diskGrowth.netChange'),
+        noHistory: moduleT('diskGrowth.noHistory'),
+        previousScan: moduleT('diskGrowth.previousScan'),
+        currentScan: moduleT('diskGrowth.exportCurrentScan'),
+        scannedFiles: moduleT('diskGrowth.fileCount'),
+        resultCount: moduleT('diskGrowth.exportResultCount'),
+        truncatedNote: moduleT('diskGrowth.exportTruncatedNote'),
+        path: moduleT('diskGrowth.path'),
+        changeTime: moduleT('diskGrowth.changeTime'),
+        level: moduleT('diskGrowth.changeLevel'),
+        size: moduleT('diskGrowth.currentSizeHeader'),
+        difference: moduleT('diskGrowth.differenceHeader'),
+        previousSize: moduleT('diskGrowth.previousSize'),
+        children: moduleT('diskGrowth.subdirectories'),
+        explanation: moduleT('diskGrowth.exportExplanation'),
+        suggestion: moduleT('diskGrowth.exportSuggestion'),
+        noResult: moduleT('diskGrowth.noChange'),
+        depthNote: moduleT('diskGrowth.exportDepthNote'),
+        levels: {
+          significant: moduleT('diskGrowth.level.significant'),
+          fast: moduleT('diskGrowth.level.fast'),
+          minor: moduleT('diskGrowth.level.minor'),
+          stable: moduleT('diskGrowth.level.stable'),
+          decreased: moduleT('diskGrowth.level.decreased'),
+          new: moduleT('diskGrowth.level.new'),
+        },
+      };
+      const content = buildDiskGrowthHtml(scanSummary, growthReport, exportTree.nodes, {
+        labels,
+        locale: i18n.language,
+        exportTotalNodes: exportTree.total_nodes,
+        exportTruncated: exportTree.truncated,
+      });
+      const reportDate = new Date().toISOString().slice(0, 10);
+      const savedPath = await saveDiskGrowthHtml(
+        content,
+        `LightC_disk_growth_${scanSummary.drive_letter.replace(':', '')}_${reportDate}.html`,
+        labels.title,
+      );
+      if (savedPath) {
+        showToast({
+          type: 'success',
+          title: moduleT('diskGrowth.exportHtmlSuccess'),
+          description: savedPath,
+        });
+      }
+    } catch (err) {
+      showToast({
+        type: 'error',
+        title: moduleT('diskGrowth.exportHtmlFailed'),
+        description: String(err),
+      });
+    }
+  }, [growthReport, moduleT, scanSummary, showToast]);
+
   const growthMap = useMemo(() => {
     const map = new Map<string, DiskGrowthEntry>();
     for (const entry of growthReport?.entries ?? []) {
@@ -1107,7 +1197,17 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
 
           <div className="flex items-center justify-between">
             <p className="text-[13px] text-[var(--text-muted)]">{moduleT('diskGrowth.resultCount', { count: entries.length })}</p>
-            <span className="text-[12px] text-[var(--text-faint)]">{isAdmin ? moduleT('diskGrowth.adminMode') : moduleT('diskGrowth.nonAdminMode')}</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleExportHtml}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                title={moduleT('diskGrowth.exportHtml')}
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>{moduleT('diskGrowth.exportHtml')}</span>
+              </button>
+              <span className="text-[12px] text-[var(--text-faint)]">{isAdmin ? moduleT('diskGrowth.adminMode') : moduleT('diskGrowth.nonAdminMode')}</span>
+            </div>
           </div>
           <DiskGrowthDiagnostics
             scanSummary={scanSummary}
