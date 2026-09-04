@@ -1,4 +1,0 @@
-interface:
-  display_name: "LightC Release"
-  short_description: "Update LightC release docs and version files."
-  default_prompt: "Use this skill to prepare a LightC release: bump versions, update CHANGELOG, release.yml, README, and run validation."
