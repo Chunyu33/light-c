@@ -26,17 +26,6 @@ LightC 是一款 Windows 桌面工具，提供安全垃圾清理、磁盘分析�
   <img src="public/assets/show1.png" alt="LightC 运行截图" width="900">
 </p>
 
-## 赞助支持
-
-如果 LightC 对你有帮助，欢迎通过自愿赞助支持项目持续维护。赞助将用于后续开发、兼容性适配和问题处理。LightC 继续保持免费使用，是否赞助不会影响功能使用或支持优先级。
-
-<p align="center">
-  <img src="src/assets/r_wechat_qr.jpg" alt="微信赞赏码" width="280">
-  <img src="src/assets/r_alipay_qr.jpg" alt="支付宝赞赏码" width="280">
-</p>
-
-<p align="center"><sub>请使用微信或支付宝扫描对应二维码。感谢你的支持。</sub></p>
-
 ## 环境要求
 
 - Windows 10 或更高版本。
@@ -77,3 +66,14 @@ npm run tauri dev
 ## 许可证
 
 详见 [LICENSE](LICENSE)。
+
+## 赞助支持
+
+如果 LightC 对你有帮助，欢迎通过自愿赞助支持项目持续维护。LightC 继续保持免费使用，是否赞助不会影响功能使用或支持优先级。
+
+<p align="center">
+  <img src="src/assets/r_wechat_qr.jpg" alt="微信赞赏码" width="280">
+  <img src="src/assets/r_alipay_qr.jpg" alt="支付宝赞赏码" width="280">
+</p>
+
+<p align="center"><sub>请使用微信或支付宝扫描对应二维码。感谢你的支持。</sub></p>
