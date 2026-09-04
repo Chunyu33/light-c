@@ -6,6 +6,7 @@
 // ============================================================================
 
 use log::info;
+use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
 
 #[tauri::command]
@@ -39,6 +40,68 @@ pub async fn get_disk_growth_directory_details(
     })
     .await
     .map_err(|error| format!("读取目录级变化明细失败: {}", error))?
+}
+
+#[tauri::command]
+pub async fn get_disk_growth_export_tree(
+    paths: Vec<String>,
+    max_depth: Option<usize>,
+    drive_letter: Option<String>,
+) -> Result<crate::disk_growth::DiskGrowthExportTreeResponse, String> {
+    tokio::task::spawn_blocking(move || {
+        crate::disk_growth::get_export_directory_tree(paths, max_depth, drive_letter)
+    })
+    .await
+    .map_err(|error| format!("读取 HTML 导出目录明细失败: {}", error))?
+}
+
+/// 通过系统保存对话框写入磁盘空间变化分析 HTML。
+/// 保存操作放在 Rust 端，复用已注册的对话框插件并统一处理 Windows 路径和扩展名。
+#[tauri::command]
+pub async fn save_disk_growth_html(
+    app: AppHandle,
+    content: String,
+    default_file_name: String,
+    dialog_title: String,
+) -> Result<Option<String>, String> {
+    use std::fs;
+    use tauri_plugin_dialog::DialogExt;
+
+    if content.is_empty() {
+        return Err("导出的 HTML 内容为空".to_string());
+    }
+
+    let selected_path = app
+        .dialog()
+        .file()
+        .set_title(&dialog_title)
+        .set_file_name(&default_file_name)
+        .add_filter("HTML 文件", &["html"])
+        .blocking_save_file();
+    let Some(selected_path) = selected_path else {
+        // 用户取消保存属于正常流程，不应被当作导出失败。
+        return Ok(None);
+    };
+
+    let mut output_path = PathBuf::from(selected_path.to_string());
+    let has_html_extension = output_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("html"));
+    if !has_html_extension {
+        // 用户可以手动修改文件名，因此这里强制补全 HTML 扩展名。
+        output_path.set_extension("html");
+    }
+
+    fs::write(&output_path, content).map_err(|error| {
+        format!(
+            "写入磁盘空间变化 HTML 失败（{}）：{}",
+            output_path.display(),
+            error
+        )
+    })?;
+
+    Ok(Some(output_path.to_string_lossy().into_owned()))
 }
 
 #[tauri::command]

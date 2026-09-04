@@ -133,17 +133,19 @@ impl JunkCategory {
             JunkCategory::WindowsTemp => vec![
                 ScanPath::env_path("TEMP", None),
                 ScanPath::env_path("TMP", None),
-                ScanPath::fixed_path("C:\\Windows\\Temp"),
+                // 使用系统根目录而不是硬编码 C 盘，兼容 Windows 安装在其他盘符的情况。
+                ScanPath::env_path("SYSTEMROOT", Some("Temp")),
             ],
             JunkCategory::SystemCache => vec![
                 // Windows 预读取缓存
-                ScanPath::fixed_path("C:\\Windows\\Prefetch"),
-                // Windows 网络缓存
-                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\INetCache")),
+                ScanPath::env_path("SYSTEMROOT", Some("Prefetch")),
                 // Windows 应用程序缓存
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\Caches")),
             ],
             JunkCategory::BrowserCache => vec![
+                // 兼容旧版 IE/WinINet 的 Temporary Internet Files 重解析路径，
+                // 该目录只包含可重建的网页资源缓存，不包含 Cookies。
+                ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\INetCache")),
                 // Chrome - 主缓存
                 ScanPath::glob_path("LOCALAPPDATA", "Google\\Chrome\\User Data\\Default\\Cache"),
                 ScanPath::glob_path(
@@ -217,8 +219,9 @@ impl JunkCategory {
                 .into_iter()
                 .map(|letter| ScanPath::fixed_path(&format!("{}:\\$Recycle.Bin", letter)))
                 .collect(),
-            JunkCategory::WindowsUpdate => vec![ScanPath::fixed_path(
-                "C:\\Windows\\SoftwareDistribution\\Download",
+            JunkCategory::WindowsUpdate => vec![ScanPath::env_path(
+                "SYSTEMROOT",
+                Some("SoftwareDistribution\\Download"),
             )],
             JunkCategory::DeliveryOptimization => vec![
                 // 新旧 Windows 版本使用不同服务账户目录，两个白名单根目录都只包含可重建缓存。
@@ -248,21 +251,20 @@ impl JunkCategory {
                 ),
             ],
             JunkCategory::LogFiles => vec![
-                ScanPath::fixed_path("C:\\Windows\\Logs"),
+                ScanPath::env_path("SYSTEMROOT", Some("Logs")),
                 ScanPath::env_path("LOCALAPPDATA", Some("CrashDumps")),
             ],
             JunkCategory::MemoryDump => vec![
-                ScanPath::fixed_path("C:\\Windows\\Minidump"),
-                ScanPath::fixed_path("C:\\Windows\\MEMORY.DMP"),
+                ScanPath::env_path("SYSTEMROOT", Some("Minidump")),
+                ScanPath::env_path("SYSTEMROOT", Some("MEMORY.DMP")),
             ],
             JunkCategory::OldWindowsInstallation => vec![
-                ScanPath::fixed_path("C:\\Windows.old"),
-                ScanPath::fixed_path("C:\\$Windows.~BT"),
-                ScanPath::fixed_path("C:\\$Windows.~WS"),
+                // 旧系统目录位于系统盘根目录，用 SYSTEMDRIVE 兼容非 C 盘安装。
+                ScanPath::system_drive_path("Windows.old"),
+                ScanPath::system_drive_path("$Windows.~BT"),
+                ScanPath::system_drive_path("$Windows.~WS"),
             ],
             JunkCategory::AppCache => vec![
-                // INetCache\IE 与 BrowserCache 的 INetCache 路径重叠，
-                // 已在 SystemCache 中统一扫描，此处移除避免重复统计
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\WebCache")),
                 // 不再泛扫 Packages\*\LocalCache：MSIX 桌面应用会把 WebView2 用户 Profile、
                 // 会话索引和应用状态放在这里，直接按 "*" 清理会误删 Claude 等应用的持久化数据。
@@ -289,16 +291,18 @@ impl JunkCategory {
                 // QQ音乐
                 ScanPath::glob_path("APPDATA", "Tencent\\QQMusic\\Cache"),
             ],
-            JunkCategory::FontCache => vec![ScanPath::fixed_path(
-                "C:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache",
+            JunkCategory::FontCache => vec![ScanPath::env_path(
+                "SYSTEMROOT",
+                Some("ServiceProfiles\\LocalService\\AppData\\Local\\FontCache"),
             )],
             JunkCategory::WindowsErrorReports => vec![
                 ScanPath::env_path("LOCALAPPDATA", Some("Microsoft\\Windows\\WER")),
-                ScanPath::fixed_path("C:\\ProgramData\\Microsoft\\Windows\\WER"),
+                // ProgramData 也使用环境变量，避免系统盘不在 C 盘时漏扫。
+                ScanPath::env_path("PROGRAMDATA", Some("Microsoft\\Windows\\WER")),
             ],
             JunkCategory::InstallerTemp => vec![
                 // Windows Installer 补丁缓存
-                ScanPath::fixed_path("C:\\Windows\\Installer\\$PatchCache$"),
+                ScanPath::env_path("SYSTEMROOT", Some("Installer\\$PatchCache$")),
                 // 下载的安装程序
                 ScanPath::env_path("LOCALAPPDATA", Some("Downloaded Installations")),
                 // C:\NVIDIA、C:\AMD、C:\Intel 是用户主动保存的驱动安装包，
@@ -331,7 +335,9 @@ impl JunkCategory {
     pub fn get_file_patterns(&self) -> Vec<&'static str> {
         match self {
             JunkCategory::WindowsTemp => vec!["*"],
-            JunkCategory::SystemCache => vec!["*.pf"],
+            // 系统缓存根目录已经是明确白名单，匹配全部文件可覆盖 Prefetch 和 Caches 中
+            // 不带 .pf 扩展名的可重建文件，同时不会扩大到 Windows 其他目录。
+            JunkCategory::SystemCache => vec!["*"],
             JunkCategory::BrowserCache => vec!["*"],
             JunkCategory::RecycleBin => vec!["*"],
             JunkCategory::WindowsUpdate => vec!["*"],
@@ -406,6 +412,8 @@ pub enum PathType {
     EnvBased,
     /// 基于环境变量的通配符展开路径
     GlobExpand,
+    /// 基于系统盘环境变量的绝对路径，避免 `C:` 被解释为盘符相对路径
+    SystemDriveBased,
 }
 
 impl ScanPath {
@@ -436,6 +444,15 @@ impl ScanPath {
         }
     }
 
+    /// 创建基于 SYSTEMDRIVE 的绝对路径。
+    pub fn system_drive_path(sub_path: &str) -> Self {
+        ScanPath {
+            path_type: PathType::SystemDriveBased,
+            base: "SYSTEMDRIVE".to_string(),
+            sub_path: Some(sub_path.to_string()),
+        }
+    }
+
     /// 解析为实际路径
     pub fn resolve(&self) -> Option<std::path::PathBuf> {
         match &self.path_type {
@@ -460,6 +477,28 @@ impl ScanPath {
                     None
                 }
             }),
+            PathType::SystemDriveBased => {
+                // SYSTEMDRIVE 通常为 `C:`，显式补上根目录，避免生成 `C:Windows.old` 盘符相对路径。
+                let drive = std::env::var(&self.base)
+                    .or_else(|_| {
+                        // 某些精简环境可能没有 SYSTEMDRIVE，使用 SYSTEMROOT 的盘符作为兜底。
+                        std::env::var("SYSTEMROOT")
+                            .map(|system_root| system_root.chars().take(2).collect::<String>())
+                    })
+                    .unwrap_or_else(|_| "C:".to_string());
+                let drive_root =
+                    format!("{}\\", drive.trim_end_matches('\\').trim_end_matches('/'));
+                let mut path = std::path::PathBuf::from(drive_root);
+                if let Some(sub) = &self.sub_path {
+                    path.push(sub);
+                }
+                if path.exists() {
+                    Some(path)
+                } else {
+                    log::debug!("扫描路径不存在，跳过: {:?}", path);
+                    None
+                }
+            }
             PathType::GlobExpand => None,
         }
     }
@@ -467,7 +506,9 @@ impl ScanPath {
     /// 解析为实际路径列表
     pub fn resolve_all(&self) -> Vec<std::path::PathBuf> {
         match &self.path_type {
-            PathType::Fixed | PathType::EnvBased => self.resolve().into_iter().collect(),
+            PathType::Fixed | PathType::EnvBased | PathType::SystemDriveBased => {
+                self.resolve().into_iter().collect()
+            }
             PathType::GlobExpand => {
                 let Some(pattern) = &self.sub_path else {
                     return Vec::new();
@@ -532,5 +573,54 @@ mod tests {
             env_path.resolve_all().len(),
             env_path.resolve().map_or(0, |_| 1)
         );
+    }
+
+    #[test]
+    fn test_legacy_internet_cache_belongs_to_browser_cache() {
+        // INetCache 是 Temporary Internet Files 的实际目标，放入浏览器缓存才能使用全量缓存规则。
+        let browser_paths = JunkCategory::BrowserCache.get_scan_paths();
+        assert!(browser_paths.iter().any(|path| {
+            matches!(&path.path_type, PathType::EnvBased)
+                && path.base == "LOCALAPPDATA"
+                && path.sub_path.as_deref() == Some("Microsoft\\Windows\\INetCache")
+        }));
+        assert!(!JunkCategory::SystemCache
+            .get_scan_paths()
+            .iter()
+            .any(|path| { path.sub_path.as_deref() == Some("Microsoft\\Windows\\INetCache") }));
+        // 明确白名单根目录内可以匹配全部缓存文件，避免只识别 .pf 导致普通缓存漏扫。
+        assert_eq!(JunkCategory::SystemCache.get_file_patterns(), vec!["*"]);
+    }
+
+    #[test]
+    fn test_windows_paths_use_dynamic_environment_roots() {
+        // 这些路径不能固定为 C 盘，否则 Windows 安装在其他分区时会静默漏扫。
+        let dynamic_paths = [
+            (JunkCategory::WindowsTemp, "Temp"),
+            (JunkCategory::SystemCache, "Prefetch"),
+            (
+                JunkCategory::WindowsUpdate,
+                "SoftwareDistribution\\Download",
+            ),
+            (JunkCategory::LogFiles, "Logs"),
+            (JunkCategory::MemoryDump, "Minidump"),
+            (
+                JunkCategory::FontCache,
+                "ServiceProfiles\\LocalService\\AppData\\Local\\FontCache",
+            ),
+            (JunkCategory::InstallerTemp, "Installer\\$PatchCache$"),
+        ];
+
+        for (category, sub_path) in dynamic_paths {
+            assert!(JunkCategory::get_scan_paths(&category).iter().any(|path| {
+                matches!(&path.path_type, PathType::EnvBased)
+                    && path.base == "SYSTEMROOT"
+                    && path.sub_path.as_deref() == Some(sub_path)
+            }));
+        }
+        assert!(JunkCategory::OldWindowsInstallation
+            .get_scan_paths()
+            .iter()
+            .all(|path| matches!(&path.path_type, PathType::SystemDriveBased)));
     }
 }

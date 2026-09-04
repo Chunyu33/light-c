@@ -65,3 +65,14 @@ Please search existing issues first, then describe one problem per issue with a 
 ## License
 
 See [LICENSE](LICENSE).
+
+## Sponsorship
+
+If LightC is useful to you, you are welcome to support its continued maintenance with a voluntary donation. LightC remains free to use, and sponsorship does not affect access to features or support priority.
+
+<p align="center">
+  <img src="src/assets/r_wechat_qr.jpg" alt="WeChat donation QR code" width="280">
+  <img src="src/assets/r_alipay_qr.jpg" alt="Alipay donation QR code" width="280">
+</p>
+
+<p align="center"><sub>Scan the corresponding QR code with WeChat or Alipay. Thank you for your support.</sub></p>

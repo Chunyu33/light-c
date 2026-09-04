@@ -11,6 +11,7 @@ import binlockxIcon from '../../assets/binlockx.svg';
 import viapIcon from '../../assets/viap.svg';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
+import { LIGHTC_OFFICIAL_WEBSITE_URL } from '../../config/officialLinks';
 
 export function AboutSettings() {
   const { t } = useTranslation('settings');
@@ -54,6 +55,24 @@ export function AboutSettings() {
                 {t('about.version', { version: appVersion || '...' })} · {distributionChannel === 'portable' ? t('about.portable') : t('about.installer')}
               </p>
             </div>
+          </div>
+          {/* 官网独立成轻量入口，既位于应用信息之后，又不会抢占应用版本和更新提示的视觉焦点。 */}
+          <div className="mt-4 border-t border-[var(--border-color)] pt-3">
+            <a
+              href={LIGHTC_OFFICIAL_WEBSITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--bg-hover)] group"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{t('about.officialWebsite')}</p>
+                <p className="mt-0.5 text-xs text-[var(--text-muted)]">{t('about.officialWebsiteDesc')}</p>
+              </div>
+              <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--brand-green)]">
+                lightc.app
+                <ExternalLink className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </a>
           </div>
           {/* 检查更新按钮 */}
           <button

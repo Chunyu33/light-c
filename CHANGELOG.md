@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.4
+
+- Settings: moved the About-page official website to a quieter entry after Application info; the Security & Integrity page keeps its one-click website link with localized descriptions.
+- Disk growth analysis: added an offline HTML data report with up to three collapsible directory levels, clarified page-versus-export statistics, and aligned the report theme with the project green.
+- Junk cleanup: expanded coverage for rebuildable legacy IE/WinINet cache and resolved Windows paths from system environment variables to support installations on non-C: drives.
+
 ## v2.16.3
 
 - UI: content area, header bar, and footer now scale with the window width for 4K/large displays (capped at 1600px) instead of a fixed 1024/1152px column.

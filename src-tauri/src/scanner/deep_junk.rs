@@ -868,11 +868,14 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     ) {
         return Some(JunkCategory::DeliveryOptimization);
     }
+    if is_windows_internet_cache(&normalized) {
+        // 旧版 IE/WinINet 的缓存属于浏览器资源缓存，Cookies 使用独立目录并不会命中这里。
+        return Some(JunkCategory::BrowserCache);
+    }
     if contains_any(
         &normalized,
         &[
             "\\windows\\prefetch\\",
-            "\\appdata\\local\\microsoft\\windows\\inetcache\\",
             "\\appdata\\local\\microsoft\\windows\\caches\\",
         ],
     ) {
@@ -1006,6 +1009,10 @@ fn is_defender_cache(path: &str) -> bool {
             "\\programdata\\microsoft\\windows defender\\scans\\history\\service\\",
         ],
     )
+}
+
+fn is_windows_internet_cache(path: &str) -> bool {
+    path.contains("\\appdata\\local\\microsoft\\windows\\inetcache\\")
 }
 
 fn is_browser_cache(path: &str) -> bool {
@@ -1174,11 +1181,29 @@ mod tests {
             r"D:\Users\Alice\AppData\Local\SomeTool\Cache\data_1"
         ));
         assert!(is_deep_junk_path(r"D:\Windows\Prefetch\OLD.PF"));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Microsoft\Windows\INetCache\IE\entry.dat"
+        ));
         assert!(!is_deep_junk_path(r"D:\Users\Alice\Downloads\old.tmp"));
         assert!(!is_deep_junk_path(
             r"D:\Users\Alice\AppData\Local\Packages\App\EBWebView\Default\Cache\data"
         ));
         assert!(!is_deep_junk_path(r"D:\$Recycle.Bin\S-1-5-21\$R123"));
+    }
+
+    #[test]
+    fn classifies_legacy_internet_cache_as_browser_cache() {
+        // Temporary Internet Files 的实际目标是 INetCache，应归入浏览器缓存而非系统缓存。
+        assert_eq!(
+            super::match_deep_junk_category(
+                r"D:\Users\Alice\AppData\Local\Microsoft\Windows\INetCache\IE\entry.dat"
+            ),
+            Some(JunkCategory::BrowserCache)
+        );
+        // Cookies 位于 INetCookies，必须保持在垃圾扫描范围之外，避免清除登录状态。
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Microsoft\Windows\INetCookies\entry.dat"
+        ));
     }
 
     #[test]
@@ -1207,8 +1232,12 @@ mod tests {
         assert!(is_deep_junk_path(
             r"D:\Users\Alice\AppData\Local\Mozilla\Firefox\Profiles\abc\cache2\entries"
         ));
-        assert!(is_deep_junk_path(r"D:\Users\Alice\AppData\Local\SomeApp\.cache\data"));
-        assert!(is_deep_junk_path(r"D:\Users\Alice\AppData\Roaming\SomeApp\Cache Data\file"));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\SomeApp\.cache\data"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Roaming\SomeApp\Cache Data\file"
+        ));
     }
 
     #[test]
@@ -1300,9 +1329,7 @@ mod tests {
         assert!(is_deep_junk_path(
             r"C:\Windows\SoftwareDistribution\DeliveryOptimization\payload.bin"
         ));
-        assert!(is_deep_junk_path(
-            r"C:\Windows\Temp\old.tmp"
-        ));
+        assert!(is_deep_junk_path(r"C:\Windows\Temp\old.tmp"));
         assert!(is_deep_junk_path(
             r"C:\Windows\Logs\setupapi\setupapi.dev.log"
         ));

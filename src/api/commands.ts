@@ -1337,6 +1337,25 @@ export interface DiskGrowthEntry {
   details: DiskGrowthDetailEntry[];
 }
 
+/** HTML 导出用的多级目录变化树，最多由后端返回三级子目录。 */
+export interface DiskGrowthExportNode {
+  path: string;
+  name: string;
+  old_size: number;
+  new_size: number;
+  diff: number;
+  modified: number;
+  level: 'significant' | 'fast' | 'minor' | 'stable' | 'decreased' | 'new';
+  children: DiskGrowthExportNode[];
+}
+
+/** HTML 导出目录树响应，明确告知是否触发了极端数据量保护上限。 */
+export interface DiskGrowthExportTreeResponse {
+  nodes: DiskGrowthExportNode[];
+  total_nodes: number;
+  truncated: boolean;
+}
+
 /** 全盘变化报告 */
 export interface DiskGrowthReport {
   /** 变化目录按绝对变化量排序，后端最多返回 300 项 */
@@ -1478,6 +1497,24 @@ export async function getDiskGrowthDirectoryDetails(
   driveLetter?: string
 ): Promise<DiskGrowthDirectoryDetailsResponse> {
   return invoke<DiskGrowthDirectoryDetailsResponse>('get_disk_growth_directory_details', { path, offset, limit, driveLetter });
+}
+
+/** 获取 HTML 导出所需的最多三级目录变化树。 */
+export async function getDiskGrowthExportTree(
+  paths: string[],
+  maxDepth?: number,
+  driveLetter?: string,
+): Promise<DiskGrowthExportTreeResponse> {
+  return invoke<DiskGrowthExportTreeResponse>('get_disk_growth_export_tree', { paths, maxDepth, driveLetter });
+}
+
+/** 通过系统保存对话框导出磁盘空间变化 HTML。 */
+export async function saveDiskGrowthHtml(
+  content: string,
+  defaultFileName: string,
+  dialogTitle: string,
+): Promise<string | null> {
+  return invoke<string | null>('save_disk_growth_html', { content, defaultFileName, dialogTitle });
 }
 
 // ============================================================================
