@@ -56,6 +56,24 @@ export function AboutSettings() {
               </p>
             </div>
           </div>
+          {/* 官网独立成轻量入口，既位于应用信息之后，又不会抢占应用版本和更新提示的视觉焦点。 */}
+          <div className="mt-4 border-t border-[var(--border-color)] pt-3">
+            <a
+              href={LIGHTC_OFFICIAL_WEBSITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--bg-hover)] group"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)]">{t('about.officialWebsite')}</p>
+                <p className="mt-0.5 text-xs text-[var(--text-muted)]">{t('about.officialWebsiteDesc')}</p>
+              </div>
+              <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-[var(--brand-green)]">
+                lightc.app
+                <ExternalLink className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </a>
+          </div>
           {/* 检查更新按钮 */}
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('lightc:check-update'))}
@@ -177,22 +195,6 @@ export function AboutSettings() {
             <span className="text-sm text-[var(--text-secondary)]">{t('about.author')}</span>
             <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
           </div>
-          {/* 关于页提供官网入口，方便用户获取项目说明和后续更新信息。 */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-[var(--text-secondary)]">{t('about.officialWebsite')}</span>
-            <a
-              href={LIGHTC_OFFICIAL_WEBSITE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-[var(--brand-green)] hover:opacity-80 flex items-center gap-1"
-            >
-              lightc.app
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-          <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-            {t('about.officialWebsiteDesc')}
-          </p>
           {/* <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">{t('about.source')}</span>
             <a

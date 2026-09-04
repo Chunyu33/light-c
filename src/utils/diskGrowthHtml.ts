@@ -33,6 +33,9 @@ export interface DiskGrowthHtmlLabels {
   suggestion: string;
   noResult: string;
   depthNote: string;
+  scopeTitle: string;
+  changeScopeNote: string;
+  baselineScopeNote: string;
   levels: Record<DiskGrowthEntry['level'], string>;
 }
 
@@ -69,6 +72,11 @@ function formatSignedSize(diff: number): string {
   return `${diff > 0 ? '+' : '-'}${formatSize(Math.abs(diff))}`;
 }
 
+function interpolateHtmlLabel(template: string, values: Record<string, string | number>): string {
+  // 报告说明需要插入实际条目数量，统一转义插值内容避免路径或外部文本破坏 HTML。
+  return template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => escapeHtml(String(values[key] ?? '')));
+}
+
 function renderNode(node: DiskGrowthExportNode, labels: DiskGrowthHtmlLabels, locale: string): string {
   const childContent = node.children.map((child) => renderNode(child, labels, locale)).join('');
   const status = labels.levels[node.level] || node.level;
@@ -84,10 +92,10 @@ function renderNode(node: DiskGrowthExportNode, labels: DiskGrowthHtmlLabels, lo
     ${childContent ? `<div class="children">${childContent}</div>` : ''}
   `;
 
-  // details/summary 无需脚本即可折叠，保证报告脱离 LightC 后仍可离线浏览。
+  // details/summary 保留原生语义，外层内容容器再配合脚本实现离线报告中的平滑折叠。
   return `<details class="node"${node.children.length > 0 ? '' : ' open'}>
     <summary><span>${escapeHtml(node.name)}</span><strong class="${node.diff >= 0 ? 'increase' : 'decrease'}">${escapeHtml(formatSignedSize(node.diff))}</strong></summary>
-    ${details}
+    <div class="node-content"><div class="node-content-inner">${details}</div></div>
   </details>`;
 }
 
@@ -125,6 +133,13 @@ export function buildDiskGrowthHtml(
   const footerNote = exportTruncated
     ? `${labels.depthNote} ${labels.truncatedNote}`
     : labels.depthNote;
+  const scopeNote = interpolateHtmlLabel(
+    isBaselineReport ? labels.baselineScopeNote : labels.changeScopeNote,
+    {
+      pageCount: isBaselineReport ? scanSummary.analyze.entries.length : growthReport.entries.length,
+      exportCount: resultCount,
+    },
+  );
 
   return `<!doctype html>
 <html lang="${escapeHtml(locale)}">
@@ -133,19 +148,20 @@ export function buildDiskGrowthHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(labels.title)}</title>
   <style>
-    :root { color-scheme: light dark; --bg: #f4f7f6; --card: #fff; --text: #1f2937; --muted: #6b7280; --border: #dce5e1; --accent: #10a875; --soft: #e7f7f1; --increase: #ef4444; --decrease: #10a875; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #151b19; --card: #202925; --text: #edf5f1; --muted: #9eada6; --border: #36443d; --soft: #173c30; } }
-    * { box-sizing: border-box; } body { margin: 0; padding: 32px 20px 48px; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; }
-    main { max-width: 1160px; margin: 0 auto; } h1 { margin: 0 0 20px; font-size: 26px; }
+    :root { color-scheme: light dark; --bg: #f4faf7; --card: #fff; --text: #1f2937; --muted: #5f7168; --border: #cfe6d9; --accent: #07c160; --accent-hover: #06ad56; --soft: rgba(7, 193, 96, .10); --increase: #ef4444; --decrease: #07c160; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111a15; --card: #1b2820; --text: #edf5f1; --muted: #a7b8ae; --border: #365443; --soft: rgba(7, 193, 96, .18); } }
+    * { box-sizing: border-box; } ::selection { background: var(--accent); color: #fff; } body { margin: 0; padding: 32px 20px 48px; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; }
+    main { max-width: 1160px; margin: 0 auto; } h1 { margin: 0 0 20px; color: var(--accent-hover); font-size: 26px; }
     .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
     .meta-item { padding: 13px 15px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
     .meta-item span, .field > span:first-child { display: block; color: var(--muted); font-size: 12px; } .meta-item strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
     .node { margin: 8px 0; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-    .node summary { display: flex; justify-content: space-between; gap: 16px; padding: 13px 16px; cursor: pointer; list-style-position: inside; } .node summary:hover { background: var(--soft); }
-    .node summary span { overflow-wrap: anywhere; } .node summary strong { flex: 0 0 auto; } .node-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 16px; padding: 0 16px 14px 34px; }
+    .node summary { display: flex; justify-content: space-between; gap: 16px; padding: 13px 16px; cursor: pointer; list-style-position: inside; } .node summary::marker { color: var(--accent); } .node summary:hover { background: var(--soft); } .node summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .node summary span { overflow-wrap: anywhere; } .node summary strong { flex: 0 0 auto; } .node-content { height: auto; overflow: hidden; opacity: 1; transition: height 220ms ease, opacity 180ms ease; } .node:not([open]) > .node-content { display: block; height: 0; opacity: 0; } .node-content-inner { min-height: 0; } .node-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 16px; padding: 0 16px 14px 34px; }
     .field { min-width: 0; } .field strong { display: block; margin-top: 2px; } .field span:last-child, .field code { display: block; overflow-wrap: anywhere; } .field code { margin-top: 2px; font: 12px/1.45 Consolas, monospace; }
     .path { grid-column: 1 / -1; } .children { margin: 0 12px 12px 28px; padding-left: 12px; border-left: 2px solid var(--border); } .badge { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; color: var(--accent); background: var(--soft); }
     .increase { color: var(--increase); } .decrease { color: var(--decrease); } .empty { padding: 24px; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 10px; } footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
+    .scope-note { margin: 0 0 24px; padding: 14px 16px; background: var(--soft); border: 1px solid var(--border); border-radius: 10px; } .scope-note h2 { margin: 0 0 5px; font-size: 14px; } .scope-note p { margin: 0; color: var(--muted); }
   </style>
 </head>
 <body><main>
@@ -161,7 +177,39 @@ export function buildDiskGrowthHtml(
     <div class="meta-item"><span>${escapeHtml(labels.scannedFiles)}</span><strong>${scanSummary.total_files_scanned.toLocaleString(locale)}</strong></div>
     <div class="meta-item"><span>${escapeHtml(labels.resultCount)}</span><strong>${resultCount.toLocaleString(locale)}</strong></div>
   </section>
+  <section class="scope-note"><h2>${escapeHtml(labels.scopeTitle)}</h2><p>${scopeNote}</p></section>
   <section>${content}</section>
   <footer>${escapeHtml(footerNote)}</footer>
-</main></body></html>`;
+</main>
+<script>
+  // 使用固定时长的高度动画，兼顾离线文件环境与不支持新 details 动画伪元素的浏览器。
+  (() => {
+    const transitionDuration = 220;
+    document.querySelectorAll('details.node').forEach((detail) => {
+      const content = detail.querySelector(':scope > .node-content');
+      if (!content) return;
+      detail.addEventListener('toggle', () => {
+        if (detail.open) {
+          content.style.height = '0px';
+          content.style.opacity = '0';
+          requestAnimationFrame(() => {
+            content.style.height = content.scrollHeight + 'px';
+            content.style.opacity = '1';
+          });
+          window.setTimeout(() => {
+            if (detail.open) content.style.height = 'auto';
+          }, transitionDuration);
+          return;
+        }
+        content.style.height = content.scrollHeight + 'px';
+        content.style.opacity = '1';
+        requestAnimationFrame(() => {
+          content.style.height = '0px';
+          content.style.opacity = '0';
+        });
+      });
+    });
+  })();
+</script>
+</body></html>`;
 }

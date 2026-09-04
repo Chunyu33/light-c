@@ -1036,6 +1036,9 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         suggestion: moduleT('diskGrowth.exportSuggestion'),
         noResult: moduleT('diskGrowth.noChange'),
         depthNote: moduleT('diskGrowth.exportDepthNote'),
+        scopeTitle: moduleT('diskGrowth.exportScopeTitle'),
+        changeScopeNote: moduleT('diskGrowth.exportChangeScopeNote'),
+        baselineScopeNote: moduleT('diskGrowth.exportBaselineScopeNote'),
         levels: {
           significant: moduleT('diskGrowth.level.significant'),
           fast: moduleT('diskGrowth.level.fast'),
