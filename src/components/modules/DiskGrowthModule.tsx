@@ -1167,7 +1167,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       )}
 
       {moduleState.status === 'scanning' && (
-        <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
+        <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-[var(--text-muted)] sm:p-6">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
           <p className="text-sm">{scanProgress ? getPhaseLabel(scanProgress.stage) : i18n.t('scanStages.mftEnumerate', { ns: 'common', drive: selectedDriveLabel })}</p>
           <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">

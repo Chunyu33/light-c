@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Database, Loader2, Trash2, CheckCircle2, Shield } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
@@ -226,48 +227,11 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
         {moduleState.status === 'scanning' && !scanResult && (
           <div className="p-5">
-            {/* 注册表扫描没有文件列表进度，补充可理解的阶段提示，减少扫描期间的空白感。 */}
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/80 p-5 shadow-sm">
-              <div className="flex flex-col items-center text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-green)]/10">
-                  <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
-                </div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{t('scanningShort')}</p>
-                <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--text-muted)]">
-                  {moduleT('registry.idleDesc')}
-                </p>
-              </div>
-
-              {/* <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  { label: '读取注册表引用', detail: '定位孤立应用关联', icon: Database },
-                  { label: '验证关联文件', detail: '确认目标文件缺失', icon: CheckCircle2 },
-                  { label: '过滤系统路径', detail: '跳过系统关键条目', icon: Shield },
-                  { label: '准备安全备份', detail: '清理前生成可恢复备份', icon: Shield },
-                ].map((step) => {
-                  const StepIcon = step.icon;
-                  return (
-                    <div
-                      key={step.label}
-                      className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)]/70 p-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-green)]/10">
-                          <StepIcon className="h-4 w-4 text-[var(--brand-green)]" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-[var(--text-primary)]">{step.label}</p>
-                          <p className="truncate text-[11px] text-[var(--text-muted)]">{step.detail}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-hover)]">
-                        <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--brand-green)]/70" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div> */}
-            </div>
+            <ModuleScanProgress
+              title={t('scanningShort')}
+              description={moduleT('registry.idleDesc')}
+              icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+            />
           </div>
         )}
 

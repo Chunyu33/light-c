@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -227,7 +228,13 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
       >
         <div className="space-y-4 p-5">
         {!entries && moduleState.status === 'idle' && <EmptyState icon={HardDriveDownload} title={t('notScannedShellIcons')} description={t('shellScanDescription')} />}
-          {moduleState.status === 'scanning' && !entries && <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" /><span>{moduleT('shellIcons.scanningDesc')}</span></div>}
+          {moduleState.status === 'scanning' && !entries && (
+            <ModuleScanProgress
+              title={t('scanningShort')}
+              description={moduleT('shellIcons.scanningDesc')}
+              icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+            />
+          )}
 
           {entries && (
             <>

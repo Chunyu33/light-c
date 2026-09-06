@@ -19,6 +19,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
@@ -563,6 +564,16 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               icon={MousePointerClick}
               title={t('notScannedContextMenu')}
               description={moduleT('contextMenu.idleDesc')}
+            />
+          </div>
+        )}
+
+        {moduleState.status === 'scanning' && !scanResult && (
+          <div className="p-5">
+            <ModuleScanProgress
+              title={t('scanningShort')}
+              description={moduleT('contextMenu.idleDesc')}
+              icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
             />
           </div>
         )}

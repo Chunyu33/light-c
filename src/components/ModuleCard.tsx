@@ -160,6 +160,7 @@ export function ModuleCard({
       className={`
         /* 微信风格卡片：纯白背景 + 极淡阴影 + 大圆角 */
         bg-[var(--bg-card)] rounded-2xl ${allowStickyContent ? 'overflow-visible' : 'overflow-hidden'}
+        ${isPageVariant ? 'module-card--page flex min-h-full flex-col' : ''}
         transition-all duration-300 ease-out
         ${isPageVariant
           ? 'shadow-sm ring-1 ring-[var(--border-color)]'
@@ -170,8 +171,8 @@ export function ModuleCard({
       `}
     >
       {/* 卡片头部 - 增加内边距提供呼吸空间 */}
-      <div className="p-6">
-        <div className="flex items-center gap-4">
+      <div className="shrink-0 p-6">
+        <div className="flex flex-wrap items-center gap-4">
           {/* 展开/收起按钮 */}
           {!isPageVariant && (
             <button
@@ -193,11 +194,11 @@ export function ModuleCard({
 
           {/* 模块信息 - 清晰的文字层次 */}
           <div
-            className={`flex-1 min-w-0 ${isPageVariant ? '' : 'cursor-pointer'}`}
+            className={`min-w-0 flex-1 basis-[220px] ${isPageVariant ? '' : 'cursor-pointer'}`}
             onClick={isPageVariant ? undefined : onToggleExpand}
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <h3 className="text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <h3 className="min-w-0 text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
               {titleExtra}
               {getStatusBadge()}
             </div>
@@ -268,8 +269,12 @@ export function ModuleCard({
       </div>
 
       {/* 展开内容 - 手风琴动画 */}
-      <AccordionContent expanded={contentExpanded} animated={!isPageVariant && !allowStickyContent}>
-        <div className="border-t border-[var(--border-color)] pb-2">
+      <AccordionContent
+        expanded={contentExpanded}
+        animated={!isPageVariant && !allowStickyContent}
+        className={isPageVariant ? 'flex flex-1 min-h-0 flex-col' : undefined}
+      >
+        <div className={`border-t border-[var(--border-color)] pb-2 ${isPageVariant ? 'module-card__body flex flex-1 flex-col' : ''}`}>
           {children}
         </div>
       </AccordionContent>
@@ -285,9 +290,10 @@ interface AccordionContentProps {
   expanded: boolean;
   children: ReactNode;
   animated?: boolean;
+  className?: string;
 }
 
-function AccordionContent({ expanded, children, animated = true }: AccordionContentProps) {
+function AccordionContent({ expanded, children, animated = true, className = '' }: AccordionContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>(expanded ? 'auto' : 0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -340,12 +346,13 @@ function AccordionContent({ expanded, children, animated = true }: AccordionCont
 
   if (!animated) {
     // 页面模式或悬浮操作模块不做高度动画，避免 overflow 规则截断 sticky 子元素。
-    return expanded ? <div ref={contentRef}>{children}</div> : null;
+    return expanded ? <div ref={contentRef} className={className}>{children}</div> : null;
   }
 
   return (
     <div
       ref={contentRef}
+      className={className}
       style={{
         height: typeof height === 'number' ? `${height}px` : height,
         overflow: 'hidden',

@@ -20,6 +20,7 @@ import {
 } from './components';
 import { DashboardProvider, useDashboardActions, FontSizeProvider, SettingsProvider, useSettings } from './contexts';
 import { APP_MODULES } from './config/modules';
+import { useWindowStatePersistence } from './utils/windowState';
 import './App.css';
 
 function PageTransitionAccent({ active }: { active: boolean }) {
@@ -98,7 +99,10 @@ function DashboardContent() {
   }, [isPageMode]);
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden select-none">
+    <div
+      data-layout-mode={isPageMode ? 'pages' : 'cards'}
+      className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden select-none"
+    >
       {/* 自定义标题栏 */}
       <TitleBar onSettingsClick={() => setShowSettings(true)} />
 
@@ -175,6 +179,9 @@ function DashboardContent() {
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const handleSplashComplete = useCallback(() => setShowSplash(false), []);
+
+  // 在启动屏期间恢复窗口尺寸，避免主界面出现后才突然改变布局。
+  useWindowStatePersistence();
 
   // 启动屏和主界面共用同一个 WebView，避免双窗口初始化和窗口切换开销。
   if (showSplash) {

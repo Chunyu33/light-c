@@ -11,6 +11,7 @@
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
     "core:window:allow-is-maximized",
+    "core:window:allow-set-size",
     "core:window:allow-start-dragging",
     "updater:default",
     "process:allow-restart",

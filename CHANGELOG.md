@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Window and layout: persist the normal window size, make page-mode empty and scanning states respond to available height, and allow module headers to wrap in narrower windows.
+- Scanning states: add a shared inline scanning component for multiple modules, preserve specialized progress details, and fix alignment plus duplicate progress indicators.
+
 ## v2.16.4
 
 - Settings: moved the About-page official website to a quieter entry after Application info; the Security & Integrity page keeps its one-click website link with localized descriptions.

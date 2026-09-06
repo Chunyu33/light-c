@@ -17,6 +17,7 @@ import {
 import type { ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -260,30 +261,24 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
         )}
 
         {isScanning && (
-          <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-green)]/10">
-              <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
-            </div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
-              {scanProgress
-                ? i18n.t(`scanStages.${scanProgress.stage}`, {
-                  ns: 'common',
-                  defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
-                })
-                : i18n.t(enableDeepDiscovery ? 'scanStages.aiDeep' : 'scanStages.aiQuick', { ns: 'common' })}
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
-              {scanProgress
-                ? i18n.t('scanStages.elapsedSummary', {
-                  ns: 'common',
-                  stage: formatDuration(scanProgress.stage_elapsed_ms),
-                  total: formatDuration(scanProgress.elapsed_ms),
-                })
-                : enableDeepDiscovery
-                ? i18n.t('scanStages.aiDeepDesc', { ns: 'common' })
-                : i18n.t('scanStages.aiQuickDesc', { ns: 'common' })}
-            </p>
-          </div>
+          <ModuleScanProgress
+            title={scanProgress
+              ? i18n.t(`scanStages.${scanProgress.stage}`, {
+                ns: 'common',
+                defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
+              })
+              : i18n.t(enableDeepDiscovery ? 'scanStages.aiDeep' : 'scanStages.aiQuick', { ns: 'common' })}
+            description={scanProgress
+              ? i18n.t('scanStages.elapsedSummary', {
+                ns: 'common',
+                stage: formatDuration(scanProgress.stage_elapsed_ms),
+                total: formatDuration(scanProgress.elapsed_ms),
+              })
+              : enableDeepDiscovery
+              ? i18n.t('scanStages.aiDeepDesc', { ns: 'common' })
+              : i18n.t('scanStages.aiQuickDesc', { ns: 'common' })}
+            icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+          />
         )}
 
         {scanResult && !isScanning && (
