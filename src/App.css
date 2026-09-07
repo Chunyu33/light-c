@@ -189,6 +189,43 @@
   margin-inline: auto;
 }
 
+/* 页面模式的空状态填充可用高度，避免窗口变高后模块卡片提前结束。 */
+[data-layout-mode="pages"] .empty-state {
+  min-height: clamp(320px, calc(100vh - 360px), 640px);
+}
+
+/* 紧凑空状态保留更低的下限，避免结果页的小提示占据过多空间。 */
+[data-layout-mode="pages"] .empty-state--compact {
+  min-height: clamp(260px, calc(100vh - 420px), 520px);
+}
+
+/* 页面模式下单个内容根节点需要参与纵向伸缩，长结果仍由外层滚动区承载。 */
+[data-layout-mode="pages"] .module-card__body > :has(.empty-state) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 兼容模块内部额外包裹一层内边距的空状态，让填充高度继续传递到占位卡片。 */
+[data-layout-mode="pages"] .module-card__body > :has(.empty-state) > :has(.empty-state) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-layout-mode="pages"] .module-card__body .empty-state {
+  flex: 1 1 auto;
+}
+
+/* 统一扫描中的内容高度，页面模式下随窗口高度增长，卡片模式保持紧凑。 */
+.module-scan-progress-area {
+  min-height: 220px;
+}
+
+[data-layout-mode="pages"] .module-scan-progress-area {
+  min-height: clamp(280px, calc(100vh - 360px), 640px);
+}
+
 @keyframes splash-orbit-one {
   from { transform: translate3d(0, 0, 0) scale(1); }
   to { transform: translate3d(12vw, 8vh, 0) scale(1.12); }

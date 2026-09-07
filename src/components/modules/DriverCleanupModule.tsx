@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Archive, CheckCheck, CheckCircle2, Cpu, FolderOpen, Loader2, RotateCcw, Search, ShieldAlert, Trash2 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { Checkbox } from '../ui/Checkbox';
@@ -383,10 +384,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
           )}
 
           {loading && !scanResult && (
-            <div className="py-8 flex flex-col items-center justify-center text-[var(--fg-muted)]">
-              <Loader2 className="w-7 h-7 text-emerald-500 animate-spin mb-2" />
-              <p className="text-sm">{moduleT('driverUi.scanning')}</p>
-            </div>
+            <ModuleScanProgress
+              title={moduleT('driverUi.scanning')}
+              icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+            />
           )}
 
           {scanResult && (

@@ -500,7 +500,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
           {/* 扫描中状态 */}
           {isScanning && files.length === 0 && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
+            <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-center sm:p-6">
               <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-3">
                 <Loader2 className="w-7 h-7 text-emerald-500 animate-spin" />
               </div>

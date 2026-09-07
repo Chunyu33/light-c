@@ -29,6 +29,7 @@ import {
   Clock
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
@@ -406,13 +407,11 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
 
           {/* 扫描中状态 */}
           {moduleState.status === 'scanning' && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-3">
-                <Loader2 className="w-7 h-7 text-emerald-500 animate-spin" />
-              </div>
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">{moduleT('social.scanning')}</p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">{moduleT('social.scanningDesc')}</p>
-            </div>
+            <ModuleScanProgress
+              title={moduleT('social.scanning')}
+              description={moduleT('social.scanningDesc')}
+              icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+            />
           )}
 
           {/* 无结果状态 */}

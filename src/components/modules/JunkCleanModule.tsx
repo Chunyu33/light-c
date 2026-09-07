@@ -726,7 +726,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           )}
 
           {moduleState.status === 'scanning' && (
-            <div className="rounded-2xl border border-[var(--brand-green-20)] bg-[var(--brand-green-10)] p-4 space-y-4">
+            <div className="module-scan-progress-area rounded-2xl border border-[var(--brand-green-20)] bg-[var(--brand-green-10)] p-5 space-y-4 sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center shrink-0">

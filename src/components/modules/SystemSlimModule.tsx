@@ -19,6 +19,7 @@ import {
   X
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
@@ -249,10 +250,10 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
 
         {/* 加载状态 */}
         {loading && !status && (
-          <div className="py-8 flex flex-col items-center justify-center">
-            <Loader2 className="w-7 h-7 text-emerald-500 animate-spin mb-2" />
-            <p className="text-sm text-[var(--fg-muted)]">{moduleT('systemSlim.checking')}...</p>
-          </div>
+          <ModuleScanProgress
+            title={`${moduleT('systemSlim.checking')}...`}
+            icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+          />
         )}
 
         {/* 空状态 */}

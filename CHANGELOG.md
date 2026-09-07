@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.5
+
+- Window and layout: added window-size persistence and improved page layouts and scanning states on larger windows.
+- Thank you for the attention and feedback after the LightC website launch. I will continue listening to useful suggestions and improving the experience.
+
 ## v2.16.4
 
 - Settings: moved the About-page official website to a quieter entry after Application info; the Security & Integrity page keeps its one-click website link with localized descriptions.

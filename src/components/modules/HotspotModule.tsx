@@ -749,7 +749,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     >
       {/* 扫描中状态 */}
       {moduleState.status === 'scanning' && (
-        <div className="flex flex-col items-center justify-center py-12 text-[var(--text-muted)]">
+        <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-[var(--text-muted)] sm:p-6">
           <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
           <p className="text-sm flex items-center gap-2">
             {fullScanEnabled ? moduleT('hotspot.deepScanning', { drive: selectedDriveLabel }) : moduleT('hotspot.scanningAppData')}

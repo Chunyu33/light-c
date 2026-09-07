@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle, ShieldCheck, ShieldPlus } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { LeftoverWhitelistModal } from './LeftoverWhitelistModal';
@@ -542,48 +543,11 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
         {moduleState.status === 'scanning' && !scanResult && (
           <div className="p-5">
-            {/* 页面模式下扫描耗时会更明显，这里补充过程状态，避免内容区长时间空白。 */}
-            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/80 p-5 shadow-sm">
-              <div className="flex flex-col items-center text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--brand-green)]/10">
-                  <Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />
-                </div>
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('leftovers.scanning')}</p>
-                <p className="mt-1 max-w-xl text-xs leading-relaxed text-[var(--text-muted)]">
-                  {moduleT('leftovers.scanningDesc')}
-                </p>
-              </div>
-
-              {/* <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  { label: moduleT('leftoversExtra.stage.search'), detail: moduleT('leftoversExtra.stage.searchDesc'), icon: FolderOpen },
-                  { label: moduleT('leftoversExtra.stage.installRecords'), detail: moduleT('leftoversExtra.stage.installRecordsDesc'), icon: Package },
-                  { label: moduleT('leftoversExtra.stage.confidence'), detail: moduleT('leftoversExtra.stage.confidenceDesc'), icon: CheckCircle2 },
-                  { label: moduleT('leftoversExtra.stage.specialFolders'), detail: moduleT('leftoversExtra.stage.specialFoldersDesc'), icon: HardDrive },
-                ].map((step) => {
-                  const StepIcon = step.icon;
-                  return (
-                    <div
-                      key={step.label}
-                      className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)]/70 p-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-green)]/10">
-                          <StepIcon className="h-4 w-4 text-[var(--brand-green)]" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold text-[var(--text-primary)]">{step.label}</p>
-                          <p className="truncate text-[11px] text-[var(--text-muted)]">{step.detail}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--bg-hover)]">
-                        <div className="h-full w-2/3 animate-pulse rounded-full bg-[var(--brand-green)]/70" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div> */}
-            </div>
+            <ModuleScanProgress
+              title={moduleT('leftovers.scanning')}
+              description={moduleT('leftovers.scanningDesc')}
+              icon={<Loader2 className="h-7 w-7 animate-spin text-[var(--brand-green)]" />}
+            />
           </div>
         )}
 
