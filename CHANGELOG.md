@@ -2,10 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.16.5
 
-- Window and layout: persist the normal window size, make page-mode empty and scanning states respond to available height, and allow module headers to wrap in narrower windows.
-- Scanning states: add a shared inline scanning component for multiple modules, preserve specialized progress details, and fix alignment plus duplicate progress indicators.
+- Window and layout: added window-size persistence and improved page layouts and scanning states on larger windows.
+- Thank you for the attention and feedback after the LightC website launch. I will continue listening to useful suggestions and improving the experience.
 
 ## v2.16.4
 
