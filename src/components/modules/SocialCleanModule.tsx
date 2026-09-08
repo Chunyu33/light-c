@@ -29,6 +29,7 @@ import {
   Clock
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -354,9 +355,9 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       >
         {/* 展开内容 */}
         <div className="min-h-[300px]">
-          {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && createPortal(
-            // 挂载到 body，避免页面过渡容器的 transform 让 fixed 退化为局部定位。
-            <div className="module-operation-toolbar">
+          {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && (
+            // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由社交软件模块维护。
+            <ModuleOperationToolbar moduleId="social">
               <button
                 onClick={toggleSelectAll}
                 className="module-operation-toolbar__button module-operation-toolbar__button--muted"
@@ -371,8 +372,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                 <Trash2 className="w-3.5 h-3.5" />
                 {moduleT('social.clean')} ({selectedStats.files})
               </button>
-            </div>,
-            document.body,
+            </ModuleOperationToolbar>
           )}
 
           {/* 说明提示 */}

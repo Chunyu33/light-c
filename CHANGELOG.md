@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.6
+- Cleanup actions: the right-side operation toolbar for junk, large-file, and social cleanup can now be collapsed to reduce content obstruction, with its state remembered per module.
+- Cleanup actions: refined the operation toolbar appearance with a smaller neutral control that scales with the selected font size and keeps the collapse entry centered on the left.
+
 ## v2.16.5
 
 - Window and layout: added window-size persistence and improved page layouts and scanning states on larger windows.

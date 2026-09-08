@@ -284,5 +284,7 @@
   "updateErrorNotFound": "未找到更新資訊，請稍後重試",
   "updateErrorFormat": "更新資訊格式錯誤，請聯絡開發者",
   "updateErrorPermission": "沒有寫入許可權，請以管理員身份執行",
-  "updateErrorDisk": "磁碟空間不足，請清理後重試"
+  "updateErrorDisk": "磁碟空間不足，請清理後重試",
+  "collapseToolbar": "收起操作區",
+  "expandToolbar": "展開操作區"
 }
