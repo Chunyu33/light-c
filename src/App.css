@@ -124,32 +124,85 @@
   right: 20px;
   z-index: 20;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
+  align-items: center;
+  gap: 0.3em;
   width: fit-content;
   max-width: calc(100vw - 76px);
   margin: 0;
-  padding: 6px;
+  padding: 0.35em;
   border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
-  border-radius: 14px;
+  border-radius: 0.8em;
   background: color-mix(in srgb, var(--bg-elevated) 78%, transparent);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(12px);
+}
+
+.module-operation-toolbar__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3em;
+}
+
+/* 折叠态仅保留操作入口，尺寸跟随应用字号，避免固定按钮在不同字号下失衡。 */
+.module-operation-toolbar--collapsed {
+  padding: 0.25em;
+}
+
+.module-operation-toolbar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.1em;
+  height: 2.1em;
+  padding: 0.35em;
+  border: 1px solid var(--border-default);
+  border-radius: 0.6em;
+  color: var(--fg-muted);
+  background: var(--bg-card);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.module-operation-toolbar__toggle:hover {
+  color: var(--fg-primary);
+  background: var(--bg-hover);
+}
+
+.module-operation-toolbar__toggle:focus-visible {
+  outline: 2px solid var(--fg-secondary);
+  outline-offset: 1px;
+}
+
+.module-operation-toolbar__toggle-icon {
+  width: 1.1em;
+  height: 1.1em;
+  stroke-width: 2;
+}
+
+/* 展开态入口位于左侧并由父级垂直居中，操作按钮保持原有纵向排列。 */
+.module-operation-toolbar:not(.module-operation-toolbar--collapsed) .module-operation-toolbar__toggle {
+  align-self: center;
 }
 
 .module-operation-toolbar__button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 6px 12px;
-  border-radius: 9px;
-  font-size: 12px;
+  gap: 0.45em;
+  min-height: 2.3em;
+  padding: 0.45em 0.85em;
+  border-radius: 0.65em;
+  font-size: 0.86em;
   line-height: 1.25;
   white-space: nowrap;
   transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+/* 操作按钮中的功能图标也跟随按钮字号，避免自定义大字号时图标显得过小。 */
+.module-operation-toolbar__button > svg {
+  width: 1em;
+  height: 1em;
 }
 
 .module-operation-toolbar__button--muted {

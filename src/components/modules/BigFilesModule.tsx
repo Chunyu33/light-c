@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom';
 import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -441,9 +442,9 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       >
         {/* 展开内容 */}
         <div>
-          {shouldShowOperationToolbar && files.length > 0 && !isScanning && createPortal(
-            // 挂载到 body，避免页面过渡容器的 transform 让 fixed 退化为局部定位。
-            <div className="module-operation-toolbar">
+          {shouldShowOperationToolbar && files.length > 0 && !isScanning && (
+            // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由大文件模块维护。
+            <ModuleOperationToolbar moduleId="bigFiles">
               <button
                 onClick={toggleSelectAll}
                 className="module-operation-toolbar__button module-operation-toolbar__button--muted"
@@ -458,8 +459,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 <Trash2 className="w-3.5 h-3.5" />
                 {t('cleanSelected', { count: selectedFiles.size })}
               </button>
-            </div>,
-            document.body,
+            </ModuleOperationToolbar>
           )}
 
           {/* 扫描进度 + 引擎 + 时长（扫描中 & 扫描完成后都显示） */}

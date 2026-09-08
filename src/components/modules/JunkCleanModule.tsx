@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { CategoryCard } from '../CategoryCard';
 import { ScanSummary } from '../ScanSummary';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -686,9 +687,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       >
         {/* 展开内容 */}
         <div className="p-4 space-y-3">
-          {shouldShowOperationToolbar && scanResult && scanResult.total_file_count > 0 && createPortal(
-            // 挂载到 body，避免页面过渡容器的 transform 让 fixed 退化为局部定位。
-            <div className="module-operation-toolbar">
+          {shouldShowOperationToolbar && scanResult && scanResult.total_file_count > 0 && (
+            // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由垃圾清理模块维护。
+            <ModuleOperationToolbar moduleId="junk">
               <button
                 onClick={() => toggleAllSelection(true)}
                 title={scanMode === 'deep' ? t('selectAllDeepTitle') : undefined}
@@ -710,8 +711,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                 <Trash2 className="w-3.5 h-3.5" />
                 {t('cleanBtn', { count: selectedFileCount })}
               </button>
-            </div>,
-            document.body,
+            </ModuleOperationToolbar>
           )}
 
           {/* 扫描结果摘要：有扫描数据时展示统计卡；清理完成后 scanResult 被清空，

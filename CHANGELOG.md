@@ -2,6 +2,9 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.6
+- Cleanup actions: the right-side operation toolbar for junk, large-file, and social cleanup can now be collapsed to reduce content obstruction, with its state remembered per module.
+
 ## v2.16.5
 
 - Window and layout: added window-size persistence and improved page layouts and scanning states on larger windows.
