@@ -2,9 +2,10 @@
 // 应用设置上下文 - 管理各种开关设置
 // ============================================================================
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { APP_MODULE_META, DEFAULT_ACTIVE_MODULE_ID, type AppModuleId, type LayoutMode } from '../config/moduleMeta';
 import i18n, { type Language } from '../i18n';
+import { prepareWindowForLayout } from '../utils/windowLayout';
 
 /** 应用设置 */
 interface AppSettings {
@@ -33,6 +34,10 @@ interface SettingsContextValue {
   settings: AppSettings;
   /** 更新设置 */
   updateSettings: (updates: Partial<AppSettings>) => void;
+  /** 切换布局前协调窗口尺寸，避免侧边栏在窄窗口中挤压内容。 */
+  switchLayoutMode: (layoutMode: LayoutMode) => Promise<void>;
+  /** 防止设置弹窗在窗口调整期间重复触发布局切换。 */
+  isLayoutSwitching: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -56,7 +61,7 @@ const defaultSettings: AppSettings = {
 function normalizeSettings(settings: AppSettings): AppSettings {
   const language: Language =
     settings.language === 'en' || settings.language === 'ja' || settings.language === 'zh-TW' ? settings.language : 'zh';
-  const layoutMode: LayoutMode = settings.layoutMode === 'pages' ? 'pages' : 'cards';
+  const layoutMode: LayoutMode = settings.layoutMode === 'pages' || settings.layoutMode === 'sidebar' ? settings.layoutMode : 'cards';
   const activeModuleId = moduleIds.includes(settings.activeModuleId)
     ? settings.activeModuleId
     : DEFAULT_ACTIVE_MODULE_ID;
@@ -95,6 +100,9 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }
     return defaultSettings;
   });
+  const [isLayoutSwitching, setIsLayoutSwitching] = useState(false);
+  const layoutSwitchRequestRef = useRef(0);
+  const layoutSwitchInProgressRef = useRef(false);
 
   useEffect(() => {
     // 设置可能来自旧版本缓存，统一在 Provider 生效后切换，避免首屏读取到非法语言。
@@ -110,8 +118,39 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     });
   }, []);
 
+  const switchLayoutMode = useCallback(async (layoutMode: LayoutMode) => {
+    if (layoutMode === settings.layoutMode || layoutSwitchInProgressRef.current) return;
+
+    layoutSwitchInProgressRef.current = true;
+    const requestId = layoutSwitchRequestRef.current + 1;
+    layoutSwitchRequestRef.current = requestId;
+    setIsLayoutSwitching(true);
+
+    try {
+      await prepareWindowForLayout(layoutMode);
+      if (layoutSwitchRequestRef.current !== requestId) return;
+
+      updateSettings({ layoutMode });
+      // 保留至少一帧的切换阶段，让窗口扩展和内容重排在同一轮视觉更新中完成。
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    } catch (error) {
+      try {
+        // 窗口扩展部分失败时恢复原模式的最小尺寸，避免留下与界面状态不一致的约束。
+        await prepareWindowForLayout(settings.layoutMode);
+      } catch (rollbackError) {
+        console.error('回滚布局窗口约束失败:', rollbackError);
+      }
+      throw error;
+    } finally {
+      if (layoutSwitchRequestRef.current === requestId) {
+        setIsLayoutSwitching(false);
+      }
+      layoutSwitchInProgressRef.current = false;
+    }
+  }, [settings.layoutMode, updateSettings]);
+
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings }}>
+    <SettingsContext.Provider value={{ settings, updateSettings, switchLayoutMode, isLayoutSwitching }}>
       {children}
     </SettingsContext.Provider>
   );

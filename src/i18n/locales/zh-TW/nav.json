@@ -22,5 +22,9 @@
   "shellIcons": "外殼圖示管理",
   "shellIconsDesc": "清理此電腦中的第三方外殼圖示，支援備份和防復活",
   "aiModels": "AI 模型空間",
-  "aiModelsDesc": "快速分析本機 AI 模型佔用"
+  "aiModelsDesc": "快速分析本機 AI 模型佔用",
+  "sidebarLabel": "功能選單",
+  "sidebarCollapse": "收起側邊欄",
+  "sidebarExpand": "展開側邊欄",
+  "sidebarResize": "調整側邊欄寬度"
 }

@@ -286,5 +286,6 @@
   "updateErrorPermission": "沒有寫入許可權，請以管理員身份執行",
   "updateErrorDisk": "磁碟空間不足，請清理後重試",
   "collapseToolbar": "收起操作區",
-  "expandToolbar": "展開操作區"
+  "expandToolbar": "展開操作區",
+  "layoutSwitching": "正在切換佈局…"
 }

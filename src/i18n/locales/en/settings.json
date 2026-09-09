@@ -48,7 +48,10 @@
     "cards": "Cards",
     "cardsDesc": "All features on one page, great for quick overview",
     "pages": "Pages",
-    "pagesDesc": "Switch features via side menu, closer to traditional PC apps"
+    "pagesDesc": "Switch features via side menu, closer to traditional PC apps",
+    "sidebar": "Sidebar",
+    "sidebarDesc": "Keep the feature menu visible on the left and show the current page on the right",
+    "switchFailed": "Layout switch failed"
   },
   "searchEngine": {
     "label": "Search Engine",

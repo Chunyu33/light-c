@@ -27,4 +27,5 @@ export { DashboardHeader } from './DashboardHeader';
 export { SplashScreen } from './SplashScreen';
 export { Footer } from './Footer';
 export { AnchorNav } from './AnchorNav';
+export { SidebarNav } from './SidebarNav';
 export * from './modules';

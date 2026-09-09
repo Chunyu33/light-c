@@ -22,5 +22,9 @@
   "shellIcons": "Shell Icons",
   "shellIconsDesc": "Manage third-party This PC shell icons with backup and anti-respawn support",
   "aiModels": "AI Model Storage",
-  "aiModelsDesc": "Quickly analyze local AI model storage usage"
+  "aiModelsDesc": "Quickly analyze local AI model storage usage",
+  "sidebarLabel": "Feature menu",
+  "sidebarCollapse": "Collapse sidebar",
+  "sidebarExpand": "Expand sidebar",
+  "sidebarResize": "Resize sidebar"
 }

@@ -5,17 +5,13 @@
 
 import { useEffect } from 'react';
 import { currentMonitor, getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { getEffectiveWindowMinimumSize, getMaximumLogicalWindowSize, prepareWindowForSavedLayout } from './windowLayout';
 
 const WINDOW_STATE_STORAGE_KEY = 'c-cleanup-window-state';
 const WINDOW_STATE_VERSION = 1;
 const WINDOW_RESIZE_SAVE_DELAY = 250;
 
 // 与 tauri.conf.json 保持一致，防止历史缓存把窗口恢复到不可用尺寸。
-const MIN_WINDOW_SIZE = {
-  width: 820,
-  height: 610,
-};
-
 interface WindowSize {
   width: number;
   height: number;
@@ -49,13 +45,13 @@ function readPersistedWindowSize(): WindowSize | null {
   }
 }
 
-function clampWindowSize(size: WindowSize, maximumSize: WindowSize | null): WindowSize {
-  const maxWidth = Math.max(MIN_WINDOW_SIZE.width, maximumSize?.width ?? Number.POSITIVE_INFINITY);
-  const maxHeight = Math.max(MIN_WINDOW_SIZE.height, maximumSize?.height ?? Number.POSITIVE_INFINITY);
+function clampWindowSize(size: WindowSize, maximumSize: WindowSize | null, minimumSize: WindowSize): WindowSize {
+  const maxWidth = Math.max(minimumSize.width, maximumSize?.width ?? Number.POSITIVE_INFINITY);
+  const maxHeight = Math.max(minimumSize.height, maximumSize?.height ?? Number.POSITIVE_INFINITY);
 
   return {
-    width: Math.min(maxWidth, Math.max(MIN_WINDOW_SIZE.width, Math.round(size.width))),
-    height: Math.min(maxHeight, Math.max(MIN_WINDOW_SIZE.height, Math.round(size.height))),
+    width: Math.min(maxWidth, Math.max(minimumSize.width, Math.round(size.width))),
+    height: Math.min(maxHeight, Math.max(minimumSize.height, Math.round(size.height))),
   };
 }
 
@@ -64,10 +60,10 @@ async function getMaximumLogicalSize(): Promise<WindowSize | null> {
   if (!monitor || !Number.isFinite(scaleFactor) || scaleFactor <= 0) return null;
 
   // Tauri 的显示器工作区尺寸是物理像素，恢复窗口时需要转换为逻辑像素。
-  return {
-    width: Math.floor(monitor.workArea.size.width / scaleFactor) - 24,
-    height: Math.floor(monitor.workArea.size.height / scaleFactor) - 24,
-  };
+  return getMaximumLogicalWindowSize(
+    { width: monitor.workArea.size.width, height: monitor.workArea.size.height },
+    scaleFactor,
+  );
 }
 
 export function useWindowStatePersistence(): void {
@@ -100,11 +96,13 @@ export function useWindowStatePersistence(): void {
 
     const restoreWindowSize = async () => {
       try {
+        const savedLayoutMode = await prepareWindowForSavedLayout();
         const savedSize = readPersistedWindowSize();
         if (!savedSize) return;
 
         const maximumSize = await getMaximumLogicalSize();
-        const restoredSize = clampWindowSize(savedSize, maximumSize);
+        const minimumSize = getEffectiveWindowMinimumSize(savedLayoutMode, maximumSize);
+        const restoredSize = clampWindowSize(savedSize, maximumSize, minimumSize);
         await appWindow.setSize(new LogicalSize(restoredSize.width, restoredSize.height));
       } catch (error) {
         console.error('恢复窗口尺寸失败:', error);
