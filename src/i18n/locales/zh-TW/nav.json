@@ -25,5 +25,6 @@
   "aiModelsDesc": "快速分析本機 AI 模型佔用",
   "sidebarLabel": "功能選單",
   "sidebarCollapse": "收起側邊欄",
-  "sidebarExpand": "展開側邊欄"
+  "sidebarExpand": "展開側邊欄",
+  "sidebarResize": "調整側邊欄寬度"
 }

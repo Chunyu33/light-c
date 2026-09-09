@@ -292,16 +292,19 @@
 }
 
 .sidebar-nav {
+  position: relative;
   display: flex;
-  flex: 0 0 clamp(13.5em, 17vw, 16em);
+  flex: 0 0 var(--sidebar-nav-width);
   flex-direction: column;
+  width: var(--sidebar-nav-width);
   min-width: 0;
   border-right: 1px solid var(--border-color);
   background: var(--bg-card);
-  transition: flex-basis 180ms ease;
+  transition: width 180ms ease, flex-basis 180ms ease;
 }
 
 .sidebar-nav--collapsed {
+  width: 4.25em;
   flex-basis: 4.25em;
 }
 
@@ -411,6 +414,43 @@
   background: currentColor;
 }
 
+/* 将拖拽热区放在边框两侧，既容易命中又不会改变菜单内容宽度。 */
+.sidebar-nav__resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 2;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.sidebar-nav__resize-handle::after {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  content: '';
+  transition: background-color 150ms ease;
+}
+
+.sidebar-nav__resize-handle:hover::after,
+.sidebar-nav--resizing .sidebar-nav__resize-handle::after {
+  background: var(--brand-green);
+}
+
+.sidebar-nav--resizing,
+.sidebar-nav--resizing * {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.sidebar-nav--resizing {
+  transition: none;
+}
+
 .sidebar-nav--collapsed .sidebar-nav__header {
   justify-content: center;
   padding-inline: 0.5em;
@@ -430,6 +470,37 @@
   top: 0.45em;
   right: 0.4em;
   margin: 0;
+}
+
+/* 折叠菜单的提示挂到 body，避免被侧边栏滚动容器裁剪；颜色沿用应用主题变量。 */
+.sidebar-nav__tooltip {
+  position: fixed;
+  z-index: 10001;
+  max-width: min(24em, calc(100vw - 1em));
+  padding: 0.45em 0.75em;
+  border: 1px solid color-mix(in srgb, var(--brand-green) 45%, var(--border-color));
+  border-radius: 0.65em;
+  color: var(--fg-primary);
+  background: var(--bg-elevated);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  font-size: 0.9em;
+  line-height: 1.3;
+  pointer-events: none;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.sidebar-nav__tooltip::before {
+  position: absolute;
+  top: 50%;
+  left: -0.35em;
+  width: 0.6em;
+  height: 0.6em;
+  border-left: 1px solid color-mix(in srgb, var(--brand-green) 45%, var(--border-color));
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-green) 45%, var(--border-color));
+  background: var(--bg-elevated);
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
 }
 
 /* 调整布局时覆盖设置弹窗，避免用户在窗口尺寸尚未稳定时再次操作。 */
@@ -465,6 +536,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sidebar-nav,
+  .sidebar-nav__resize-handle::after,
   .layout-switching-overlay__icon {
     transition: none;
     animation: none;

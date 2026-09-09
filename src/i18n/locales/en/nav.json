@@ -25,5 +25,6 @@
   "aiModelsDesc": "Quickly analyze local AI model storage usage",
   "sidebarLabel": "Feature menu",
   "sidebarCollapse": "Collapse sidebar",
-  "sidebarExpand": "Expand sidebar"
+  "sidebarExpand": "Expand sidebar",
+  "sidebarResize": "Resize sidebar"
 }

@@ -5,7 +5,10 @@ import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from 
 import type { LayoutMode } from '../config/moduleMeta';
 
 export const BASE_WINDOW_MIN_SIZE = { width: 820, height: 610 } as const;
-export const SIDEBAR_WINDOW_MIN_SIZE = { width: 1080, height: 610 } as const;
+// 侧边栏包含完整功能菜单和页面内容，720px 高度可减少底部菜单被截断的情况。
+export const SIDEBAR_WINDOW_MIN_SIZE = { width: 1080, height: 720 } as const;
+// 预留少量工作区边距，避免窗口贴边时被任务栏或系统缩放误判为超出屏幕。
+export const WINDOW_WORK_AREA_MARGIN = 24;
 
 interface WindowLayoutSize {
   width: number;
@@ -38,53 +41,122 @@ export function getWindowMinimumSize(layoutMode: LayoutMode) {
   return layoutMode === 'sidebar' ? SIDEBAR_WINDOW_MIN_SIZE : BASE_WINDOW_MIN_SIZE;
 }
 
-async function setWindowMinimumSize(layoutMode: LayoutMode) {
-  const minimumSize = getWindowMinimumSize(layoutMode);
+export function getMaximumLogicalWindowSize(
+  workArea: { width: number; height: number },
+  scaleFactor: number,
+): WindowLayoutSize | null {
+  if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) return null;
+
+  // 工作区尺寸来自物理像素，边距也先按物理像素扣除，保证不同 DPI 下规则一致。
+  return {
+    width: Math.max(1, Math.floor((workArea.width - WINDOW_WORK_AREA_MARGIN) / scaleFactor)),
+    height: Math.max(1, Math.floor((workArea.height - WINDOW_WORK_AREA_MARGIN) / scaleFactor)),
+  };
+}
+
+export function getEffectiveWindowMinimumSize(
+  layoutMode: LayoutMode,
+  maximumSize: WindowLayoutSize | null,
+): WindowLayoutSize {
+  const configuredMinimum = getWindowMinimumSize(layoutMode);
+  if (!maximumSize) return configuredMinimum;
+
+  // 小分辨率设备无法达到设计目标时服从工作区，避免最小尺寸大于屏幕可用空间。
+  return {
+    width: Math.max(1, Math.min(configuredMinimum.width, maximumSize.width)),
+    height: Math.max(1, Math.min(configuredMinimum.height, maximumSize.height)),
+  };
+}
+
+interface WindowBounds {
+  currentSize: WindowLayoutSize;
+  maximumSize: WindowLayoutSize | null;
+  outerPosition: { x: number; y: number };
+  outerSize: WindowLayoutSize;
+}
+
+async function readWindowBounds(): Promise<WindowBounds> {
+  const appWindow = getCurrentWindow();
+  const scaleFactor = await appWindow.scaleFactor();
+  if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) {
+    throw new Error('无法读取当前窗口缩放比例');
+  }
+
+  const [physicalInnerSize, monitor, outerPosition, physicalOuterSize] = await Promise.all([
+    appWindow.innerSize(),
+    currentMonitor(),
+    appWindow.outerPosition(),
+    appWindow.outerSize(),
+  ]);
+
+  return {
+    currentSize: toLogicalSize(physicalInnerSize, scaleFactor),
+    maximumSize: monitor
+      ? getMaximumLogicalWindowSize({ width: monitor.workArea.size.width, height: monitor.workArea.size.height }, scaleFactor)
+      : null,
+    outerPosition,
+    outerSize: toLogicalSize(physicalOuterSize, scaleFactor),
+  };
+}
+
+async function setWindowMinimumSize(layoutMode: LayoutMode, maximumSize: WindowLayoutSize | null) {
+  const minimumSize = getEffectiveWindowMinimumSize(layoutMode, maximumSize);
   await getCurrentWindow().setMinSize(new LogicalSize(minimumSize.width, minimumSize.height));
 }
 
-async function expandWindowForSidebar(): Promise<void> {
+async function expandWindowForSidebar(bounds: WindowBounds, minimumSize: WindowLayoutSize): Promise<void> {
   const appWindow = getCurrentWindow();
   if (await appWindow.isMaximized()) return;
 
   const scaleFactor = await appWindow.scaleFactor();
   if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) return;
 
-  const [physicalInnerSize, monitor, outerPosition, outerSize] = await Promise.all([
-    appWindow.innerSize(),
-    currentMonitor(),
-    appWindow.outerPosition(),
-    appWindow.outerSize(),
-  ]);
-  const currentSize = toLogicalSize(physicalInnerSize, scaleFactor);
-  if (currentSize.width >= SIDEBAR_WINDOW_MIN_SIZE.width) return;
+  const nextWidth = Math.max(bounds.currentSize.width, minimumSize.width);
+  const nextHeight = Math.max(bounds.currentSize.height, minimumSize.height);
+  if (nextWidth === bounds.currentSize.width && nextHeight === bounds.currentSize.height) return;
 
-  // 多显示器和高 DPI 下优先服从当前工作区，无法达到目标时仍切换布局并交给 CSS 收缩适配。
-  const maximumWidth = monitor
-    ? Math.max(BASE_WINDOW_MIN_SIZE.width, Math.floor(monitor.workArea.size.width / scaleFactor) - 24)
-    : SIDEBAR_WINDOW_MIN_SIZE.width;
-  const nextWidth = Math.min(SIDEBAR_WINDOW_MIN_SIZE.width, maximumWidth);
-  const nextSize = new LogicalSize(nextWidth, Math.max(BASE_WINDOW_MIN_SIZE.height, Math.round(currentSize.height)));
+  // 当前窗口如果已经大于工作区，不因切换布局而强制缩小，避免覆盖用户主动设置的尺寸。
+  const safeWidth = bounds.maximumSize
+    ? Math.max(bounds.currentSize.width, Math.min(nextWidth, bounds.maximumSize.width))
+    : nextWidth;
+  const safeHeight = bounds.maximumSize
+    ? Math.max(bounds.currentSize.height, Math.min(nextHeight, bounds.maximumSize.height))
+    : nextHeight;
+  const nextSize = new LogicalSize(Math.round(safeWidth), Math.round(safeHeight));
   await appWindow.setSize(nextSize);
 
+  const monitor = await currentMonitor();
   if (!monitor) return;
 
-  // 扩展时尽量保持窗口中心不变，并把结果限制在当前显示器工作区内，避免右侧内容被屏幕截断。
-  const nextPhysicalWidth = nextWidth * scaleFactor;
-  const centeredX = outerPosition.x - (nextPhysicalWidth - outerSize.width) / 2;
+  // 扩展时尽量保持窗口中心不变，并把结果限制在当前显示器工作区内，避免窗口边缘跑出屏幕。
+  const nextOuterWidth = bounds.outerSize.width + (safeWidth - bounds.currentSize.width) * scaleFactor;
+  const nextOuterHeight = bounds.outerSize.height + (safeHeight - bounds.currentSize.height) * scaleFactor;
+  const centeredX = bounds.outerPosition.x - (nextOuterWidth - bounds.outerSize.width) / 2;
+  const centeredY = bounds.outerPosition.y - (nextOuterHeight - bounds.outerSize.height) / 2;
   const workAreaLeft = monitor.workArea.position.x;
+  const workAreaTop = monitor.workArea.position.y;
   const workAreaRight = workAreaLeft + monitor.workArea.size.width;
-  const nextX = clamp(centeredX, workAreaLeft, workAreaRight - nextPhysicalWidth);
-  if (Math.round(nextX) !== outerPosition.x) {
-    await appWindow.setPosition(new PhysicalPosition(Math.round(nextX), outerPosition.y));
+  const workAreaBottom = workAreaTop + monitor.workArea.size.height;
+  // 极端情况下旧窗口可能本来就大于工作区，此时保留原位置，不制造反向跳动。
+  const nextX = nextOuterWidth <= monitor.workArea.size.width
+    ? clamp(centeredX, workAreaLeft, workAreaRight - nextOuterWidth)
+    : bounds.outerPosition.x;
+  const nextY = nextOuterHeight <= monitor.workArea.size.height
+    ? clamp(centeredY, workAreaTop, workAreaBottom - nextOuterHeight)
+    : bounds.outerPosition.y;
+  if (Math.round(nextX) !== bounds.outerPosition.x || Math.round(nextY) !== bounds.outerPosition.y) {
+    await appWindow.setPosition(new PhysicalPosition(Math.round(nextX), Math.round(nextY)));
   }
 }
 
 export async function prepareWindowForLayout(layoutMode: LayoutMode): Promise<void> {
+  const bounds = await readWindowBounds();
+  const minimumSize = getEffectiveWindowMinimumSize(layoutMode, bounds.maximumSize);
+
   // 先更新最小尺寸，再扩展当前窗口，保证切换完成后用户不能立即拖回不适合的宽度。
-  await setWindowMinimumSize(layoutMode);
+  await setWindowMinimumSize(layoutMode, bounds.maximumSize);
   if (layoutMode === 'sidebar') {
-    await expandWindowForSidebar();
+    await expandWindowForSidebar(bounds, minimumSize);
   }
 }
 

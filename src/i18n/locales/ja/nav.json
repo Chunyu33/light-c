@@ -25,5 +25,6 @@
   "aiModelsDesc": "ローカルAIモデルの容量をすばやく分析",
   "sidebarLabel": "機能メニュー",
   "sidebarCollapse": "サイドバーを折りたたむ",
-  "sidebarExpand": "サイドバーを展開"
+  "sidebarExpand": "サイドバーを展開",
+  "sidebarResize": "サイドバーの幅を変更"
 }
