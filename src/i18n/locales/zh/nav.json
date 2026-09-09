@@ -22,5 +22,8 @@
   "shellIcons": "外壳图标管理",
   "shellIconsDesc": "清理此电脑中的第三方外壳图标，支持备份和防复活",
   "aiModels": "AI 模型空间",
-  "aiModelsDesc": "快速分析本机 AI 模型占用"
+  "aiModelsDesc": "快速分析本机 AI 模型占用",
+  "sidebarLabel": "功能菜单",
+  "sidebarCollapse": "收起侧边栏",
+  "sidebarExpand": "展开侧边栏"
 }

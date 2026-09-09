@@ -26,7 +26,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const { t } = useTranslation('settings');
   const { t: commonT } = useTranslation('common');
   const { level: fontSizeLevel, setLevel: setFontSizeLevel, customFontSize, setCustomFontSize } = useFontSize();
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, switchLayoutMode, isLayoutSwitching } = useSettings();
   const { showToast } = useToast();
   const [dataDir, setDataDir] = useState('');
   const [storageInfo, setStorageInfo] = useState<StorageLocationInfo | null>(null);
@@ -37,6 +37,17 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const [clearableItems, setClearableItems] = useState<ClearableDataItem[]>([]);
   const [selectedClearItemIds, setSelectedClearItemIds] = useState<string[]>([]);
   const [customFontSizeDraft, setCustomFontSizeDraft] = useState(String(customFontSize));
+
+  const handleLayoutModeChange = async (layoutMode: typeof settings.layoutMode) => {
+    if (layoutMode === settings.layoutMode || isLayoutSwitching) return;
+
+    try {
+      await switchLayoutMode(layoutMode);
+    } catch (error) {
+      // 窗口调整失败时保留原布局，提示用户而不是让设置状态与实际窗口脱节。
+      showToast({ type: 'error', title: t('layout.switchFailed'), description: String(error) });
+    }
+  };
 
   useEffect(() => {
     setCustomFontSizeDraft(String(customFontSize));
@@ -317,7 +328,8 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
               {LAYOUT_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => (
                 <button
                   key={mode}
-                  onClick={() => updateSettings({ layoutMode: mode })}
+                  onClick={() => void handleLayoutModeChange(mode)}
+                  disabled={isLayoutSwitching}
                   title={`${t(label)}: ${t(description)}`}
                   className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 ${
                     settings.layoutMode === mode

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
-export type LayoutMode = 'cards' | 'pages';
+export type LayoutMode = 'cards' | 'pages' | 'sidebar';
 
 export type AppModuleId =
   | 'junk-clean'

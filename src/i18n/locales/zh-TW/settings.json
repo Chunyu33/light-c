@@ -81,7 +81,10 @@
     "cards": "卡片模式",
     "cardsDesc": "所有功能集中在同一頁，適合快速總覽",
     "pages": "頁面模式",
-    "pagesDesc": "左側選單切換單功能頁，更接近傳統 PC 軟體"
+    "pagesDesc": "左側選單切換單功能頁，更接近傳統 PC 軟體",
+    "sidebar": "側邊欄模式",
+    "sidebarDesc": "固定側邊欄顯示功能選單，右側顯示目前功能頁面",
+    "switchFailed": "佈局切換失敗"
   },
   "searchEngine": {
     "label": "搜尋引擎",

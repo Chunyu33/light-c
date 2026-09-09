@@ -2,7 +2,13 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.7
+
+- Fixed sidebar layout switching being blocked by missing window resize permissions.
+- Layout: added an optional sidebar mode with a collapsible feature menu, a layout-switch loading state, and automatic window widening when the current width is insufficient.
+
 ## v2.16.6
+
 - Cleanup actions: the right-side operation toolbar for junk, large-file, and social cleanup can now be collapsed to reduce content obstruction, with its state remembered per module.
 
 ## v2.16.5

@@ -22,5 +22,8 @@
   "shellIcons": "シェルアイコン管理",
   "shellIconsDesc": "バックアップと再作成防止に対応したサードパーティ製シェルアイコン管理",
   "aiModels": "AIモデルストレージ",
-  "aiModelsDesc": "ローカルAIモデルの容量をすばやく分析"
+  "aiModelsDesc": "ローカルAIモデルの容量をすばやく分析",
+  "sidebarLabel": "機能メニュー",
+  "sidebarCollapse": "サイドバーを折りたたむ",
+  "sidebarExpand": "サイドバーを展開"
 }
