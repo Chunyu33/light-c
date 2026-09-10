@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ListChecks } from 'lucide-react';
@@ -10,38 +10,13 @@ interface ModuleOperationToolbarProps {
   children: ReactNode;
 }
 
-const STORAGE_KEY_PREFIX = 'lightc.moduleOperationToolbar.';
-
-function getStorageKey(moduleId: ModuleOperationToolbarId) {
-  return `${STORAGE_KEY_PREFIX}${moduleId}`;
-}
-
-function readCollapsedState(moduleId: ModuleOperationToolbarId) {
-  try {
-    return window.localStorage.getItem(getStorageKey(moduleId)) === 'collapsed';
-  } catch (error) {
-    // 本地存储不可用时保持默认展开，避免操作区因为浏览器权限问题消失。
-    console.warn('读取操作区折叠状态失败:', error);
-    return false;
-  }
-}
-
-function writeCollapsedState(moduleId: ModuleOperationToolbarId, isCollapsed: boolean) {
-  try {
-    window.localStorage.setItem(getStorageKey(moduleId), isCollapsed ? 'collapsed' : 'expanded');
-  } catch (error) {
-    // 写入失败不影响当前会话的折叠操作，但需要保留日志方便定位环境问题。
-    console.warn('保存操作区折叠状态失败:', error);
-  }
-}
-
-export function ModuleOperationToolbar({ moduleId, children }: ModuleOperationToolbarProps) {
+// moduleId 用于标识操作区归属哪个模块（React 依赖调用位置区分实例），折叠状态不再依赖它做持久化。
+export function ModuleOperationToolbar({ moduleId: _moduleId, children }: ModuleOperationToolbarProps) {
   const { t } = useTranslation('common');
-  const [isCollapsed, setIsCollapsed] = useState(() => readCollapsedState(moduleId));
-
-  useEffect(() => {
-    writeCollapsedState(moduleId, isCollapsed);
-  }, [isCollapsed, moduleId]);
+  // 中文说明：折叠状态只属于当前会话，因此使用组件内部 state，不再写入 localStorage。
+  // 垃圾清理、大文件清理、社交软件专清各自挂载一个实例，状态天然互相独立；
+  // 每次启动或重新扫描后组件重新挂载，初始值固定为展开，避免上次收起的操作区在重启后仍然消失。
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleLabel = isCollapsed ? t('expandToolbar') : t('collapseToolbar');
 
@@ -57,6 +32,7 @@ export function ModuleOperationToolbar({ moduleId, children }: ModuleOperationTo
       >
         {isCollapsed ? <ListChecks className="module-operation-toolbar__toggle-icon" /> : <ChevronLeft className="module-operation-toolbar__toggle-icon" />}
       </button>
+      {/* 折叠时直接卸载按钮，保证操作区不再占用结果区空间；展开为瞬时切换，不做过渡动画。 */}
       {!isCollapsed && (
         <div className="module-operation-toolbar__actions">
           {children}

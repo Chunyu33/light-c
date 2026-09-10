@@ -110,6 +110,7 @@ impl ScanEngine {
         // 回收站的物理目录包含多用户 SID 和 Shell 元数据，必须使用专用扫描器保持与 Explorer 一致。
         if matches!(category, JunkCategory::RecycleBin) {
             super::recycle_bin::scan_current_user(category, &mut result);
+            result.sort_files_by_size_desc();
             return result;
         }
 
@@ -141,6 +142,9 @@ impl ScanEngine {
             self.scan_path(resolved_path, category, &patterns, &mut result);
         }
 
+        // 并行线程与目录遍历的完成顺序会随机化文件顺序，统一按大小倒序展示，
+        // 让用户先在每个分类里看到占用空间最大的文件。
+        result.sort_files_by_size_desc();
         result
     }
 
@@ -432,5 +436,28 @@ mod tests {
         assert!(engine.is_system_protected(Path::new(
             r"C:\ProgramData\Microsoft\Windows Defender\Quarantine\entry.bin"
         )));
+    }
+
+    #[test]
+    fn test_category_files_are_sorted_by_size_desc() {
+        let mut result = CategoryScanResult::new(JunkCategory::WindowsTemp);
+        for (name, size) in [("small.tmp", 10_u64), ("large.tmp", 4096), ("medium.tmp", 512)] {
+            result.add_file(FileInfo::new(
+                format!(r"C:\Users\Test\AppData\Local\Temp\{}", name),
+                name.to_string(),
+                size,
+                0,
+                false,
+                JunkCategory::WindowsTemp,
+            ));
+        }
+
+        result.sort_files_by_size_desc();
+
+        let sizes = result.files.iter().map(|file| file.size).collect::<Vec<_>>();
+        assert_eq!(sizes, vec![4096, 512, 10]);
+        // 排序只调整展示顺序，不能改变分类统计口径。
+        assert_eq!(result.file_count, 3);
+        assert_eq!(result.total_size, 4618);
     }
 }

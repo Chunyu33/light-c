@@ -197,6 +197,12 @@ pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
     result.total_size = result.categories.iter().map(|item| item.total_size).sum();
     result.total_file_count = result.categories.iter().map(|item| item.file_count).sum();
 
+    // 深度结果按分区先后合并，分区内又按路径排序，顺序对用户没有意义。
+    // 在建立会话前统一按大小倒序，保证前端分页拿到的是“最大的文件先出现”。
+    for category in &mut result.categories {
+        category.sort_files_by_size_desc();
+    }
+
     emit_progress(
         window,
         "summary",
@@ -1381,5 +1387,42 @@ mod tests {
         // 后端应返回整类 501 个文件，并正确排除前端明确取消的 1 个路径。
         assert_eq!(full_paths.len(), 500);
         assert!(full_paths.iter().any(|path| path.ends_with("500.tmp")));
+    }
+
+    #[test]
+    fn sorts_deep_category_files_by_size_before_paging() {
+        let mut category = CategoryScanResult::new(JunkCategory::WindowsTemp);
+        for (name, size) in [("small.tmp", 1_u64), ("large.tmp", 900), ("medium.tmp", 500)] {
+            category.add_file(FileInfo::new(
+                format!(r"D:\Users\Test\AppData\Local\Temp\{}", name),
+                name.to_string(),
+                size,
+                1,
+                false,
+                JunkCategory::WindowsTemp,
+            ));
+        }
+        category.sort_files_by_size_desc();
+
+        let result = DeepJunkScanResult {
+            scan_mode: "deep".to_string(),
+            scan_id: String::new(),
+            categories: vec![category],
+            total_size: 1401,
+            total_file_count: 3,
+            scan_duration_ms: 0,
+            scan_timestamp: 0,
+            drives: Vec::new(),
+        };
+
+        // 首屏必须直接给出最大的文件，避免用户为了找大文件反复翻页。
+        let first_page = create_session(result).expect("创建深度扫描会话");
+        let sizes = first_page.categories[0]
+            .files
+            .iter()
+            .map(|file| file.size)
+            .collect::<Vec<_>>();
+        assert_eq!(sizes, vec![900, 500, 1]);
+        assert_eq!(first_page.categories[0].total_size, 1401);
     }
 }

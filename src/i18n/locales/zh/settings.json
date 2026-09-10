@@ -2,6 +2,7 @@
   "title": "设置",
   "about": { "appInfo": "应用信息", "appDescription": "Windows C盘智能清理工具", "version": "版本 {{version}}", "portable": "便携版", "installer": "安装版", "authorDownload": "作者渠道下载", "checkUpdates": "检查更新", "portableUpdateHint": "便携版不会自动安装更新，推荐从作者网盘下载新版 zip 后覆盖当前目录，GitHub Releases 作为官方备用渠道。", "updateHint": "温馨提示：更新源为 GitHub，国内可能会出现间歇性 DNS 污染，如果失败可以稍后重试。", "systemInfo": "系统信息", "loadingSystemInfo": "正在获取系统信息...", "operatingSystem": "操作系统", "architecture": "系统架构", "processor": "处理器", "cpuCores": "CPU 核心数", "memory": "内存", "memoryValue": "{{free}} 可用 / {{total}} 总计", "computerName": "计算机名", "currentUser": "当前用户", "uptime": "系统运行时间", "uptimeValue": "{{days}} 天 {{hours}} 小时 {{minutes}} 分钟", "systemInfoFailed": "无法获取系统信息", "nameSection": "为什么叫 LightC", "nameDescription": "Light 代表轻量、轻快，C 即 C 盘。LightC 致力于帮助您安全、高效地清理系统垃圾文件，释放磁盘空间。", "developer": "开发者", "author": "作者", "officialWebsite": "官方网站", "officialWebsiteDesc": "访问 LightC 官方网站，获取项目介绍、最新动态和相关资源。", "source": "源码地址", "license": "源码许可证", "changelog": "更新日志", "changelogDesc": "查看版本更新历史" },
   "close": "关闭设置",
+  "navResize": "调整设置导航宽度",
   "tabs": {
     "general": "通用",
     "features": "功能设置",

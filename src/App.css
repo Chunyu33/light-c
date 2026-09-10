@@ -537,6 +537,7 @@
 @media (prefers-reduced-motion: reduce) {
   .sidebar-nav,
   .sidebar-nav__resize-handle::after,
+  .settings-modal__nav-resize-handle::after,
   .layout-switching-overlay__icon {
     transition: none;
     animation: none;
@@ -777,6 +778,44 @@ body {
 /* ============================================================================
    动画效果
    ============================================================================ */
+
+/* ============================================================================
+   设置弹窗左右分栏宽度拖拽
+   与主界面侧边栏保持一致：热区压在分界线上，悬停/拖拽时只显示一条 1px 绿线。
+   ============================================================================ */
+.settings-modal__nav-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 2;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.settings-modal__nav-resize-handle::after {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  content: '';
+  transition: background-color 150ms ease;
+}
+
+.settings-modal__nav-resize-handle:hover::after,
+.settings-modal__nav-resize-handle:focus-visible::after,
+.settings-modal--resizing .settings-modal__nav-resize-handle::after {
+  background: var(--brand-green);
+}
+
+/* 拖拽过程中统一指针和选区，避免鼠标越过分栏后光标抖动或选中文字。 */
+.settings-modal--resizing,
+.settings-modal--resizing * {
+  cursor: col-resize;
+  user-select: none;
+}
 
 /* ── 模态框弹入动画 ──────────────────────────────────────────────────────────
    cubic-bezier(0.16, 1, 0.3, 1) 弹簧曲线：快速加速后回弹收敛，
