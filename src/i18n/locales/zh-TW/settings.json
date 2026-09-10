@@ -35,6 +35,7 @@
     "changelogDesc": "檢視版本更新歷史"
   },
   "close": "關閉設定",
+  "navResize": "調整設定導覽寬度",
   "tabs": {
     "general": "通用",
     "features": "功能設定",

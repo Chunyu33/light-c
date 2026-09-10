@@ -105,6 +105,22 @@ impl CategoryScanResult {
     pub fn human_readable_total_size(&self) -> String {
         format_size(self.total_size)
     }
+
+    /// 按文件大小倒序排列：占用空间最大的排在最前，便于用户优先处理。
+    ///
+    /// 中文说明：
+    /// 交叉来源（快速扫描的并行线程、深度扫描的多分区合并、回收站扫描）产生的文件顺序
+    /// 由遍历顺序和线程完成顺序决定，对用户没有意义。这里统一收敛为“大小倒序 + 路径升序”：
+    /// 大小相同时按路径排序，保证同一份扫描结果每次展示顺序一致，也保证深度扫描分页时
+    /// 首屏就是最大的文件，不需要为排序额外遍历全部分类。
+    pub fn sort_files_by_size_desc(&mut self) {
+        self.files.sort_by(|left, right| {
+            right
+                .size
+                .cmp(&left.size)
+                .then_with(|| left.path.cmp(&right.path))
+        });
+    }
 }
 
 /// 完整扫描结果

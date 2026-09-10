@@ -2,6 +2,7 @@
   "title": "設定",
   "about": { "appInfo": "アプリ情報", "appDescription": "Windows C: ドライブ向けスマートクリーンアップツール", "version": "バージョン {{version}}", "portable": "ポータブル版", "installer": "インストール版", "authorDownload": "作者の配布元からダウンロード", "checkUpdates": "更新を確認", "portableUpdateHint": "ポータブル版は自動更新をインストールしません。作者の配布元から新しい zip を取得して現在のフォルダーを置き換えてください。GitHub Releases は公式の予備配布元です。", "updateHint": "更新元は GitHub です。地域によって DNS の問題が発生する場合は、後でもう一度お試しください。", "systemInfo": "システム情報", "loadingSystemInfo": "システム情報を取得中...", "operatingSystem": "オペレーティングシステム", "architecture": "システムアーキテクチャ", "processor": "プロセッサー", "cpuCores": "CPU コア数", "memory": "メモリ", "memoryValue": "空き {{free}} / 合計 {{total}}", "computerName": "コンピューター名", "currentUser": "現在のユーザー", "uptime": "稼働時間", "uptimeValue": "{{days}} 日 {{hours}} 時間 {{minutes}} 分", "systemInfoFailed": "システム情報を取得できません", "nameSection": "LightC の名前の由来", "nameDescription": "Light は軽快さ、C は C ドライブを表します。LightC はシステムの不要ファイルを安全かつ効率的に整理し、空き容量を増やします。", "developer": "開発者", "author": "作者", "officialWebsite": "公式サイト", "officialWebsiteDesc": "LightC のプロジェクト情報、最新情報、関連リソースを確認できます。", "source": "ソースコード", "license": "ソースライセンス", "changelog": "変更履歴", "changelogDesc": "バージョン履歴を表示" },
   "close": "設定を閉じる",
+  "navResize": "設定ナビゲーションの幅を変更",
   "tabs": {
     "general": "一般",
     "features": "機能設定",

@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.8
+
+- Settings: the left menu and the content area can now be resized by dragging the divider, and the width is remembered for next time. The default width is wider as well, so menu entries are no longer cramped.
+- Junk cleanup: files inside each category are now listed from largest to smallest, so the biggest space hogs show up first.
+- The cleanup toolbar (junk cleanup, large-file cleanup, social cleanup) is expanded by default, and its collapsed state is no longer remembered, so a new scan always starts expanded.
+
 ## v2.16.7
 
 - Sidebar: added font-size-aware bounded width resizing.
