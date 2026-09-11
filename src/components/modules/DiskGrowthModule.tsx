@@ -130,11 +130,29 @@ function normalizeDiskPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
 }
 
-function isDescendantPath(path: string, parentPath: string): boolean {
-  const normalizedPath = normalizeDiskPath(path);
-  const normalizedParentPath = normalizeDiskPath(parentPath);
-  // 仅按完整路径段判断父子关系，避免 C:/data 与 C:/database 发生错误嵌套。
-  return normalizedPath.startsWith(`${normalizedParentPath}/`);
+/**
+ * 选出导出报告需要的顶层变化目录。
+ *
+ * 中文说明：后端的变化目录列表是扁平的，父目录可能出现在子目录之后，因此不能简单地
+ * "逐个向后看"；这里先按路径排序，再只和最近一次选中的根目录比较，把 O(n²) 的
+ * 两两比较收敛成一次排序加一次线性扫描。返回原始路径，找不到入口时返回空数组。
+ */
+function selectTopLevelGrowthPaths(entries: DiskGrowthEntry[]): string[] {
+  const normalizedEntries = entries
+    .map((entry) => ({ path: entry.path, normalized: normalizeDiskPath(entry.path) }))
+    .sort((left, right) => left.normalized.localeCompare(right.normalized));
+
+  const topLevelPaths: string[] = [];
+  let lastAcceptedPrefix = '';
+  for (const entry of normalizedEntries) {
+    if (lastAcceptedPrefix && entry.normalized.startsWith(`${lastAcceptedPrefix}/`)) {
+      continue;
+    }
+    lastAcceptedPrefix = entry.normalized;
+    topLevelPaths.push(entry.path);
+  }
+
+  return topLevelPaths;
 }
 
 function buildChildGrowthEntry(parent: DiskGrowthEntry, path: string): DiskGrowthEntry | null {
@@ -1003,9 +1021,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       // 只为当前结果一次性获取多级目录树，避免逐条请求造成不必要的 IPC 和快照读取。
       const exportTree = growthReport.entries.length > 0
         ? await getDiskGrowthExportTree(
-            growthReport.entries
-              .filter((entry) => !growthReport.entries.some((parent) => parent !== entry && isDescendantPath(entry.path, parent.path)))
-              .map((entry) => entry.path),
+            selectTopLevelGrowthPaths(growthReport.entries),
             3,
             scanSummary.drive_letter,
           )

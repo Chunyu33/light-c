@@ -2,6 +2,13 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Disk growth analysis: fixed the exported HTML report freezing on open and refusing to expand. The report no longer attaches a script to every directory (the collapse animation is now pure CSS), only top-level directories start expanded, and each directory's markup is leaner. A single export is capped at 10,000 directory nodes — about 4.9 MB and ~1.5 s to open; the real size depends on the amount of changed data, so a flat report can still be only a few hundred KB.
+- Junk cleanup: fixed the deep scan failing to find leftovers of an old Windows installation. Files inside Windows.old, $Windows.~BT and $Windows.~WS were previously filtered out wholesale by the system-directory protection rules.
+- Junk cleanup: widened the range of cleanable caches, including browser Service Worker and media caches, Firefox startup and crash-recovery caches, NVIDIA ComputeCache, the legacy icon cache, the system temp folder, kernel crash reports, and Windows Update and Store logs.
+- Junk cleanup: fixed several directories that could be found but not removed, such as the Windows Error Reporting queue.
+
 ## v2.16.8
 
 - Settings: the left menu and the content area can now be resized by dragging the divider, and the width is remembered for next time. The default width is wider as well, so menu entries are no longer cramped.

@@ -77,38 +77,56 @@ function interpolateHtmlLabel(template: string, values: Record<string, string | 
   return template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => escapeHtml(String(values[key] ?? '')));
 }
 
-function renderNode(node: DiskGrowthExportNode, labels: DiskGrowthHtmlLabels, locale: string): string {
-  const childContent = node.children.map((child) => renderNode(child, labels, locale)).join('');
-  const status = labels.levels[node.level] || node.level;
-  const details = `
-    <div class="node-details">
-      <div class="field path"><span>${escapeHtml(labels.path)}</span><code>${escapeHtml(node.path)}</code></div>
-      <div class="field"><span>${escapeHtml(labels.previousSize)}</span><strong>${escapeHtml(formatSize(node.old_size))}</strong></div>
-      <div class="field"><span>${escapeHtml(labels.currentSize)}</span><strong>${escapeHtml(formatSize(node.new_size))}</strong></div>
-      <div class="field"><span>${escapeHtml(labels.difference)}</span><strong class="${node.diff >= 0 ? 'increase' : 'decrease'}">${escapeHtml(formatSignedSize(node.diff))}</strong></div>
-      <div class="field"><span>${escapeHtml(labels.changeTime)}</span><span>${escapeHtml(formatDateTime(node.modified, locale))}</span></div>
-      <div class="field"><span>${escapeHtml(labels.level)}</span><span class="badge">${escapeHtml(status)}</span></div>
-    </div>
-    ${childContent ? `<div class="children">${childContent}</div>` : ''}
-  `;
+function renderNode(
+  node: DiskGrowthExportNode,
+  labels: DiskGrowthHtmlLabels,
+  locale: string,
+  parts: string[],
+): void {
+  const hasChildren = node.children.length > 0;
+  const diffClass = node.diff >= 0 ? 'increase' : 'decrease';
+  // 只有根节点默认展开：节点数量可达数千，全部展开会让浏览器首屏布局严重卡顿。
+  parts.push(`<details class="node"${hasChildren ? ' open' : ''}><summary><span>`);
+  parts.push(escapeHtml(node.name));
+  parts.push(`</span><strong class="${diffClass}">`);
+  parts.push(escapeHtml(formatSignedSize(node.diff)));
+  // 详情用 dl/dt/dd 表达，比 div + span 少一层包装：每个节点可少 5 个 DOM 元素，
+  // 数千节点时直接影响浏览器解析与布局成本，而信息量完全不变。
+  parts.push('</strong></summary><div class="node-content"><dl class="node-details">');
+  parts.push(detailRow(labels.path, `<code>${escapeHtml(node.path)}</code>`));
+  parts.push(detailRow(labels.previousSize, `<strong>${escapeHtml(formatSize(node.old_size))}</strong>`));
+  parts.push(detailRow(labels.currentSize, `<strong>${escapeHtml(formatSize(node.new_size))}</strong>`));
+  parts.push(detailRow(labels.difference, `<strong class="${diffClass}">${escapeHtml(formatSignedSize(node.diff))}</strong>`));
+  parts.push(detailRow(labels.changeTime, escapeHtml(formatDateTime(node.modified, locale))));
+  parts.push(detailRow(labels.level, `<span class="badge">${escapeHtml(labels.levels[node.level] || node.level)}</span>`));
+  parts.push('</dl>');
 
-  // details/summary 保留原生语义，外层内容容器再配合脚本实现离线报告中的平滑折叠。
-  return `<details class="node"${node.children.length > 0 ? '' : ' open'}>
-    <summary><span>${escapeHtml(node.name)}</span><strong class="${node.diff >= 0 ? 'increase' : 'decrease'}">${escapeHtml(formatSignedSize(node.diff))}</strong></summary>
-    <div class="node-content"><div class="node-content-inner">${details}</div></div>
-  </details>`;
+  if (hasChildren) {
+    parts.push('<div class="children">');
+    for (const child of node.children) {
+      renderNode(child, labels, locale, parts);
+    }
+    parts.push('</div>');
+  }
+
+  parts.push('</div></details>');
+}
+
+/// 生成一行“标签 + 取值”的详情；valueHtml 必须是已经转义过的 HTML 片段。
+function detailRow(label: string, valueHtml: string): string {
+  return `<dt>${escapeHtml(label)}</dt><dd>${valueHtml}</dd>`;
 }
 
 function renderBaselineEntry(entry: DiskGrowthAnalyzeEntry, labels: DiskGrowthHtmlLabels, locale: string): string {
   return `<details class="node" open>
     <summary><span>${escapeHtml(entry.path)}</span><strong>${escapeHtml(formatSize(entry.size))}</strong></summary>
-    <div class="node-details">
-      <div class="field path"><span>${escapeHtml(labels.path)}</span><code>${escapeHtml(entry.path)}</code></div>
-      <div class="field"><span>${escapeHtml(labels.currentSize)}</span><strong>${escapeHtml(formatSize(entry.size))}</strong></div>
-      <div class="field"><span>${escapeHtml(labels.changeTime)}</span><span>${escapeHtml(formatDateTime(entry.modified, locale))}</span></div>
-      <div class="field"><span>${escapeHtml(labels.explanation)}</span><span>${escapeHtml(entry.reason)}</span></div>
-      <div class="field path"><span>${escapeHtml(labels.suggestion)}</span><span>${escapeHtml(entry.suggestion)}</span></div>
-    </div>
+    <div class="node-content"><dl class="node-details">
+      <dt>${escapeHtml(labels.path)}</dt><dd><code>${escapeHtml(entry.path)}</code></dd>
+      <dt>${escapeHtml(labels.currentSize)}</dt><dd><strong>${escapeHtml(formatSize(entry.size))}</strong></dd>
+      <dt>${escapeHtml(labels.changeTime)}</dt><dd>${escapeHtml(formatDateTime(entry.modified, locale))}</dd>
+      <dt>${escapeHtml(labels.explanation)}</dt><dd>${escapeHtml(entry.reason)}</dd>
+      <dt>${escapeHtml(labels.suggestion)}</dt><dd>${escapeHtml(entry.suggestion)}</dd>
+    </dl></div>
   </details>`;
 }
 
@@ -121,10 +139,19 @@ export function buildDiskGrowthHtml(
   const { labels, locale, exportTotalNodes, exportTruncated = false } = options;
   // 是否有历史快照决定报告模式；二次扫描即使没有变化，也不能退回首次扫描基线。
   const isBaselineReport = !scanSummary.previous_scan_time;
-  const resultContent = !isBaselineReport
-    ? exportNodes.map((node) => renderNode(node, labels, locale)).join('')
-    : scanSummary.analyze.entries.map((entry) => renderBaselineEntry(entry, labels, locale)).join('');
-  const content = resultContent || `<p class="empty">${escapeHtml(labels.noResult)}</p>`;
+  // 用数组累积再一次性拼接：递归 template string 会让每层子树都重复复制一次下层结果，
+  // 上千节点时会产生明显的中间字符串开销。
+  const parts: string[] = [];
+  if (!isBaselineReport) {
+    for (const node of exportNodes) {
+      renderNode(node, labels, locale, parts);
+    }
+  } else {
+    for (const entry of scanSummary.analyze.entries) {
+      parts.push(renderBaselineEntry(entry, labels, locale));
+    }
+  }
+  const content = parts.length > 0 ? parts.join('') : `<p class="empty">${escapeHtml(labels.noResult)}</p>`;
   const previousScan = scanSummary.previous_scan_time || labels.noHistory;
   // 变化报告使用后端实际生成的节点总数，避免把去重后的根目录数量当成导出数量。
   const resultCount = !isBaselineReport
@@ -154,12 +181,23 @@ export function buildDiskGrowthHtml(
     main { max-width: 1160px; margin: 0 auto; } h1 { margin: 0 0 20px; color: var(--accent-hover); font-size: 26px; }
     .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
     .meta-item { padding: 13px 15px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
-    .meta-item span, .field > span:first-child { display: block; color: var(--muted); font-size: 12px; } .meta-item strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
+    .meta-item span { display: block; color: var(--muted); font-size: 12px; } .meta-item strong { display: block; margin-top: 3px; overflow-wrap: anywhere; }
     .node { margin: 8px 0; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
     .node summary { display: flex; justify-content: space-between; gap: 16px; padding: 13px 16px; cursor: pointer; list-style-position: inside; } .node summary::marker { color: var(--accent); } .node summary:hover { background: var(--soft); } .node summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-    .node summary span { overflow-wrap: anywhere; } .node summary strong { flex: 0 0 auto; } .node-content { height: auto; overflow: hidden; opacity: 1; transition: height 220ms ease, opacity 180ms ease; } .node:not([open]) > .node-content { display: block; height: 0; opacity: 0; } .node-content-inner { min-height: 0; } .node-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 16px; padding: 0 16px 14px 34px; }
-    .field { min-width: 0; } .field strong { display: block; margin-top: 2px; } .field span:last-child, .field code { display: block; overflow-wrap: anywhere; } .field code { margin-top: 2px; font: 12px/1.45 Consolas, monospace; }
-    .path { grid-column: 1 / -1; } .children { margin: 0 12px 12px 28px; padding-left: 12px; border-left: 2px solid var(--border); } .badge { display: inline-block; margin-top: 2px; padding: 2px 8px; border-radius: 999px; color: var(--accent); background: var(--soft); }
+    .node summary span { overflow-wrap: anywhere; } .node summary strong { flex: 0 0 auto; }
+    /* 折叠动画完全由 CSS 驱动：interpolate-size 让 height:auto 与 0 之间可插值，
+       不再需要给每个节点绑定 toggle 监听（数千节点时那会让浏览器主线程长时间卡死）。
+       不支持该属性的旧浏览器只是没有过渡效果，展开/折叠本身仍然正常。 */
+    .node-content { height: auto; overflow: hidden; opacity: 1; interpolate-size: allow-keywords; transition: height 220ms ease, opacity 180ms ease; }
+    .node:not([open]) > .node-content { height: 0; opacity: 0; }
+    .node-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 16px; margin: 0; padding: 0 16px 14px 34px; }
+    /* dl 用两列网格：dt 固定在左列、dd 在右列并自动换行，成对占一行，不需要 field 包装层。 */
+    .node-details { display: grid; grid-template-columns: minmax(96px, max-content) minmax(0, 1fr); column-gap: 14px; row-gap: 6px; margin: 0; padding: 0 16px 14px 34px; }
+    .node-details dt { grid-column: 1; color: var(--muted); font-size: 12px; min-width: 0; }
+    .node-details dd { grid-column: 2; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+    .node-details dd code { font: 12px/1.45 Consolas, monospace; }
+    .children { margin: 0 12px 12px 28px; padding-left: 12px; border-left: 2px solid var(--border); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; color: var(--accent); background: var(--soft); }
     .increase { color: var(--increase); } .decrease { color: var(--decrease); } .empty { padding: 24px; color: var(--muted); background: var(--card); border: 1px solid var(--border); border-radius: 10px; } footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
     .scope-note { margin: 0 0 24px; padding: 14px 16px; background: var(--soft); border: 1px solid var(--border); border-radius: 10px; } .scope-note h2 { margin: 0 0 5px; font-size: 14px; } .scope-note p { margin: 0; color: var(--muted); }
   </style>
@@ -181,35 +219,5 @@ export function buildDiskGrowthHtml(
   <section>${content}</section>
   <footer>${escapeHtml(footerNote)}</footer>
 </main>
-<script>
-  // 使用固定时长的高度动画，兼顾离线文件环境与不支持新 details 动画伪元素的浏览器。
-  (() => {
-    const transitionDuration = 220;
-    document.querySelectorAll('details.node').forEach((detail) => {
-      const content = detail.querySelector(':scope > .node-content');
-      if (!content) return;
-      detail.addEventListener('toggle', () => {
-        if (detail.open) {
-          content.style.height = '0px';
-          content.style.opacity = '0';
-          requestAnimationFrame(() => {
-            content.style.height = content.scrollHeight + 'px';
-            content.style.opacity = '1';
-          });
-          window.setTimeout(() => {
-            if (detail.open) content.style.height = 'auto';
-          }, transitionDuration);
-          return;
-        }
-        content.style.height = content.scrollHeight + 'px';
-        content.style.opacity = '1';
-        requestAnimationFrame(() => {
-          content.style.height = '0px';
-          content.style.opacity = '0';
-        });
-      });
-    });
-  })();
-</script>
 </body></html>`;
 }

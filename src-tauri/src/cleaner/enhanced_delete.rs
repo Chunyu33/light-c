@@ -438,7 +438,13 @@ const SAFE_OWNERSHIP_PATHS: &[&str] = &[
     "\\appdata\\local\\microsoft\\windows\\explorer",
     "\\appdata\\local\\microsoft\\windows\\webcache",
     "\\appdata\\local\\microsoft\\windows\\clipboard",
+    // Chromium 系浏览器的 Service Worker / 媒体缓存目录，与 Cache 同级且同样可重建。
+    "\\service worker",
+    "\\media cache",
     "\\windows\\temp",
+    // Windows 10/11 的系统级临时目录与内核崩溃报告目录，属可重建的诊断数据。
+    "\\windows\\systemtemp",
+    "\\windows\\livekernelreports",
     "\\windows\\prefetch",
     "\\windows\\softwaredistribution\\download",
     "\\windows\\softwaredistribution\\deliveryoptimization",
@@ -447,12 +453,15 @@ const SAFE_OWNERSHIP_PATHS: &[&str] = &[
     "\\programdata\\microsoft\\windows defender\\localcopy",
     "\\programdata\\microsoft\\windows defender\\support",
     "\\programdata\\microsoft\\windows defender\\scans\\history\\service",
+    // Windows 错误报告队列/归档：SYSTEM 与 TrustedInstaller 混占，需要允许提权删除。
+    "\\programdata\\microsoft\\windows\\wer",
     "\\windows\\system32\\d3d_cache",
     "\\appdata\\local\\d3dscache",
     "\\appdata\\local\\amd\\dxcache",
     "\\appdata\\local\\nvidia\\dxcache",
     "\\appdata\\local\\nvidia\\glcache",
     "\\appdata\\local\\nvidia\\dxc",
+    "\\appdata\\local\\nvidia\\computecache",
     "\\appdata\\local\\intel\\shadercache",
     "\\$recycle.bin",
 ];
@@ -1124,6 +1133,35 @@ mod tests {
         assert!(engine.is_system_protected(Path::new("C:\\Windows\\System32\\ntdll.dll")));
         assert!(engine.is_system_protected(Path::new("C:\\pagefile.sys")));
         assert!(!engine.is_system_protected(Path::new("C:\\Temp\\test.tmp")));
+    }
+
+    #[test]
+    fn test_extended_junk_paths_are_deletable() {
+        let engine = EnhancedDeleteEngine::new();
+
+        // 新纳入深度扫描的缓存/诊断目录必须既不被系统保护拦截，也允许提权删除，
+        // 否则它们会被扫出来却永远删不掉。
+        let deletable_paths = [
+            r"C:\Windows\SystemTemp\setup.tmp",
+            r"C:\Windows\LiveKernelReports\WATCHDOG\report.dmp",
+            r"C:\Users\Test\AppData\Local\Microsoft\Windows\Explorer\iconcache.db",
+            r"C:\Users\Test\AppData\Local\Google\Chrome\User Data\Default\Service Worker\CacheStorage\abc",
+            r"C:\Users\Test\AppData\Local\NVIDIA\ComputeCache\shader.bin",
+            r"C:\ProgramData\Microsoft\Windows\WER\ReportQueue\AppCrash\report.wer",
+        ];
+
+        for path in deletable_paths {
+            assert!(
+                !engine.is_system_protected(Path::new(path)),
+                "不应被系统保护拦截: {}",
+                path
+            );
+            assert!(
+                engine.is_safe_for_ownership(Path::new(path)),
+                "应允许提权删除: {}",
+                path
+            );
+        }
     }
 
     #[test]
