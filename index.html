@@ -162,11 +162,34 @@
         }
       }
     </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
     <script>
-      // 在首次绘制前同步应用用户主题，避免浅色主题先出现深色闪烁。
+      // 启动屏由脚本注入，而不是写成静态 HTML。
+      //
+      // 中文说明：静态标记在 index.html 里必然带缩进，解析后会在标签之间产生空白文本节点，
+      // 而 React 的 SplashScreen 渲染出的子树没有这些空白节点；hydrateRoot 接管 #root 时
+      // 就会报 "Hydration failed ... {"\n      "}"。这里用字符串拼接出与 React 完全一致的
+      // 节点结构（不含元素间空白），既保留首帧零闪烁，也不再触发 hydration 报错。
       (() => {
+        const SLOGANS = {
+          zh: "LightC，让磁盘优化更简单",
+          "zh-TW": "LightC，讓磁碟最佳化更簡單",
+          en: "LightC — making disk optimization simpler",
+          ja: "LightC — ディスク最適化をもっとシンプルに"
+        };
+
+        // 与 src/i18n/index.ts 的 getInitialLanguage 保持同一判定，避免标语语言不一致。
+        let language = "zh";
         let theme = "dark";
         try {
+          const settings = JSON.parse(localStorage.getItem("c-cleanup-settings") || "{}");
+          language = settings.language === "en" || settings.language === "ja" || settings.language === "zh-TW"
+            ? settings.language
+            : "zh";
+          // 与 ThemeContext 同一判定：light / dark / system(跟随系统)。
           const mode = localStorage.getItem("c-cleanup-theme");
           theme = mode === "light"
             ? "light"
@@ -174,51 +197,25 @@
               ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
               : "dark";
         } catch {
-          // localStorage 不可用时使用与应用一致的默认深色主题。
+          // localStorage 不可用时使用与应用一致的默认值（深色 + 中文）。
         }
-        document.documentElement.dataset.splashTheme = theme;
-        document.documentElement.dataset.splashLanguage = (() => {
-          try {
-            const settings = JSON.parse(localStorage.getItem("c-cleanup-settings") || "{}");
-            return settings.language === "en" || settings.language === "ja" ? settings.language : "zh";
-          } catch {
-            return "zh";
-          }
-        })();
-        document.documentElement.dataset.splashStartedAt = String(performance.now());
-      })();
-    </script>
-  </head>
 
-  <body>
-    <div id="root">
-      <div id="initial-splash" class="splash-screen splash-screen--dark" role="status" aria-label="LightC">
-        <div class="splash-screen__aurora splash-screen__aurora--one" aria-hidden="true"></div>
-        <div class="splash-screen__aurora splash-screen__aurora--two" aria-hidden="true"></div>
-        <div class="splash-screen__content">
-          <img class="splash-screen__logo" src="/logo.svg" alt="LightC" />
-          <p id="splash-slogan" class="splash-screen__slogan">LightC，让磁盘优化更简单</p>
-          <div class="splash-screen__platform" aria-label="Evan的像素空间">
-            <!-- <span class="splash-screen__author">Evan的像素空间</span> -->
-            <span class="splash-screen__channel">Bilibili · @Evan的像素空间</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <script>
-      // 在 React 接管前同步设置主题 class 和本地化标语，确保 hydration 节点完全一致。
-      (() => {
-        const splash = document.getElementById("initial-splash");
-        const theme = document.documentElement.dataset.splashTheme || "dark";
-        const slogans = {
-          zh: "LightC，让磁盘优化更简单",
-          en: "LightC — making disk optimization simpler",
-          ja: "LightC — ディスク最適化をもっとシンプルに"
-        };
-        const language = document.documentElement.dataset.splashLanguage || "zh";
-        if (splash) splash.className = `splash-screen splash-screen--${theme}`;
-        const slogan = document.getElementById("splash-slogan");
-        if (slogan) slogan.textContent = slogans[language] || slogans.zh;
+        // 主题与语言提前写到 html 上，index.html 里的样式选择器仍按这两个值工作。
+        document.documentElement.dataset.splashTheme = theme;
+        document.documentElement.dataset.splashLanguage = language;
+        document.documentElement.dataset.splashStartedAt = String(performance.now());
+
+        const markup = '<div id="initial-splash" class="splash-screen splash-screen--' + theme + '" role="status" aria-label="LightC">'
+          + '<div class="splash-screen__aurora splash-screen__aurora--one" aria-hidden="true"></div>'
+          + '<div class="splash-screen__aurora splash-screen__aurora--two" aria-hidden="true"></div>'
+          + '<div class="splash-screen__content">'
+          + '<img class="splash-screen__logo" src="/logo.svg" alt="LightC">'
+          + '<p id="splash-slogan" class="splash-screen__slogan">' + (SLOGANS[language] || SLOGANS.zh) + '</p>'
+          + '<div class="splash-screen__platform" aria-label="Evan的像素空间">'
+          + '<span class="splash-screen__channel">Bilibili · @Evan的像素空间</span>'
+          + '</div></div></div>';
+
+        document.getElementById("root").innerHTML = markup;
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>

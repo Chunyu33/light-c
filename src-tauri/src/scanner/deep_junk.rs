@@ -679,6 +679,24 @@ fn system_level_cache_roots(root: &Path) -> Vec<PathBuf> {
         root.join("Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache"),
         root.join("Windows\\Installer\\$PatchCache$"),
         root.join("Windows\\System32\\d3d_cache"),
+        // 系统级临时缓存：更新回滚暂存、内核崩溃报告（深度受限，见下）、
+        // Windows Update 与应用商店日志。这些目录只包含可重建的诊断/更新数据。
+        root.join("Windows\\SystemTemp"),
+        root.join("Windows\\Logs\\WindowsUpdate"),
+        root.join("Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalCache"),
+    ]
+}
+
+/// 需要限制遍历深度的补充根目录。
+///
+/// 中文说明：这些目录本身是可重建缓存，但内部可能包含大量嵌套的小文件（例如 WER 的报告队列
+/// 会按应用/时间建多层子目录）。限制深度可以在覆盖真实垃圾的同时，避免深度扫描把时间花在
+/// 深不见底的目录树上。
+#[cfg(windows)]
+fn depth_limited_system_cache_roots(root: &Path) -> Vec<(PathBuf, usize)> {
+    vec![
+        (root.join("ProgramData\\Microsoft\\Windows\\WER"), 2),
+        (root.join("Windows\\LiveKernelReports"), 1),
     ]
 }
 
@@ -687,6 +705,7 @@ fn system_level_cache_roots(root: &Path) -> Vec<PathBuf> {
 #[cfg(windows)]
 fn user_level_cache_roots(profile: &Path) -> Vec<PathBuf> {
     let local = profile.join("AppData\\Local");
+    let roaming = profile.join("AppData\\Roaming");
     vec![
         local.join("Temp"),
         local.join("CrashDumps"),
@@ -701,6 +720,9 @@ fn user_level_cache_roots(profile: &Path) -> Vec<PathBuf> {
         local.join("Microsoft\\Windows\\WebCache"),
         local.join("Microsoft\\Windows\\Clipboard"),
         local.join("Microsoft\\Windows\\WER"),
+        // Firefox 崩溃恢复缓存放在 Roaming 下；Chromium 系浏览器的 Service Worker / 媒体缓存
+        // 位于各浏览器 user data 之下，由深度规则覆盖。
+        roaming.join("Mozilla\\Firefox\\Crash Reports"),
     ]
 }
 
@@ -768,48 +790,70 @@ fn scan_supplement_roots(
         started_at,
     );
 
+    let drive_root = PathBuf::from(format!("{}:\\", drive_letter));
+
     for root in supplement_ntfs_scan_roots(drive_letter) {
         if is_cancelled() {
             break;
         }
-        if !root.exists() {
+        scan_supplement_root(&root, 12, results, &mut visited);
+    }
+
+    // 深度受限的补充根：只覆盖根目录附近的真实垃圾，避免深入无意义的多层子目录。
+    for (root, max_depth) in depth_limited_system_cache_roots(&drive_root) {
+        if is_cancelled() {
+            break;
+        }
+        scan_supplement_root(&root, max_depth, results, &mut visited);
+    }
+}
+
+/// 对单个补扫根做受控遍历，把命中的高置信缓存文件追加到 results。
+/// max_depth 为 0 时只检查根目录自身，不做递归。
+#[cfg(windows)]
+fn scan_supplement_root(
+    root: &Path,
+    max_depth: usize,
+    results: &mut Vec<(JunkCategory, FileInfo)>,
+    visited: &mut HashSet<String>,
+) {
+    if !root.exists() {
+        return;
+    }
+
+    for entry in WalkDir::new(root)
+        .max_depth(max_depth)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        if is_cancelled() {
+            break;
+        }
+        if !entry.file_type().is_file() {
             continue;
         }
-
-        for entry in WalkDir::new(root)
-            .max_depth(12)
-            .follow_links(false)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            if is_cancelled() {
-                break;
-            }
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let path = entry.path().to_string_lossy().into_owned();
-            if !visited.insert(path.to_ascii_lowercase()) {
-                continue;
-            }
-            let Some(category) = match_deep_junk_category(&path) else {
-                continue;
-            };
-            let Ok(metadata) = entry.metadata() else {
-                continue;
-            };
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
-                .map(|value| value.as_secs() as i64)
-                .unwrap_or(0);
-            let name = entry.file_name().to_string_lossy().into_owned();
-            results.push((
-                category.clone(),
-                FileInfo::new(path, name, metadata.len(), modified, false, category),
-            ));
+        let path = entry.path().to_string_lossy().into_owned();
+        if !visited.insert(path.to_ascii_lowercase()) {
+            continue;
         }
+        let Some(category) = match_deep_junk_category(&path) else {
+            continue;
+        };
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+            .map(|value| value.as_secs() as i64)
+            .unwrap_or(0);
+        let name = entry.file_name().to_string_lossy().into_owned();
+        results.push((
+            category.clone(),
+            FileInfo::new(path, name, metadata.len(), modified, false, category),
+        ));
     }
 }
 
@@ -849,19 +893,34 @@ pub fn is_deep_junk_path(path: &str) -> bool {
 
 fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     let normalized = normalize_path(path);
-    if normalized.is_empty() || is_excluded_path(&normalized) {
+    if normalized.is_empty() {
         return None;
     }
 
+    // 这三个白名单目录必须早于系统排除规则判断：
+    // d3d_cache 位于 System32 下，Defender 目录位于被排除的 Defender 根目录下，
+    // 而 Windows.old 内部本身还有一份 \Windows\System32\，晚了就会被当成系统目录整片丢掉。
     if is_shader_cache(&normalized) {
         return Some(JunkCategory::ShaderCache);
     }
     if is_defender_cache(&normalized) {
         return Some(JunkCategory::WindowsDefenderCache);
     }
+    if is_old_windows_installation(&normalized) {
+        return Some(JunkCategory::OldWindowsInstallation);
+    }
+    if is_excluded_path(&normalized) {
+        return None;
+    }
+
     if contains_any(
         &normalized,
-        &["\\appdata\\local\\temp\\", "\\windows\\temp\\"],
+        &[
+            "\\appdata\\local\\temp\\",
+            "\\windows\\temp\\",
+            // Windows 10/11 提供的系统级临时目录，只存放可清理的安装/更新解包数据。
+            "\\windows\\systemtemp\\",
+        ],
     ) {
         return Some(JunkCategory::WindowsTemp);
     }
@@ -920,17 +979,14 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     ) {
         return Some(JunkCategory::WindowsErrorReports);
     }
-    if normalized.ends_with("\\windows\\memory.dmp") {
+    if normalized.ends_with("\\windows\\memory.dmp")
+        // 内核崩溃报告目录（WATCHDOG 等子目录）里的转储文件同样是可清理的诊断数据。
+        || normalized.contains("\\windows\\livekernelreports\\")
+    {
         return Some(JunkCategory::MemoryDump);
     }
     if is_windows_log(&normalized) {
         return Some(JunkCategory::LogFiles);
-    }
-    if contains_any(
-        &normalized,
-        &["\\windows.old\\", "\\$windows.~bt\\", "\\$windows.~ws\\"],
-    ) {
-        return Some(JunkCategory::OldWindowsInstallation);
     }
     if contains_any(
         &normalized,
@@ -960,6 +1016,16 @@ fn normalize_path(path: &str) -> String {
 
 fn contains_any(path: &str, markers: &[&str]) -> bool {
     markers.iter().any(|marker| path.contains(marker))
+}
+
+/// 旧版 Windows 安装残留、升级暂存目录。
+/// 这些目录内部包含完整的 \Windows\System32\ 等结构，必须在系统排除规则之前判断，
+/// 否则 Windows.old 只会剩下一堆被排除后的碎片，用户会看到深度扫描"扫不出旧系统"。
+fn is_old_windows_installation(path: &str) -> bool {
+    contains_any(
+        path,
+        &["\\windows.old\\", "\\$windows.~bt\\", "\\$windows.~ws\\"],
+    )
 }
 
 fn is_excluded_path(path: &str) -> bool {
@@ -1000,6 +1066,8 @@ fn is_shader_cache(path: &str) -> bool {
             // NVIDIA OpenGL 着色器缓存与 DX 编译缓存，删除后自动重建
             "\\appdata\\local\\nvidia\\glcache\\",
             "\\appdata\\local\\nvidia\\dxc\\",
+            // NVIDIA 计算着色器缓存（CUDA/OptiX 编译产物），同样由驱动自动重建。
+            "\\appdata\\local\\nvidia\\computecache\\",
             "\\appdata\\local\\intel\\shadercache\\",
         ],
     )
@@ -1059,6 +1127,17 @@ fn is_browser_cache(path: &str) -> bool {
                 "\\graphitedawncache\\",
                 "\\dawngraphitecache\\",
                 "\\dawnwebgpucache\\",
+                // Chromium 的 PWA/离线资源缓存，与 cache 同级且同样可重建；
+                // 注意不包含 CacheStorage/IndexedDB 等持久化站点数据目录。
+                "\\service worker\\",
+                "\\scriptcache\\",
+                // 媒体缓存：网页音视频缓冲数据，删除后重新播放会重新下载。
+                "\\media cache\\",
+                "\\jump list icons\\",
+                // Firefox 的启动缓存与崩溃恢复缓存，均位于 profile 下并自动重建。
+                "\\startupcache\\",
+                "\\cache-tmp\\",
+                "\\crash reports\\",
             ],
         )
 }
@@ -1096,6 +1175,13 @@ fn is_user_profile_cache(path: &str) -> bool {
         "shadercache",
         "d3dscache",
         "crashdumps",
+        // 以下目录名同样只包含可重建数据，但此前未收录，导致同目录下其它缓存被扫到、
+        // 这些子目录却被漏掉（用户感觉"同一个软件只清了一半"）。
+        "service worker",
+        "media cache",
+        "startupcache",
+        "cache-tmp",
+        "crash reports",
     ];
 
     segments
@@ -1150,7 +1236,10 @@ fn is_thumbnail_cache(path: &str) -> bool {
         return false;
     };
     let name = name.to_ascii_lowercase();
-    (name.starts_with("thumbcache_") || name.starts_with("iconcache_")) && name.ends_with(".db")
+    // IconCache.db 是没有下划线的旧版本图标缓存，与 thumbcache_*.db 一样可重建。
+    name == "iconcache.db"
+        || ((name.starts_with("thumbcache_") || name.starts_with("iconcache_"))
+            && name.ends_with(".db"))
 }
 
 fn is_windows_log(path: &str) -> bool {
@@ -1244,6 +1333,67 @@ mod tests {
         assert!(is_deep_junk_path(
             r"D:\Users\Alice\AppData\Roaming\SomeApp\Cache Data\file"
         ));
+    }
+
+    #[test]
+    fn matches_additional_rebuildable_cache_directories() {
+        // Chromium 的 Service Worker / 媒体缓存与 Firefox 启动缓存此前被漏掉，
+        // 命中它们可以让"同一个软件只清一半"的问题消失。
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\Service Worker\CacheStorage\abc"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Microsoft\Edge\User Data\Default\Media Cache\data_0"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\SomeApp\Service Worker\ScriptCache\index"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Roaming\Mozilla\Firefox\Profiles\abc.default\startupCache\cache.bin"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Roaming\Mozilla\Firefox\Profiles\abc.default\Crash Reports\crash.dmp"
+        ));
+        // Chromium 的新版 GPU 着色器缓存与 NVIDIA ComputeCache 同样可重建。
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\GPUCache\data_0"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\NVIDIA\ComputeCache\shader.bin"
+        ));
+        // Windows 自带诊断缓存：系统临时目录、内核崩溃报告、旧版图标缓存。
+        assert!(is_deep_junk_path(r"D:\Windows\SystemTemp\a.tmp"));
+        assert!(is_deep_junk_path(
+            r"D:\Windows\LiveKernelReports\WATCHDOG\report.dmp"
+        ));
+        assert!(is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Microsoft\Windows\Explorer\iconcache.db"
+        ));
+    }
+
+    #[test]
+    fn keeps_persistent_site_data_out_of_new_cache_rules() {
+        // CacheStorage 允许清理，但 WebView2/MSIX 应用持久化目录仍必须整体排除，
+        // 避免新规则把 Claude 等应用的会话数据带进来。
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Packages\Some.App\LocalCache\Local\app\EBWebView\Default\Cache\data"
+        ));
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Packages\Some.App\LocalCache\Local\app\EBWebView\Default\Service Worker\CacheStorage\data"
+        ));
+        // 浏览器持久化站点数据（Local Storage / IndexedDB / Session Storage）不在清理范围。
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\Local Storage\leveldb\data"
+        ));
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\IndexedDB\abc\data"
+        ));
+        assert!(!is_deep_junk_path(
+            r"D:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\Session Storage\data"
+        ));
+        // 普通用户文件不会因为新规则被误判。
+        assert!(!is_deep_junk_path(r"D:\Users\Alice\Documents\report.dmp"));
+        assert!(!is_deep_junk_path(r"D:\Windows\System32\kernel32.dll"));
     }
 
     #[test]
@@ -1424,5 +1574,199 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(sizes, vec![900, 500, 1]);
         assert_eq!(first_page.categories[0].total_size, 1401);
+    }
+
+    /// 深度扫描必须是快速扫描的超集，否则用户会看到"深度扫描反而更少"。
+    ///
+    /// 中文说明：这里用与本机一致的 C 盘路径，把 `JunkCategory::get_scan_paths()` 里每一条
+    /// 快速扫描路径都跑一遍深度规则；任何一条不命中都说明用户在深度模式下会漏掉整个目录。
+    /// 缩略图缓存按文件名规则（thumbcache_*.db）匹配，这里给出代表性文件名。
+    #[test]
+    fn deep_rules_cover_every_quick_scan_path() {
+        const QUICK_SCAN_TARGETS: &[(&str, &str)] = &[
+            ("WindowsTemp", r"C:\Users\chunyu\AppData\Local\Temp\a.tmp"),
+            ("WindowsTemp", r"C:\WINDOWS\Temp\a.tmp"),
+            ("SystemCache", r"C:\WINDOWS\Prefetch\APP.PF"),
+            (
+                "SystemCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\Caches\cversion.ini",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\INetCache\IE\entry.dat",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\Default\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\Default\Code Cache\js\index",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\Default\GPUCache\data_0",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\Profile 1\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\ShaderCache\data_0",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Edge\User Data\Default\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Mozilla\Firefox\Profiles\abc123.default\cache2\entries\A1B2",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Roaming\Mozilla\Firefox\Profiles\abc123.default\cache2\entries\A1B2",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\BraveSoftware\Brave-Browser\User Data\Default\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Roaming\Opera Software\Opera Stable\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Tencent\QQBrowser\User Data\Default\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\360Chrome\Chrome\User Data\Default\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Vivaldi\User Data\Default\Cache\data_1",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\Default\Service Worker\CacheStorage\data",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Google\Chrome\User Data\Default\Media Cache\data_0",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Local\Mozilla\Firefox\Profiles\abc.default\startupCache\cache.bin",
+            ),
+            (
+                "BrowserCache",
+                r"C:\Users\chunyu\AppData\Roaming\Mozilla\Firefox\Profiles\abc.default\Crash Reports\a.dmp",
+            ),
+            (
+                "ThumbnailCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\Explorer\iconcache.db",
+            ),
+            ("MemoryDump", r"C:\WINDOWS\LiveKernelReports\WATCHDOG\report.dmp"),
+            ("WindowsTemp", r"C:\WINDOWS\SystemTemp\a.tmp"),
+            (
+                "WindowsUpdate",
+                r"C:\WINDOWS\Logs\WindowsUpdate\WindowsUpdate.20240101.etl",
+            ),
+            (
+                "WindowsUpdate",
+                r"C:\WINDOWS\SoftwareDistribution\Download\update.cab",
+            ),
+            (
+                "DeliveryOptimization",
+                r"C:\WINDOWS\SoftwareDistribution\DeliveryOptimization\payload.bin",
+            ),
+            (
+                "DeliveryOptimization",
+                r"C:\WINDOWS\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\payload.bin",
+            ),
+            (
+                "WindowsDefenderCache",
+                r"C:\ProgramData\Microsoft\Windows Defender\LocalCopy\copy.bin",
+            ),
+            (
+                "WindowsDefenderCache",
+                r"C:\ProgramData\Microsoft\Windows Defender\Support\MPLog.log",
+            ),
+            (
+                "WindowsDefenderCache",
+                r"C:\ProgramData\Microsoft\Windows Defender\Scans\History\Service\entry.bin",
+            ),
+            ("LogFiles", r"C:\WINDOWS\Logs\setupapi\setupapi.dev.log"),
+            ("LogFiles", r"C:\Users\chunyu\AppData\Local\CrashDumps\app.exe.1234.dmp"),
+            ("MemoryDump", r"C:\WINDOWS\Minidump\010101-1234-01.dmp"),
+            ("MemoryDump", r"C:\WINDOWS\MEMORY.DMP"),
+            ("OldWindowsInstallation", r"C:\Windows.old\Windows\System32\old.dll"),
+            ("OldWindowsInstallation", r"C:\$Windows.~BT\sources\install.wim"),
+            (
+                "AppCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\WebCache\V01.log",
+            ),
+            (
+                "ThirdPartyAppCache",
+                r"C:\Users\chunyu\AppData\Roaming\discord\Cache\data_1",
+            ),
+            (
+                "ThirdPartyAppCache",
+                r"C:\Users\chunyu\AppData\Local\Steam\htmlcache\index.html",
+            ),
+            (
+                "ThirdPartyAppCache",
+                r"C:\Users\chunyu\AppData\Local\EpicGamesLauncher\Saved\webcache\data",
+            ),
+            (
+                "FontCache",
+                r"C:\WINDOWS\ServiceProfiles\LocalService\AppData\Local\FontCache\font.bin",
+            ),
+            (
+                "WindowsErrorReports",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\WER\ReportQueue\a.wer",
+            ),
+            (
+                "WindowsErrorReports",
+                r"C:\ProgramData\Microsoft\Windows\WER\ReportQueue\a.wer",
+            ),
+            (
+                "InstallerTemp",
+                r"C:\WINDOWS\Installer\$PatchCache$\Managed\entry.bin",
+            ),
+            (
+                "InstallerTemp",
+                r"C:\Users\chunyu\AppData\Local\Downloaded Installations\setup.msi",
+            ),
+            (
+                "ClipboardCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\Clipboard\entry.bin",
+            ),
+            (
+                "ThumbnailCache",
+                r"C:\Users\chunyu\AppData\Local\Microsoft\Windows\Explorer\thumbcache_256.db",
+            ),
+            (
+                "ThumbnailCache",
+                r"C:\Users\other\AppData\Local\Microsoft\Windows\Explorer\iconcache_48.db",
+            ),
+            ("ShaderCache", r"C:\WINDOWS\System32\d3d_cache\shader.bin"),
+            ("ShaderCache", r"C:\Users\chunyu\AppData\Local\D3DSCache\shader.bin"),
+            ("ShaderCache", r"C:\Users\chunyu\AppData\Local\NVIDIA\DXCache\shader.bin"),
+            ("ShaderCache", r"C:\Users\chunyu\AppData\Local\Intel\ShaderCache\shader.bin"),
+        ];
+
+        let missing = QUICK_SCAN_TARGETS
+            .iter()
+            .filter(|(_, path)| !is_deep_junk_path(path))
+            .map(|(label, path)| format!("{} -> {}", label, path))
+            .collect::<Vec<_>>();
+
+        assert!(
+            missing.is_empty(),
+            "以下快速扫描路径未被深度扫描覆盖，深度结果会少于快速扫描：\n{}",
+            missing.join("\n")
+        );
     }
 }

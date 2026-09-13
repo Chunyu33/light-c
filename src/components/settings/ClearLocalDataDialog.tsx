@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle, RefreshCw, Trash2, X } from 'lucide-react';
 import type { ClearableDataItem } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import { MODAL_BACKDROP_MOTION, MODAL_CARD_MOTION } from '../../utils/modalMotion';
 import { useTranslation } from 'react-i18next';
 
 const DATA_ITEM_TRANSLATION_KEYS: Record<string, string> = {
@@ -75,17 +76,11 @@ export function ClearLocalDataDialog({
           <motion.div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onCancel}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            {...MODAL_BACKDROP_MOTION}
           />
           <motion.div
             className="relative w-[520px] max-w-[92vw] overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+            {...MODAL_CARD_MOTION}
           >
             <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-4">
               <div className="flex items-center gap-3">

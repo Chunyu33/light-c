@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.9
+
+- Portable build: no longer mistaken for an installed build and writing data to AppData; a read-only program folder now shows a clear message, and "Check for updates" opens a dialog pointing to the official website or the author's netdisk instead of running an installer-based update.
+- Junk cleanup covers more: fixed old Windows installation files (such as Windows.old) not being found, and added more cleanable content such as browser caches, system temporary files and crash reports.
+- Other fixes: the exported disk growth report no longer freezes when opened; the update and cleanup dialogs now animate smoothly; the layout defaults to the sidebar layout.
+
 ## v2.16.8
 
 - Settings: the left menu and the content area can now be resized by dragging the divider, and the width is remembered for next time. The default width is wider as well, so menu entries are no longer cramped.

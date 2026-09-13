@@ -21,6 +21,9 @@ import type { ComponentType } from 'react';
 
 export type LayoutMode = 'cards' | 'pages' | 'sidebar';
 
+/** 布局模式默认值：首次启动使用侧边栏模式，窗口尺寸策略与设置默认值必须共用这一个来源。 */
+export const DEFAULT_LAYOUT_MODE: LayoutMode = 'sidebar';
+
 export type AppModuleId =
   | 'junk-clean'
   | 'big-files'

@@ -12,6 +12,7 @@ import type { ScanResult } from '../types';
 import type { EnhancedDeleteResult, FileDeleteResult } from '../api/commands';
 import { getFailureReasonMessage, getFailureReasonTooltip } from '../api/commands';
 import { formatSize, formatDuration } from '../utils/format';
+import { MODAL_BACKDROP_MOTION, MODAL_CARD_MOTION } from '../utils/modalMotion';
 import { useTranslation } from 'react-i18next';
 
 interface ScanSummaryProps {
@@ -49,25 +50,19 @@ function FailedFilesModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
         >
           {/* 遮罩层 */}
           <motion.div 
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onClose}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+            {...MODAL_BACKDROP_MOTION}
           />
           
           {/* 弹窗 */}
           <motion.div
             className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden"
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+            {...MODAL_CARD_MOTION}
           >
             {/* 头部 */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)] shrink-0">

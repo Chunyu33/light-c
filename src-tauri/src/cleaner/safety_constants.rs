@@ -75,6 +75,10 @@ pub fn is_rebuildable_system_cache_path(path: &str) -> bool {
         "\\programdata\\microsoft\\windows defender\\localcopy",
         "\\programdata\\microsoft\\windows defender\\support",
         "\\programdata\\microsoft\\windows defender\\scans\\history\\service",
+        // Windows 错误报告的队列与归档目录：只存放崩溃报告，系统会在下次崩溃时重建。
+        // 深度扫描会命中 ReportQueue/ReportArchive，这里必须同样放行，否则会扫出来却删不掉。
+        "\\programdata\\microsoft\\windows\\wer\\reportqueue",
+        "\\programdata\\microsoft\\windows\\wer\\reportarchive",
     ]
     .iter()
     .any(|marker| {

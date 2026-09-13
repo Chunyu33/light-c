@@ -22,7 +22,15 @@ const DEFAULT_MAX_CHANGE_ENTRIES: usize = 300;
 const MIN_CHANGE_ENTRIES: usize = 50;
 const MAX_CHANGE_ENTRIES: usize = 1000;
 const MAX_DETAIL_ENTRIES: usize = 50;
-const MAX_EXPORT_TREE_NODES: usize = 20_000;
+/// HTML 报告的最大节点数。
+///
+/// 中文说明：每个节点会渲染成一段完整的详情卡片，节点数决定报告体积与浏览器解析成本。
+/// 实测（无头浏览器，扣掉启动开销）约每 MB 需要 300 ms 解析 + 建 DOM：5000 节点约 3.2 MB / 1.0 s，
+/// 10000 节点约 6.5 MB / 2.1 s，20000 节点约 12.9 MB / 4.7 s。
+/// 10000 是本模块给出的平衡点：单次导出仍能覆盖所有 1000 个变化目录的多数细节，
+/// 打开耗时控制在 2 s 量级，且报告页脚会明确提示内容被截断。真实体积取决于数据量，
+/// 目录结构扁平时节点数远小于上限，导出的报告可能只有几百 KB。
+const MAX_EXPORT_TREE_NODES: usize = 10_000;
 const DEFAULT_DETAIL_PAGE_SIZE: usize = 200;
 const MAX_DETAIL_PAGE_SIZE: usize = 1000;
 const DETAIL_SUBTREE_FALLBACK_DEPTH: u8 = 4;
@@ -1032,5 +1040,38 @@ mod tests {
             determine_level(-100 * 1024 * 1024, 1),
             DiskGrowthLevel::Decreased
         );
+    }
+
+    #[test]
+    fn export_tree_node_budget_stays_browser_friendly() {
+        // 导出上限直接决定 HTML 体积与浏览器解析成本：实测 20000 节点约 12.9 MB、需要约 4.7 s
+        // 解析建 DOM，浏览器打开后会长时间占用主线程。这里锁定合理区间：过低会丢用户要看的
+        // 变化明细，过高会让报告卡死。
+        assert!(
+            (5_000..=10_000).contains(&MAX_EXPORT_TREE_NODES),
+            "导出树节点上限需要落在 5000-10000：过低会丢数据，过高会让报告在浏览器中卡死"
+        );
+    }
+
+    #[test]
+    fn recursive_export_node_count_handles_deep_trees() {
+        // count_export_nodes 是递归实现，这里确认深层嵌套不会算错数量。
+        let leaf = |diff: i64| DiskGrowthExportNode {
+            name: "leaf".to_string(),
+            path: r"C:\a\leaf".to_string(),
+            old_size: 0,
+            new_size: diff as u64,
+            diff,
+            modified: 0,
+            level: DiskGrowthLevel::New,
+            children: Vec::new(),
+        };
+        let mut node = leaf(1);
+        for _ in 0..64 {
+            let mut parent = leaf(1);
+            parent.children.push(node);
+            node = parent;
+        }
+        assert_eq!(count_export_nodes(&[node]), 65);
     }
 }

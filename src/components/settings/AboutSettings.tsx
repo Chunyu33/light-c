@@ -80,7 +80,8 @@ export function AboutSettings() {
             className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--brand-green)] bg-[var(--brand-green)]/10 rounded-xl hover:bg-[var(--brand-green)]/20 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            {distributionChannel === 'portable' ? t('about.authorDownload') : t('about.checkUpdates')}
+            {/* 两个发行版共用同一个入口文案：点下去都是"看有没有新版本"，只是便携版走手动替换引导。 */}
+            {t('about.checkUpdates')}
           </button>
           <p className="text-xs text-[var(--text-faint)] mt-3">
             {distributionChannel === 'portable'
