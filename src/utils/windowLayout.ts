@@ -2,7 +2,7 @@
 // 侧边栏需要稳定的内容宽度，因此在切换前先完成窗口约束和必要的扩展。
 
 import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window';
-import type { LayoutMode } from '../config/moduleMeta';
+import { DEFAULT_LAYOUT_MODE, type LayoutMode } from '../config/moduleMeta';
 
 export const BASE_WINDOW_MIN_SIZE = { width: 820, height: 610 } as const;
 // 侧边栏包含完整功能菜单和页面内容，720px 高度可减少底部菜单被截断的情况。
@@ -22,11 +22,17 @@ function clamp(value: number, minimum: number, maximum: number) {
 export function getSavedLayoutMode(): LayoutMode {
   try {
     const savedSettings = JSON.parse(localStorage.getItem('c-cleanup-settings') ?? '{}') as { layoutMode?: unknown };
-    return savedSettings.layoutMode === 'pages' || savedSettings.layoutMode === 'sidebar' ? savedSettings.layoutMode : 'cards';
+    // 没有缓存（首次启动）时与设置默认值保持一致，否则窗口最小尺寸会按卡片模式准备，
+    // 而界面已经渲染侧边栏，导致菜单被裁切。
+    return savedSettings.layoutMode === 'pages' || savedSettings.layoutMode === 'sidebar'
+      ? savedSettings.layoutMode
+      : savedSettings.layoutMode === 'cards'
+        ? 'cards'
+        : DEFAULT_LAYOUT_MODE;
   } catch (error) {
-    // 设置损坏时使用最小窗口布局，避免启动阶段因尺寸策略阻断主界面。
+    // 设置损坏时使用默认布局，避免启动阶段因尺寸策略阻断主界面。
     console.warn('读取窗口布局设置失败:', error);
-    return 'cards';
+    return DEFAULT_LAYOUT_MODE;
   }
 }
 

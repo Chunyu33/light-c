@@ -9,7 +9,7 @@ import { CheckCircle2, ClipboardList, ChevronRight, FolderOpen, HardDrive, Histo
 import { Select } from '../ui/Select';
 import { useFontSize, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, useSettings, type Language, type ThemeMode } from '../../contexts';
 import { useToast } from '../Toast';
-import { clearSelectedLocalData, getStorageLocationInfo, listClearableDataItems, migrateLegacyPortableData, openInFolder, openLogsFolder, openStartupManager, openStorageSettings, pickFolderDialog, setDataDirectory, type ClearableDataItem, type StorageLocationInfo } from '../../api/commands';
+import { clearSelectedLocalData, getStorageLocationInfo, getStorageWriteDiagnostic, listClearableDataItems, migrateLegacyPortableData, openInFolder, openLogsFolder, openStartupManager, openStorageSettings, pickFolderDialog, setDataDirectory, type ClearableDataItem, type StorageLocationInfo, type StorageWriteDiagnostic } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { getStoredSearchEngine, SEARCH_ENGINE_CHANGED_EVENT, SEARCH_ENGINE_OPTIONS, setStoredSearchEngine, type SearchEngine } from '../../utils/searchEngine';
 import { ClearLocalDataDialog } from './ClearLocalDataDialog';
@@ -30,6 +30,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const { showToast } = useToast();
   const [dataDir, setDataDir] = useState('');
   const [storageInfo, setStorageInfo] = useState<StorageLocationInfo | null>(null);
+  const [writeDiagnostic, setWriteDiagnostic] = useState<StorageWriteDiagnostic | null>(null);
   const [isChangingDir, setIsChangingDir] = useState(false);
   const [isMigratingLegacyData, setIsMigratingLegacyData] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -61,6 +62,12 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
         setDataDir(info.current_data_directory);
       })
       .catch(() => setDataDir(commonT('unknown')));
+
+    // 便携包被解压到不可写目录时，需要明确告诉用户数据临时落在 AppData，
+    // 否则用户会以为便携版又去写 C 盘了。
+    getStorageWriteDiagnostic()
+      .then(setWriteDiagnostic)
+      .catch((error) => console.error('读取便携目录写入诊断失败:', error));
   }, []);
 
   const handleOpenLogsFolder = async () => {
@@ -420,6 +427,20 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
                 </button>
               </div>
             </div>
+            {writeDiagnostic?.portable_root && writeDiagnostic.preferred_writable === false && (
+              // 便携目录不可写：数据只能临时存放在 AppData，必须明确告知并给出解决办法。
+              <div className="space-y-1 rounded-xl bg-[var(--color-warning)]/10 px-3 py-2">
+                <p className="flex items-start gap-1.5 text-[11px] text-[var(--color-warning)]">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {writeDiagnostic.active_writable
+                    ? t('dataDir.portableFallbackWarning', { path: writeDiagnostic.preferred_data_directory })
+                    : t('dataDir.portableReadOnlyBlocked')}
+                </p>
+                <p className="break-all pl-5 text-[10px] text-[var(--text-faint)]">
+                  {t('dataDir.portableRootLabel')}: {writeDiagnostic.portable_root}
+                </p>
+              </div>
+            )}
             {storageInfo && !storageInfo.can_write && (
               <p className="flex items-start gap-1.5 text-[11px] text-[var(--color-danger)]">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />

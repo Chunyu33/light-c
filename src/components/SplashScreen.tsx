@@ -14,10 +14,26 @@ interface SplashScreenProps {
   onComplete?: () => void;
 }
 
+/**
+ * 读取启动屏当前主题。
+ *
+ * 中文说明：index.html 的静态启动屏会在 React 接管前先按用户主题写好
+ * `splash-screen--light|dark`，这里优先读取 DOM 上的既有值，保证首帧渲染与静态节点完全一致，
+ * 否则 hydrateRoot 会报 "Hydration failed"。只有拿不到 DOM 信息时才回退到主题上下文。
+ */
+function readPrerenderedSplashTheme(fallback: string): string {
+  const classList = document.getElementById('initial-splash')?.classList;
+  if (!classList) return fallback;
+  if (classList.contains('splash-screen--light')) return 'light';
+  if (classList.contains('splash-screen--dark')) return 'dark';
+  return fallback;
+}
+
 export function SplashScreen({ onComplete }: SplashScreenProps) {
   const { theme } = useTheme();
   const { t } = useTranslation('ui');
   const [isExiting, setIsExiting] = useState(false);
+  const [splashTheme] = useState(() => readPrerenderedSplashTheme(theme));
 
   useEffect(() => {
     const startedAt = Number(document.documentElement.dataset.splashStartedAt);
@@ -39,7 +55,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   return (
     <div
       id="initial-splash"
-      className={`splash-screen splash-screen--${theme}${isExiting ? ' splash-screen--exiting' : ''}`}
+      className={`splash-screen splash-screen--${splashTheme}${isExiting ? ' splash-screen--exiting' : ''}`}
       role="status"
       aria-label="LightC"
     >

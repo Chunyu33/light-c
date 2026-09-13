@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // Tauri 鍛戒护璋冪敤灏佽
 // 灏佽鎵€鏈変笌Rust鍚庣鐨勯€氫俊鎺ュ彛
 // ============================================================================
@@ -56,6 +56,25 @@ export interface StorageLocationInfo {
 /** 获取统一的配置、数据目录和便携版迁移状态。 */
 export async function getStorageLocationInfo(): Promise<StorageLocationInfo> {
   return invoke<StorageLocationInfo>('get_storage_location_info');
+}
+
+/** 便携目录写入能力诊断：不可写时数据只能临时放在 AppData。 */
+export interface StorageWriteDiagnostic {
+  /** 便携包（exe）所在目录，安装版为 null。 */
+  portable_root?: string | null;
+  /** 期望写入的数据目录（便携版即 exe 目录下的 data）。 */
+  preferred_data_directory: string;
+  /** 期望目录是否真的可写。 */
+  preferred_writable: boolean;
+  /** 是否发生了"便携目录不可写 → 回落到 AppData"。 */
+  fell_back_to_app_data: boolean;
+  /** 当前实际使用的数据目录是否可写。 */
+  active_writable: boolean;
+  reason?: string | null;
+}
+
+export async function getStorageWriteDiagnostic(): Promise<StorageWriteDiagnostic> {
+  return invoke<StorageWriteDiagnostic>('get_storage_write_diagnostic');
 }
 
 /** 重试旧版便携数据迁移，后端只复制 LightC 自有数据且保留源文件。 */

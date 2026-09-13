@@ -16,6 +16,12 @@ pub fn get_storage_location_info() -> crate::data_dir::StorageLocationInfo {
     crate::data_dir::get_storage_location_info()
 }
 
+/// 检测便携目录写入能力，供设置页在"便携包放在不可写目录"时给出明确指引。
+#[tauri::command]
+pub fn get_storage_write_diagnostic() -> crate::data_dir::StorageWriteDiagnostic {
+    crate::data_dir::get_storage_write_diagnostic()
+}
+
 /// 重试便携版旧 AppData 数据迁移，源数据始终保留。
 #[tauri::command]
 pub fn migrate_legacy_portable_data() -> Result<crate::data_dir::StorageLocationInfo, String> {

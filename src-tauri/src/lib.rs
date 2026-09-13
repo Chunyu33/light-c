@@ -31,6 +31,9 @@ pub fn run() {
     // 便携版必须在 Tauri 自动创建窗口前指定 WebView2 绝对数据目录，
     // 否则 localStorage 会继续落到 AppData，便携包移动后设置不会跟随。
     let portable_webview_data_directory = runtime::prepare_portable_webview_data_directory();
+    // 开发环境把实际生效的存储路径打到日志，便于区分"数据去了哪"是模式判定还是自定义目录导致。
+    #[cfg(debug_assertions)]
+    data_dir::log_storage_diagnostics();
     let mut context = tauri::generate_context!();
     if portable_webview_data_directory.is_some() {
         for window_config in &mut context.config_mut().app.windows {
@@ -139,6 +142,7 @@ pub fn run() {
             // 数据目录管理
             get_data_directory,
             get_storage_location_info,
+            get_storage_write_diagnostic,
             migrate_legacy_portable_data,
             set_data_directory,
             clear_local_data,

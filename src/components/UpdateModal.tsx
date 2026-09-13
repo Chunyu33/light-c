@@ -11,8 +11,11 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { getVersion } from '@tauri-apps/api/app';
 import { useToast } from './Toast';
+import { PortableUpdateDialog } from './settings/PortableUpdateDialog';
+import { registerPortableUpdateDebugTrigger } from '../utils/portableUpdateDebug';
 import { getDistributionChannel, type DistributionChannel } from '../api/commands';
 import { getOfficialDownloadConfig } from '../utils/downloadConfig';
+import { LIGHTC_DEFAULT_DOWNLOAD_CONFIG, LIGHTC_OFFICIAL_WEBSITE_URL } from '../config/officialLinks';
 import { useTranslation } from 'react-i18next';
 
 // ============================================================================
@@ -91,6 +94,12 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
   const [errorMessage, setErrorMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
   const [distributionChannel, setDistributionChannel] = useState<DistributionChannel | null>(null);
+  // 便携版更新提示：只引导下载，不安装；latestVersion 为 null 表示未查到或已是最新。
+  const [portableDialogOpen, setPortableDialogOpen] = useState(false);
+  const [portableLatestVersion, setPortableLatestVersion] = useState<string | null>(null);
+  const [isCheckingPortableVersion, setIsCheckingPortableVersion] = useState(false);
+  const [portableCheckFailed, setPortableCheckFailed] = useState(false);
+  const [downloadConfig, setDownloadConfig] = useState({ netDiskUrl: LIGHTC_DEFAULT_DOWNLOAD_CONFIG.netDiskUrl });
   const { showToast } = useToast();
   const sourceRef = useRef<'auto' | 'manual'>('auto');
 
@@ -109,6 +118,70 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
       });
   }, []);
 
+  /**
+   * 便携版更新引导：先立即弹出二次确认窗口，再后台查询远端版本用于补充提示。
+   *
+   * 中文说明：便携版替换文件即可升级，绝不能调用 downloadAndInstall（那会静默安装 NSIS 包）。
+   * 这里把"需要手动替换"讲清楚，并给出官网与网盘两个官方入口。
+   */
+  const openPortableUpdateDialog = useCallback(async () => {
+    setPortableLatestVersion(null);
+    setPortableCheckFailed(false);
+    setPortableDialogOpen(true);
+    setIsCheckingPortableVersion(true);
+
+    // 渠道地址来自官方 download.json，失败时沿用内置网盘地址，保证按钮永远可用。
+    try {
+      const config = await getOfficialDownloadConfig();
+      setDownloadConfig({ netDiskUrl: config.netDiskUrl });
+    } catch (error) {
+      console.error('读取官方下载配置失败，沿用内置网盘地址:', error);
+    }
+
+    try {
+      // 只查询版本用于提示，不下载也不安装。
+      const updateResult = await check();
+      setPortableLatestVersion(updateResult?.version ?? null);
+      setPortableCheckFailed(false);
+    } catch (error) {
+      // 查询失败不影响引导流程，弹窗降级为纯渠道入口，并如实说明没查到版本。
+      console.error('查询便携版最新版本失败:', error);
+      setPortableLatestVersion(null);
+      setPortableCheckFailed(true);
+    } finally {
+      setIsCheckingPortableVersion(false);
+    }
+  }, []);
+
+  // 开发环境提供控制台入口，便于直接预览便携版弹窗样式。
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    registerPortableUpdateDebugTrigger((overrides = {}) => {
+      setPortableLatestVersion(overrides.latestVersion ?? null);
+      setIsCheckingPortableVersion(overrides.isChecking ?? false);
+      setPortableDialogOpen(true);
+    });
+  }, []);
+
+  /** 打开官方渠道；网盘地址保持使用官方配置里的作者网盘。 */
+  const handleOpenPortableChannel = useCallback(async (url: string, channel: 'website' | 'netDisk') => {
+    try {
+      await openUrl(url);
+      showToast({
+        type: 'info',
+        title: channel === 'website' ? uiT('websiteOpened') : uiT('netDiskOpened'),
+        description: uiT('portableUpdateHint'),
+      });
+    } catch (error) {
+      console.error('打开便携版下载渠道失败:', error);
+      showToast({
+        type: 'error',
+        title: uiT('downloadOpenFailed'),
+        description: uiT('downloadOpenFailedDesc'),
+      });
+    }
+  }, [showToast, uiT]);
+
   // 检查更新（source: 'auto' 启动自动检查 / 'manual' 用户手动触发）
   const checkForUpdate = useCallback(async (source: 'auto' | 'manual' = 'auto') => {
     sourceRef.current = source;
@@ -120,33 +193,18 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
         currentDistributionChannel = await getDistributionChannel();
         setDistributionChannel(currentDistributionChannel);
       } catch (error) {
-        console.error('获取发行渠道失败:', error);
-        currentDistributionChannel = 'installer';
-        setDistributionChannel(currentDistributionChannel);
+        // 渠道未知时绝不能假定为安装版：那会让便携版去调用安装器式自动更新。
+        // 这里留空，下面的判断会按"非安装版"处理，改为打开官方下载页。
+        console.error('获取发行渠道失败，将按便携版方式提示手动下载:', error);
+        currentDistributionChannel = null;
+        setDistributionChannel(null);
       }
     }
 
-    if (currentDistributionChannel === 'portable') {
+    // 只有明确是安装版才允许走 Tauri 自动更新；便携版和渠道未知都只做下载引导。
+    if (currentDistributionChannel !== 'installer') {
       if (source === 'manual') {
-        try {
-          const downloadConfig = await getOfficialDownloadConfig();
-          const targetUrl = downloadConfig.netDiskUrl ?? downloadConfig.githubReleasesUrl;
-          await openUrl(targetUrl);
-          showToast({
-            type: 'info',
-            title: downloadConfig.netDiskUrl ? uiT('downloadOpened') : uiT('githubOpened'),
-            description: downloadConfig.netDiskUrl
-              ? uiT('portableDownloadOpened')
-              : uiT('githubFallbackOpened'),
-          });
-        } catch (error) {
-          console.error('打开便携版下载页失败:', error);
-          showToast({
-            type: 'error',
-            title: uiT('downloadOpenFailed'),
-            description: uiT('downloadOpenFailedDesc'),
-          });
-        }
+        await openPortableUpdateDialog();
       }
       return;
     }
@@ -191,7 +249,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
         setStatus('error');
       }
     }
-  }, [currentVersion, distributionChannel, showToast, t, uiT]);
+  }, [currentVersion, distributionChannel, openPortableUpdateDialog, showToast, t, uiT]);
 
   // 启动时自动检查
   useEffect(() => {
@@ -208,9 +266,20 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     return () => window.removeEventListener('lightc:check-update', handler);
   }, [checkForUpdate]);
 
-  // 下载并安装更新
+  // 下载并安装更新：只允许安装版执行，便携版永远不会调用安装器。
   const handleDownloadAndInstall = async () => {
     if (!update) return;
+    if (distributionChannel !== 'installer') {
+      // 双保险：即便弹窗状态被意外推进到 available，也不让便携版拉起 NSIS 安装包。
+      setIsVisible(false);
+      setTimeout(() => setIsOpen(false), 200);
+      showToast({
+        type: 'warning',
+        title: uiT('downloadOpenFailed'),
+        description: uiT('portableUpdateBlocked'),
+      });
+      return;
+    }
     
     setStatus('downloading');
     setDownloadProgress(0);
@@ -260,9 +329,11 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     checkForUpdate(sourceRef.current);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !portableDialogOpen) return null;
 
-  return createPortal(
+  return (
+    <>
+      {isOpen && createPortal(
     <div className={`fixed inset-0 z-[10000] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
       {/* 遮罩 */}
       <div 
@@ -434,5 +505,19 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
       </div>
     </div>,
     document.body
+      )}
+
+      <PortableUpdateDialog
+        isOpen={portableDialogOpen}
+        latestVersion={portableLatestVersion}
+        currentVersion={currentVersion || '...'}
+        isChecking={isCheckingPortableVersion}
+        checkFailed={portableCheckFailed}
+        netDiskUrl={downloadConfig.netDiskUrl}
+        officialWebsiteUrl={LIGHTC_OFFICIAL_WEBSITE_URL}
+        onOpenChannel={handleOpenPortableChannel}
+        onClose={() => setPortableDialogOpen(false)}
+      />
+    </>
   );
 }

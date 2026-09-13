@@ -119,6 +119,26 @@ pub struct ClearLocalDataResult {
     pub freed_bytes: u64,
 }
 
+/// 便携版写入能力诊断。
+///
+/// 中文说明：便携版的正常状态是"数据全部跟随 exe"。当程序目录不可写（解压到
+/// `C:\Program Files`、只读 U 盘、杀软/组策略限制等）时，应用只能把数据放到 AppData，
+/// 这会让用户以为便携版又"写 C 盘"了。这里把判定结果结构化返回，设置页据此给出明确指引。
+#[derive(Debug, Clone, Serialize)]
+pub struct StorageWriteDiagnostic {
+    /// 判定为便携版时才有值：exe 所在目录。
+    pub portable_root: Option<String>,
+    /// 应用期望写入的数据目录（便携版即 exe 目录下的 data）。
+    pub preferred_data_directory: String,
+    /// 期望目录是否真的可写（实际创建并删除探针文件验证）。
+    pub preferred_writable: bool,
+    /// 是否发生了"便携目录不可写 → 回落 AppData"。
+    pub fell_back_to_app_data: bool,
+    /// 当前实际使用的数据目录是否可写。
+    pub active_writable: bool,
+    pub reason: Option<String>,
+}
+
 struct ClearableDataDefinition {
     id: &'static str,
     label: &'static str,
@@ -236,7 +256,9 @@ fn load_or_create() -> PathBuf {
     let channel = current_distribution_channel();
 
     // 先复制旧版配置到便携目录，再解析配置中的数据目录，避免旧配置直接指向 AppData。
-    if channel == DistributionChannel::Portable {
+    // 开发环境不迁移：调试实例不应该继承正式包的自定义数据目录（否则 dev 的数据会写到
+    // 用户以前选过的目录里，看起来像"读到了便携包的配置"）。
+    if channel == DistributionChannel::Portable && !cfg!(debug_assertions) {
         migrate_legacy_portable_config_if_needed();
     }
 
@@ -246,40 +268,79 @@ fn load_or_create() -> PathBuf {
         if is_legacy_default {
             migrate_legacy_data_to_default(&default, channel);
         }
-        if configured_data_dir.is_dir() || fs::create_dir_all(&configured_data_dir).is_ok() {
-            if let Err(error) = save_config_inner(&configured_data_dir) {
-                log::warn!("保存数据目录配置失败: {}", error);
-            }
-            log::info!(
-                "数据目录 ({}): {}",
-                if from_legacy_config {
-                    "旧配置迁移"
-                } else {
-                    "配置"
-                },
-                configured_data_dir.display()
-            );
-            return configured_data_dir;
-        }
-        log::warn!(
-            "配置中的数据目录不存在且无法创建: {}，回退到默认",
-            configured_data_dir.display()
+        // 自定义数据目录由用户明确指定，不可写时只提示，不擅自搬走用户的数据。
+        let allow_fallback = !is_legacy_default
+            || path_compare_key(&configured_data_dir) == path_compare_key(&default);
+        let resolved = ensure_writable_data_dir(
+            configured_data_dir,
+            channel,
+            allow_fallback,
         );
+        if let Err(error) = save_config_inner(&resolved) {
+            log::warn!("保存数据目录配置失败: {}", error);
+        }
+        log::info!(
+            "数据目录 ({}): {}",
+            if from_legacy_config {
+                "旧配置迁移"
+            } else {
+                "配置"
+            },
+            resolved.display()
+        );
+        return resolved;
     }
 
     // 缺少配置时迁移旧版默认数据；只复制白名单内容，避免把用户无关文件带入便携包。
-    migrate_legacy_data_to_default(&default, channel);
-    if let Err(e) = fs::create_dir_all(&default) {
-        log::warn!("无法创建默认数据目录 {}: {}", default.display(), e);
+    // 开发环境跳过：调试实例不应把正式包的历史数据搬进 target 目录。
+    if !cfg!(debug_assertions) {
+        migrate_legacy_data_to_default(&default, channel);
     }
 
-    // 首次运行时写入默认配置
-    if let Err(error) = save_config_inner(&default) {
+    let resolved = ensure_writable_data_dir(default, channel, true);
+    if let Err(error) = save_config_inner(&resolved) {
         log::warn!("保存默认数据目录配置失败: {}", error);
     }
 
-    log::info!("数据目录 (默认): {}", default.display());
-    default
+    log::info!("数据目录 (默认): {}", resolved.display());
+    resolved
+}
+
+/// 便携版数据目录落地前确认可写：不可写时明确退回 AppData，并记录可读原因。
+///
+/// 中文说明：此前只靠 `create_dir_all` 判断，而目录已存在时它会直接返回成功，
+/// 结果日志/快照在真正写入时才失败，甚至静默落到 AppData 让用户以为便携版又写 C 盘。
+/// 这里用真实探针校验，并把回退结果写进日志与配置，供设置页展示。
+fn ensure_writable_data_dir(
+    preferred: PathBuf,
+    channel: DistributionChannel,
+    allow_fallback: bool,
+) -> PathBuf {
+    if probe_writable_directory(&preferred).is_ok() {
+        return preferred;
+    }
+    if channel != DistributionChannel::Portable || !allow_fallback {
+        log::warn!("数据目录不可写: {}", preferred.display());
+        return preferred;
+    }
+
+    // 极端情况下连 AppData 也不可写时，保留期望目录，让后续写入失败暴露真实原因。
+    let Some(fallback) = app_data_fallback_dir()
+        .filter(|candidate| probe_writable_directory(candidate).is_ok())
+    else {
+        log::warn!(
+            "便携目录与备用目录均不可写，继续使用: {}",
+            preferred.display()
+        );
+        return preferred;
+    };
+
+    log::warn!(
+        "便携目录不可写，数据改用 {}（原目录: {}）",
+        fallback.display(),
+        preferred.display()
+    );
+    fallback
 }
 
 fn load_existing_config() -> Option<(DataDirConfig, bool)> {
@@ -653,6 +714,44 @@ fn copy_dir_contents(src: &Path, dest: &Path) -> Result<(), String> {
 // 公共 API
 // ============================================================================
 
+/// 打印本次运行的存储路径与判定依据（仅调试构建调用）。
+///
+/// 中文说明：便携版与安装版的数据目录由「发行模式 + 配置文件 + 数据目录配置」共同决定，
+/// 排查"数据到底写到哪了"时只看配置文件容易误判。这里把关键路径和来源一次性打到日志，
+/// 开发环境（cargo tauri dev）启动即可在终端看到。
+#[cfg(debug_assertions)]
+pub fn log_storage_diagnostics() {
+    let channel = current_distribution_channel();
+    let config_file = config_file_path()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|| "(无法确定)".to_string());
+    let default_directory = default_data_dir()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|| "(无法确定)".to_string());
+    let active_directory = get_data_dir();
+    let executable = current_executable_path()
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "(无法确定)".to_string());
+    // 说明当前数据目录是"跟随程序目录"还是"用户在设置里指定的自定义目录"。
+    let directory_source = if path_compare_key(&active_directory) == path_compare_key(Path::new(&default_directory)) {
+        "默认（跟随发行模式）"
+    } else {
+        "自定义（配置文件中记录，可能在别的磁盘）"
+    };
+
+    log::info!(
+        "存储诊断: 发行模式={:?} | 程序={} | 配置文件={} | 数据目录={} [{}] | 界面数据目录={}",
+        channel,
+        executable,
+        config_file,
+        active_directory.display(),
+        directory_source,
+        portable_webview_data_directory()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_else(|| "(安装版默认 AppData)".to_string())
+    );
+}
+
 /// 获取当前数据目录路径
 pub fn get_data_dir() -> PathBuf {
     DATA_DIR_CACHE.read().unwrap().clone()
@@ -734,6 +833,79 @@ fn has_migratable_data_entries(root: &Path) -> bool {
 fn can_write_storage(config_directory: &Path, data_directory: &Path) -> bool {
     // 初始化阶段已经创建过目录，这里只确认当前运行配置仍具备写入能力，不创建测试文件污染用户目录。
     fs::create_dir_all(config_directory).is_ok() && fs::create_dir_all(data_directory).is_ok()
+}
+
+/// 真实写入探针：创建目录后写入 0 字节文件并立即删除。
+///
+/// 中文说明：仅靠 `create_dir_all` 判断不可靠——如果目录已存在，即使没有写权限也会返回成功，
+/// 于是日志、快照、备份会在真正写入时才失败。探针文件用完立刻删除，不会留下垃圾。
+fn probe_writable_directory(directory: &Path) -> Result<(), String> {
+    fs::create_dir_all(directory)
+        .map_err(|error| format!("无法创建目录 {}: {}", directory.display(), error))?;
+
+    let probe_path = directory.join(format!(".lightc-write-probe-{}", std::process::id()));
+    match fs::write(&probe_path, b"") {
+        Ok(()) => {
+            let _ = fs::remove_file(&probe_path);
+            Ok(())
+        }
+        Err(error) => Err(format!("目录不可写 {}: {}", directory.display(), error)),
+    }
+}
+
+/// 便携版写入诊断。
+///
+/// 便携包被解压到 `C:\Program Files`、只读 U 盘或受杀软/组策略保护的目录时，程序目录不可写，
+/// 数据只能落到 AppData。这里把结果结构化返回，设置页给出"把程序移到可写目录"的明确指引。
+pub fn get_storage_write_diagnostic() -> StorageWriteDiagnostic {
+    let channel = current_distribution_channel();
+    let preferred_directory = default_data_dir().unwrap_or_else(|| PathBuf::from("."));
+    let active_directory = get_data_dir();
+    let portable_root = (channel == DistributionChannel::Portable)
+        .then(|| storage_root_dir())
+        .flatten();
+
+    if channel != DistributionChannel::Portable {
+        // 安装版本来就该写 AppData，只需要确认当前目录仍可写。
+        return StorageWriteDiagnostic {
+            portable_root: None,
+            preferred_data_directory: preferred_directory.to_string_lossy().to_string(),
+            preferred_writable: true,
+            fell_back_to_app_data: false,
+            active_writable: probe_writable_directory(&active_directory).is_ok(),
+            reason: None,
+        };
+    }
+
+    let preferred_error = probe_writable_directory(&preferred_directory).err();
+    let active_writable = probe_writable_directory(&active_directory).is_ok();
+    // 只有"期望目录不可写 + 实际用的是 AppData 目录"才算回落。用户自定义的数据目录
+    // 或历史配置里的其它路径都不该被误报成"又写 C 盘了"。
+    let active_is_app_data = app_local_root_dir()
+        .is_some_and(|root| is_same_or_child_path(&path_compare_key(&active_directory), &path_compare_key(&root)));
+    let fell_back = preferred_error.is_some()
+        && !path_compare_key(&active_directory).eq(&path_compare_key(&preferred_directory))
+        && active_is_app_data;
+
+    StorageWriteDiagnostic {
+        portable_root: portable_root.map(|path| path.to_string_lossy().to_string()),
+        preferred_data_directory: preferred_directory.to_string_lossy().to_string(),
+        preferred_writable: preferred_error.is_none(),
+        fell_back_to_app_data: fell_back,
+        active_writable,
+        // reason 只在真正发生回落时给出可展示的原因，避免把"自定义目录"等情况误报成写 C 盘。
+        reason: fell_back.then(|| {
+            format!(
+                "便携目录不可写，数据已临时保存到 {}",
+                active_directory.display()
+            )
+        }),
+    }
+}
+
+/// 便携目录不可写时的兜底数据目录：安装版位置（%LOCALAPPDATA%\LightC\data）。
+fn app_data_fallback_dir() -> Option<PathBuf> {
+    app_local_root_dir().map(|root| root.join(DEFAULT_DATA_DIR_NAME))
 }
 
 /// 设置新的数据目录并迁移已有数据
@@ -1219,6 +1391,7 @@ fn directory_usage(dir: &Path, excluded_relative_paths: &[&str]) -> Result<(usiz
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::{installer_root_dir, portable_root_dir_for};
 
     #[test]
     fn test_default_dir_exists() {
@@ -1267,12 +1440,108 @@ mod tests {
     }
 
     #[test]
-    fn separates_config_and_default_data_paths() {
-        let config_path = config_file_path().expect("config path should be available");
-        let default_dir = default_data_dir().expect("default data dir should be available");
+    fn probe_detects_writable_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "lightc-write-probe-ok-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("获取测试时间失败")
+                .as_nanos()
+        ));
 
-        assert!(path_compare_key(&config_path).contains("\\lightc\\config\\config.json"));
-        assert!(path_compare_key(&default_dir).ends_with("\\lightc\\data"));
+        // 目录不存在也应通过（探针会先创建），且不能让探针文件残留。
+        assert!(probe_writable_directory(&root.join("nested")).is_ok());
+        let leftovers = fs::read_dir(&root)
+            .expect("读取测试目录失败")
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().starts_with(".lightc-write-probe-"))
+            .count();
+        assert_eq!(leftovers, 0, "写入探针必须在检测后删除自身");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn probe_rejects_file_as_directory() {
+        // 路径被同名文件占用时必须报错，否则后续日志/快照写入会在运行时才失败。
+        let root = std::env::temp_dir().join(format!(
+            "lightc-write-probe-file-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("获取测试时间失败")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("创建测试目录失败");
+        let blocked = root.join("blocked");
+        fs::write(&blocked, b"not a directory").expect("创建占位文件失败");
+
+        assert!(probe_writable_directory(&blocked).is_err());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn installer_channel_never_reports_portable_fallback() {
+        // 安装版本来就写 AppData，诊断不应把它标记成"便携目录回落"。
+        let diagnostic = get_storage_write_diagnostic();
+        let channel = current_distribution_channel();
+        if channel == DistributionChannel::Installer {
+            assert!(diagnostic.portable_root.is_none());
+            assert!(!diagnostic.fell_back_to_app_data);
+            assert!(diagnostic.preferred_writable);
+        } else {
+            // 便携版：期望目录必须可写；只有"不可写 + 实际用 AppData"才算回落，
+            // 历史配置或用户自定义目录都不应被误报。
+            assert_eq!(
+                path_compare_key(Path::new(&diagnostic.preferred_data_directory)),
+                path_compare_key(&get_default_dir())
+            );
+            assert_eq!(diagnostic.preferred_writable, !diagnostic.fell_back_to_app_data);
+            if diagnostic.fell_back_to_app_data {
+                assert!(diagnostic.reason.is_some(), "回落时必须给出可展示原因");
+            }
+        }
+    }
+
+    #[test]
+    fn separates_config_and_default_data_paths() {
+        // 便携版：配置与默认数据都必须跟随 exe 目录，且分别落在 config/ 与 data/ 下。
+        let portable_root = PathBuf::from(r"D:\LightCPortable");
+        let config_path = portable_root.join(CONFIG_DIR_NAME).join(CONFIG_FILE);
+        let default_dir = portable_root.join(DEFAULT_DATA_DIR_NAME);
+
+        assert_eq!(
+            path_compare_key(&config_path),
+            path_compare_key(&PathBuf::from(r"D:\LightCPortable\config\config.json"))
+        );
+        assert_eq!(
+            path_compare_key(&default_dir),
+            path_compare_key(&PathBuf::from(r"D:\LightCPortable\data"))
+        );
+
+        // 安装版：两者都在 %LOCALAPPDATA%\LightC 下，保证 NSIS 更新/卸载不会碰到数据。
+        let installer_root = installer_root_dir().expect("安装版根目录应可用");
+        assert_eq!(
+            path_compare_key(&installer_root.join(CONFIG_DIR_NAME).join(CONFIG_FILE)),
+            path_compare_key(&installer_root.join("config").join("config.json"))
+        );
+        assert!(
+            path_compare_key(&installer_root).ends_with("\\lightc"),
+            "安装版根目录应位于 LocalAppData\\LightC: {}",
+            installer_root.display()
+        );
+    }
+
+    #[test]
+    fn portable_root_follows_executable_directory() {
+        // 便携版根目录必须等于 exe 所在目录，这是"数据随包携带"的前提。
+        let executable = PathBuf::from(r"E:\USB\LightC\LightC.exe");
+        assert_eq!(
+            path_compare_key(&portable_root_dir_for(&executable).expect("便携版根目录应可用")),
+            path_compare_key(&PathBuf::from(r"E:\USB\LightC"))
+        );
     }
 
     #[test]
