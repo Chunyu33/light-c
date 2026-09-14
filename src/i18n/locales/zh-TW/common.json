@@ -4,7 +4,7 @@
   "wechatQr": "微信讚賞碼",
   "alipayQr": "支付寶讚賞碼",
   "zoom": "點選放大",
-  "zoomHint": "點選圖片可放大掃描",
+  "supportQrHint": "點選放大，掃碼支持",
   "wechat": "微信",
   "alipay": "支付寶",
   "scan": "掃描",
