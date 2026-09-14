@@ -5,21 +5,28 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Coffee, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Coffee, Heart, ShieldCheck, X } from 'lucide-react';
 import wechatQr from '../../assets/r_wechat_qr.jpg';
 import alipayQr from '../../assets/r_alipay_qr.jpg';
+import { MODAL_BACKDROP_MOTION, MODAL_CARD_MOTION } from '../../utils/modalMotion';
 import { useTranslation } from 'react-i18next';
 
 type PaymentType = 'wechat' | 'alipay';
+
+/** 支付方式元数据：颜色与文案只在这里定义，普通视图和放大视图共用，避免两处写法不一致 */
+const PAYMENT_OPTIONS: { type: PaymentType; activeClass: string; labelKey: string }[] = [
+  { type: 'wechat', activeClass: 'bg-[#07C160]', labelKey: 'wechat' },
+  { type: 'alipay', activeClass: 'bg-[#1677FF]', labelKey: 'alipay' },
+];
 
 export function SupportAuthor() {
   const { t } = useTranslation('common');
   const [paymentType, setPaymentType] = useState<PaymentType>('wechat');
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 切换支付方式时的淡入淡出动画
+  // 切换支付方式时先淡出再换图：直接换 src 会瞬间跳变，观感生硬
   const handlePaymentChange = (type: PaymentType) => {
     if (type === paymentType) return;
     setIsTransitioning(true);
@@ -29,28 +36,17 @@ export function SupportAuthor() {
     }, 150);
   };
 
-  // 打开放大 Modal
-  const openModal = () => {
-    setShowModal(true);
-    requestAnimationFrame(() => setModalVisible(true));
-  };
-
-  // 关闭放大 Modal
-  const closeModal = () => {
-    setModalVisible(false);
-    setTimeout(() => setShowModal(false), 200);
-  };
-
-  // ESC 键关闭 Modal
+  // ESC 键关闭放大视图
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showModal) {
-        closeModal();
-      }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsModalOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showModal]);
+  }, []);
+
+  const qrAlt = paymentType === 'wechat' ? t('wechatQr') : t('alipayQr');
+  const qrSrc = paymentType === 'wechat' ? wechatQr : alipayQr;
 
   return (
     <>
@@ -60,118 +56,119 @@ export function SupportAuthor() {
           {t('supportTitle')}
         </h4>
         <div className="bg-[var(--bg-main)] rounded-2xl p-5">
-          {/* 文案说明 */}
-          <p className="text-sm text-[var(--text-secondary)] text-center mb-4">
-            {t('supportDesc')}
-          </p>
-
-          {/* 赞赏码图片 - 可点击放大 */}
-          <div className="flex justify-center mb-2">
-            <div
-              onClick={openModal}
-              className="relative w-36 h-36 rounded-xl border border-[var(--border-color)] overflow-hidden bg-white p-2 cursor-pointer hover:shadow-lg hover:border-[var(--brand-green)] transition-all duration-200 group"
-            >
-              <img
-                src={paymentType === 'wechat' ? wechatQr : alipayQr}
-                alt={paymentType === 'wechat' ? t('wechatQr') : t('alipayQr')}
-                className={`w-full h-full object-contain transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'
-                  }`}
-              />
-              {/* 悬浮放大提示 */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
-                  {t('zoom')}
+          {/* 左右布局：左侧赞赏码、右侧文案；窄屏下自动改为上下排列 */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            {/* 左列：赞赏码 + 支付方式切换 */}
+            <div className="shrink-0">
+              <div
+                onClick={() => setIsModalOpen(true)}
+                className="relative w-32 h-32 rounded-xl border border-[var(--border-color)] overflow-hidden bg-white p-2 cursor-pointer hover:shadow-lg hover:border-[var(--brand-green)] transition-all duration-200 group"
+              >
+                <img
+                  src={qrSrc}
+                  alt={qrAlt}
+                  className={`w-full h-full object-contain transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+                />
+                {/* 悬浮放大提示 */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
+                    {t('zoom')}
+                  </div>
                 </div>
               </div>
+
+              {/* Segmented Control 切换开关 */}
+              <div className="mt-3 inline-flex w-full bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]">
+                {PAYMENT_OPTIONS.map((option) => (
+                  <button
+                    key={option.type}
+                    onClick={() => handlePaymentChange(option.type)}
+                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                      paymentType === option.type
+                        ? `${option.activeClass} text-white shadow-sm`
+                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {t(option.labelKey)}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-[10px] text-[var(--text-faint)] text-center mt-2">
+                {t('zoomHint')}
+              </p>
             </div>
-          </div>
 
-          {/* 点击提示文字 */}
-          <p className="text-[10px] text-[var(--text-faint)] text-center mb-3">
-            {t('zoomHint')}
-          </p>
-
-          {/* Segmented Control 切换开关 */}
-          <div className="flex justify-center">
-            <div className="inline-flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]">
-              <button
-                onClick={() => handlePaymentChange('wechat')}
-                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'wechat'
-                    ? 'bg-[#07C160] text-white shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-              >
-                {t('wechat')}
-              </button>
-              <button
-                onClick={() => handlePaymentChange('alipay')}
-                className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'alipay'
-                    ? 'bg-[#1677FF] text-white shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-              >
-                {t('alipay')}
-              </button>
+            {/* 右列：说明文案 */}
+            <div className="min-w-0 flex-1 space-y-3 text-center sm:text-left">
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {t('supportDesc')}
+              </p>
+              {/* 两条要点让说明更易扫读，避免长段落 */}
+              <ul className="space-y-1.5 text-xs text-[var(--text-muted)]">
+                <li className="flex items-start justify-center sm:justify-start gap-1.5">
+                  <Heart className="w-3.5 h-3.5 mt-px shrink-0 text-[var(--brand-green)]" />
+                  <span>{t('supportPointDev')}</span>
+                </li>
+                <li className="flex items-start justify-center sm:justify-start gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 mt-px shrink-0 text-[var(--brand-green)]" />
+                  <span>{t('supportPointVoluntary')}</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 放大 Modal - 半透明磨砂背景 */}
-      {showModal && createPortal(
-        <div
-          className={`fixed inset-0 z-[10000] flex items-center justify-center transition-all duration-200 ${modalVisible ? 'bg-black/50 backdrop-blur-sm' : 'bg-transparent'
-            }`}
-          onClick={closeModal}
-        >
-          <div
-            className={`relative bg-white rounded-2xl shadow-2xl p-4 transition-all duration-200 ${modalVisible ? 'scale-100 opacity-100' : 'scale-90 opacity-0'
-              }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* 关闭按钮 */}
-            <button
-              onClick={closeModal}
-              className="absolute -top-2 -right-2 w-8 h-8 bg-[var(--bg-card)] rounded-full shadow-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
+      {/* 放大视图 - 与项目其他弹窗共用同一套动效预设 */}
+      {createPortal(
+        <AnimatePresence>
+          {isModalOpen && (
+            <motion.div
+              {...MODAL_BACKDROP_MOTION}
+              className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+              onClick={() => setIsModalOpen(false)}
             >
-              <X className="w-4 h-4" />
-            </button>
-
-            {/* 高清大图 */}
-            <img
-              src={paymentType === 'wechat' ? wechatQr : alipayQr}
-              alt={paymentType === 'wechat' ? t('wechatQr') : t('alipayQr')}
-              className="w-72 h-72 object-contain"
-            />
-
-            {/* 底部切换 */}
-            <div className="flex justify-center mt-4">
-              <div className="inline-flex bg-gray-100 rounded-xl p-1">
+              <motion.div
+                {...MODAL_CARD_MOTION}
+                className="relative bg-white rounded-2xl shadow-2xl p-4"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {/* 关闭按钮 */}
                 <button
-                  onClick={() => handlePaymentChange('wechat')}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'wechat'
-                      ? 'bg-[#07C160] text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                  onClick={() => setIsModalOpen(false)}
+                  className="absolute -top-2 -right-2 w-8 h-8 bg-[var(--bg-card)] rounded-full shadow-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
                 >
-                  {t('wechat')}
+                  <X className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => handlePaymentChange('alipay')}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${paymentType === 'alipay'
-                      ? 'bg-[#1677FF] text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                  {t('alipay')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
+
+                {/* 高清大图 */}
+                <img src={qrSrc} alt={qrAlt} className="w-72 h-72 object-contain" />
+
+                {/* 底部切换 */}
+                <div className="flex justify-center mt-4">
+                  <div className="inline-flex bg-gray-100 rounded-xl p-1">
+                    {PAYMENT_OPTIONS.map((option) => (
+                      <button
+                        key={option.type}
+                        onClick={() => handlePaymentChange(option.type)}
+                        className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                          paymentType === option.type
+                            ? `${option.activeClass} text-white shadow-sm`
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        {t(option.labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
         document.body
       )}
     </>
   );
 }
-

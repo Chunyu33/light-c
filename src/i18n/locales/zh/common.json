@@ -1,5 +1,5 @@
 {
-  "supportTitle": "支持作者", "supportDesc": "维护不易，如果软件对您有帮助，请我吃个猪脚饭~（自愿原则）", "wechatQr": "微信赞赏码", "alipayQr": "支付宝赞赏码", "zoom": "点击放大", "zoomHint": "点击图片可放大扫描", "wechat": "微信", "alipay": "支付宝",
+  "supportTitle": "支持作者", "supportDesc": "LightC 一直以“为爱发电”的方式开发和维护。如果它帮你腾出了空间、也让电脑更清爽，欢迎为这份长期的坚持添一把柴。", "supportPointDev": "所有支持都会投入到功能开发与长期维护", "supportPointVoluntary": "完全自愿，打赏不解锁任何功能", "wechatQr": "微信赞赏码", "alipayQr": "支付宝赞赏码", "zoom": "点击放大", "zoomHint": "点击图片可放大扫描", "wechat": "微信", "alipay": "支付宝",
   "scan": "扫描",
   "scanning": "扫描中",
   "scanningShort": "扫描中...",

@@ -89,7 +89,7 @@
     "whitelistDesc": "Protected paths and their descendants are excluded from scans and cannot be deleted here.",
     "whitelistEmpty": "No protected paths",
     "whitelistAddedAt": "Added: {{time}}",
-    "addToWhitelist": "Add to whitelist",
+    "addToWhitelist": "Add to whitelist", "addToWhitelistFailed": "Failed to add to the whitelist",
     "removeFromWhitelist": "Remove protection",
     "whitelistConfirmDesc": "This path and all of its descendants will be protected: {{path}}",
     "whitelistConfirmWarning": "The item is removed from the current results immediately. Future scans and deletions will block it."

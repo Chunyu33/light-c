@@ -89,7 +89,7 @@
     "whitelistDesc": "保護したパスとその子項目はスキャン結果から除外され、このモジュールでは削除できません。",
     "whitelistEmpty": "保護したパスはありません",
     "whitelistAddedAt": "追加日時: {{time}}",
-    "addToWhitelist": "ホワイトリストに追加",
+    "addToWhitelist": "ホワイトリストに追加", "addToWhitelistFailed": "ホワイトリストへの追加に失敗しました",
     "removeFromWhitelist": "保護を解除",
     "whitelistConfirmDesc": "このパスとすべての子項目を保護します: {{path}}",
     "whitelistConfirmWarning": "保護すると現在の結果から直ちに除外され、今後のスキャンと削除でもブロックされます。"

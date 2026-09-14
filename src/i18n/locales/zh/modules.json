@@ -109,7 +109,7 @@
     "whitelistDesc": "受保护路径及其子项不会再出现在扫描结果中，也无法通过本模块删除。",
     "whitelistEmpty": "暂无受保护路径",
     "whitelistAddedAt": "添加时间：{{time}}",
-    "addToWhitelist": "加入白名单",
+    "addToWhitelist": "加入白名单", "addToWhitelistFailed": "加入白名单失败",
     "removeFromWhitelist": "移除保护",
     "whitelistConfirmDesc": "将保护此路径及其全部子项：{{path}}",
     "whitelistConfirmWarning": "保护后，该路径会立即从当前结果中移除；后续扫描和删除都会拦截它。"

@@ -124,7 +124,7 @@
     "whitelistDesc": "受保護路徑及其子項不會再出現在掃描結果中，也無法透過此模組刪除。",
     "whitelistEmpty": "暫無受保護路徑",
     "whitelistAddedAt": "新增時間：{{time}}",
-    "addToWhitelist": "加入白名單",
+    "addToWhitelist": "加入白名單", "addToWhitelistFailed": "加入白名單失敗",
     "removeFromWhitelist": "移除保護",
     "whitelistConfirmDesc": "將保護此路徑及其全部子項：{{path}}",
     "whitelistConfirmWarning": "保護後，該路徑會立即從目前結果中移除；後續掃描和刪除都會攔截它。"
