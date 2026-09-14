@@ -427,6 +427,8 @@
     "exportDepthNote": "報告中的目錄明細最多展示三層，資料來自本次分析結果。"
   },
   "hotspot": {
+    "expandChildren": "展開子目錄",
+    "collapseChildren": "收合子目錄",
     "scanning": "正在掃描大目錄",
     "completed": "掃描完成",
     "noResult": "未發現大型目錄",

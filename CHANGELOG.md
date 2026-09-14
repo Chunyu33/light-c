@@ -2,11 +2,15 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.11
+
+- Large-folder analysis: subfolders are collapsed by default and clicking anywhere on a row opens or closes it with a smooth transition; the list now has padding on both sides and the path text no longer switches to a question-mark cursor.
+- "Support the author" is split into two areas: the reward code and the WeChat/Alipay switch on the left, the description on the right. The wording now talks about sponsoring, explains that every sponsorship goes into development and long-term maintenance, and notes that sponsoring or not changes nothing about how the app works.
+
 ## v2.16.10
 
 - System slimming improved: disabling hibernation, cleaning components and compressing the baseline display the current stage, percentage and elapsed time so long operations no longer look stuck; the state refreshes right after an operation and reports the actual freed space, other actions are locked while one runs, and compressing the baseline asks for confirmation first.
 - Leftover cleanup fixed: folders added to the protection list are now really skipped and no longer show up again in the next scan, and the protection list opens with the same smooth animation as other dialogs.
-- "Support the author" redesigned: the reward codes sit next to the message and are now large enough to scan, with a clear note that all support goes into developing and maintaining the app and that donating never unlocks features.
 
 ## v2.16.9
 
