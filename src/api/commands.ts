@@ -295,14 +295,33 @@ export async function getSystemSlimStatus(): Promise<SystemSlimStatus> {
 }
 
 /**
- * 鍏抽棴浼戠湢鍔熻兘
+ * 系统瘦身操作进度（后端事件 system-slim:progress）。
+ */
+export interface SlimOperationProgress {
+  /** 操作项 id（hibernation / winsxs / winsxs_resetbase）。 */
+  item_id: string;
+  /** 阶段：preparing / running / waiting / done / error。 */
+  phase: string;
+  /** 面向用户的阶段说明。 */
+  message: string;
+  /** 0-100，0 表示暂时无法估算。 */
+  percent: number;
+  /** running / done / error。 */
+  status: 'running' | 'done' | 'error';
+  /** 已用时间（毫秒）。 */
+  elapsed_ms: number;
+}
+
+/**
+ * 关闭休眠功能（异步执行，进度通过 system-slim:progress 事件推送）
  */
 export async function disableHibernation(): Promise<string> {
   return invoke<string>('disable_hibernation');
 }
 
 /**
- * 寮€鍚紤鐪犲姛鑳? */
+ * 开启休眠功能（异步执行，进度通过 system-slim:progress 事件推送）
+ */
 export async function enableHibernation(): Promise<string> {
   return invoke<string>('enable_hibernation');
 }

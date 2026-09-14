@@ -26,16 +26,16 @@ pub async fn get_system_slim_status() -> SystemSlimStatus {
     crate::system_slim::get_status().await
 }
 
-/// 关闭休眠功能
+/// 关闭休眠功能（异步 + 进度推送）
 #[tauri::command]
-pub fn disable_hibernation() -> Result<String, String> {
-    crate::system_slim::disable_hibernation()
+pub async fn disable_hibernation(window: Window) -> Result<String, String> {
+    crate::system_slim::disable_hibernation_with_progress(&window).await
 }
 
-/// 开启休眠功能
+/// 开启休眠功能（异步 + 进度推送）
 #[tauri::command]
-pub fn enable_hibernation() -> Result<String, String> {
-    crate::system_slim::enable_hibernation()
+pub async fn enable_hibernation(window: Window) -> Result<String, String> {
+    crate::system_slim::enable_hibernation_with_progress(&window).await
 }
 
 /// 清理 WinSxS 组件存储

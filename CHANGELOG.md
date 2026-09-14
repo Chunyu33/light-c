@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.10
+
+- System slimming improved: disabling hibernation, cleaning components and compressing the baseline display the current stage, percentage and elapsed time so long operations no longer look stuck; the state refreshes right after an operation and reports the actual freed space, other actions are locked while one runs, and compressing the baseline asks for confirmation first.
+
 ## v2.16.9
 
 - Portable build: no longer mistaken for an installed build and writing data to AppData; a read-only program folder now shows a clear message, and "Check for updates" opens a dialog pointing to the official website or the author's netdisk instead of running an installer-based update.

@@ -178,7 +178,7 @@
     "result": "清理結果",
     "backup": "備份位置"
   },
-  "systemSlim": {
+  "systemSlim": { "actions": { "noCleanup": "無需清理", "startCleanup": "開始清理", "deepCleanup": "深度清理", "runCleanup": "執行清理", "rescan": "重新檢測", "openSettings": "開啟設定" },
     "done": "操作已完成，請重新檢測重新整理當前狀態",
     "adminRequired": "此操作需要管理員許可權",
     "checking": "正在檢測系統狀態",
@@ -195,7 +195,7 @@
     "resetBaseCompletedTitle": "元件基線壓縮完成",
     "settingsOpened": "已開啟設定",
     "pagefileOpened": "請手動配置虛擬記憶體位置。",
-    "estimatedReclaim": "本次檢測估算可回收 {{size}}。可重新檢測重新整理狀態。",
+    "estimatedReclaim": "本次檢測估算可回收 {{size}}。可重新檢測重新整理狀態。", "actualReclaim": "實際釋放 {{size}}。",
     "resetBaseCompleted": "已執行 ResetBase，已處理被替代的元件版本和系統更新基線；完成後當前已安裝的 Windows 更新無法解除安裝。",
     "componentCleanupCompleted": "已執行 StartComponentCleanup，已處理被替代的元件版本、元件儲存快取和臨時元件資料。",
     "administrator": "管理員",
@@ -203,7 +203,7 @@
     "adminHint": "請關閉程式，右鍵點選程式圖示選擇“以管理員身份執行”。",
     "disabled": "已關閉",
     "itemStatus": "操作已完成，請重新檢測重新整理當前狀態",
-    "executing": "執行中",
+    "executing": "執行中", "busyTitle": "正在執行其他操作", "busyDesc": "請等待目前系統操作完成後再執行下一個。", "waitForCurrent": "請等待目前操作完成", "progressPreparing": "正在準備…", "progressElapsed": "已用 {{time}}", "progressDoNotClose": "請勿關閉程式或關機", "confirmResetBaseTitle": "壓縮元件儲存基線", "confirmResetBaseDesc": "此操作會移除 Windows 更新的回溯基線以回收空間，且無法復原：完成後已安裝的更新將無法解除安裝。確定繼續嗎？", "confirmResetBaseConfirm": "確定壓縮",
     "searchIndexServiceRunning": "搜尋服務執行中",
     "searchIndexDbSize": "索引資料庫 {{size}}",
     "searchIndexRebuildStartedTitle": "重建已開始",
@@ -215,7 +215,7 @@
         "name": "休眠檔案",
         "description": "關閉休眠可釋放 hiberfil.sys 佔用的空間。",
         "warning": "關閉休眠會禁用 Windows 快速啟動和休眠功能。",
-        "action": "關閉休眠"
+        "enable": "開啟休眠", "disable": "關閉休眠", "action": "關閉休眠"
       },
       "winsxs": {
         "name": "Windows 元件儲存",
