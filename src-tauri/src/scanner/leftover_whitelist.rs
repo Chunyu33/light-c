@@ -56,7 +56,7 @@ pub fn add_entry(path: &str) -> Result<LeftoverWhitelistEntry, String> {
 
     if let Some(entry) = entries
         .iter()
-        .find(|entry| paths_are_equal(&entry.path, &normalized_path))
+        .find(|entry| normalize_string_path_for_compare(&entry.path) == normalize_string_path_for_compare(&normalized_path))
     {
         return Ok(entry.clone());
     }
@@ -78,7 +78,10 @@ pub fn remove_entry(path: &str) -> Result<(), String> {
     let store_path = whitelist_file_path();
     let mut entries = load_entries_from(&store_path)?;
     let previous_len = entries.len();
-    entries.retain(|entry| !paths_are_equal(&entry.path, path));
+    // 与 contains_path 使用同一套比较规则：前端传回的路径可能带 `\\?\` 前缀或大小写不同，
+    // 直接用原始字符串比较会导致"界面上删掉了、文件里还在"。
+    let target = normalize_string_path_for_compare(path);
+    entries.retain(|entry| normalize_string_path_for_compare(&entry.path) != target);
 
     if entries.len() != previous_len {
         save_entries_to(&store_path, &entries)?;
@@ -97,7 +100,6 @@ pub fn contains_path(entries: &[LeftoverWhitelistEntry], candidate: &Path) -> bo
                 .is_some_and(|suffix| suffix.starts_with('\\'))
     })
 }
-
 fn load_entries_from(store_path: &Path) -> Result<Vec<LeftoverWhitelistEntry>, String> {
     if !store_path.exists() {
         return Ok(Vec::new());
@@ -137,7 +139,7 @@ fn normalize_existing_path(path: &str) -> Result<String, String> {
 }
 
 fn normalize_path_for_storage(path: &Path) -> String {
-    trim_trailing_separator(path.to_string_lossy().replace('/', "\\"))
+    trim_trailing_separator(strip_extended_length_prefix(&path.to_string_lossy().replace('/', "\\")))
 }
 
 fn normalize_path_for_compare(path: &Path) -> String {
@@ -145,7 +147,23 @@ fn normalize_path_for_compare(path: &Path) -> String {
 }
 
 fn normalize_string_path_for_compare(path: &str) -> String {
-    trim_trailing_separator(path.replace('/', "\\")).to_lowercase()
+    trim_trailing_separator(strip_extended_length_prefix(&path.replace('/', "\\"))).to_lowercase()
+}
+
+/// 去掉 Windows 扩展长度路径前缀（`\\?\` 与 `\\.\`）。
+///
+/// 中文说明：白名单入库走 `fs::canonicalize`，Windows 会在绝对路径前加 `\\?\`；
+/// 而扫描结果里的路径没有这个前缀，导致字符串比较永远不相等、白名单实际失效。
+/// 两边统一去掉前缀后再比较，路径本身不变，只是让两者可比。
+fn strip_extended_length_prefix(path: &str) -> String {
+    // UNC 长路径 `\\?\UNC\server\share` 还原成 `\\server\share`。
+    if let Some(rest) = path.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{}", rest);
+    }
+    path.strip_prefix(r"\\?\")
+        .or_else(|| path.strip_prefix(r"\\.\"))
+        .map(str::to_string)
+        .unwrap_or_else(|| path.to_string())
 }
 
 fn trim_trailing_separator(mut path: String) -> String {
@@ -153,10 +171,6 @@ fn trim_trailing_separator(mut path: String) -> String {
         path.pop();
     }
     path
-}
-
-fn paths_are_equal(left: &str, right: &str) -> bool {
-    normalize_string_path_for_compare(left) == normalize_string_path_for_compare(right)
 }
 
 #[cfg(test)]
@@ -175,6 +189,88 @@ mod tests {
         assert!(!contains_path(&entries, Path::new(r"C:\Fixture\AppData")));
     }
 
+    #[test]
+    fn strips_extended_length_path_prefix() {
+        // \\?\ 与 \\.\ 前缀必须去掉，否则和扫描结果里的普通路径无法比较。
+        assert_eq!(
+            strip_extended_length_prefix(r"\\?\C:\Users\Test\AppData\Local\App"),
+            r"C:\Users\Test\AppData\Local\App"
+        );
+        assert_eq!(
+            strip_extended_length_prefix(r"\\.\C:\Users\Test"),
+            r"C:\Users\Test"
+        );
+        // UNC 形式要还原成 \\server\share，而不是变成 server\share。
+        assert_eq!(
+            strip_extended_length_prefix(r"\\?\UNC\server\share\App"),
+            r"\\server\share\App"
+        );
+        // 普通路径保持不变。
+        assert_eq!(
+            strip_extended_length_prefix(r"C:\Users\Test"),
+            r"C:\Users\Test"
+        );
+    }
+
+    #[test]
+    fn canonicalized_whitelist_entry_matches_scanned_path() {
+        // 这条是本次白名单失效的回归测试：入库路径来自 fs::canonicalize（Windows 会加 \\?\ 前缀），
+        // 扫描路径来自目录遍历（无前缀），两者必须判定为同一路径。
+        let root = std::env::temp_dir().join(format!(
+            "lightc-whitelist-prefix-{}-{}",
+            std::process::id(),
+            Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let scanned_directory = root.join("AppData").join("Local").join("SomeApp");
+        fs::create_dir_all(&scanned_directory).expect("创建测试目录失败");
+
+        let canonical = fs::canonicalize(&scanned_directory).expect("canonicalize 失败");
+        let entries = vec![LeftoverWhitelistEntry {
+            path: normalize_path_for_storage(&canonical),
+            added_at: "2026-01-01T00:00:00Z".to_string(),
+        }];
+
+        // 扫描侧给的是未加前缀的路径，也必须命中白名单。
+        assert!(
+            contains_path(&entries, &scanned_directory),
+            "带 \\\\?\\ 前缀的入库路径必须能匹配扫描路径"
+        );
+        assert!(contains_path(&entries, &scanned_directory.join("cache")));
+        assert!(!contains_path(&entries, &root.join("AppData").join("Local").join("OtherApp")));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn comparison_ignores_case_separators_and_prefix() {
+        // 前端传回的路径可能大小写不同、用正斜杠或带 \\?\ 前缀，都必须视为同一条目，
+        // 否则会出现"界面上删掉了、实际上还在"或"保护了但没生效"。
+        let stored = r"\\?\C:\Users\Test\AppData\Local\SomeApp";
+        let candidates = [
+            r"C:\Users\Test\AppData\Local\SomeApp",
+            r"c:\users\test\appdata\local\someapp",
+            r"C:/Users/Test/AppData/Local/SomeApp",
+            r"C:\Users\Test\AppData\Local\SomeApp\",
+        ];
+
+        let entries = vec![LeftoverWhitelistEntry {
+            path: stored.to_string(),
+            added_at: "2026-01-01T00:00:00Z".to_string(),
+        }];
+        for candidate in candidates {
+            assert!(
+                contains_path(&entries, Path::new(candidate)),
+                "应命中白名单: {}",
+                candidate
+            );
+            assert_eq!(
+                normalize_string_path_for_compare(stored),
+                normalize_string_path_for_compare(candidate),
+                "比较口径应一致: {}",
+                candidate
+            );
+        }
+    }
     #[test]
     fn whitelist_store_round_trip_preserves_entries() {
         let root = std::env::temp_dir().join(format!(

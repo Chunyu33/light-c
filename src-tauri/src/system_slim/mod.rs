@@ -37,6 +37,49 @@ pub struct SystemSlimStatus {
     pub total_reclaimable: u64,
 }
 
+/// 瘦身操作进度事件（事件名 `system-slim:progress`）。
+///
+/// 中文说明：休眠开关、组件清理、基线压缩都可能耗时几十秒到十几分钟。前端用它显示
+/// 阶段、百分比和已用时间，让用户明确知道"还在跑、大概到哪一步"，而不是盯着一个不动的按钮。
+#[derive(Debug, Clone, Serialize)]
+pub struct SlimOperationProgress {
+    /// 操作项 id，与 SlimItemStatus.id 对应，前端据此定位是哪个卡片在跑。
+    pub item_id: String,
+    /// 阶段标识：preparing / running / waiting / done / error。
+    pub phase: String,
+    /// 面向用户的中文阶段说明。
+    pub message: String,
+    /// 0-100；无法估算时返回 0，前端显示不确定进度条。
+    pub percent: u8,
+    /// running / done / error。
+    pub status: String,
+    /// 已用时间（毫秒），让用户能判断还要不要继续等。
+    pub elapsed_ms: u64,
+}
+
+/// 统一推送瘦身进度；发送失败只记录日志，不影响操作本身。
+fn emit_slim_progress(
+    window: &Window,
+    item_id: &str,
+    phase: &str,
+    message: &str,
+    percent: u8,
+    status: &str,
+    started_at: std::time::Instant,
+) {
+    let progress = SlimOperationProgress {
+        item_id: item_id.to_string(),
+        phase: phase.to_string(),
+        message: message.to_string(),
+        percent,
+        status: status.to_string(),
+        elapsed_ms: started_at.elapsed().as_millis() as u64,
+    };
+    if let Err(error) = window.emit("system-slim:progress", &progress) {
+        warn!("发送系统瘦身进度失败: {}", error);
+    }
+}
+
 const WINSXS_ANALYZE_TIMEOUT_SECS: u64 = 30;
 const WINSXS_CACHE_TTL_SECS: u64 = 10 * 60;
 
@@ -287,12 +330,19 @@ fn get_cached_winsxs_result() -> Option<WinsxsAnalyzeResult> {
 }
 
 fn set_cached_winsxs_result(result: WinsxsAnalyzeResult) {
-    if let Ok(mut cache) = WINSXS_ANALYZE_CACHE.write() {
-        // 只缓存成功解析到的结果，失败和超时保持 0，避免把临时异常固化到检查结果里。
+    let Ok(mut cache) = WINSXS_ANALYZE_CACHE.write() else {
+        return;
+    };
+
+    // 只缓存"成功且真的估算出可回收内容"的结果。分析失败或结果为 0 时缓存 10 分钟会让
+    // 清理后的对比始终读到 0（用户看不到实际释放量），因此这类结果直接清空缓存、下次重算。
+    if result.analysis_succeeded && result.reclaimable_size > 0 {
         *cache = Some(WinsxsAnalyzeCache {
             result,
             cached_at: std::time::Instant::now(),
         });
+    } else {
+        *cache = None;
     }
 }
 
@@ -699,73 +749,172 @@ fn decode_command_output(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).into_owned()
 }
 
+/// 当前正在运行的 DISM 进程 id。
+///
+/// 中文说明：DISM 是独立进程，程序被强制关闭后它会继续在后台跑完，用户既看不到进度、
+/// 也不知道系统仍在改动。这里记录 pid，下次启动或发起新的清理前先把它结束掉，
+/// 避免留下"看不见的组件清理"。
+static RUNNING_DISM_PROCESS_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// 结束上一次残留的 DISM 进程（如果有）。
+///
+/// 中文说明：只结束我们自己启动、且仍在运行的那个 pid，不会误伤用户在命令行手动执行的 DISM。
+#[cfg(target_os = "windows")]
+fn terminate_previous_dism_process() {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    let previous_pid = RUNNING_DISM_PROCESS_ID.swap(0, Ordering::SeqCst);
+    if previous_pid == 0 {
+        return;
+    }
+
+    // 进程可能已经自然结束，taskkill 对不存在的 pid 会返回非零，这里不当作错误处理。
+    let result = Command::new("taskkill.exe")
+        .args(["/PID", &previous_pid.to_string(), "/T", "/F"])
+        .creation_flags(0x08000000)
+        .output();
+    match result {
+        Ok(output) if output.status.success() => {
+            warn!("已结束后台残留的 DISM 清理进程 (pid {})", previous_pid);
+        }
+        Ok(_) => {}
+        Err(error) => warn!("结束残留 DISM 进程失败 (pid {}): {}", previous_pid, error),
+    }
+}
+
+/// 程序启动时清理上一次可能遗留的 DISM 进程。
+#[cfg(target_os = "windows")]
+pub fn cleanup_orphan_dism_process() {
+    terminate_previous_dism_process();
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn cleanup_orphan_dism_process() {}
+
 // ============================================================================
 // 操作执行
 // ============================================================================
 
-/// 关闭休眠功能
-pub fn disable_hibernation() -> Result<String, String> {
-    if !check_admin() {
-        return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        info!("正在关闭休眠功能...");
-
-        let output = run_powercfg_hibernation_command("off")?;
-
-        if output.status.success() {
-            if wait_for_hibernation_disabled() {
-                info!("休眠功能已关闭");
-                Ok("休眠功能已成功关闭，hiberfil.sys 文件将被删除".to_string())
-            } else {
-                Err("关闭休眠命令已返回成功，但系统状态或 hiberfil.sys 文件仍未完成更新，请重新检测后再试".to_string())
-            }
-        } else {
-            Err(format!(
-                "关闭休眠失败: {}",
-                decode_command_output(&output.stderr).trim()
-            ))
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows 系统".to_string())
-    }
+/// 关闭休眠功能（异步执行并推送进度）。
+///
+/// 中文说明：powercfg 关闭休眠后还要等待系统删除 hiberfil.sys（大文件，可能需要一两秒），
+/// 同步执行会把主线程卡住、界面完全没有反馈；这里改为 spawn_blocking + 进度事件。
+pub async fn disable_hibernation_with_progress(window: &Window) -> Result<String, String> {
+    run_hibernation_toggle(window, false).await
 }
 
-/// 开启休眠功能
-pub fn enable_hibernation() -> Result<String, String> {
+/// 开启休眠功能（异步执行并推送进度）。
+pub async fn enable_hibernation_with_progress(window: &Window) -> Result<String, String> {
+    run_hibernation_toggle(window, true).await
+}
+
+/// 休眠开关的统一实现：关闭时轮询等待 hiberfil.sys 释放，并把等待过程报给前端。
+async fn run_hibernation_toggle(window: &Window, enable: bool) -> Result<String, String> {
     if !check_admin() {
         return Err("需要管理员权限才能执行此操作，请以管理员身份运行程序".to_string());
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        info!("正在开启休眠功能...");
+    let started_at = std::time::Instant::now();
+    let item_id = "hibernation";
+    let item_label = if enable { "开启休眠" } else { "关闭休眠" };
 
-        let output = run_powercfg_hibernation_command("on")?;
+    emit_slim_progress(
+        window,
+        item_id,
+        "preparing",
+        &format!("正在{}...", item_label),
+        10,
+        "running",
+        started_at,
+    );
 
-        if output.status.success() {
-            if check_hibernation_enabled() {
-                info!("休眠功能已开启");
-                Ok("休眠功能已成功开启".to_string())
-            } else {
-                Err("开启休眠命令已返回成功，但系统状态尚未更新，请重新检测后再试".to_string())
+    let progress_window = window.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        {
+            let mode = if enable { "on" } else { "off" };
+            let output = run_powercfg_hibernation_command(mode)?;
+
+            if !output.status.success() {
+                return Err(format!(
+                    "{}失败: {}",
+                    item_label,
+                    decode_command_output(&output.stderr).trim()
+                ));
             }
-        } else {
-            Err(format!(
-                "开启休眠失败: {}",
-                decode_command_output(&output.stderr).trim()
-            ))
-        }
-    }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows 系统".to_string())
+            emit_slim_progress(
+                &progress_window,
+                item_id,
+                "waiting",
+                if enable {
+                    "命令已执行，正在确认系统状态..."
+                } else {
+                    // 删除 hiberfil.sys 需要时间，明确告诉用户在等什么，避免误以为卡死。
+                    "命令已执行，正在等待系统释放 hiberfil.sys（文件较大，通常需要几秒）..."
+                },
+                70,
+                "running",
+                started_at,
+            );
+
+            let confirmed = if enable {
+                check_hibernation_enabled()
+            } else {
+                wait_for_hibernation_disabled()
+            };
+            Ok::<bool, String>(confirmed)
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = progress_window;
+            Err("此功能仅支持 Windows 系统".to_string())
+        }
+    })
+    .await
+    .map_err(|error| format!("任务执行失败: {}", error))?
+    .map(|confirmed| {
+        (
+            confirmed,
+            if enable {
+                "休眠功能已成功开启"
+            } else {
+                "休眠功能已成功关闭，hiberfil.sys 文件将被删除"
+            },
+            if enable {
+                "休眠状态尚未更新，请重新检测后再试"
+            } else {
+                "关闭休眠命令已返回成功，但 hiberfil.sys 仍未释放，请重新检测后再试"
+            },
+        )
+    })?;
+
+    let (confirmed, success_message, failure_message) = result;
+    if confirmed {
+        emit_slim_progress(
+            window,
+            item_id,
+            "done",
+            if enable { "休眠已开启" } else { "休眠已关闭" },
+            100,
+            "done",
+            started_at,
+        );
+        info!("{}完成", item_label);
+        Ok(success_message.to_string())
+    } else {
+        emit_slim_progress(
+            window,
+            item_id,
+            "error",
+            failure_message,
+            100,
+            "error",
+            started_at,
+        );
+        Err(failure_message.to_string())
     }
 }
 
@@ -792,17 +941,24 @@ async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String,
 
         info!("开始清理 WinSxS 组件存储，ResetBase: {}", reset_base);
 
-        let _ = window.emit(
-            "winsxs-cleanup-progress",
-            serde_json::json!({
-                "status": "running",
-                "message": if reset_base {
-                    "正在深度清理系统组件基线，请耐心等待..."
-                } else {
-                    "正在执行官方系统组件清理，请耐心等待..."
-                },
-                "progress": 0
-            }),
+        // 先结束上一次可能残留的 DISM，避免两个清理进程同时改动组件存储。
+        terminate_previous_dism_process();
+
+        let started_at = std::time::Instant::now();
+        let item_id = if reset_base { "winsxs_resetbase" } else { "winsxs" };
+        // DISM 清理耗时可能从几十秒到十几分钟，首条进度必须说明"这一步很慢"，否则用户会以为卡死。
+        emit_slim_progress(
+            window,
+            item_id,
+            "preparing",
+            if reset_base {
+                "正在准备组件基线压缩。该步骤可能持续数分钟，请保持程序运行..."
+            } else {
+                "正在准备组件存储清理。该步骤可能持续数分钟，请保持程序运行..."
+            },
+            0,
+            "running",
+            started_at,
         );
 
         let handle = window.app_handle().clone();
@@ -820,6 +976,9 @@ async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String,
                 .creation_flags(0x08000000)
                 .spawn()?;
 
+            // 记录 pid：程序被强制关闭后，下次启动可以结束这个残留进程。
+            RUNNING_DISM_PROCESS_ID.store(child.id(), Ordering::SeqCst);
+
             let stdout = child.stdout.take().unwrap();
             let reader = std::io::BufReader::new(stdout);
             let mut last_progress: u32 = 0;
@@ -831,12 +990,15 @@ async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String,
                         if pct > last_progress {
                             last_progress = pct;
                             let _ = handle.emit(
-                                "winsxs-cleanup-progress",
-                                serde_json::json!({
-                                    "status": "running",
-                                    "message": format!("正在清理: {}%", pct),
-                                    "progress": pct
-                                }),
+                                "system-slim:progress",
+                                &SlimOperationProgress {
+                                    item_id: item_id.to_string(),
+                                    phase: "running".to_string(),
+                                    message: format!("正在处理组件存储: {}%", pct),
+                                    percent: pct.min(100) as u8,
+                                    status: "running".to_string(),
+                                    elapsed_ms: started_at.elapsed().as_millis() as u64,
+                                },
                             );
                         }
                     }
@@ -844,6 +1006,8 @@ async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String,
             }
 
             let output = child.wait_with_output()?;
+            // 进程已结束，清掉 pid，避免下次启动或下一次清理去杀一个不存在的进程。
+            RUNNING_DISM_PROCESS_ID.store(0, Ordering::SeqCst);
             Ok::<std::process::Output, std::io::Error>(output)
         })
         .await
@@ -853,13 +1017,18 @@ async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String,
         if result.status.success() {
             info!("WinSxS 清理完成，ResetBase: {}", reset_base);
             clear_cached_winsxs_size();
-            let _ = window.emit(
-                "winsxs-cleanup-progress",
-                serde_json::json!({
-                    "status": "done",
-                    "message": "清理完成",
-                    "progress": 100
-                }),
+            emit_slim_progress(
+                window,
+                item_id,
+                "done",
+                if reset_base {
+                    "组件基线压缩完成"
+                } else {
+                    "组件存储清理完成"
+                },
+                100,
+                "done",
+                started_at,
             );
             if reset_base {
                 Ok("组件基线压缩完成，当前已安装的 Windows 更新将无法卸载".to_string())
@@ -869,13 +1038,14 @@ async fn run_winsxs_cleanup(window: &Window, reset_base: bool) -> Result<String,
         } else {
             let stderr = decode_command_output(&result.stderr);
             let stdout = decode_command_output(&result.stdout);
-            let _ = window.emit(
-                "winsxs-cleanup-progress",
-                serde_json::json!({
-                    "status": "error",
-                    "message": format!("清理失败: {}", stderr),
-                    "progress": 0
-                }),
+            emit_slim_progress(
+                window,
+                item_id,
+                "error",
+                &format!("清理失败: {}", stderr.trim()),
+                0,
+                "error",
+                started_at,
             );
             Err(format!("清理失败: {} {}", stdout, stderr))
         }
@@ -1146,5 +1316,81 @@ pub fn rebuild_search_index() -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {
         Err("此功能仅支持 Windows 系统".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_dism_progress_percentages() {
+        // DISM 的输出形如 "[==========35.5%==========          ]"，必须能取出百分比。
+        assert_eq!(parse_dism_progress("[==========35.5%==========          ]"), Some(35));
+        assert_eq!(parse_dism_progress("[===========================85.0%==================        ]"), Some(85));
+        assert_eq!(parse_dism_progress("[100.0%]"), Some(100));
+        // 没有百分比的行（普通日志）不应被误判为进度。
+        assert_eq!(parse_dism_progress("Deployment Image Servicing and Management tool"), None);
+        assert_eq!(parse_dism_progress(""), None);
+    }
+
+    #[test]
+    fn parses_whole_and_fractional_percentages() {
+        // DISM 不同版本会给 "35.5%" 或 "35%" 两种写法，都要能解析。
+        assert_eq!(parse_dism_progress("[===== 7% =====]"), Some(7));
+        assert_eq!(parse_dism_progress("[===== 7.9% =====]"), Some(7));
+    }
+
+    #[test]
+    fn only_useful_winsxs_analysis_is_cached() {
+        // 成功且有可回收内容 → 进入缓存，避免页面重复打开反复卡在 DISM 分析。
+        // 失败或 0 结果 → 不缓存；否则清理后重新检测会一直读到 0，用户看不到实际释放量。
+        *WINSXS_ANALYZE_CACHE.write().unwrap() = None;
+
+        set_cached_winsxs_result(WinsxsAnalyzeResult {
+            reclaimable_size: 1024,
+            cleanup_recommended: true,
+            reclaimable_packages: 3,
+            analysis_succeeded: true,
+        });
+        assert_eq!(
+            get_cached_winsxs_result().map(|result| result.reclaimable_size),
+            Some(1024)
+        );
+
+        set_cached_winsxs_result(WinsxsAnalyzeResult {
+            reclaimable_size: 0,
+            cleanup_recommended: false,
+            reclaimable_packages: 0,
+            analysis_succeeded: true,
+        });
+        assert!(
+            get_cached_winsxs_result().is_none(),
+            "0 可回收结果不能进入缓存"
+        );
+
+        set_cached_winsxs_result(WinsxsAnalyzeResult::default());
+        assert!(
+            get_cached_winsxs_result().is_none(),
+            "分析失败结果不能进入缓存"
+        );
+
+        clear_cached_winsxs_size();
+    }
+    #[test]
+    fn slim_progress_payload_serializes_expected_fields() {
+        let progress = SlimOperationProgress {
+            item_id: "winsxs".to_string(),
+            phase: "running".to_string(),
+            message: "正在处理组件存储: 42%".to_string(),
+            percent: 42,
+            status: "running".to_string(),
+            elapsed_ms: 1234,
+        };
+        let json = serde_json::to_value(&progress).expect("进度结构应可序列化");
+        // 前端依赖这些字段名，改动字段会让进度条直接失效，因此在这里锁定。
+        for key in ["item_id", "phase", "message", "percent", "status", "elapsed_ms"] {
+            assert!(json.get(key).is_some(), "缺少字段: {}", key);
+        }
     }
 }

@@ -1,5 +1,5 @@
 {
-  "supportTitle": "作者を支援", "supportDesc": "開発の維持には時間がかかります。LightC が役立った場合は、任意のご支援をお願いします。", "wechatQr": "WeChat 支援 QR コード", "alipayQr": "Alipay 支援 QR コード", "zoom": "クリックで拡大", "zoomHint": "画像をクリックして拡大", "wechat": "WeChat", "alipay": "Alipay",
+  "supportTitle": "作者を支援", "supportDesc": "LightC は「好きだから作る」という形で開発と保守を続けています。お役に立てたなら、この小さな活動をそっと支えていただけると嬉しいです。", "supportPointDev": "いただいた支援はすべて開発と継続的な保守に使われます", "supportPointVoluntary": "完全に任意です。支援で機能が解放されることはありません", "wechatQr": "WeChat 支援 QR コード", "alipayQr": "Alipay 支援 QR コード", "zoom": "クリックで拡大", "supportQrHint": "クリックで拡大して読み取り", "wechat": "WeChat", "alipay": "Alipay",
   "scan": "スキャン",
   "scanning": "スキャン中",
   "scanningShort": "スキャン中...",

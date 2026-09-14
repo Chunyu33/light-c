@@ -11,6 +11,7 @@ import { ModuleCard } from '../ModuleCard';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
+import { useToast } from '../Toast';
 import { LeftoverWhitelistModal } from './LeftoverWhitelistModal';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import {
@@ -36,11 +37,26 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 // 组件实现
 // ============================================================================
 
+/**
+ * 统一路径比较口径。
+ *
+ * 中文说明：扫描结果与白名单返回的路径可能只差大小写或正反斜杠，用原始字符串比较会漏匹配，
+ * 导致"已经加进白名单的条目仍然留在当前结果里"，与后端的大小写不敏感比较也不一致。
+ */
+function normalizePathForCompare(path: string): string {
+  return path.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
+}
+
+function isSamePath(left: string, right: string): boolean {
+  return normalizePathForCompare(left) === normalizePathForCompare(right);
+}
+
 export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('leftovers');
+  const { showToast } = useToast();
 
   const lastScanTriggerRef = useRef(0);
 
@@ -147,39 +163,54 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       });
 
       // 立即移除当前结果，避免用户在同一次扫描中继续误删已保护路径。
+      // 路径比较必须与后端同口径（忽略大小写与斜杠），否则保护成功但列表里还在。
       setScanResult((result) => {
         if (!result) return result;
-        const leftovers = result.leftovers.filter((item) => item.path !== whitelistCandidate.path);
+        const leftovers = result.leftovers.filter((item) => !isSamePath(item.path, whitelistCandidate.path));
         const totalSize = leftovers.reduce((sum, item) => sum + item.size, 0);
         updateModuleState('leftovers', { fileCount: leftovers.length, totalSize });
         return { ...result, leftovers, total_size: totalSize };
       });
       setSelectedPaths((paths) => {
         const next = new Set(paths);
-        next.delete(whitelistCandidate.path);
+        for (const selected of paths) {
+          if (isSamePath(selected, whitelistCandidate.path)) next.delete(selected);
+        }
         return next;
       });
       setWhitelistCandidate(null);
       setWhitelistError(null);
     } catch (error) {
-      setWhitelistError(String(error));
+      /*
+        添加失败必须让用户看到：此前只写入 whitelistError，而该文案仅在白名单管理弹窗里展示，
+        确认框照常关闭，用户会以为保护已生效。这里改为弹提示并重新拉取列表。
+      */
+      const message = String(error);
+      setWhitelistError(message);
+      showToast({
+        type: 'error',
+        title: moduleT('leftovers.addToWhitelistFailed'),
+        description: message,
+      });
     } finally {
       setIsUpdatingWhitelist(false);
     }
-  }, [updateModuleState, whitelistCandidate]);
+  }, [moduleT, showToast, updateModuleState, whitelistCandidate]);
 
   const handleRemoveWhitelist = useCallback(async (path: string) => {
     setIsUpdatingWhitelist(true);
     try {
       await removeLeftoverWhitelistEntry(path);
-      setWhitelistEntries((entries) => entries.filter((entry) => entry.path !== path));
+      setWhitelistEntries((entries) => entries.filter((entry) => !isSamePath(entry.path, path)));
       setWhitelistError(null);
     } catch (error) {
       setWhitelistError(String(error));
+      // 删除失败时重新拉取，避免界面显示"已移除"而文件里仍然保留。
+      await loadWhitelist();
     } finally {
       setIsUpdatingWhitelist(false);
     }
-  }, []);
+  }, [loadWhitelist]);
 
   // 开始扫描
   const handleScan = useCallback(async () => {
@@ -833,19 +864,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         cancelText={t('cancel')}
       />
 
-      {showWhitelistManager && createPortal(
-        <LeftoverWhitelistModal
-          entries={whitelistEntries}
-          error={whitelistError}
-          isUpdating={isUpdatingWhitelist}
-          onClose={() => setShowWhitelistManager(false)}
-          onOpen={openInFolder}
-          onRemove={handleRemoveWhitelist}
-          t={moduleT}
-          commonT={t}
-        />,
-        document.body
-      )}
+      {/* 白名单管理弹窗自身用 AnimatePresence 处理进出场，因此这里始终挂载、由 isOpen 控制 */}
+      <LeftoverWhitelistModal
+        isOpen={showWhitelistManager}
+        entries={whitelistEntries}
+        error={whitelistError}
+        isUpdating={isUpdatingWhitelist}
+        onClose={() => setShowWhitelistManager(false)}
+        onOpen={openInFolder}
+        onRemove={handleRemoveWhitelist}
+        t={moduleT}
+        commonT={t}
+      />
 
       {/* 深度清理警告弹窗 - 微信风格 */}
       {isWarningAnimating && createPortal(
