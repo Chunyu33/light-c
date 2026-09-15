@@ -41,6 +41,24 @@ import { openSearchUrl } from '../../utils/searchEngine';
 const DEEP_DISCOVERY_STORAGE_KEY = 'lightc.aiModels.deepDiscovery';
 const LARGE_MODEL_THRESHOLD = 20 * 1024 * 1024 * 1024;
 
+/**
+ * 取当前扫描阶段的标题。
+ *
+ * 阶段文案统一放在 i18n 的 scanStages 下，MFT 阶段需要盘符插值；
+ * 后端同时下发盘符和中文兜底文案，i18n 缺键时回退到后端文案，避免出现 {{drive}} 这类未替换占位符。
+ */
+function getScanStageLabel(progress: AiModelScanProgress | null, enableDeepDiscovery: boolean): string {
+  if (!progress) {
+    return i18n.t(enableDeepDiscovery ? 'scanStages.aiDeep' : 'scanStages.aiQuick', { ns: 'common' });
+  }
+
+  return i18n.t(`scanStages.${progress.stage}`, {
+    ns: 'common',
+    drive: progress.drive_label ?? '',
+    defaultValue: progress.message || i18n.t('scanStages.scanning', { ns: 'common' }),
+  });
+}
+
 type AiModelViewMode = 'overview' | 'models';
 type AiModelSortMode = 'size-desc' | 'size-asc' | 'name-asc' | 'name-desc';
 
@@ -262,12 +280,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
         {isScanning && (
           <ModuleScanProgress
-            title={scanProgress
-              ? i18n.t(`scanStages.${scanProgress.stage}`, {
-                ns: 'common',
-                defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
-              })
-              : i18n.t(enableDeepDiscovery ? 'scanStages.aiDeep' : 'scanStages.aiQuick', { ns: 'common' })}
+            title={getScanStageLabel(scanProgress, enableDeepDiscovery)}
             description={scanProgress
               ? i18n.t('scanStages.elapsedSummary', {
                 ns: 'common',
@@ -815,7 +828,6 @@ function ModelTable({
         {models.map(model => {
           const displayName = splitDisplayModelName(model.name);
           const modelType = getModelType(model);
-          const canDeleteModel = !model.path.toLowerCase().endsWith('.mlpackage');
 
           return (
             <div key={`${model.sourceName}-${model.path}-${model.name}`} className={`flex items-center gap-3 px-4 hover:bg-[var(--bg-hover)] transition ${compact ? 'py-2.5' : 'py-3'}`}>
@@ -840,16 +852,14 @@ function ModelTable({
               <div className="flex shrink-0 items-center gap-1">
                 <IconButton title={moduleT('aiModels.openFolder')} onClick={() => onOpenPath(model.path)} icon={<FolderOpen className="w-4 h-4" />} />
                 <IconButton title={moduleT('aiModels.searchModel')} onClick={() => onSearchModel(model.name)} icon={<Search className="w-4 h-4" />} />
-                {canDeleteModel && (
-                  <IconButton
-                    title={moduleT('aiModels.deleteModel')}
-                    onClick={() => onDeleteModel(model)}
-                    disabled={deletingModelPath !== null}
-                    icon={deletingModelPath === model.path
-                      ? <Loader2 className="h-4 w-4 animate-spin text-[var(--color-danger)]" />
-                      : <Trash2 className="h-4 w-4 text-[var(--color-danger)]" />}
-                  />
-                )}
+                <IconButton
+                  title={moduleT('aiModels.deleteModel')}
+                  onClick={() => onDeleteModel(model)}
+                  disabled={deletingModelPath !== null}
+                  icon={deletingModelPath === model.path
+                    ? <Loader2 className="h-4 w-4 animate-spin text-[var(--color-danger)]" />
+                    : <Trash2 className="h-4 w-4 text-[var(--color-danger)]" />}
+                />
               </div>
             </div>
           );
@@ -941,14 +951,25 @@ function IconButton({ title, icon, onClick, disabled = false }: { title: string;
 function removeDeletedModel(scanResult: AiModelScanResult | null, deletedPath: string): AiModelScanResult | null {
   if (!scanResult) return scanResult;
 
+  // 先记录被删模型原来的体积：来源总量按原有值递减，而不是用剩余模型重新累加。
+  // Ollama 这类来源的多个模型会共享同一份权重，重新累加会得到偏小的数值。
+  const deletedSize = scanResult.sources
+    .flatMap(source => source.models)
+    .find(model => model.path === deletedPath)?.size ?? 0;
+
   const sources = scanResult.sources
     .map((source) => {
       const models = source.models.filter((model) => model.path !== deletedPath);
+      if (models.length === source.models.length) {
+        // 该来源不含被删模型，保持原值不变
+        return source;
+      }
+
       return {
         ...source,
         models,
         model_count: models.length,
-        total_size: models.reduce((total, model) => total + model.size, 0),
+        total_size: Math.max(0, source.total_size - deletedSize),
       };
     })
     .filter((source) => source.models.length > 0);
@@ -958,7 +979,7 @@ function removeDeletedModel(scanResult: AiModelScanResult | null, deletedPath: s
     sources,
     source_count: sources.length,
     total_model_count: sources.reduce((total, source) => total + source.model_count, 0),
-    total_size: sources.reduce((total, source) => total + source.total_size, 0),
+    total_size: Math.max(0, scanResult.total_size - deletedSize),
   };
 }
 

@@ -3,8 +3,10 @@
 // ============================================================================
 //
 // 支持的社交软件：
-// - 微信 (WeChat): 通过注册表读取自定义路径，识别聊天记录数据库
-// - QQ/NTQQ: 定位 nt_data 目录，识别消息数据库
+// - 微信 (WeChat): 注册表 + 文档目录 + 全盘搜索定位数据目录，同时兼容旧版 3.x（WeChat Files）
+//   与新版 4.x（xwechat_files / db_storage + msg）两代目录结构
+// - QQ/NTQQ: 定位 nt_data 目录与 nt_qq\global，识别消息数据库；
+//   安装路径除注册表外还会从常见安装目录推断，覆盖自定义安装位置
 // - 钉钉 (DingTalk): 定位 storage 和 cache 目录
 // - 飞书 (Lark/Feishu): 扫描 LarkShell，定位 sdk_storage 和 file_storage
 // - 企业微信 (WXWork): 识别缓存和文件目录
@@ -16,7 +18,7 @@
 //
 // CRITICAL (危险) - 聊天记录数据库，禁止删除
 //   识别规则：
-//   1. 路径包含: Msg/Database, Msg/Multi, nt_msg, nt_db, tdata
+//   1. 路径包含: Msg/Database, Msg/Multi, nt_msg, nt_db, db_storage, tdata
 //   2. 文件后缀: .db, .db-wal, .db-shm, .sqlite, .sqlite-wal, .sqlite-shm
 //   3. 效果: is_deletable = false，前端禁用勾选
 //

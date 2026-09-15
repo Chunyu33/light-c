@@ -1600,6 +1600,8 @@ export interface AiModelScanProgress {
   message: string;
   elapsed_ms: number;
   stage_elapsed_ms: number;
+  /** 当前阶段涉及的盘符（MFT 阶段才有），用于阶段文案插值 */
+  drive_label?: string | null;
 }
 
 /**

@@ -87,7 +87,8 @@ where
         progress,
         scan_started_at,
         &phase_started_at,
-        "mft_enumerate",
+        drive_letter,
+        "mftEnumerate",
         &format!("正在枚举 {} 盘 MFT 文件记录", drive_letter),
     );
     let entries_result = mft_core::enumerate_usn_records_v2(handle, &|_| true);
@@ -95,7 +96,7 @@ where
     let entries = entries_result?;
     finish_mft_phase(
         phase_durations,
-        "mft_enumerate",
+        "mftEnumerate",
         &format!("{} 盘 MFT 枚举", drive_letter),
         phase_started_at,
     );
@@ -105,7 +106,8 @@ where
         progress,
         scan_started_at,
         &phase_started_at,
-        "mft_filter",
+        drive_letter,
+        "mftFilter",
         &format!("正在筛选 {} 盘大模型候选", drive_letter),
     );
     let candidate_min_sizes = entries
@@ -118,7 +120,7 @@ where
         .collect::<HashMap<_, _>>();
     finish_mft_phase(
         phase_durations,
-        "mft_filter",
+        "mftFilter",
         &format!("{} 盘候选筛选", drive_letter),
         phase_started_at,
     );
@@ -132,14 +134,15 @@ where
         progress,
         scan_started_at,
         &phase_started_at,
-        "mft_paths",
+        drive_letter,
+        "mftPaths",
         &format!("正在重建 {} 盘模型路径", drive_letter),
     );
     let candidate_ids = candidate_min_sizes.keys().copied().collect::<HashSet<_>>();
     let paths = mft_core::rebuild_paths_for_ids(&entries, drive_letter, &candidate_ids);
     finish_mft_phase(
         phase_durations,
-        "mft_paths",
+        "mftPaths",
         &format!("{} 盘路径重建", drive_letter),
         phase_started_at,
     );
@@ -153,7 +156,8 @@ where
         progress,
         scan_started_at,
         &phase_started_at,
-        "mft_metadata",
+        drive_letter,
+        "mftMetadata",
         &format!("正在校验 {} 盘候选文件大小", drive_letter),
     );
     let mut models = Vec::new();
@@ -201,7 +205,7 @@ where
     }
     finish_mft_phase(
         phase_durations,
-        "mft_metadata",
+        "mftMetadata",
         &format!("{} 盘候选校验", drive_letter),
         phase_started_at,
     );
@@ -213,6 +217,7 @@ fn emit_mft_progress<F>(
     progress: &F,
     scan_started_at: &Instant,
     phase_started_at: &Instant,
+    drive_letter: char,
     stage: &str,
     message: &str,
 ) where
@@ -223,6 +228,8 @@ fn emit_mft_progress<F>(
         message: message.to_string(),
         elapsed_ms: scan_started_at.elapsed().as_millis(),
         stage_elapsed_ms: phase_started_at.elapsed().as_millis(),
+        // 阶段文案里的盘符由前端做插值，这里把盘符一并带出去
+        drive_label: Some(drive_letter.to_string()),
     });
 }
 

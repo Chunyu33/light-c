@@ -293,7 +293,8 @@ interface AccordionContentProps {
   className?: string;
 }
 
-function AccordionContent({ expanded, children, animated = true, className = '' }: AccordionContentProps) {
+// 导出给同样需要手风琴过渡的模块复用（如大目录分析的树形展开），避免各处重复实现高度动画。
+export function AccordionContent({ expanded, children, animated = true, className = '' }: AccordionContentProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState<number | 'auto'>(expanded ? 'auto' : 0);
   const [isAnimating, setIsAnimating] = useState(false);

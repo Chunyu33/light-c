@@ -1,6 +1,6 @@
 use super::{
-    collect_model_files, source_from_models, unique_existing_paths, user_home_dir, DetectorOutput,
-    ModelDetector,
+    collect_prefixed_model_files, source_from_models, unique_existing_paths, user_home_dir,
+    DetectorOutput, ModelDetector,
 };
 use crate::ai_models::types::ModelItem;
 use serde_json::Value;
@@ -55,8 +55,9 @@ impl ModelDetector for ComfyUiDetector {
             ));
         }
 
-        for drive_letter in ["C", "D", "E", "F"] {
-            let install_root = PathBuf::from(format!("{}:\\ComfyUI", drive_letter));
+        // 遍历真实存在的盘符，而不是写死 C~F：把 ComfyUI 装在 G 盘及之后的用户会整体漏扫
+        for drive in available_drive_roots() {
+            let install_root = drive.join("ComfyUI");
             candidate_roots.push(install_root.join("models"));
             install_roots.push(install_root);
         }
@@ -66,17 +67,49 @@ impl ModelDetector for ComfyUiDetector {
         }
 
         let mut models = Vec::new();
-        let mut source_path = None;
-        for root in unique_existing_paths(candidate_roots) {
-            source_path.get_or_insert_with(|| root.clone());
-            models.extend(collect_comfyui_models(&root));
+        // 来源路径记录"实际扫出模型的那个根目录"，而不是第一个存在的候选目录：
+        // 两者可能不同（例如配置指向 D 盘数据目录），写错会让用户以为另一个目录占了这些空间。
+        let resolved_roots = unique_existing_paths(candidate_roots);
+        let mut best_root_match: Option<(PathBuf, u64)> = None;
+
+        for root in &resolved_roots {
+            let mut found = collect_comfyui_models(root);
+            let found_size: u64 = found.iter().map(|model| model.size).sum();
+            if found_size > 0
+                && best_root_match
+                    .as_ref()
+                    .map(|(_, size)| found_size > *size)
+                    .unwrap_or(true)
+            {
+                best_root_match = Some((root.clone(), found_size));
+            }
+            models.append(&mut found);
         }
 
+        let source_path = best_root_match
+            .map(|(path, _)| path)
+            .or_else(|| resolved_roots.first().cloned())
+            .unwrap_or_default();
+
         DetectorOutput {
-            source: source_from_models("ComfyUI", source_path.unwrap_or_default(), models),
+            source: source_from_models("ComfyUI", source_path, models),
             warnings: Vec::new(),
         }
     }
+}
+
+/// 枚举本机真实存在的盘符根目录（如 `D:\`）。
+#[cfg(target_os = "windows")]
+fn available_drive_roots() -> Vec<PathBuf> {
+    (b'C'..=b'Z')
+        .map(|letter| PathBuf::from(format!("{}:\\", letter as char)))
+        .filter(|drive| drive.exists())
+        .collect()
+}
+
+#[cfg(not(target_os = "windows"))]
+fn available_drive_roots() -> Vec<PathBuf> {
+    vec![PathBuf::from("/")]
 }
 
 fn collect_comfyui_models(models_root: &Path) -> Vec<ModelItem> {
@@ -88,12 +121,8 @@ fn collect_comfyui_models(models_root: &Path) -> Vec<ModelItem> {
             continue;
         }
 
-        let mut typed_models = collect_model_files(&model_type_dir);
-        for model in &mut typed_models {
-            // ComfyUI 的子目录本身就是资产类型，放进名称里能降低用户理解成本。
-            model.name = format!("{} / {}", directory_name, model.name);
-        }
-        models.extend(typed_models);
+        // ComfyUI 的子目录本身就是资产类型，放进名称里能降低用户理解成本。
+        models.extend(collect_prefixed_model_files(&model_type_dir, directory_name));
     }
 
     models

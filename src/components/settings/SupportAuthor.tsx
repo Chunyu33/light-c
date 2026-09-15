@@ -63,11 +63,11 @@ export function SupportAuthor() {
           {t('supportTitle')}
         </h4>
         <div className="@container bg-[var(--bg-main)] rounded-2xl p-5">
-          {/* 左右布局：左侧赞赏码、右侧文案。
+          {/* 左右两列：左列是赞赏码与支付方式切换（同属"扫码支持"这一件事），右列只放文案。
               这里用容器查询而不是视口断点：设置弹窗只占视口 76%，右侧内容区更窄，
               按视口宽度判断会在中等窗口下把文案压成一列几个字。 */}
           <div className="flex flex-col @[24rem]:flex-row items-center @[24rem]:items-start gap-5">
-            {/* 左列：赞赏码 + 扫描提示 */}
+            {/* 左列：赞赏码、扫描提示、支付方式切换 */}
             <div className="flex flex-col items-center shrink-0">
               <div
                 onClick={() => setIsModalOpen(true)}
@@ -89,6 +89,23 @@ export function SupportAuthor() {
               <p className="text-[10px] text-[var(--text-faint)] text-center mt-2">
                 {t('supportQrHint')}
               </p>
+
+              {/* 支付方式切换：跟赞赏码同列，切换结果直接作用在上方图片上 */}
+              <div className="mt-3 inline-flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]">
+                {PAYMENT_OPTIONS.map((option) => (
+                  <button
+                    key={option.type}
+                    onClick={() => handlePaymentChange(option.type)}
+                    className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                      paymentType === option.type
+                        ? `${option.activeClass} text-white shadow-sm`
+                        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {t(option.labelKey)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* 右列：说明文案 + 支持要点 */}
@@ -106,25 +123,6 @@ export function SupportAuthor() {
                   <span>{t('supportPointVoluntary')}</span>
                 </li>
               </ul>
-            </div>
-          </div>
-
-          {/* 支付方式切换：独占一行，按钮不会被窄列挤变形 */}
-          <div className="flex justify-center mt-4">
-            <div className="inline-flex bg-[var(--bg-card)] rounded-xl p-1 border border-[var(--border-color)]">
-              {PAYMENT_OPTIONS.map((option) => (
-                <button
-                  key={option.type}
-                  onClick={() => handlePaymentChange(option.type)}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                    paymentType === option.type
-                      ? `${option.activeClass} text-white shadow-sm`
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {t(option.labelKey)}
-                </button>
-              ))}
             </div>
           </div>
         </div>

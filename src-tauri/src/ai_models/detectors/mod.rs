@@ -26,6 +26,6 @@ pub fn create_detectors() -> Vec<Box<dyn ModelDetector>> {
 }
 
 pub(crate) use common::{
-    collect_model_files, directory_size, file_size, source_from_models, unique_existing_paths,
-    user_home_dir,
+    collect_model_files, collect_prefixed_model_files, directory_size_deduped, file_size,
+    linked_file_size, source_from_models, unique_existing_paths, user_home_dir,
 };

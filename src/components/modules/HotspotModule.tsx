@@ -9,7 +9,7 @@ import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
 import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2, XCircle } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
-import { ModuleCard } from '../ModuleCard';
+import { AccordionContent, ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import {
@@ -80,8 +80,11 @@ function formatDuration(ms?: number): string {
 }
 
 function getProgressStageLabel(stage?: string): string {
+  // 传空盘符做兜底：阶段文案里若带 {{drive}} 占位符，缺参数时会被替换成空串，
+  // 而不是把 "{{drive}}" 原样显示出来。热点扫描的进度事件不带盘符，实际用不到该占位符。
   return i18n.t(`scanStages.${stage || 'scanning'}`, {
     ns: 'common',
+    drive: '',
     defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
   });
 }
@@ -191,8 +194,13 @@ interface HotspotItemProps {
 function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup, onSearch, parentName, isChild, treeDepth = 0, onDrillDown }: HotspotItemProps) {
   const { t: moduleT } = useTranslation('modules');
   const { settings } = useSettings();
+  // 子目录默认折叠：一次扫描可能带出上百行，默认全展开会让用户先看到一大片层级噪音。
+  // 这里按行各自记录展开状态（手风琴是过渡形式，不是"同时只允许一行展开"），用户自己控制看哪一支。
+  const [isChildrenExpanded, setIsChildrenExpanded] = useState(false);
   // 根据用户设置的展示深度动态控制树形展开层数：treeDepth 0 为顶级，settings.hotspotDepth 限制最多展示层数
   const maxTreeDepth = settings.hotspotDepth;
+  // 是否还有可展开的下一层：到达深度上限后改由下钻弹窗承接
+  const hasNestedChildren = treeDepth < maxTreeDepth - 1 && Boolean(entry.children?.length);
   // 计算占比条宽度
   const percentage = maxSize > 0 ? (entry.total_size / maxSize) * 100 : 0;
   
@@ -207,9 +215,49 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
     ? { paddingLeft: `${Math.min(treeDepth, maxTreeDepth) * 24}px`, borderLeft: '2px solid var(--border-color)' }
     : {};
 
+  const toggleChildren = () => setIsChildrenExpanded((current) => !current);
+
+  /**
+   * 判断点击是否落在行内的按钮上。
+   * 右侧下钻/清理/搜索/打开各自已有独立行为，整行点击不能把它们吞掉，
+   * 否则会出现"点清理却只展开列表"这类误操作；子行里的按钮冒泡到父行时同样要放行。
+   * 只匹配 button/a/表单控件，不匹配 [role="button"]：行自身为了键盘可达也带 role="button"，
+   * 把它算进来会导致整行点击反而被判定成"点在按钮上"而失效。
+   */
+  const isInteractiveTarget = (target: EventTarget | null) => (
+    target instanceof Element
+    && Boolean(target.closest('button, a, input, select, textarea'))
+  );
+
+  /** 整行点击展开/折叠：只对有下级的行生效，没有下级时保持纯展示，不产生误导性的可点观感。 */
+  const handleRowClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!hasNestedChildren || isInteractiveTarget(event.target)) return;
+    // 用户正在选中路径文本时不触发折叠，避免复制路径时列表突然收起。
+    // 注意顺序：按钮先放行，否则"选中文字后点按钮"会因为选中态而点不动按钮。
+    if (window.getSelection()?.toString()) return;
+    toggleChildren();
+  };
+
+  /** 键盘可达：Enter / Space 等价于点击整行 */
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!hasNestedChildren || event.target !== event.currentTarget) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    toggleChildren();
+  };
+
   return (
     <div style={indentStyle}>
-      <div className={`group relative bg-[var(--bg-main)] rounded-xl p-3 hover:bg-[var(--bg-hover)] transition-colors ${
+      <div
+        onClick={handleRowClick}
+        onKeyDown={handleRowKeyDown}
+        role={hasNestedChildren ? 'button' : undefined}
+        tabIndex={hasNestedChildren ? 0 : undefined}
+        aria-expanded={hasNestedChildren ? isChildrenExpanded : undefined}
+        title={hasNestedChildren ? moduleT(isChildrenExpanded ? 'hotspot.collapseChildren' : 'hotspot.expandChildren') : undefined}
+        className={`group relative bg-[var(--bg-main)] rounded-xl p-3 hover:bg-[var(--bg-hover)] transition-colors ${
+          hasNestedChildren ? 'cursor-pointer' : ''
+        } ${
         entry.is_protected ? 'border border-red-200 dark:border-red-800/30' : ''
       } ${isChild ? 'bg-opacity-50' : ''}`}>
       {/* 占比背景条 */}
@@ -221,6 +269,20 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
       />
       
       <div className="relative flex items-center gap-3">
+        {/* 展开/折叠指示：整行都可点击，这里只承担"有下级/已展开"的视觉提示。
+            去掉 click 处理，避免和整行点击叠加成一次点击切换两次。 */}
+        {hasNestedChildren && (
+          <span
+            className="flex-shrink-0 flex items-center gap-1 px-1.5 py-1 rounded-lg text-[var(--text-muted)]"
+            aria-hidden="true"
+          >
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-300 ${isChildrenExpanded ? 'rotate-90' : ''}`} />
+            {!isChildrenExpanded && (
+              <span className="text-[10px] tabular-nums">{entry.children.length}</span>
+            )}
+          </span>
+        )}
+
         {/* 文件夹徽标：用文件夹作为主视觉，序号作为角标，避免纯序号块和树线抢视觉焦点。 */}
         <div className="flex-shrink-0 relative w-10 h-9 flex items-center justify-center">
           <div className={`relative w-9 h-7 rounded-md shadow-sm ${
@@ -291,7 +353,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             )}
           </div>
           <div 
-            className="text-xs text-[var(--text-muted)] mt-0.5 truncate cursor-help"
+            className="text-xs text-[var(--text-muted)] mt-0.5 truncate"
             title={entry.path}
           >
             {middleEllipsis(entry.path)}
@@ -377,25 +439,34 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
       </div>
       </div>
       
-      {/* 递归渲染子目录 — 最多展示 3 层树形结构 */}
-      {treeDepth < maxTreeDepth - 1 && entry.children && entry.children.length > 0 && (
-        <div className="mt-1 space-y-1">
-          {entry.children.map((child, idx) => (
-            <HotspotItem
-              key={child.path}
-              entry={child}
-              rank={idx + 1}
-              maxSize={entry.total_size}
-              isFullScan={isFullScan}
-              onOpenFolder={onOpenFolder}
-              onCleanup={onCleanup}
-              onSearch={onSearch}
-              parentName={entry.name}
-              isChild={true}
-              treeDepth={treeDepth + 1}
-              onDrillDown={onDrillDown}
-            />
-          ))}
+      {/* 递归渲染子目录 — 默认折叠，展开时用手风琴过渡；最多展示 maxTreeDepth 层树形结构 */}
+      {hasNestedChildren && (
+        // 缩进与树线放在动画容器外层：AccordionContent 需要 overflow:hidden，
+        // 若边框和左内边距放在里面会被裁掉。
+        <div
+          className="mt-1"
+          style={{ paddingLeft: `${Math.min(treeDepth + 1, maxTreeDepth) * 24}px`, borderLeft: '2px solid var(--border-color)' }}
+        >
+          <AccordionContent expanded={isChildrenExpanded}>
+            <div className="space-y-1 pt-1">
+              {entry.children.map((child, idx) => (
+                <HotspotItem
+                  key={child.path}
+                  entry={child}
+                  rank={idx + 1}
+                  maxSize={entry.total_size}
+                  isFullScan={isFullScan}
+                  onOpenFolder={onOpenFolder}
+                  onCleanup={onCleanup}
+                  onSearch={onSearch}
+                  parentName={entry.name}
+                  isChild={true}
+                  treeDepth={treeDepth + 1}
+                  onDrillDown={onDrillDown}
+                />
+              ))}
+            </div>
+          </AccordionContent>
         </div>
       )}
     </div>
@@ -831,8 +902,8 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
             />
           )}
 
-          {/* 目录列表 */}
-          <div className="space-y-2">
+          {/* 目录列表：左右留出内边距，避免行卡片与模块边框贴在一起 */}
+          <div className="space-y-2 px-2">
             {displayedEntries.map((entry, index) => (
               <HotspotItem
                 key={entry.path}

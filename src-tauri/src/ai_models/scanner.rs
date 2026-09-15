@@ -125,6 +125,8 @@ fn emit_progress<F>(
         message: message.to_string(),
         elapsed_ms: scan_started_at.elapsed().as_millis(),
         stage_elapsed_ms: phase_started_at.elapsed().as_millis(),
+        // 非 MFT 阶段不涉及具体盘符
+        drive_label: None,
     });
 }
 
