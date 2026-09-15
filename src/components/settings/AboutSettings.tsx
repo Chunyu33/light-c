@@ -248,7 +248,7 @@ export function AboutSettings() {
           className="flex items-center justify-between p-4 rounded-2xl bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] transition-colors group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
               <Clock className="w-4 h-4 text-[var(--brand-green)]" />
             </div>
             <div>
@@ -302,10 +302,10 @@ function MoreToolsSection() {
             key={name}
             className="rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] p-4"
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-[var(--brand-green)]/10 flex items-center justify-center">
+            <div className="flex items-center mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center">
                 {/* 使用项目原始图标，避免推荐卡片和 LightC 自身功能图标混淆。 */}
-                <img src={icon} alt={`${name} ${t('toolIcon')}`} className="w-5 h-5 object-contain" />
+                <img src={icon} alt={`${name} ${t('toolIcon')}`} className="w-5 h-5 object-contain border border-[var(--border-color)]" />
               </div>
               <h5 className="text-sm font-semibold text-[var(--text-primary)]">{name}</h5>
             </div>
