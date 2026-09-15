@@ -80,8 +80,11 @@ function formatDuration(ms?: number): string {
 }
 
 function getProgressStageLabel(stage?: string): string {
+  // 传空盘符做兜底：阶段文案里若带 {{drive}} 占位符，缺参数时会被替换成空串，
+  // 而不是把 "{{drive}}" 原样显示出来。热点扫描的进度事件不带盘符，实际用不到该占位符。
   return i18n.t(`scanStages.${stage || 'scanning'}`, {
     ns: 'common',
+    drive: '',
     defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
   });
 }

@@ -42,4 +42,7 @@ pub struct AiModelScanProgress {
     pub message: String,
     pub elapsed_ms: u128,
     pub stage_elapsed_ms: u128,
+    /// 当前阶段涉及的盘符（如 "C"）。
+    /// MFT 阶段文案需要它做插值，后端不传的话前端只能显示成 "正在枚举 {{drive}} 盘"。
+    pub drive_label: Option<String>,
 }
