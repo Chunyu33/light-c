@@ -6,6 +6,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 - Large-folder analysis: subfolders are collapsed by default and clicking anywhere on a row opens or closes it with a smooth transition; the list now has padding on both sides and the path text no longer switches to a question-mark cursor.
 - Social app cleanup: both the new and the old versions of WeChat and QQ are now detected, including data stored in custom folders, so the scan results are noticeably more complete.
+- AI model storage fixed: HuggingFace models were not being found at all, and now they are detected with their real size; Ollama usage is no longer counted twice, and model packages can be deleted.
 - "Support the author" is split into two areas: the reward code and the WeChat/Alipay switch on the left, the description on the right. The wording now talks about sponsoring, explains that every sponsorship goes into development and long-term maintenance, and notes that sponsoring or not changes nothing about how the app works.
 
 ## v2.16.10
