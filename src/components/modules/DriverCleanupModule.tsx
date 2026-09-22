@@ -313,9 +313,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
     setRestoring(true);
     try {
       const result = await restoreAllDriverBackups();
+      // 恢复结果位于 driverUi 分组，引用状态分组会直接显示翻译键并丢失结果消息。
       showToast({
-        title: result.success ? moduleT('driverCleanup.restoreStarted') : moduleT('driverCleanup.restoreIncomplete'),
-        description: moduleT('driverCleanup.restoreDesc', { message: result.message }),
+        title: result.success ? moduleT('driverUi.restoreStarted') : moduleT('driverUi.restoreIncomplete'),
+        description: moduleT('driverUi.restoreDesc', { message: result.message }),
         type: result.success ? 'success' : 'warning',
       });
       if (result.needs_reboot) {
@@ -323,7 +324,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       }
       await loadDrivers();
     } catch (error) {
-      showToast({ title: moduleT('driverCleanup.restoreFailed'), description: String(error), type: 'error' });
+      showToast({ title: moduleT('driverUi.restoreFailed'), description: String(error), type: 'error' });
     } finally {
       setRestoring(false);
     }
@@ -464,10 +465,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                               <span className="min-w-0 truncate font-semibold text-sm text-[var(--fg-primary)]" title={packageInfo.original_name || moduleT('driverUi.unknownInf')}>{packageInfo.original_name || moduleT('driverUi.unknownInf')}</span>
                               <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${getStatusClass(packageInfo)}`}>{getStatusLabel(packageInfo, moduleT)}</span>
                             </div>
+                            {/* 详情标签使用 driverUi 分组，避免缺失信息时显示内部翻译键。 */}
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-[var(--fg-secondary)]" title={packageInfo.published_name}>{packageInfo.published_name}</span>
-                              <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverCleanup.unknownVendor')}>{packageInfo.provider_name || moduleT('driverCleanup.unknownVendor')}</span>
-                              <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || moduleT('driverCleanup.unknownVersion')}>{moduleT('driverCleanup.version')} {packageInfo.driver_version || moduleT('driverCleanup.unknownVersion')}</span>
+                              <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverUi.unknownVendor')}>{packageInfo.provider_name || moduleT('driverUi.unknownVendor')}</span>
+                              <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || moduleT('driverUi.unknownVersion')}>{moduleT('driverUi.version')} {packageInfo.driver_version || moduleT('driverUi.unknownVersion')}</span>
                               <span className={`inline-flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 ${driverClassBadge.className}`}>
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${driverClassBadge.dotClassName}`} />
                                 {driverClassBadge.label}
@@ -476,10 +478,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className={`max-w-full truncate rounded-full px-1.5 py-0.5 ${getReasonClass(packageInfo)}`} title={packageInfo.reason}>{getReasonLabel(packageInfo, moduleT)}</span>
           <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.devices')} {packageInfo.device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.active')} {packageInfo.active_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.current')} {packageInfo.installed_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.replaced')} {packageInfo.outranked_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.files')} {packageInfo.file_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.active')} {packageInfo.active_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.current')} {packageInfo.installed_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.replaced')} {packageInfo.outranked_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.files')} {packageInfo.file_count}</span>
                             </div>
                           </div>
                           <div className="flex shrink-0 self-center items-center gap-1">
