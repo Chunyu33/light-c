@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Social app and old-driver cleanup confirmations now display the selected counts correctly; junk cleanup completion messages no longer show unreplaced placeholders.
+- Old-driver cleanup now correctly displays driver details and backup restoration results in all supported languages.
+
 ## v2.16.11
 
 - Large-folder analysis: subfolders are collapsed by default and clicking anywhere on a row opens or closes it with a smooth transition; the list now has padding on both sides and the path text no longer switches to a question-mark cursor.

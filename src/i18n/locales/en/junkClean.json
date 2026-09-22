@@ -56,7 +56,7 @@
     "listenProgressFailed": "Failed to listen for deep scan progress",
     "listenDeleteProgressFailed": "Failed to listen for delete progress",
     "cleanDone": "Cleanup complete",
-    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}{{refreshing}}",
+    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}",
     "blocked": ", {{count}} files failed",
     "reboot": ", {{count}} files will be deleted on reboot",
     "refreshing": ", verifying latest results in background",

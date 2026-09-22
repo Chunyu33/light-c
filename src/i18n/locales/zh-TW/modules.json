@@ -34,7 +34,7 @@
     "deletePartial": "部分成功",
     "deletePartialDesc": "{{success}} 個已刪除，{{failed}} 個失敗",
     "confirmDelete": "確認清理快取",
-    "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。",
+    "confirmDeleteDesc": "確定要清理選中的 {{count}} 個檔案嗎？將釋放約 {{size}} 空間。",
     "risk": {
       "critical": "危險（聊天記錄）",
       "medium": "謹慎清理",
@@ -607,7 +607,7 @@
     "driverDirectoryUnavailable": "驅動目錄資訊不可用",
     "searchAria": "搜尋 {{provider}} {{name}}",
     "openDriverAria": "開啟 {{provider}} 驅動所在目錄",
-    "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。",
+    "confirmDeleteDesc": "將備份並刪除選中的 {{count}} 個驅動包。",
     "confirmRestoreDesc": "將讀取當前資料目錄 driver_backups 下的全部 INF 備份，並交由 Windows pnputil 遞迴安裝。",
     "openBackupFailed": "開啟備份目錄失敗",
     "openFolderFailed": "開啟驅動目錄失敗"
