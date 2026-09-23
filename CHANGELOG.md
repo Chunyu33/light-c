@@ -2,15 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## v2.16.13
-
-- Fixed disk info failing to load on some computers: on machines with incomplete system disk information the page used to fail outright, and it now falls back to a second method so the disk list still shows.
-- When reading really does fail, the message is now a plain explanation with something to try instead of a wall of error text.
-
 ## v2.16.12
 
-- Fixed the placeholder text showing up in cleanup confirmation dialogs: social app cleanup and old driver cleanup used to display raw "{{name}}" and "{{size}}", and now show the actual target and size.
-- Swept the whole app for the same kind of broken text: labels on old driver rows (version, active, current, replaced, files), AI model search, the large-folder scan-stopped message and the disk-growth exported report were all missing their wording and now show correctly, along with a few gaps in the Traditional Chinese and Japanese interfaces.
+- Fixed cleanup confirmation dialogs showing raw "{{name}}" and "{{size}}" instead of the actual target and size.
+- Fixed text that was missing in several places, including a few gaps in the Traditional Chinese and Japanese interfaces.
+- Fixed disk info failing to load on some computers, and the message shown when reading fails is now clearer.
+
 
 ## v2.16.11
 
