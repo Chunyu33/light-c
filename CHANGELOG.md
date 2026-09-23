@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.12
+
+- Fixed the placeholder text showing up in cleanup confirmation dialogs: social app cleanup and old driver cleanup used to display raw "{{name}}" and "{{size}}", and now show the actual target and size.
+- Swept the whole app for the same kind of broken text: labels on old driver rows (version, active, current, replaced, files), AI model search, the large-folder scan-stopped message and the disk-growth exported report were all missing their wording and now show correctly, along with a few gaps in the Traditional Chinese and Japanese interfaces.
+
 ## v2.16.11
 
 - Large-folder analysis: subfolders are collapsed by default and clicking anywhere on a row opens or closes it with a smooth transition; the list now has padding on both sides and the path text no longer switches to a question-mark cursor.

@@ -165,6 +165,7 @@
   "confirmRestoreDrivers": "確認恢復全部驅動備份",
   "driverRestoreWarning": "該操作需要管理員許可權，可能重新安裝多個歷史驅動版本；執行後建議重新檢測，必要時重啟 Windows。",
   "confirmRestore": "確認恢復",
+  "restore": "恢復",
   "associatedApp": "關聯應用",
   "unknownApp": "未知應用",
   "shellRemoveTitle": "備份後刪除當前登錄檔節點，軟體之後可能重新建立",

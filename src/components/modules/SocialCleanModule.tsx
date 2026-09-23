@@ -280,6 +280,17 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       size: acc.size + f.size,
     }), { files: 0, size: 0 }) || { files: 0, size: 0 };
 
+  // 确认文案里的名称占位符只认「本次真正被选中的文件所属分类」，
+  // 避免跨分类勾选时把未涉及的软件名也列出来。
+  const selectedCategoryNames = Array.from(new Set(
+    scanResult?.categories
+      .filter(category => category.files.some(file => selectedPaths.has(file.path)))
+      .map(category => moduleT(`social.category.${category.id}.name`)) ?? [],
+  ));
+  const confirmTargetName = selectedCategoryNames.length > 0
+    ? selectedCategoryNames.join('、')
+    : moduleT('social.confirmTargetFallback');
+
   const isExpanded = expandedModule === 'social';
   // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，避免误判为共用操作区。
   const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
@@ -333,6 +344,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
           handleDelete();
         }}
         onCancel={() => setShowDeleteConfirm(false)}
+        targetName={confirmTargetName}
         selectedFiles={selectedStats.files}
         selectedSize={selectedStats.size}
       />
@@ -565,6 +577,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
 
 interface SocialDeleteConfirmModalProps {
   isOpen: boolean;
+  /** 本次实际会被清理的范围描述，用于填充确认文案里的名称占位符 */
+  targetName: string;
   selectedFiles: number;
   selectedSize: number;
   onConfirm: () => void;
@@ -573,6 +587,7 @@ interface SocialDeleteConfirmModalProps {
 
 function SocialDeleteConfirmModal({
   isOpen,
+  targetName,
   selectedFiles,
   selectedSize,
   onConfirm,
@@ -618,7 +633,11 @@ function SocialDeleteConfirmModal({
 
             <div className="px-5 py-4 space-y-4">
               <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
-                {moduleT('social.confirmDeleteDesc', { count: selectedFiles.toLocaleString(), size: formatSize(selectedSize) })}
+                {moduleT('social.confirmDeleteDesc', {
+                  name: targetName,
+                  count: selectedFiles.toLocaleString(),
+                  size: formatSize(selectedSize),
+                })}
               </p>
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
                 <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">

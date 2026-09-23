@@ -56,7 +56,7 @@
     "listenProgressFailed": "ディープスキャン進捗のリッスンに失敗しました",
     "listenDeleteProgressFailed": "削除進捗のリッスンに失敗しました",
     "cleanDone": "クリーン完了",
-    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}{{refreshing}}",
+    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}",
     "blocked": "、{{count}} 個のファイルが失敗",
     "reboot": "、{{count}} 個のファイルは再起動後に削除されます",
     "refreshing": "、バックグラウンドで最新結果を検証中",

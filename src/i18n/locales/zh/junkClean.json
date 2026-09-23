@@ -56,7 +56,7 @@
     "listenProgressFailed": "深度扫描进度监听失败",
     "listenDeleteProgressFailed": "删除进度监听失败",
     "cleanDone": "垃圾清理完成",
-    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}{{refreshing}}",
+    "cleanDoneDesc": "{{summary}}{{blocked}}{{reboot}}",
     "blocked": "，{{count}} 个文件清理失败",
     "reboot": "，{{count}} 个文件将在重启后删除",
     "refreshing": "，正在后台核验最新结果",

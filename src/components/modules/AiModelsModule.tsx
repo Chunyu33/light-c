@@ -472,7 +472,7 @@ function HeroOverview({
           {largestModel && (
             <div className="flex shrink-0 items-center gap-1">
               <IconButton title={t('openInFolder')} onClick={() => onOpenPath(largestModel.path)} icon={<FolderOpen className="w-4 h-4" />} />
-              <IconButton title={t('search')} onClick={() => onSearchModel(largestModel.name)} icon={<Search className="w-4 h-4" />} />
+              <IconButton title={moduleT('aiModels.search')} onClick={() => onSearchModel(largestModel.name)} icon={<Search className="w-4 h-4" />} />
             </div>
           )}
         </div>

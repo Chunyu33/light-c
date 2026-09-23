@@ -39,6 +39,8 @@ pub struct DriverPackageInfo {
     pub installed_device_count: usize,
     pub outranked_device_count: usize,
     pub file_count: usize,
+    /// 驱动包目录的估算占用（字节），用于删除确认弹窗展示；读取失败为 0 表示未知。
+    pub total_size: u64,
     pub status: String,
     pub actionable: bool,
     pub reason: String,
@@ -419,6 +421,7 @@ fn classify_packages(
     raw_packages
         .into_iter()
         .map(|package| {
+            let driver_store_path = build_driver_store_path(&package.driver_package_id);
             let parsed_version = parse_driver_version(&package.driver_version);
             let has_newer_version = parsed_version.as_ref().is_some_and(|current_version| {
                 family_versions
@@ -479,6 +482,11 @@ fn classify_packages(
                 )
             };
 
+            // 驱动包占用无法由 pnputil 直接给出，按驱动目录实际文件大小统计，
+            // 目录不可读时回落 0，由前端按“未知”处理，避免弹窗展示假数据。
+            // 必须在 driver_store_path 被移入结构体之前计算。
+            let total_size = sum_driver_package_size(&driver_store_path);
+
             DriverPackageInfo {
                 published_name: package.published_name,
                 original_name: package.original_name,
@@ -487,18 +495,34 @@ fn classify_packages(
                 driver_version: package.driver_version,
                 family_id: package.family_id,
                 signer_name: package.signer_name,
-                driver_store_path: build_driver_store_path(&package.driver_package_id),
+                driver_store_path,
                 device_count: package.device_count,
                 active_device_count: package.active_device_count,
                 installed_device_count,
                 outranked_device_count,
                 file_count: package.file_count,
+                total_size,
                 status: status.to_string(),
                 actionable,
                 reason,
             }
         })
         .collect()
+}
+
+/// 统计单个驱动包目录的占用大小；Windows 会把部分文件硬链接到系统其他位置，
+/// 这里只做展示用估算，不做去重，读取失败按 0 处理。
+fn sum_driver_package_size(driver_store_path: &str) -> u64 {
+    if driver_store_path.is_empty() {
+        return 0;
+    }
+    WalkDir::new(driver_store_path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len())
+        .sum()
 }
 
 fn is_published_driver_name(name: &str) -> bool {
