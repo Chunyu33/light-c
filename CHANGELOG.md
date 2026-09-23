@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.13
+
+- Fixed disk info failing to load on some computers: on machines with incomplete system disk information the page used to fail outright, and it now falls back to a second method so the disk list still shows.
+- When reading really does fail, the message is now a plain explanation with something to try instead of a wall of error text.
+
 ## v2.16.12
 
 - Fixed the placeholder text showing up in cleanup confirmation dialogs: social app cleanup and old driver cleanup used to display raw "{{name}}" and "{{size}}", and now show the actual target and size.
