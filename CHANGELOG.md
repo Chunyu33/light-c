@@ -2,6 +2,13 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.12
+
+- Fixed cleanup confirmation dialogs showing raw "{{name}}" and "{{size}}" instead of the actual target and size.
+- Fixed text that was missing in several places, including a few gaps in the Traditional Chinese and Japanese interfaces.
+- Fixed disk info failing to load on some computers, and the message shown when reading fails is now clearer.
+
+
 ## v2.16.11
 
 - Large-folder analysis: subfolders are collapsed by default and clicking anywhere on a row opens or closes it with a smooth transition; the list now has padding on both sides and the path text no longer switches to a question-mark cursor.

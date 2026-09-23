@@ -1,6 +1,13 @@
 // ============================================================================
 // 更新提示模态框组件
-// 启动时自动检查更新，发现新版本时弹出精致的更新提示
+// 启动时自动检查更新，发现新版本时弹出更新提示。
+//
+// 视觉与尺寸都跟随全局设置：
+// - 颜色用主题变量，深色模式自动适配；
+// - 所有尺寸用 em，继承 :root 的 font-size（= --base-font-size + --font-size-offset），
+//   因此用户调整字号时，弹窗的宽高与文字会和主界面同比例放大缩小。
+// - 进出场沿用项目统一的 modal-overlay-* / modal-content-* 动画类（见 App.css），
+//   与 ConfirmDialog / SettingsModal 保持一致。
 // ============================================================================
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -93,6 +100,10 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
+  // 退场动画期间需要继续保留 DOM，否则 animate-out 会来不及播就被卸载。
+  const [isAnimating, setIsAnimating] = useState(false);
+  const enteredRef = useRef(false);
+  if (isVisible) enteredRef.current = true;
   const [distributionChannel, setDistributionChannel] = useState<DistributionChannel | null>(null);
   // 便携版更新提示：只引导下载，不安装；latestVersion 为 null 表示未查到或已是最新。
   const [portableDialogOpen, setPortableDialogOpen] = useState(false);
@@ -214,8 +225,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
 
     // 手动触发时立即打开弹窗显示 loading，给用户即时反馈
     if (source === 'manual') {
-      setIsOpen(true);
-      requestAnimationFrame(() => setIsVisible(true));
+      openModal();
     }
 
     try {
@@ -226,13 +236,11 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
         setStatus('available');
         // auto 模式下需要打开弹窗；manual 模式弹窗已打开，仅切换状态
         if (source === 'auto') {
-          setIsOpen(true);
-          requestAnimationFrame(() => setIsVisible(true));
+          openModal();
         }
       } else if (source === 'manual') {
         // 已是最新版本：关闭弹窗 + toast 提示
-        setIsVisible(false);
-        setTimeout(() => setIsOpen(false), 200);
+        closeModal();
         showToast({
           type: 'success',
           title: uiT('upToDate'),
@@ -271,8 +279,7 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     if (!update) return;
     if (distributionChannel !== 'installer') {
       // 双保险：即便弹窗状态被意外推进到 available，也不让便携版拉起 NSIS 安装包。
-      setIsVisible(false);
-      setTimeout(() => setIsOpen(false), 200);
+      closeModal();
       showToast({
         type: 'warning',
         title: uiT('downloadOpenFailed'),
@@ -318,88 +325,107 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     }
   };
 
-  // 关闭模态框
-  const handleClose = () => {
-    setIsVisible(false);
-    setTimeout(() => setIsOpen(false), 200);
+  /**
+   * 打开弹窗。
+   * 中文说明：先挂载再在下一帧置为可见，让 CSS 动画从初始态正常起播；
+   * 同时把 isAnimating 打开，保证关闭时的退场动画有 DOM 可播。
+   */
+  const openModal = () => {
+    setIsAnimating(true);
+    setIsOpen(true);
+    requestAnimationFrame(() => setIsVisible(true));
   };
+
+  /** 关闭弹窗：先播放退场动画，动画结束（与 modal-content-out 时长对齐）后再卸载。 */
+  const closeModal = () => {
+    setIsVisible(false);
+    // 280ms 是入场动画时长，退场固定 185ms；这里取 200ms 与既有的 ConfirmDialog 一致。
+    setTimeout(() => {
+      setIsAnimating(false);
+      setIsOpen(false);
+    }, 200);
+  };
+
+  // 关闭模态框（供按钮与遮罩复用）
+  const handleClose = closeModal;
 
   // 重试（沿用上次的触发来源）
   const handleRetry = () => {
     checkForUpdate(sourceRef.current);
   };
 
-  if (!isOpen && !portableDialogOpen) return null;
+  if (!isOpen && !portableDialogOpen && !isAnimating) return null;
 
   return (
     <>
       {isOpen && createPortal(
-    <div className={`fixed inset-0 z-[10000] flex items-center justify-center transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center">
       {/* 遮罩 */}
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      <div
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={status !== 'downloading' ? handleClose : undefined}
       />
-      
-      {/* 模态框内容 */}
-      <div className={`relative w-[420px] bg-[var(--bg-card)] rounded-2xl shadow-2xl overflow-hidden transition-all duration-200 ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-        {/* 顶部装饰条 */}
-        <div className="h-1.5 bg-gradient-to-r from-[var(--brand-green)] via-emerald-400 to-teal-400" />
-        
-        {/* 关闭按钮 */}
+
+      {/* 弹窗主体：宽高与圆角都随全局字号缩放，1.86em ≈ 26px */}
+      <div className={`relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] overflow-hidden rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+        {/* 关闭按钮：下载中不允许中断，故不渲染 */}
         {status !== 'downloading' && (
           <button
+            type="button"
             onClick={handleClose}
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
+            aria-label={t('close')}
+            className="absolute right-[1em] top-[1em] z-10 flex h-[2em] w-[2em] items-center justify-center rounded-[0.57em] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
-            <X className="w-4 h-4" />
+            <X className="h-[1.14em] w-[1.14em]" />
           </button>
         )}
 
         {/* 内容区域 */}
-        <div className="p-6">
+        <div className="p-[1.43em]">
           {/* 有新版本可用 */}
           {status === 'available' && update && (
             <>
-              {/* 标题 */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--brand-green)] to-emerald-500 flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-6 h-6 text-white" />
+              {/* 版本标题：浅绿底图标 + 版本号，与主界面模块卡片同一语汇 */}
+              <div className="flex items-start gap-[0.86em]">
+                <div className="flex h-[2.57em] w-[2.57em] shrink-0 items-center justify-center rounded-[0.71em] bg-[var(--brand-green-10)]">
+                  <Sparkles className="h-[1.29em] w-[1.29em] text-[var(--brand-green)]" />
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t('updateAvailable')}</h2>
-                  <p className="text-sm text-[var(--text-muted)]">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[1em] font-semibold text-[var(--text-primary)]">
+                    {t('updateAvailable')}
+                  </h2>
+                  <p className="mt-[0.14em] text-[0.86em] text-[var(--text-muted)]">
                     v{currentVersion} → v{update.version}
                   </p>
                 </div>
               </div>
 
               {/* 更新说明 */}
-              <div className="mb-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="w-4 h-4 text-[var(--text-muted)]" />
-                  <span className="text-sm font-medium text-[var(--text-primary)]">{t('updateNotes')}</span>
+              <div className="mt-[1.14em]">
+                <div className="flex items-center gap-[0.43em]">
+                  <FileText className="h-[0.86em] w-[0.86em] text-[var(--text-muted)]" />
+                  <span className="text-[0.86em] font-medium text-[var(--text-secondary)]">{t('updateNotes')}</span>
                 </div>
-                <div className="bg-[var(--bg-main)] rounded-xl p-4 max-h-48 overflow-auto">
-                  <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
+                <div className="mt-[0.57em] max-h-[14em] overflow-auto rounded-[0.71em] border border-[var(--border-color)] bg-[var(--bg-main)] p-[1em]">
+                  <div className="whitespace-pre-wrap text-[0.86em] leading-relaxed text-[var(--text-secondary)]">
                     {update.body || t('updateNotes')}
                   </div>
                 </div>
               </div>
 
               {/* 操作按钮 */}
-              <div className="flex gap-3">
+              <div className="mt-[1.43em] flex gap-[0.71em]">
                 <button
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
+                  className="flex-1 rounded-[0.71em] border border-[var(--border-default)] bg-[var(--bg-card)] px-[1em] py-[0.64em] text-[0.86em] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
                 >
                   {t('cancel')}
                 </button>
                 <button
                   onClick={handleDownloadAndInstall}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors shadow-lg shadow-[var(--brand-green)]/20"
+                  className="flex flex-1 items-center justify-center gap-[0.43em] rounded-[0.71em] bg-[var(--brand-green)] px-[1em] py-[0.64em] text-[0.86em] font-semibold text-white transition-colors hover:bg-[var(--brand-green-hover)]"
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="h-[0.86em] w-[0.86em]" />
                   {t('confirm')}
                 </button>
               </div>
@@ -408,21 +434,25 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
 
           {/* 正在下载 */}
           {status === 'downloading' && (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
-                <RefreshCw className="w-8 h-8 text-[var(--brand-green)] animate-spin" />
+            <div className="py-[1em]">
+              <div className="flex items-start gap-[0.86em]">
+                <div className="flex h-[2.57em] w-[2.57em] shrink-0 items-center justify-center rounded-[0.71em] bg-[var(--brand-green-10)]">
+                  <RefreshCw className="h-[1.29em] w-[1.29em] animate-spin text-[var(--brand-green)]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[1em] font-semibold text-[var(--text-primary)]">{t('downloadingUpdate')}</h2>
+                  <p className="mt-[0.14em] text-[0.86em] text-[var(--text-muted)]">{t('doNotCloseApp')}</p>
+                </div>
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('downloadingUpdate')}</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-4">{t('doNotCloseApp')}</p>
-              
-              {/* 进度条 */}
-              <div className="w-full h-2 bg-[var(--bg-main)] rounded-full overflow-hidden mb-2">
-                <div 
-                  className="h-full bg-gradient-to-r from-[var(--brand-green)] to-emerald-400 transition-all duration-300"
+
+              {/* 进度条：纯色填充，不用渐变装饰 */}
+              <div className="mt-[1.14em] h-[0.43em] w-full overflow-hidden rounded-full bg-[var(--bg-main)]">
+                <div
+                  className="h-full rounded-full bg-[var(--brand-green)] transition-all duration-300"
                   style={{ width: `${downloadProgress}%` }}
                 />
               </div>
-              <p className="text-sm font-medium text-[var(--brand-green)]">
+              <p className="mt-[0.57em] text-right text-[0.86em] font-medium text-[var(--brand-green)]">
                 {downloadProgress.toFixed(0)}%
               </p>
             </div>
@@ -430,75 +460,83 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
 
           {/* 下载完成，准备安装 */}
           {status === 'ready' && (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-[var(--brand-green)]" />
+            <>
+              <div className="flex items-start gap-[0.86em]">
+                <div className="flex h-[2.57em] w-[2.57em] shrink-0 items-center justify-center rounded-[0.71em] bg-[var(--brand-green-10)]">
+                  <CheckCircle className="h-[1.29em] w-[1.29em] text-[var(--brand-green)]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[1em] font-semibold text-[var(--text-primary)]">{t('updateReady')}</h2>
+                  <p className="mt-[0.14em] text-[0.86em] leading-relaxed text-[var(--text-muted)]">{t('restartToUpdate')}</p>
+                </div>
               </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('updateReady')}</h2>
-              <p className="text-sm text-[var(--text-muted)] mb-5">{t('restartToUpdate')}</p>
-              
-              <div className="flex gap-3">
+
+              <div className="mt-[1.43em] flex gap-[0.71em]">
                 <button
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
+                  className="flex-1 rounded-[0.71em] border border-[var(--border-default)] bg-[var(--bg-card)] px-[1em] py-[0.64em] text-[0.86em] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
                 >
                   {t('cancel')}
                 </button>
                 <button
                   onClick={handleRelaunch}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors"
+                  className="flex flex-1 items-center justify-center gap-[0.43em] rounded-[0.71em] bg-[var(--brand-green)] px-[1em] py-[0.64em] text-[0.86em] font-semibold text-white transition-colors hover:bg-[var(--brand-green-hover)]"
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className="h-[0.86em] w-[0.86em]" />
                   {t('confirm')}
                 </button>
               </div>
-            </div>
+            </>
           )}
 
           {/* 错误状态 */}
           {status === 'error' && (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
-                <AlertCircle className="w-8 h-8 text-[var(--color-danger)]" />
-              </div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{t('updateFailed')}</h2>
-              <p className="text-sm text-[var(--color-danger)] mb-5 px-4">{errorMessage}</p>
-              
-              {/* 错误提示 */}
-              <div className="bg-[var(--color-warning)]/10 rounded-xl p-3 mb-5 text-left">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-[var(--color-warning)] mt-0.5 shrink-0" />
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {t('updateFailed')}
+            <>
+              <div className="flex items-start gap-[0.86em]">
+                <div className="flex h-[2.57em] w-[2.57em] shrink-0 items-center justify-center rounded-[0.71em] bg-[var(--color-danger)]/10">
+                  <AlertCircle className="h-[1.29em] w-[1.29em] text-[var(--color-danger)]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[1em] font-semibold text-[var(--text-primary)]">{t('updateFailed')}</h2>
+                  <p className="mt-[0.14em] break-words text-[0.86em] leading-relaxed text-[var(--color-danger)]">
+                    {errorMessage}
                   </p>
                 </div>
               </div>
-              
-              <div className="flex gap-3">
+
+              {/* 提示条：浅色底 + 1px 边框，去掉原来的大块警示底色 */}
+              <div className="mt-[1.14em] flex items-start gap-[0.57em] rounded-[0.71em] border border-[var(--border-color)] bg-[var(--bg-main)] px-[0.86em] py-[0.64em]">
+                <AlertTriangle className="mt-[0.14em] h-[0.86em] w-[0.86em] shrink-0 text-[var(--color-warning)]" />
+                <p className="text-[0.79em] leading-relaxed text-[var(--text-muted)]">
+                  {t('updateFailed')}
+                </p>
+              </div>
+
+              <div className="mt-[1.43em] flex gap-[0.71em]">
                 <button
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-main)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
+                  className="flex-1 rounded-[0.71em] border border-[var(--border-default)] bg-[var(--bg-card)] px-[1em] py-[0.64em] text-[0.86em] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
                 >
                   {t('close')}
                 </button>
                 <button
                   onClick={handleRetry}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:bg-[var(--brand-green-hover)] transition-colors"
+                  className="flex flex-1 items-center justify-center gap-[0.43em] rounded-[0.71em] bg-[var(--brand-green)] px-[1em] py-[0.64em] text-[0.86em] font-semibold text-white transition-colors hover:bg-[var(--brand-green-hover)]"
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className="h-[0.86em] w-[0.86em]" />
                   {t('retry')}
                 </button>
               </div>
-            </div>
+            </>
           )}
 
           {/* 正在检查 */}
           {status === 'checking' && (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[var(--brand-green)]/10 flex items-center justify-center">
-                <RefreshCw className="w-6 h-6 text-[var(--brand-green)] animate-spin" />
+            <div className="flex items-center gap-[0.86em] py-[1.43em]">
+              <div className="flex h-[2.29em] w-[2.29em] shrink-0 items-center justify-center rounded-[0.71em] bg-[var(--brand-green-10)]">
+                <RefreshCw className="h-[1.14em] w-[1.14em] animate-spin text-[var(--brand-green)]" />
               </div>
-              <p className="text-sm text-[var(--text-muted)]">{t('checkingUpdates')}</p>
+              <p className="text-[0.86em] text-[var(--text-muted)]">{t('checkingUpdates')}</p>
             </div>
           )}
         </div>

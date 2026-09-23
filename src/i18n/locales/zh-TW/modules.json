@@ -35,6 +35,7 @@
     "deletePartialDesc": "{{success}} 個已刪除，{{failed}} 個失敗",
     "confirmDelete": "確認清理快取",
     "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。",
+    "confirmTargetFallback": "選中的社交軟體快取",
     "risk": {
       "critical": "危險（聊天記錄）",
       "medium": "謹慎清理",
@@ -419,6 +420,7 @@
     "exportGeneratedAt": "產生時間",
     "exportCurrentScan": "本次掃描",
     "exportExplanation": "變化說明",
+    "exportSuggestion": "排查建議",
     "exportResultCount": "匯出目錄總數",
     "exportTruncatedNote": "部分目錄因資料量保護上限未能匯出。",
     "exportScopeTitle": "報告與頁面的統計口徑",
@@ -466,6 +468,8 @@
     "systemFilterOff": "已關閉系統目錄過濾，掃描時間可能較長",
     "notNtfs": "當前分割槽不是 NTFS，將無法使用 MFT 深度掃描",
     "stop": "停止掃描",
+    "scanStopped": "掃描已停止",
+    "scanStoppedDesc": "已取消目前掃描，可隨時重新開始。",
     "deepScanReadOnly": "深度掃描模式：僅供檢視分析，清理功能已禁用以保護系統安全",
     "folderCount": "共 {{count}} 個資料夾",
     "coverageTitle": "掃描遍歷到的檔案累計大小；系統保護目錄可能因效能原因跳過",
@@ -608,6 +612,8 @@
     "searchAria": "搜尋 {{provider}} {{name}}",
     "openDriverAria": "開啟 {{provider}} 驅動所在目錄",
     "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。",
+    "confirmDeleteTarget": "選中的 {{count}} 個驅動包",
+    "unknownSize": "未知",
     "confirmRestoreDesc": "將讀取當前資料目錄 driver_backups 下的全部 INF 備份，並交由 Windows pnputil 遞迴安裝。",
     "openBackupFailed": "開啟備份目錄失敗",
     "openFolderFailed": "開啟驅動目錄失敗"

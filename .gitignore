@@ -13,6 +13,7 @@ dist-ssr
 *.local
 /CLAUDE.*
 /.claude
+.workbuddy
 
 # Editor directories and files
 .vscode/*
@@ -37,3 +38,6 @@ update.md
 release.ps1
 /docs
 /dist_release
+
+# i18n 审计脚本的机器可读输出（每次运行都会重写，仅供本地排查用）
+.i18n-audit.json

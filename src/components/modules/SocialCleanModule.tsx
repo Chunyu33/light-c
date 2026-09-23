@@ -280,6 +280,17 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       size: acc.size + f.size,
     }), { files: 0, size: 0 }) || { files: 0, size: 0 };
 
+  // 确认文案里的名称占位符只认「本次真正被选中的文件所属分类」，
+  // 避免跨分类勾选时把未涉及的软件名也列出来。
+  const selectedCategoryNames = Array.from(new Set(
+    scanResult?.categories
+      .filter(category => category.files.some(file => selectedPaths.has(file.path)))
+      .map(category => moduleT(`social.category.${category.id}.name`)) ?? [],
+  ));
+  const confirmTargetName = selectedCategoryNames.length > 0
+    ? selectedCategoryNames.join('、')
+    : moduleT('social.confirmTargetFallback');
+
   const isExpanded = expandedModule === 'social';
   // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，避免误判为共用操作区。
   const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
@@ -333,6 +344,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
           handleDelete();
         }}
         onCancel={() => setShowDeleteConfirm(false)}
+        targetName={confirmTargetName}
         selectedFiles={selectedStats.files}
         selectedSize={selectedStats.size}
       />
@@ -565,6 +577,8 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
 
 interface SocialDeleteConfirmModalProps {
   isOpen: boolean;
+  /** 本次实际会被清理的范围描述，用于填充确认文案里的名称占位符 */
+  targetName: string;
   selectedFiles: number;
   selectedSize: number;
   onConfirm: () => void;
@@ -573,6 +587,7 @@ interface SocialDeleteConfirmModalProps {
 
 function SocialDeleteConfirmModal({
   isOpen,
+  targetName,
   selectedFiles,
   selectedSize,
   onConfirm,
@@ -591,52 +606,57 @@ function SocialDeleteConfirmModal({
           transition={{ duration: 0.18, ease: 'easeOut' }}
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px */}
           <motion.div
-            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden"
+            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[30em] max-w-[calc(100vw-2em)] overflow-hidden"
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <div className="flex items-center justify-between px-[1.43em] py-[1.14em] border-b border-[var(--border-default)]">
+              <div className="flex items-center gap-[0.86em]">
+                <div className="w-[2.86em] h-[2.86em] rounded-full bg-amber-500/15 flex items-center justify-center">
+                  <AlertTriangle className="w-[1.43em] h-[1.43em] text-amber-500" />
                 </div>
-                <h3 className="text-base font-semibold text-[var(--fg-primary)]">
+                <h3 className="text-[1.14em] font-semibold text-[var(--fg-primary)]">
                   {moduleT('social.confirmDelete')}
                 </h3>
               </div>
               <button
                 onClick={onCancel}
-                className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="p-[0.43em] rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-[1.14em] h-[1.14em]" />
               </button>
             </div>
 
-            <div className="px-5 py-4 space-y-4">
-              <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
-                {moduleT('social.confirmDeleteDesc', { count: selectedFiles.toLocaleString(), size: formatSize(selectedSize) })}
+            <div className="px-[1.43em] py-[1.14em] space-y-[1.14em]">
+              <p className="text-[1em] text-[var(--fg-secondary)] leading-relaxed">
+                {moduleT('social.confirmDeleteDesc', {
+                  name: targetName,
+                  count: selectedFiles.toLocaleString(),
+                  size: formatSize(selectedSize),
+                })}
               </p>
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-[0.86em]">
+                <p className="text-[0.86em] text-amber-600 dark:text-amber-400 leading-relaxed">
                   {moduleT('social.risk.mediumTip')}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[var(--border-default)] bg-[var(--bg-card)]">
+            <div className="flex items-center justify-end gap-[0.86em] px-[1.43em] py-[1.14em] border-t border-[var(--border-default)] bg-[var(--bg-card)]">
               <button
                 onClick={onCancel}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="px-[1.14em] py-[0.57em] rounded-lg text-[1em] font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 {t('cancel')}
               </button>
               <button
                 onClick={onConfirm}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25"
+                className="px-[1.14em] py-[0.57em] rounded-lg text-[1em] font-medium text-white transition-all bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25"
               >
                 {moduleT('social.clean')}
               </button>

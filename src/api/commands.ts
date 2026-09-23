@@ -369,6 +369,8 @@ export interface DriverPackageInfo {
   installed_device_count: number;
   outranked_device_count: number;
   file_count: number;
+  /** 驱动包目录的估算占用（字节），0 表示无法读取 */
+  total_size: number;
   status: 'old_confirmed' | 'recommended' | 'in_use' | 'no_newer_version' | 'unknown';
   actionable: boolean;
   reason: string;

@@ -667,7 +667,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     setScanProgress(null);
     try {
       await cancelHotspotScan();
-      showToast({ type: 'info', title: t('scanStopped'), description: t('scanStoppedDesc') });
+      showToast({ type: 'info', title: moduleT('hotspot.scanStopped'), description: moduleT('hotspot.scanStoppedDesc') });
     } catch (err) {
       console.error('停止扫描失败:', err);
     }

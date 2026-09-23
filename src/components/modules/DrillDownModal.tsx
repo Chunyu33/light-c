@@ -498,31 +498,32 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
       {/* 模态框主体 */}
       <div
         className={`relative flex flex-col bg-[var(--bg-elevated)] rounded-2xl shadow-2xl border border-[var(--border-default)]
-          w-[720px] max-w-[92vw] max-h-[80vh] overflow-hidden ${
+          w-[51.43em] max-w-[calc(100vw-2em)] max-h-[57.14em] overflow-hidden ${
           isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'
         }`}
       >
         {/* ====== 头部：面包屑 + 关闭按钮 ====== */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-default)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
-          <div className="flex-1 min-w-0 mr-3">
+        {/* 内部尺寸统一用 em，跟随全局字号缩放，避免只有外壳变大而内容不变 */}
+        <div className="flex items-center justify-between px-[1.43em] py-[0.86em] border-b border-[var(--border-default)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
+          <div className="flex-1 min-w-0 mr-[0.86em]">
             <ModalBreadcrumbs segments={breadcrumbSegments} initialDepth={initialDepth} onNavigate={handleBreadcrumbNavigate} />
           </div>
           <button
             onClick={handleClose}
-            className="flex-shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="flex-shrink-0 p-[0.43em] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             title={moduleT('drillDown.close') + ' (ESC)'}
           >
-            <X className="w-4 h-4" />
+            <X className="w-[1.14em] h-[1.14em]" />
           </button>
         </div>
 
         {/* ====== 内容区：可滚动列表 ====== */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-[200px]">
+        <div className="flex-1 overflow-y-auto px-[1.14em] py-[0.86em] space-y-[0.57em] min-h-[14.29em]">
           {/* 加载中 */}
           {loading && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 animate-spin text-[var(--brand-green)] mr-2" />
-              <span className="text-sm text-[var(--text-muted)]">{moduleT('drillDown.scanning')}</span>
+            <div className="flex items-center justify-center py-[4.57em]">
+              <Loader2 className="w-[1.71em] h-[1.71em] animate-spin text-[var(--brand-green)] mr-[0.57em]" />
+              <span className="text-[1em] text-[var(--text-muted)]">{moduleT('drillDown.scanning')}</span>
             </div>
           )}
 
@@ -532,12 +533,12 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
               {/* 返回上级 */}
               <button
                 onClick={handleGoBack}
-                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-left"
+                className="w-full flex items-center gap-[0.86em] p-[0.86em] rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-left"
               >
-                <div className="w-7 h-7 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center">
-                  <CornerLeftUp className="w-4 h-4 text-[var(--text-muted)]" />
+                <div className="w-[2em] h-[2em] rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center">
+                  <CornerLeftUp className="w-[1.14em] h-[1.14em] text-[var(--text-muted)]" />
                 </div>
-                <span className="text-sm text-[var(--text-muted)]">
+                <span className="text-[1em] text-[var(--text-muted)]">
                   {pathStack.length <= 1 ? moduleT('drillDown.close') : moduleT('drillDown.back')}
                 </span>
               </button>
@@ -560,18 +561,18 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
               {!showAll && scanResult.entries.length > DEFAULT_DISPLAY_COUNT && (
                 <button
                   onClick={() => setShowAll(true)}
-                  className="w-full flex items-center justify-center gap-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  className="w-full flex items-center justify-center gap-[0.29em] py-[0.57em] text-[0.86em] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <span>{moduleT('drillDown.showAll', { count: scanResult.entries.length })}</span>
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-[1.14em] h-[1.14em]" />
                 </button>
               )}
 
               {/* 空状态 */}
               {scanResult.entries.length === 0 && (
-                <div className="text-center py-10 text-[var(--text-muted)]">
-                  <FolderOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">{moduleT('drillDown.noFolders')}</p>
+                <div className="text-center py-[2.86em] text-[var(--text-muted)]">
+                  <FolderOpen className="w-[2.29em] h-[2.29em] mx-auto mb-[0.57em] opacity-30" />
+                  <p className="text-[1em]">{moduleT('drillDown.noFolders')}</p>
                 </div>
               )}
             </>
@@ -580,7 +581,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
 
         {/* ====== 底栏：统计信息 ====== */}
         {!loading && scanResult && scanResult.entries.length > 0 && (
-          <div className="flex items-center justify-between px-5 py-2.5 border-t border-[var(--border-default)] text-xs text-[var(--text-muted)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between px-[1.43em] py-[0.71em] border-t border-[var(--border-default)] text-[0.86em] text-[var(--text-muted)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
             <span>
               {moduleT('drillDown.summary', { count: scanResult.entries.length, size: formatSize(scanResult.scanned_total_size) })}
             </span>

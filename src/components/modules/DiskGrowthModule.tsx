@@ -1053,7 +1053,10 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         noResult: moduleT('diskGrowth.noChange'),
         depthNote: moduleT('diskGrowth.exportDepthNote'),
         scopeTitle: moduleT('diskGrowth.exportScopeTitle'),
-        changeScopeNote: moduleT('diskGrowth.exportChangeScopeNote'),
+        changeScopeNote: moduleT('diskGrowth.exportChangeScopeNote', {
+          pageCount: growthReport.entries.length,
+          exportCount: exportTree.total_nodes,
+        }),
         baselineScopeNote: moduleT('diskGrowth.exportBaselineScopeNote'),
         levels: {
           significant: moduleT('diskGrowth.level.significant'),

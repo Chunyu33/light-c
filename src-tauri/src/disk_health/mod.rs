@@ -45,6 +45,9 @@ struct StorageSnapshot {
     physical_disks: Vec<RawPhysicalDisk>,
     #[serde(default, deserialize_with = "deserialize_array_or_single")]
     partitions: Vec<RawPartition>,
+    /// 脚本内部两路查询都失败时写入的异常文本，正常情况为 null。
+    #[serde(default)]
+    error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -98,6 +101,13 @@ pub fn query_disk_health() -> Result<Vec<DiskHealthInfo>, String> {
         let output = run_storage_query()?;
         let snapshot: StorageSnapshot = serde_json::from_str(&output)
             .map_err(|error| format!("解析 Windows 磁盘信息失败: {}", error))?;
+        // 脚本两路查询都没拿到物理磁盘时会带回异常文本，这里转成人话再抛给前端，
+        // 避免用户看到成片的 CLIXML 乱码。
+        if snapshot.physical_disks.is_empty() {
+            if let Some(raw) = snapshot.error.as_deref() {
+                return Err(describe_storage_query_failure(raw));
+            }
+        }
         return merge_storage_snapshot(snapshot);
     }
 
@@ -112,6 +122,12 @@ fn run_storage_query() -> Result<String, String> {
     use std::os::windows::process::CommandExt;
 
     // 使用 CIM 一次性读取全部对象，减少 PowerShell 进程和 WMI 查询次数。
+    //
+    // 中文说明：本脚本对「存储模块」与「传统 WMI 磁盘类」做了双通道降级。
+    // 部分 Windows 11 机器的 WMI 仓库损坏、或 VSS / SMPHost 服务被禁用后，
+    // root/Microsoft/Windows/Storage 下的 MSFT_* 类会整体缺失，
+    // 查询直接抛 0x80041031（WBEM_E_CLASS_NOT_FOUND），导致设置页「读取失败」。
+    // 因此这两个查询各自带 try/catch 与降级来源，任何一路失败都不影响整体出结果。
     let script = r#"
 $ErrorActionPreference = 'Stop'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -119,58 +135,147 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $OutputEncoding = $utf8
 $logicalDisks = @{}
 Get-CimInstance -ClassName Win32_LogicalDisk | ForEach-Object { $logicalDisks[$_.DeviceID] = $_ }
-$physical = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -ClassName MSFT_PhysicalDisk | ForEach-Object {
-  $number = $null
-  $numberMatch = [regex]::Match([string]$_.DeviceId, '\d+$')
-  if ($numberMatch.Success) { $number = [UInt32]$numberMatch.Value }
-  [PSCustomObject]@{
-    number = $number
-    model = $_.FriendlyName
-    serial_number = $_.SerialNumber
-    firmware_version = $_.FirmwareVersion
-    media_type = $_.MediaType
-    bus_type = $_.BusType
-    health_status = $_.HealthStatus
-    operational_status = $_.OperationalStatus
-    size = [UInt64]$_.Size
-  }
-})
-$partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -ClassName MSFT_Partition | ForEach-Object {
-  $drive = $null
-  $volumeName = $null
-  $fileSystem = $null
-  $totalSpace = $null
-  $usedSpace = $null
-  $freeSpace = $null
-  $usagePercent = $null
-  $volume = $_ | Get-CimAssociatedInstance -Association MSFT_PartitionToVolume -ResultClassName MSFT_Volume | Select-Object -First 1
-  if ($volume) {
-    $drive = $volume.DriveLetter
-    $volumeName = $volume.FileSystemLabel
-    $fileSystem = $volume.FileSystem
-    if ($drive) {
-      $root = "$drive`:\"
-      $space = $logicalDisks["$drive`:"]
-      if ($space) {
-        $totalSpace = [UInt64]$space.Size
-        $freeSpace = [UInt64]$space.FreeSpace
-        $usedSpace = $totalSpace - $freeSpace
-        if ($totalSpace -gt 0) { $usagePercent = [Math]::Round(($usedSpace / $totalSpace) * 100, 1) }
+
+# ---- 物理磁盘：优先 MSFT_PhysicalDisk，失败则降级到 Win32_DiskDrive ----
+# $physicalError / $partitionError 记录首选通道的失败原因，用于两路都空时给出可读提示。
+$physical = @()
+$physicalError = $null
+try {
+  $physical = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -ClassName MSFT_PhysicalDisk -ErrorAction Stop | ForEach-Object {
+    $number = $null
+    $numberMatch = [regex]::Match([string]$_.DeviceId, '\d+$')
+    if ($numberMatch.Success) { $number = [UInt32]$numberMatch.Value }
+    [PSCustomObject]@{
+      number = $number
+      model = $_.FriendlyName
+      serial_number = $_.SerialNumber
+      firmware_version = $_.FirmwareVersion
+      media_type = $_.MediaType
+      bus_type = $_.BusType
+      health_status = $_.HealthStatus
+      operational_status = $_.OperationalStatus
+      size = [UInt64]$_.Size
+    }
+  })
+} catch {
+  # 注意：Exception.Message 不含 HRESULT（例如「无效命名空间」），
+  # 错误码只出现在 FullyQualifiedErrorId 里（如「HRESULT 0x80041031,...」）。
+  # 这里把两者都带上，Rust 侧才认得出 WMI 类缺失这类已知故障。
+  $physicalError = "$($_.Exception.Message) $($_.FullyQualifiedErrorId)"
+  $physical = @()
+}
+if ($physical.Count -eq 0) {
+  # 降级：Win32_DiskDrive 是传统类，不依赖 Storage 模块，覆盖面最广。
+  # MediaType 只说明是否可移动介质，无法区分 SSD/HDD，这里统一留空（前端显示「未知」），
+  # 不做猜测，避免给出错误的介质类型。
+  # Status 是 Win32 的老式字符串枚举（OK / Degraded / Error 等），
+  # 这里翻译成与 MSFT_PhysicalDisk.HealthStatus 相同的词汇，让下游只需一套映射。
+  $physical = @(Get-CimInstance -ClassName Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Size -gt 0 } | ForEach-Object {
+    $health = switch -Regex ([string]$_.Status) {
+      '^OK$'            { 'Healthy' }
+      'Degraded|Stressed' { 'Warning' }
+      'Error|Pred Fail|NonRecover' { 'Unhealthy' }
+      default           { $null }
+    }
+    [PSCustomObject]@{
+      number = [UInt32]$_.Index
+      model = $_.Model
+      serial_number = $_.SerialNumber
+      firmware_version = $_.FirmwareRevision
+      media_type = $null
+      bus_type = $_.InterfaceType
+      health_status = $health
+      operational_status = $_.Status
+      size = [UInt64]$_.Size
+    }
+  })
+}
+
+# ---- 分区：优先 MSFT_Partition，失败则降级到 Win32_DiskPartition 关联盘符 ----
+# 分区查询失败不影响整体：没有卷信息时磁盘列表照常展示，因此这里不记录错误原因。
+$partitions = @()
+try {
+  $partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -ClassName MSFT_Partition -ErrorAction Stop | ForEach-Object {
+    $drive = $null
+    $volumeName = $null
+    $fileSystem = $null
+    $totalSpace = $null
+    $usedSpace = $null
+    $freeSpace = $null
+    $usagePercent = $null
+    $volume = $_ | Get-CimAssociatedInstance -Association MSFT_PartitionToVolume -ResultClassName MSFT_Volume | Select-Object -First 1
+    if ($volume) {
+      $drive = $volume.DriveLetter
+      $volumeName = $volume.FileSystemLabel
+      $fileSystem = $volume.FileSystem
+      if ($drive) {
+        $root = "$drive`:\"
+        $space = $logicalDisks["$drive`:"]
+        if ($space) {
+          $totalSpace = [UInt64]$space.Size
+          $freeSpace = [UInt64]$space.FreeSpace
+          $usedSpace = $totalSpace - $freeSpace
+          if ($totalSpace -gt 0) { $usagePercent = [Math]::Round(($usedSpace / $totalSpace) * 100, 1) }
+        }
       }
     }
-  }
-  [PSCustomObject]@{
-    disk_number = [UInt32]$_.DiskNumber
-    drive_letter = $drive
-    volume_name = $volumeName
-    file_system = $fileSystem
-    total_space = $totalSpace
-    used_space = $usedSpace
-    free_space = $freeSpace
-    usage_percent = $usagePercent
-  }
-})
-    $json = [PSCustomObject]@{ physical_disks = $physical; partitions = $partitions } | ConvertTo-Json -Depth 6 -Compress
+    [PSCustomObject]@{
+      disk_number = [UInt32]$_.DiskNumber
+      drive_letter = $drive
+      volume_name = $volumeName
+      file_system = $fileSystem
+      total_space = $totalSpace
+      used_space = $usedSpace
+      free_space = $freeSpace
+      usage_percent = $usagePercent
+    }
+  })
+} catch {
+  # 分区查不到就交给下面的降级通道，不在这里抛错。
+  $partitions = @()
+}
+if ($partitions.Count -eq 0) {
+  # 降级：Win32_DiskPartition -> Win32_LogicalDisk 两步关联。
+  # 只有真正带盘符的逻辑卷才需要展示，因此没有关联到盘符的分区直接跳过。
+  $partitions = @(Get-CimInstance -ClassName Win32_DiskPartition -ErrorAction SilentlyContinue | ForEach-Object {
+    $partition = $_
+    $drive = $null
+    $logical = $partition | Get-CimAssociatedInstance -Association Win32_LogicalDiskToPartition -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($logical) { $drive = $logical.DeviceID }
+    if (-not $drive) { return }
+    $letter = $drive.TrimEnd(':')
+    $space = $logicalDisks[$drive]
+    $totalSpace = $null
+    $usedSpace = $null
+    $freeSpace = $null
+    $usagePercent = $null
+    if ($space) {
+      $totalSpace = [UInt64]$space.Size
+      $freeSpace = [UInt64]$space.FreeSpace
+      $usedSpace = $totalSpace - $freeSpace
+      if ($totalSpace -gt 0) { $usagePercent = [Math]::Round(($usedSpace / $totalSpace) * 100, 1) }
+    }
+    [PSCustomObject]@{
+      disk_number = [UInt32]$partition.DiskIndex
+      drive_letter = $letter
+      volume_name = $space.VolumeName
+      file_system = $space.FileSystem
+      total_space = $totalSpace
+      used_space = $usedSpace
+      free_space = $freeSpace
+      usage_percent = $usagePercent
+    }
+  })
+}
+
+    # 只有当两个通道都拿不到物理磁盘时才算真正失败：把首选通道的异常文本带出去，
+    # 让 Rust 侧能判断是不是 WMI 类缺失（0x80041031），从而给出可操作的提示。
+    # 只要有一路出结果就正常返回，降级场景前端不做额外提示。
+    # 分区查询失败不算整体失败——没有卷信息时磁盘列表照常显示。
+    $errorText = $null
+    if ($physical.Count -eq 0 -and $physicalError) { $errorText = $physicalError }
+
+    $json = [PSCustomObject]@{ physical_disks = $physical; partitions = $partitions; error = $errorText } | ConvertTo-Json -Depth 6 -Compress
     [Console]::Out.Write($json)
 "#;
 
@@ -208,16 +313,16 @@ $partitions = @(Get-CimInstance -Namespace 'root/Microsoft/Windows/Storage' -Cla
                 .wait_with_output()
                 .map_err(|error| format!("读取磁盘信息查询结果失败: {}", error))?;
             if !status.success() {
-                let error = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let error = sanitize_powershell_error(&String::from_utf8_lossy(&output.stderr));
                 return Err(if error.is_empty() {
                     "Windows 磁盘信息查询失败".to_string()
                 } else {
-                    format!("Windows 磁盘信息查询失败: {}", error)
+                    describe_storage_query_failure(&error)
                 });
             }
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if stdout.is_empty() {
-                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let stderr = sanitize_powershell_error(&String::from_utf8_lossy(&output.stderr));
                 let exit_code = status
                     .code()
                     .map_or_else(|| "未知".to_string(), |code| code.to_string());
@@ -252,6 +357,101 @@ fn encode_powershell_script(script: &str) -> String {
         .flat_map(|unit| unit.to_le_bytes())
         .collect::<Vec<_>>();
     BASE64_STANDARD.encode(utf16_bytes)
+}
+
+/// 把 PowerShell / WMI 的原始异常文本转成用户能看懂的一句话。
+///
+/// 背景：PowerShell 在非交互宿主里会把异常序列化成 CLIXML（`#< CLIXML …<S S="Error">…`），
+/// 直接展示给用户就是一屏幕乱码，这也是 issue 里「读取失败」框里那一大段东西的来源。
+/// 这里按已知的 HRESULT 给出结论和排查建议，未知错误只保留清洗后的短文本。
+fn describe_storage_query_failure(raw: &str) -> String {
+    let text = sanitize_powershell_error(raw);
+
+    // 已知 HRESULT 的处理建议。顺序有意义：更具体的错误放前面。
+    const KNOWN_FAILURES: &[(&str, &str)] = &[
+        (
+            "0x80041031",
+            "系统 WMI 存储信息不完整，无法读取磁盘列表。可尝试以管理员身份运行，或在系统服务中启用 Volume Shadow Copy、SMI 服务后重试。",
+        ),
+        (
+            "0x8004100e",
+            "系统 WMI 存储信息不完整，无法读取磁盘列表。可尝试以管理员身份运行，或重启系统后重试。",
+        ),
+        (
+            "0x80041010",
+            "系统的 WMI 存储信息不完整，无法读取磁盘列表。可尝试以管理员身份运行后重试。",
+        ),
+        (
+            "0x80041013",
+            "访问系统 WMI 信息超时，请稍后重试。",
+        ),
+        (
+            "0x80041003",
+            "没有权限读取系统 WMI 信息，请以管理员身份运行后重试。",
+        ),
+        (
+            "0x80070005",
+            "没有权限读取系统 WMI 信息，请以管理员身份运行后重试。",
+        ),
+        (
+            "0x80070422",
+            "系统相关服务未启动，无法读取磁盘信息。请在系统服务中启用 Windows Management Instrumentation 后重试。",
+        ),
+    ];
+
+    let lower = text.to_ascii_lowercase();
+    for (code, hint) in KNOWN_FAILURES {
+        if lower.contains(&code.to_ascii_lowercase()) {
+            return (*hint).to_string();
+        }
+    }
+
+    if text.is_empty() {
+        return "无法读取系统磁盘信息，请稍后重试。".to_string();
+    }
+    // 未知错误：限长，避免异常文本撑破弹窗。
+    let summary: String = text.chars().take(180).collect();
+    if text.chars().count() > 180 {
+        return format!("无法读取系统磁盘信息：{}…", summary);
+    }
+    format!("无法读取系统磁盘信息：{}", summary)
+}
+
+/// 清洗 PowerShell 异常文本：剥离 CLIXML 外壳与转义实体，压掉多余空白，只留可读的一行。
+fn sanitize_powershell_error(raw: &str) -> String {
+    let mut text = raw.trim().to_string();
+
+    // 去掉 CLIXML 头，例如 `#< CLIXML\r\n<Objs Version="1.1.0.1" …>`
+    if let Some(index) = text.find("<Objs") {
+        text = text[index..].to_string();
+    }
+    // 只取 <S S="Error">…</S> 里的内容，这是 PowerShell 实际想表达的异常行。
+    let mut collected = String::new();
+    let marker = "<S S=\"Error\">";
+    let mut rest = text.as_str();
+    while let Some(start) = rest.find(marker) {
+        let after = &rest[start + marker.len()..];
+        if let Some(end) = after.find("</S>") {
+            collected.push_str(&after[..end]);
+            collected.push(' ');
+            rest = &after[end + 4..];
+        } else {
+            break;
+        }
+    }
+    let text = if collected.trim().is_empty() { text } else { collected };
+
+    // 还原 CLIXML 的 XML 实体与 _xHHHH_ 形式的转义（如 _x000D__x000A_ 代表换行），再合并空白。
+    text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+        .replace("_x000D_", " ")
+        .replace("_x000A_", " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn merge_storage_snapshot(snapshot: StorageSnapshot) -> Result<Vec<DiskHealthInfo>, String> {
@@ -381,6 +581,17 @@ fn map_bus_type(value: Option<serde_json::Value>) -> String {
     }
     if text.contains("usb") {
         return "USB".to_string();
+    }
+    // 降级路径（Win32_DiskDrive.InterfaceType）只给 SCSI / IDE / HDC 这类粗略值，
+    // NVMe 与 SATA 盘在该字段里通常都报 SCSI，因此按「未知」处理更诚实，不做具体总线猜测。
+    if text.contains("scsi") || text.contains("raid") {
+        return "SCSI".to_string();
+    }
+    if text.contains("ide") || text.contains("hdc") || text.contains("ata") {
+        return "ATA".to_string();
+    }
+    if text.contains("1394") {
+        return "IEEE 1394".to_string();
     }
     match numeric_storage_value(value) {
         Some(7) => "USB".to_string(),
@@ -530,11 +741,58 @@ mod tests {
                     usage_percent: None,
                 },
             ],
+            error: None,
         };
         let result = merge_storage_snapshot(snapshot).expect("应合并磁盘信息");
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].drive_letters, vec!["C:"]);
         assert!(result[1].drive_letters.is_empty());
         assert_eq!(result[1].health_status, "Unknown");
+    }
+
+    #[test]
+    fn maps_legacy_disk_drive_fields_from_fallback_channel() {
+        // 降级路径（Win32_DiskDrive）给的是另一套取值：media_type 为 null、
+        // bus_type 是 SCSI 这类粗粒度字符串、health_status 已由脚本归一化。
+        assert_eq!(map_media_type(None), "未知");
+        assert_eq!(map_bus_type(Some(serde_json::json!("SCSI"))), "SCSI");
+        assert_eq!(map_bus_type(Some(serde_json::json!("ATA"))), "ATA");
+        assert_eq!(
+            map_health_status(Some(serde_json::json!("Healthy"))),
+            "Healthy"
+        );
+    }
+
+    #[test]
+    fn sanitizes_clixml_error_into_single_line() {
+        let raw = "#< CLIXML\n<Objs Version=\"1.1.0.1\"><S S=\"Error\">Get-CimInstance : \u{65e0}\u{6cd5}\u{627e}\u{5230}_x000D__x000A_</S><S S=\"Error\">FullyQualifiedErrorId : HRESULT 0x80041031</S></Objs>";
+        let clean = sanitize_powershell_error(raw);
+        assert!(!clean.contains("CLIXML"), "应剥离 CLIXML 外壳");
+        assert!(!clean.contains("<S S="), "应剥离 XML 标记");
+        assert!(!clean.contains("_x000D_"), "应去掉转义换行");
+        assert!(!clean.contains('\n'), "应压成单行");
+        assert!(clean.contains("0x80041031"), "应保留关键错误码");
+    }
+
+    #[test]
+    fn describes_known_hresult_with_actionable_hint() {
+        // 0x80041031 = WBEM_E_CLASS_NOT_FOUND，即 Storage 命名空间下的 MSFT_* 类缺失。
+        let hint = describe_storage_query_failure(
+            "#< CLIXML<Objs><S S=\"Error\">FullyQualifiedErrorId : HRESULT 0x80041031</S></Objs>",
+        );
+        assert!(hint.contains("WMI"), "应给出 WMI 方向的提示: {}", hint);
+        assert!(!hint.contains("0x80041031"), "不应把原始错误码丢给用户");
+
+        let denied = describe_storage_query_failure("HRESULT 0x80070005");
+        assert!(denied.contains("管理员"), "权限错误应提示提权: {}", denied);
+    }
+
+    #[test]
+    fn truncates_unknown_error_to_stay_readable() {
+        let long = "X".repeat(500);
+        let hint = describe_storage_query_failure(&long);
+        // 180 个字符 + 前后缀，留一点余量。
+        assert!(hint.chars().count() < 220, "未知错误应限长: {}", hint.chars().count());
+        assert!(hint.ends_with('…'), "截断应有省略号");
     }
 }

@@ -24,6 +24,7 @@ import {
 } from '../../api/commands';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import { openSearchUrl } from '../../utils/searchEngine';
+import { formatSize } from '../../utils/format';
 
 function findScrollParent(element: HTMLElement): HTMLElement | null {
   let parent = element.parentElement;
@@ -302,7 +303,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       setSelectedNames(new Set());
       await loadDrivers();
     } catch (error) {
-      showToast({ title: t('deleteFailed'), description: String(error), type: 'error' });
+      showToast({ title: moduleT('driverCleanup.failed'), description: String(error), type: 'error' });
     } finally {
       setDeleting(false);
     }
@@ -314,8 +315,8 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
     try {
       const result = await restoreAllDriverBackups();
       showToast({
-        title: result.success ? moduleT('driverCleanup.restoreStarted') : moduleT('driverCleanup.restoreIncomplete'),
-        description: moduleT('driverCleanup.restoreDesc', { message: result.message }),
+        title: result.success ? moduleT('driverUi.restoreStarted') : moduleT('driverUi.restoreIncomplete'),
+        description: moduleT('driverUi.restoreDesc', { message: result.message }),
         type: result.success ? 'success' : 'warning',
       });
       if (result.needs_reboot) {
@@ -323,7 +324,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       }
       await loadDrivers();
     } catch (error) {
-      showToast({ title: moduleT('driverCleanup.restoreFailed'), description: String(error), type: 'error' });
+      showToast({ title: moduleT('driverUi.restoreFailed'), description: String(error), type: 'error' });
     } finally {
       setRestoring(false);
     }
@@ -339,6 +340,25 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
   const selectedHighConfidenceCount = highConfidenceNames.filter((publishedName) => selectedNames.has(publishedName)).length;
   const allHighConfidenceSelected = highConfidenceNames.length > 0
     && selectedHighConfidenceCount === highConfidenceNames.length;
+
+  // 删除确认弹窗需要展示本次会删除的驱动名和占用，这里直接在渲染前算出，
+  // 避免弹窗内再遍历一次 packages。
+  const selectedPackages = useMemo(
+    () => scanResult?.packages.filter((packageInfo) => selectedNames.has(packageInfo.published_name)) ?? [],
+    [scanResult, selectedNames],
+  );
+  const selectedDriverSize = selectedPackages.reduce((sum, packageInfo) => sum + packageInfo.total_size, 0);
+  const selectedDriverSummary = useMemo(() => {
+    // 单个驱动时直接显示文件名，多个时只给数量，避免文案被长文件名撑爆。
+    if (selectedPackages.length === 1) {
+      return selectedPackages[0].original_name || selectedPackages[0].published_name;
+    }
+    return moduleT('driverUi.confirmDeleteTarget', { count: selectedPackages.length });
+  }, [moduleT, selectedPackages]);
+  // 后端拿不到占用时传 0，前端统一显示“未知”，不展示 0 B 误导用户。
+  const selectedDriverSizeText = selectedDriverSize > 0
+    ? formatSize(selectedDriverSize)
+    : moduleT('driverUi.unknownSize');
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !deleting && !restoring) return null;
 
   return (
@@ -466,8 +486,8 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             </div>
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-[var(--fg-secondary)]" title={packageInfo.published_name}>{packageInfo.published_name}</span>
-                              <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverCleanup.unknownVendor')}>{packageInfo.provider_name || moduleT('driverCleanup.unknownVendor')}</span>
-                              <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || moduleT('driverCleanup.unknownVersion')}>{moduleT('driverCleanup.version')} {packageInfo.driver_version || moduleT('driverCleanup.unknownVersion')}</span>
+          <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverUi.unknownVendor')}>{packageInfo.provider_name || moduleT('driverUi.unknownVendor')}</span>
+          <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || moduleT('driverUi.unknownVersion')}>{moduleT('driverUi.version')} {packageInfo.driver_version || moduleT('driverUi.unknownVersion')}</span>
                               <span className={`inline-flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 ${driverClassBadge.className}`}>
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${driverClassBadge.dotClassName}`} />
                                 {driverClassBadge.label}
@@ -476,10 +496,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className={`max-w-full truncate rounded-full px-1.5 py-0.5 ${getReasonClass(packageInfo)}`} title={packageInfo.reason}>{getReasonLabel(packageInfo, moduleT)}</span>
           <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.devices')} {packageInfo.device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.active')} {packageInfo.active_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.current')} {packageInfo.installed_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.replaced')} {packageInfo.outranked_device_count}</span>
-                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverCleanup.files')} {packageInfo.file_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.active')} {packageInfo.active_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.current')} {packageInfo.installed_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.replaced')} {packageInfo.outranked_device_count}</span>
+                              <span className="rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 text-[var(--fg-muted)]">{moduleT('driverUi.files')} {packageInfo.file_count}</span>
                             </div>
                           </div>
                           <div className="flex shrink-0 self-center items-center gap-1">
@@ -532,7 +552,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         onCancel={() => setShowConfirm(false)}
         onConfirm={() => void handleDelete()}
         title={t('confirmDeleteDriver')}
-        description={moduleT('driverUi.confirmDeleteDesc', { count: selectedNames.size })}
+        description={moduleT('driverUi.confirmDeleteDesc', {
+          name: selectedDriverSummary,
+          size: selectedDriverSizeText,
+        })}
         warning={t('driverDeleteWarning')}
         confirmText={t('backupAndDelete')}
         cancelText={t('cancel')}

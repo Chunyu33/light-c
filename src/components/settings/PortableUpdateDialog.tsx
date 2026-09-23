@@ -80,61 +80,61 @@ export function PortableUpdateDialog({
             {...MODAL_BACKDROP_MOTION}
           />
 
+          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗宽高随全局字号设置缩放 */}
           <motion.div
-            className="relative w-[440px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
+            className="relative mx-[1em] w-[31.43em] max-w-[calc(100vw-2em)] overflow-hidden rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl"
             {...MODAL_CARD_MOTION}
           >
-            <div className="h-1.5 bg-gradient-to-r from-[var(--brand-green)] via-emerald-400 to-teal-400" />
-
             <button
               type="button"
               onClick={onClose}
               aria-label={commonT('close')}
-              className="absolute right-4 top-4 z-10 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              className="absolute right-[1em] top-[1em] z-10 flex h-[2em] w-[2em] items-center justify-center rounded-[0.57em] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             >
-              <X className="h-4 w-4" />
+              <X className="h-[1.14em] w-[1.14em]" />
             </button>
 
-            <div className="p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand-green)] to-emerald-500 shadow-lg">
-                  <HardDriveDownload className="h-6 w-6 text-white" />
+            <div className="p-[1.43em]">
+              {/* 标题区：浅绿底图标 + 版本信息，与主界面模块卡片同一语汇 */}
+              <div className="mb-[1.14em] flex items-start gap-[0.86em]">
+                <div className="flex h-[2.57em] w-[2.57em] shrink-0 items-center justify-center rounded-[0.71em] bg-[var(--brand-green-10)]">
+                  <HardDriveDownload className="h-[1.29em] w-[1.29em] text-[var(--brand-green)]" />
                 </div>
-                <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[1em] font-semibold text-[var(--text-primary)]">
                     {latestVersion ? t('portableUpdateFound', { version: latestVersion }) : t('portableUpdateTitle')}
                   </h2>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                    {isChecking && <RefreshCw className="h-3 w-3 shrink-0 animate-spin" />}
+                  <p className="mt-[0.14em] flex items-center gap-[0.43em] text-[0.86em] text-[var(--text-muted)]">
+                    {isChecking && <RefreshCw className="h-[0.86em] w-[0.86em] shrink-0 animate-spin" />}
                     {subtitle}
                   </p>
                 </div>
               </div>
 
-              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+              <p className="text-[0.86em] leading-relaxed text-[var(--text-secondary)]">
                 {t('portableUpdateIntro')}
               </p>
 
-              <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-[1.43em] flex flex-col gap-[0.57em] sm:flex-row">
                 <button
                   type="button"
                   onClick={() => onOpenChannel(officialWebsiteUrl, 'website')}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--brand-green)] px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-[var(--brand-green)]/20 transition-colors hover:bg-[var(--brand-green-hover)]"
+                  className="flex flex-1 items-center justify-center gap-[0.43em] rounded-[0.71em] bg-[var(--brand-green)] px-[1em] py-[0.64em] text-[0.86em] font-semibold text-white transition-colors hover:bg-[var(--brand-green-hover)]"
                 >
-                  <Globe className="h-4 w-4" />
+                  <Globe className="h-[0.86em] w-[0.86em]" />
                   {t('portableUpdateWebsite')}
                 </button>
                 <button
                   type="button"
                   onClick={() => onOpenChannel(netDiskUrl, 'netDisk')}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--brand-green)]/10 px-4 py-2.5 text-sm font-medium text-[var(--brand-green)] transition-colors hover:bg-[var(--brand-green)]/20"
+                  className="flex flex-1 items-center justify-center gap-[0.43em] rounded-[0.71em] border border-[var(--border-default)] bg-[var(--bg-card)] px-[1em] py-[0.64em] text-[0.86em] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
                 >
-                  <HardDriveDownload className="h-4 w-4" />
+                  <HardDriveDownload className="h-[0.86em] w-[0.86em]" />
                   {t('portableUpdateNetDisk')}
                 </button>
               </div>
 
-              <p className="mt-3 text-xs leading-relaxed text-[var(--text-faint)]">
+              <p className="mt-[0.86em] text-[0.79em] leading-relaxed text-[var(--text-faint)]">
                 {t('portableUpdateHint')}
               </p>
             </div>
