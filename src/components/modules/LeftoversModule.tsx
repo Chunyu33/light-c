@@ -516,20 +516,21 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       {isDeletingAnimating && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4 ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
-            <div className="w-16 h-16 rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-[var(--color-warning)] animate-spin" />
+          {/* 尺寸用 em 跟随全局字号，20em 的上限对应原来的 max-w-sm */}
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[2.29em] shadow-2xl flex flex-col items-center gap-[1.14em] max-w-[20em] mx-[1em] ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+            <div className="w-[4.57em] h-[4.57em] rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
+              <Loader2 className="w-[2.29em] h-[2.29em] text-[var(--color-warning)] animate-spin" />
             </div>
             <div className="text-center">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)]">{moduleT('leftovers.deleting')}</h3>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
+        <h3 className="text-[1.29em] font-semibold text-[var(--text-primary)]">{moduleT('leftovers.deleting')}</h3>
+              <p className="text-[1em] text-[var(--text-muted)] mt-[0.29em]">
                 {moduleT('leftovers.deletingFolder')} ({selectedPaths.size})...
               </p>
             </div>
-            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
+            <div className="w-full h-[0.57em] bg-[var(--bg-hover)] rounded-full overflow-hidden">
               <div className="h-full bg-[var(--color-warning)] rounded-full animate-pulse" style={{ width: '100%' }} />
             </div>
-            <p className="text-xs text-[var(--text-faint)]">{moduleT('leftovers.doNotClose')}</p>
+            <p className="text-[0.86em] text-[var(--text-faint)]">{moduleT('leftovers.doNotClose')}</p>
           </div>
         </div>,
         document.body
@@ -881,26 +882,27 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       {isWarningAnimating && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isWarningVisible ? 'modal-overlay-in' : warningEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanWarning(false)} />
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl max-w-md mx-4 ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+          {/* 尺寸用 em 跟随全局字号，25em 的上限对应原来的 max-w-md */}
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl max-w-[25em] mx-[1em] ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             {/* 警告图标 */}
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
+            <div className="flex justify-center mb-[1.14em]">
+              <div className="w-[4.57em] h-[4.57em] rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
+                <AlertTriangle className="w-[2.29em] h-[2.29em] text-[var(--color-danger)]" />
               </div>
             </div>
 
             {/* 标题 */}
-            <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-3">
+            <h3 className="text-[1.29em] font-bold text-[var(--text-primary)] text-center mb-[0.86em]">
               {moduleT('leftovers.deepWarningTitle')}
             </h3>
 
             {/* 内容 */}
-            <div className="space-y-3 mb-6">
-              <p className="text-sm text-[var(--text-secondary)] text-center">
+            <div className="space-y-[0.86em] mb-[1.71em]">
+              <p className="text-[1em] text-[var(--text-secondary)] text-center">
                 {moduleT('leftovers.deepWarningDesc')}
               </p>
-              <div className="bg-[var(--color-warning)]/10 rounded-xl p-4 border border-[var(--color-warning)]/20">
-                <p className="text-xs text-[var(--text-muted)]">
+              <div className="bg-[var(--color-warning)]/10 rounded-xl p-[1.14em] border border-[var(--color-warning)]/20">
+                <p className="text-[0.86em] text-[var(--text-muted)]">
                   <span className="font-semibold text-[var(--color-warning)]">{moduleT('leftovers.safetyTitle')}</span>
                   {moduleT('leftovers.safetyDesc')}
                 </p>
@@ -908,16 +910,16 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
             </div>
 
             {/* 按钮 */}
-            <div className="flex gap-3">
+            <div className="flex gap-[0.86em]">
               <button
                 onClick={() => setShowDeepCleanWarning(false)}
-                className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-colors"
+                className="flex-1 px-[1.14em] py-[0.86em] rounded-xl text-[1em] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-colors"
               >
                 {t('cancel')}
               </button>
               <button
                 onClick={handleDeepCleanWarningConfirm}
-                className="flex-1 px-4 py-3 rounded-xl text-sm font-medium bg-[var(--color-danger)] text-white hover:opacity-90 transition-colors"
+                className="flex-1 px-[1.14em] py-[0.86em] rounded-xl text-[1em] font-medium bg-[var(--color-danger)] text-white hover:opacity-90 transition-colors"
               >
                 {moduleT('leftovers.understood')}
               </button>
@@ -1007,33 +1009,34 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
         className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onClose}
       />
-      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-6 shadow-2xl w-[420px] max-h-[80vh] overflow-hidden flex flex-col mx-4 ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
+      {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px */}
+      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl w-[30em] max-h-[57.14em] overflow-hidden flex flex-col mx-[1em] ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 结果图标 */}
-        <div className="flex justify-center mb-4">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center ${result.success_count > 0
+        <div className="flex justify-center mb-[1.14em]">
+          <div className={`w-[4.57em] h-[4.57em] rounded-full flex items-center justify-center ${result.success_count > 0
               ? 'bg-[var(--brand-green)]/10'
               : 'bg-[var(--color-danger)]/10'
             }`}>
             {result.success_count > 0 ? (
-              <CheckCircle2 className="w-8 h-8 text-[var(--brand-green)]" />
+              <CheckCircle2 className="w-[2.29em] h-[2.29em] text-[var(--brand-green)]" />
             ) : (
-              <AlertTriangle className="w-8 h-8 text-[var(--color-danger)]" />
+              <AlertTriangle className="w-[2.29em] h-[2.29em] text-[var(--color-danger)]" />
             )}
           </div>
         </div>
 
         {/* 标题 */}
-        <h3 className="text-lg font-bold text-[var(--text-primary)] text-center mb-4">
+        <h3 className="text-[1.29em] font-bold text-[var(--text-primary)] text-center mb-[1.14em]">
           {moduleT('leftovers.completed')}
         </h3>
 
         {/* 统计信息 - 可滚动区域 */}
-        <div className="flex-1 overflow-auto space-y-3 mb-4">
+        <div className="flex-1 overflow-auto space-y-[0.86em] mb-[1.14em]">
           {/* 成功删除 */}
           {result.success_count > 0 && (
-            <div className="flex items-center justify-between p-3 bg-[var(--brand-green)]/10 rounded-xl">
-              <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.successDeleted')}</span>
-              <span className="text-sm font-bold text-[var(--brand-green)]">
+            <div className="flex items-center justify-between p-[0.86em] bg-[var(--brand-green)]/10 rounded-xl">
+              <span className="text-[1em] text-[var(--text-secondary)]">{moduleT('leftovers.successDeleted')}</span>
+              <span className="text-[1em] font-bold text-[var(--brand-green)]">
                 {moduleT('leftoversExtra.successSummary', { count: result.success_count, size: formatSize(result.freed_size) })}
               </span>
             </div>
@@ -1044,41 +1047,41 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
             <div className="bg-[var(--color-warning)]/10 rounded-xl overflow-hidden">
               <button
                 onClick={() => setExpandedSection(expandedSection === 'review' ? null : 'review')}
-                className="w-full flex items-center justify-between p-3 hover:bg-[var(--color-warning)]/5 transition-colors"
+                className="w-full flex items-center justify-between p-[0.86em] hover:bg-[var(--color-warning)]/5 transition-colors"
               >
-                <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.manualReview')}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[var(--color-warning)]">
+                <span className="text-[1em] text-[var(--text-secondary)]">{moduleT('leftovers.manualReview')}</span>
+                <div className="flex items-center gap-[0.57em]">
+                  <span className="text-[1em] font-bold text-[var(--color-warning)]">
                     {moduleT('leftoversExtra.count', { count: reviewItems.length })}
                   </span>
                   {expandedSection === 'review' ? (
-                    <ChevronUp className="w-4 h-4 text-[var(--color-warning)]" />
+                    <ChevronUp className="w-[1.14em] h-[1.14em] text-[var(--color-warning)]" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-[var(--color-warning)]" />
+                    <ChevronDown className="w-[1.14em] h-[1.14em] text-[var(--color-warning)]" />
                   )}
                 </div>
               </button>
               {expandedSection === 'review' && (
-                <div className="px-3 pb-3 space-y-2">
-                  <p className="text-xs text-[var(--text-muted)] mb-2">
+                <div className="px-[0.86em] pb-[0.86em] space-y-[0.57em]">
+                  <p className="text-[0.86em] text-[var(--text-muted)] mb-[0.57em]">
                     {moduleT('leftovers.manualReviewDesc')}
                   </p>
                   {reviewItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-[var(--bg-card)] rounded-lg">
+                    <div key={idx} className="flex items-center justify-between gap-[0.57em] p-[0.57em] bg-[var(--bg-card)] rounded-lg">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-[var(--text-primary)] truncate" title={item.path}>
+                        <p className="text-[0.86em] font-medium text-[var(--text-primary)] truncate" title={item.path}>
                           {getFolderName(item.path)}
                         </p>
-                        <p className="text-[10px] text-[var(--text-muted)] truncate" title={item.path}>
+                        <p className="text-[0.71em] text-[var(--text-muted)] truncate" title={item.path}>
                           {item.path}
                         </p>
                       </div>
                       <button
                         onClick={() => openInFolder(item.path)}
-                        className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                        className="shrink-0 p-[0.43em] rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
                     title={t('openInFolder')}
                       >
-                        <FolderOpen className="w-4 h-4" />
+                        <FolderOpen className="w-[1.14em] h-[1.14em]" />
                       </button>
                     </div>
                   ))}
@@ -1089,9 +1092,9 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
 
           {/* 待重启删除 */}
           {result.reboot_pending_count > 0 && (
-            <div className="flex items-center justify-between p-3 bg-[var(--color-info)]/10 rounded-xl">
-              <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.pendingReboot')}</span>
-              <span className="text-sm font-bold text-[var(--color-info)]">
+            <div className="flex items-center justify-between p-[0.86em] bg-[var(--color-info)]/10 rounded-xl">
+              <span className="text-[1em] text-[var(--text-secondary)]">{moduleT('leftovers.pendingReboot')}</span>
+              <span className="text-[1em] font-bold text-[var(--color-info)]">
                 {moduleT('leftoversExtra.count', { count: result.reboot_pending_count })}
               </span>
             </div>
@@ -1102,39 +1105,39 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
             <div className="bg-[var(--color-danger)]/10 rounded-xl overflow-hidden">
               <button
                 onClick={() => setExpandedSection(expandedSection === 'failed' ? null : 'failed')}
-                className="w-full flex items-center justify-between p-3 hover:bg-[var(--color-danger)]/5 transition-colors"
+                className="w-full flex items-center justify-between p-[0.86em] hover:bg-[var(--color-danger)]/5 transition-colors"
               >
-                <span className="text-sm text-[var(--text-secondary)]">{moduleT('leftovers.deleteFailed')}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[var(--color-danger)]">
+                <span className="text-[1em] text-[var(--text-secondary)]">{moduleT('leftovers.deleteFailed')}</span>
+                <div className="flex items-center gap-[0.57em]">
+                  <span className="text-[1em] font-bold text-[var(--color-danger)]">
                     {moduleT('leftoversExtra.count', { count: failedItems.length })}
                   </span>
                   {expandedSection === 'failed' ? (
-                    <ChevronUp className="w-4 h-4 text-[var(--color-danger)]" />
+                    <ChevronUp className="w-[1.14em] h-[1.14em] text-[var(--color-danger)]" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-[var(--color-danger)]" />
+                    <ChevronDown className="w-[1.14em] h-[1.14em] text-[var(--color-danger)]" />
                   )}
                 </div>
               </button>
               {expandedSection === 'failed' && (
-                <div className="px-3 pb-3 space-y-2">
+                <div className="px-[0.86em] pb-[0.86em] space-y-[0.57em]">
                   {failedItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2 bg-[var(--bg-card)] rounded-lg">
-                      <XCircle className="w-4 h-4 text-[var(--color-danger)] shrink-0" />
+                    <div key={idx} className="flex items-center gap-[0.57em] p-[0.57em] bg-[var(--bg-card)] rounded-lg">
+                      <XCircle className="w-[1.14em] h-[1.14em] text-[var(--color-danger)] shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-[var(--text-primary)] truncate" title={item.path}>
+                        <p className="text-[0.86em] font-medium text-[var(--text-primary)] truncate" title={item.path}>
                           {getFolderName(item.path)}
                         </p>
-                        <p className="text-[10px] text-[var(--color-danger)]">
+                        <p className="text-[0.71em] text-[var(--color-danger)]">
                           {getFailureReason(item)}
                         </p>
                       </div>
                       <button
                         onClick={() => openInFolder(item.path)}
-                        className="shrink-0 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                        className="shrink-0 p-[0.43em] rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
                     title={t('openInFolder')}
                       >
-                        <FolderOpen className="w-4 h-4" />
+                        <FolderOpen className="w-[1.14em] h-[1.14em]" />
                       </button>
                     </div>
                   ))}
@@ -1147,7 +1150,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
         {/* 关闭按钮 */}
         <button
           onClick={onClose}
-          className="w-full px-4 py-3 rounded-xl text-sm font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors shrink-0"
+          className="w-full px-[1.14em] py-[0.86em] rounded-xl text-[1em] font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors shrink-0"
         >
           {moduleT('leftoversExtra.confirm')}
         </button>

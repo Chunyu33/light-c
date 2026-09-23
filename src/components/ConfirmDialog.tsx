@@ -73,38 +73,39 @@ export const ConfirmDialog = memo(function ConfirmDialog({
       />
       
       {/* 对话框 */}
-      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[420px] max-w-[90vw] overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+      {/* 对话框：宽度用 em 跟随全局字号，30em ≈ 标准字号下的 420px */}
+      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[30em] max-w-[calc(100vw-2em)] overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 头部 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+        <div className="flex items-center justify-between px-[1.43em] py-[1.14em] border-b border-[var(--border-default)]">
+          <div className="flex items-center gap-[0.86em]">
+            <div className={`w-[2.86em] h-[2.86em] rounded-full flex items-center justify-center ${
               isDanger ? 'bg-amber-500/15' : 'bg-emerald-500/15'
             }`}>
-              <AlertTriangle className={`w-5 h-5 ${
+              <AlertTriangle className={`w-[1.43em] h-[1.43em] ${
                 isDanger ? 'text-amber-500' : 'text-emerald-500'
               }`} />
             </div>
-            <h3 className="text-base font-semibold text-[var(--fg-primary)]">
+            <h3 className="text-[1.14em] font-semibold text-[var(--fg-primary)]">
               {title}
             </h3>
           </div>
           <button
             onClick={onCancel}
-            className="p-1.5 rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="p-[0.43em] rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-[1.14em] h-[1.14em]" />
           </button>
         </div>
 
         {/* 内容 */}
-        <div className="px-5 py-4 space-y-4">
-          <p className="text-sm text-[var(--fg-secondary)] leading-relaxed">
+        <div className="px-[1.43em] py-[1.14em] space-y-[1.14em]">
+          <p className="text-[1em] text-[var(--fg-secondary)] leading-relaxed">
             {description}
           </p>
           
           {warning && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-              <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed break-words whitespace-pre-wrap">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-[0.86em]">
+              <p className="text-[0.86em] text-amber-600 dark:text-amber-400 leading-relaxed break-words whitespace-pre-wrap">
                 {warning}
               </p>
             </div>
@@ -112,16 +113,16 @@ export const ConfirmDialog = memo(function ConfirmDialog({
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[var(--border-default)] bg-[var(--bg-card)]">
+        <div className="flex items-center justify-end gap-[0.86em] px-[1.43em] py-[1.14em] border-t border-[var(--border-default)] bg-[var(--bg-card)]">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="px-[1.14em] py-[0.57em] rounded-lg text-[1em] font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             {resolvedCancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-all ${
+            className={`px-[1.14em] py-[0.57em] rounded-lg text-[1em] font-medium text-white transition-all ${
               isDanger
                 ? 'bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25'
                 : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-500/25'
