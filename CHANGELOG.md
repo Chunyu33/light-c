@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.13
+
+- Fixed several dialogs growing taller than the window on short screens: the folder drill-down dialog and the cleanup-result dialog now scroll their content inside, so the title and the bottom button always stay reachable.
+- Social app cleanup: the file list dialog can be filtered by source (WeChat, QQ, DingTalk and others), each with its own file count, and you can select all within the filter; removal only affects the files shown, and the list updates right away instead of triggering a full rescan.
+- Social app cleanup: the in-progress scan area now has proper spacing instead of hugging the card edges.
+
 ## v2.16.12
 
 - Fixed cleanup confirmation dialogs showing raw "{{name}}" and "{{size}}" instead of the actual target and size.
