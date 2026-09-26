@@ -36,6 +36,21 @@
     "confirmDelete": "Confirm cache cleanup",
     "confirmDeleteDesc": "Permanently delete “{{name}}” (about {{size}} in total)?",
     "confirmTargetFallback": "the selected social app cache",
+    "allSources": "All",
+    "deleteSelected": "Delete selected",
+    "deleteScopeHint": "Will delete {{count}} in the current filter",
+    "hiddenByFilterHint": "{{count}} more are hidden by the filter and will be kept",
+    "app": {
+      "wechat": "WeChat",
+      "qq": "QQ",
+      "ntqq": "QQ (new)",
+      "wxwork": "WeCom",
+      "dingtalk": "DingTalk",
+      "feishu": "Feishu",
+      "telegram": "Telegram",
+      "line": "LINE",
+      "whatsapp": "WhatsApp"
+    },
     "risk": { "critical": "Danger (chat records)", "medium": "Review carefully", "low": "Recommended", "none": "Safe to clean", "criticalTip": "Chat databases are permanently lost when deleted. Keeping them is strongly recommended.", "mediumTip": "May contain important documents or attachments. Review before deleting.", "lowTip": "Image or video cache can usually be downloaded again.", "noneTip": "Temporary cache files are usually safe to delete." },
     "category": {
       "chatdatabase": { "name": "Chat records", "description": "Chat database; cannot be recovered after deletion" },

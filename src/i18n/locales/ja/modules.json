@@ -36,6 +36,21 @@
     "confirmDelete": "キャッシュ整理の確認",
     "confirmDeleteDesc": "「{{name}}」を完全に削除しますか（合計 約 {{size}}）？",
     "confirmTargetFallback": "選択した SNS アプリのキャッシュ",
+    "allSources": "すべて",
+    "deleteSelected": "選択項目を削除",
+    "deleteScopeHint": "現在の絞り込みから {{count}} 件を削除します",
+    "hiddenByFilterHint": "絞り込みで非表示の {{count}} 件は削除されません",
+    "app": {
+      "wechat": "WeChat",
+      "qq": "QQ",
+      "ntqq": "QQ（新版）",
+      "wxwork": "WeCom",
+      "dingtalk": "DingTalk",
+      "feishu": "Feishu",
+      "telegram": "Telegram",
+      "line": "LINE",
+      "whatsapp": "WhatsApp"
+    },
     "risk": { "critical": "危険（チャット履歴）", "medium": "要確認", "low": "推奨", "none": "安全に整理可能", "criticalTip": "チャットデータベースは削除すると永久に失われます。残すことを強く推奨します。", "mediumTip": "重要な文書や添付ファイルが含まれる可能性があります。確認してから削除してください。", "lowTip": "画像・動画キャッシュは通常再ダウンロードできます。", "noneTip": "一時キャッシュは通常安全に削除できます。" },
     "category": {
       "chatdatabase": { "name": "チャット履歴", "description": "チャットデータベース。削除後は復元できません" },

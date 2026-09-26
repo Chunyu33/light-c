@@ -36,6 +36,21 @@
     "confirmDelete": "确认清理缓存",
     "confirmDeleteDesc": "将永久删除“{{name}}”，占用约 {{size}}。",
     "confirmTargetFallback": "选中的社交软件缓存",
+    "allSources": "全部",
+    "deleteSelected": "删除选中",
+    "deleteScopeHint": "将删除当前筛选中的 {{count}} 项",
+    "hiddenByFilterHint": "另有 {{count}} 项被筛选隐藏，不会被删除",
+    "app": {
+      "wechat": "微信",
+      "qq": "QQ",
+      "ntqq": "QQ 新版",
+      "wxwork": "企业微信",
+      "dingtalk": "钉钉",
+      "feishu": "飞书",
+      "telegram": "Telegram",
+      "line": "LINE",
+      "whatsapp": "WhatsApp"
+    },
     "risk": {
       "critical": "危险（聊天记录）",
       "medium": "谨慎清理",

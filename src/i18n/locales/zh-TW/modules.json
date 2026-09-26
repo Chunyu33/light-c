@@ -36,6 +36,21 @@
     "confirmDelete": "確認清理快取",
     "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。",
     "confirmTargetFallback": "選中的社交軟體快取",
+    "allSources": "全部",
+    "deleteSelected": "刪除選中",
+    "deleteScopeHint": "將刪除目前篩選中的 {{count}} 項",
+    "hiddenByFilterHint": "另有 {{count}} 項被篩選隱藏，不會被刪除",
+    "app": {
+      "wechat": "微信",
+      "qq": "QQ",
+      "ntqq": "QQ 新版",
+      "wxwork": "企業微信",
+      "dingtalk": "釘釘",
+      "feishu": "飛書",
+      "telegram": "Telegram",
+      "line": "LINE",
+      "whatsapp": "WhatsApp"
+    },
     "risk": {
       "critical": "危險（聊天記錄）",
       "medium": "謹慎清理",
