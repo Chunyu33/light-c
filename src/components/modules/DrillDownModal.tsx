@@ -498,7 +498,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
       {/* 模态框主体 */}
       <div
         className={`relative flex flex-col bg-[var(--bg-elevated)] rounded-2xl shadow-2xl border border-[var(--border-default)]
-          w-[51.43em] max-w-[calc(100vw-2em)] max-h-[57.14em] overflow-hidden ${
+          w-[51.43em] max-w-[calc(100vw-2em)] max-h-[min(57.14em,calc(100vh_-_2em))] overflow-hidden ${
           isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'
         }`}
       >

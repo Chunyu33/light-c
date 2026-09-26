@@ -1009,8 +1009,9 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
         className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onClose}
       />
-      {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px */}
-      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl w-[30em] max-h-[57.14em] overflow-hidden flex flex-col mx-[1em] ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
+      {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px。
+          高度叠加视口约束：只写 57.14em 时窗口高度低于 832px 就会上下溢出，头部与底栏被切掉。 */}
+      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl w-[30em] max-h-[min(57.14em,calc(100vh_-_2em))] overflow-hidden flex flex-col mx-[1em] ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 结果图标 */}
         <div className="flex justify-center mb-[1.14em]">
           <div className={`w-[4.57em] h-[4.57em] rounded-full flex items-center justify-center ${result.success_count > 0
