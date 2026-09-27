@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.14
+
+- Fixed dialogs growing taller than the window on short screens: the "Clear local data" dialog, the cleanup confirmation, the update prompt and the deep-clean warning now scroll their content inside, so the title and the buttons at the bottom stay reachable.
+
 ## v2.16.13
 
 - Fixed several dialogs growing taller than the window on short screens: the folder drill-down dialog and the cleanup-result dialog now scroll their content inside, so the title and the bottom button always stay reachable.
