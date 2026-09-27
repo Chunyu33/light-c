@@ -64,9 +64,11 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
         className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={handleClose}
       />
-      {/* 宽度随字号缩放：标准字号下约 400px，同时用 vw 上限兜住大字号的小窗口场景 */}
+      {/* 宽度随字号缩放：标准字号下约 400px，同时用 vw 上限兜住大字号的小窗口场景。
+          高度同理要叠加视口约束，否则矮窗口下底部按钮会被顶出可视区；
+          overflow-hidden 改为 overflow-y-auto，让内容在弹窗内滚动。 */}
       <div
-        className={`relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] overflow-hidden rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}
+        className={`relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-[1.43em]">

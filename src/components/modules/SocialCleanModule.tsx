@@ -713,9 +713,10 @@ function SocialDeleteConfirmModal({
           transition={{ duration: 0.18, ease: 'easeOut' }}
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px */}
+          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px。
+              高度同样要叠加视口约束，避免矮窗口下标题与确认按钮被顶出可视区。 */}
           <motion.div
-            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[30em] max-w-[calc(100vw-2em)] overflow-hidden"
+            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[30em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto"
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}

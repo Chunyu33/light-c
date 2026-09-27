@@ -516,8 +516,9 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       {isDeletingAnimating && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
-          {/* 尺寸用 em 跟随全局字号，20em 的上限对应原来的 max-w-sm */}
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[2.29em] shadow-2xl flex flex-col items-center gap-[1.14em] max-w-[20em] mx-[1em] ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+          {/* 尺寸用 em 跟随全局字号，20em 的上限对应原来的 max-w-sm。
+              内容虽短，也一并加上视口约束，避免字号调大后在矮窗口溢出。 */}
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[2.29em] shadow-2xl flex flex-col items-center gap-[1.14em] max-w-[20em] mx-[1em] max-h-[calc(100vh-2em)] overflow-y-auto ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             <div className="w-[4.57em] h-[4.57em] rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
               <Loader2 className="w-[2.29em] h-[2.29em] text-[var(--color-warning)] animate-spin" />
             </div>
@@ -882,8 +883,9 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       {isWarningAnimating && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
           <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isWarningVisible ? 'modal-overlay-in' : warningEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanWarning(false)} />
-          {/* 尺寸用 em 跟随全局字号，25em 的上限对应原来的 max-w-md */}
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl max-w-[25em] mx-[1em] ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+          {/* 尺寸用 em 跟随全局字号，25em 的上限对应原来的 max-w-md。
+              高度叠加视口约束，避免矮窗口下标题与按钮被顶出可视区。 */}
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl max-w-[25em] mx-[1em] max-h-[calc(100vh-2em)] overflow-y-auto ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             {/* 警告图标 */}
             <div className="flex justify-center mb-[1.14em]">
               <div className="w-[4.57em] h-[4.57em] rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">

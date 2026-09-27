@@ -80,9 +80,11 @@ export function PortableUpdateDialog({
             {...MODAL_BACKDROP_MOTION}
           />
 
-          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗宽高随全局字号设置缩放 */}
+          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗宽高随全局字号设置缩放。
+              高度必须叠加视口约束，否则窗口偏矮时底部按钮会被顶出可视区；
+              overflow-hidden 改为 overflow-y-auto，让内容在弹窗内滚动。 */}
           <motion.div
-            className="relative mx-[1em] w-[31.43em] max-w-[calc(100vw-2em)] overflow-hidden rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl"
+            className="relative mx-[1em] w-[31.43em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl"
             {...MODAL_CARD_MOTION}
           >
             <button

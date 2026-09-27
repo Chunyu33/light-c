@@ -73,8 +73,10 @@ export const ConfirmDialog = memo(function ConfirmDialog({
       />
       
       {/* 对话框 */}
-      {/* 对话框：宽度用 em 跟随全局字号，30em ≈ 标准字号下的 420px */}
-      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[30em] max-w-[calc(100vw-2em)] overflow-hidden ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+      {/* 对话框：宽度用 em 跟随全局字号，30em ≈ 标准字号下的 420px。
+          高度必须叠加视口约束：只约束宽度时，内容一旦超过窗口高度就会上下溢出，
+          标题和确认按钮会被顶出可视区。overflow-hidden 改成 overflow-y-auto 让内容在弹窗内滚动。 */}
+      <div className={`relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[30em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-[1.43em] py-[1.14em] border-b border-[var(--border-default)]">
           <div className="flex items-center gap-[0.86em]">

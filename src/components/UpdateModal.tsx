@@ -366,8 +366,10 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
         onClick={status !== 'downloading' ? handleClose : undefined}
       />
 
-      {/* 弹窗主体：宽高与圆角都随全局字号缩放，1.86em ≈ 26px */}
-      <div className={`relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] overflow-hidden rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+      {/* 弹窗主体：宽高与圆角都随全局字号缩放，1.86em ≈ 26px。
+          高度必须叠加视口约束，否则窗口偏矮时顶部内容与底部按钮会被顶出可视区；
+          overflow-hidden 改为 overflow-y-auto，让内容在弹窗内滚动。 */}
+      <div className={`relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 关闭按钮：下载中不允许中断，故不渲染 */}
         {status !== 'downloading' && (
           <button

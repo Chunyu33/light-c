@@ -78,12 +78,14 @@ export function ClearLocalDataDialog({
             onClick={onCancel}
             {...MODAL_BACKDROP_MOTION}
           />
-          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，37.14em ≈ 520px */}
+          {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，37.14em ≈ 520px。
+              高度必须叠加视口约束：此前只有列表自身的 41.43em 上限，窗口偏矮时整个弹窗会溢出上下边缘。
+              与「社交软件专清」的文件列表弹窗保持同一套写法：外壳限高 + 列表 flex-1 自己滚。 */}
           <motion.div
-            className="relative w-[37.14em] max-w-[calc(100vw-2em)] overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
+            className="relative flex w-[37.14em] max-w-[calc(100vw-2em)] max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
             {...MODAL_CARD_MOTION}
           >
-            <div className="flex items-center justify-between border-b border-[var(--border-color)] px-[1.43em] py-[1.14em]">
+            <div className="flex items-center justify-between border-b border-[var(--border-color)] px-[1.43em] py-[1.14em] shrink-0">
               <div className="flex items-center gap-[0.86em]">
                 <div className="flex h-[2.86em] w-[2.86em] items-center justify-center rounded-full bg-[var(--color-danger)]/10">
                   <Trash2 className="h-[1.43em] w-[1.43em] text-[var(--color-danger)]" />
@@ -101,7 +103,8 @@ export function ClearLocalDataDialog({
               </button>
             </div>
 
-            <div className="max-h-[41.43em] overflow-y-auto px-[1.43em] py-[1.14em]">
+            {/* flex-1：在外壳的 max-h 内收缩；41.43em 是宽屏下的列表高度上限，避免弹窗无限变高 */}
+            <div className="max-h-[41.43em] flex-1 overflow-y-auto px-[1.43em] py-[1.14em]">
               <div className="mb-[0.86em] rounded-xl border border-amber-500/20 bg-amber-500/10 p-[0.86em]">
                 <p className="text-[0.86em] leading-relaxed text-amber-700 dark:text-amber-300">
                   {t('clearData.warning')}
@@ -157,7 +160,7 @@ export function ClearLocalDataDialog({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-[0.86em] border-t border-[var(--border-color)] bg-[var(--bg-main)] px-[1.43em] py-[1.14em]">
+            <div className="flex items-center justify-between gap-[0.86em] border-t border-[var(--border-color)] bg-[var(--bg-main)] px-[1.43em] py-[1.14em] shrink-0">
               <p className="text-[0.86em] text-[var(--text-muted)]">
                 {t('clearData.summary', { count: selectedFileCount.toLocaleString(), size: formatSize(selectedSize) })}
               </p>
