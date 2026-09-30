@@ -48,7 +48,7 @@ export function BackToTopButton({ scrollContainerRef, threshold = 360 }: BackToT
           type="button"
           onClick={handleBackToTop}
           className="
-            fixed right-8 bottom-10 z-50 flex h-8 w-8 items-center justify-center rounded-lg
+            glass-overlay fixed right-8 bottom-10 z-50 flex h-8 w-8 items-center justify-center rounded-lg
             border border-[var(--brand-green-20)] bg-[var(--bg-card)]/95 text-[var(--brand-green)]
             shadow-lg shadow-black/10 backdrop-blur-md transition-colors
             hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)] hover:text-white

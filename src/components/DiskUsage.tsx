@@ -46,7 +46,7 @@ export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsa
   // 加载中或数据为空时显示骨架屏
   if (loading || !diskInfo) {
     return (
-      <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
+      <div className="glass-block bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-4">
         <div className="animate-pulse flex items-center gap-4">
           <div className="w-12 h-12 bg-[var(--bg-hover)] rounded-lg"></div>
           <div className="flex-1">
@@ -72,7 +72,7 @@ export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsa
   return (
     <div
       onClick={handleClick}
-      className={`bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] ${
+      className={`glass-block bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] ${
         compact ? 'p-3' : 'p-4'
       } cursor-default`}
     >

@@ -98,7 +98,7 @@ export function Select<T extends string = string>({
       {/* 下拉列表 */}
       {open && (
         <div
-          className={`absolute top-full left-0 mt-1.5 w-full py-1 rounded-xl
+          className={`glass-overlay absolute top-full left-0 mt-1.5 w-full py-1 rounded-xl
             bg-[var(--bg-card)] border border-[var(--border-color)]
             shadow-lg shadow-black/5 z-50 overflow-y-auto ${menuMaxHeightClass}
             animate-in fade-in slide-in-from-top-1 duration-150`}

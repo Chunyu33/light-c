@@ -219,7 +219,7 @@ export function ScanProgress({
       {/* 弹窗内容 */}
       <div 
         className={`
-          relative bg-[var(--bg-elevated)] rounded-2xl shadow-2xl 
+          glass-overlay relative bg-[var(--bg-elevated)] rounded-2xl shadow-2xl 
           border border-[var(--border-default)] p-6 w-80
           transition-all duration-300 ease-out
           ${isVisible ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}
@@ -241,7 +241,7 @@ export function ScanProgress({
 
         {/* 统计信息卡片 */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-[var(--bg-card)] rounded-lg p-3 text-center">
+          <div className="glass-block bg-[var(--bg-card)] rounded-lg p-3 text-center">
             <FileText className="w-4 h-4 text-emerald-500 mx-auto mb-1" />
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {displayFileCount.toLocaleString()}
@@ -249,7 +249,7 @@ export function ScanProgress({
             <p className="text-[10px] text-[var(--fg-muted)]">{t('fileCountLabel')}</p>
           </div>
           
-          <div className="bg-[var(--bg-card)] rounded-lg p-3 text-center">
+          <div className="glass-block bg-[var(--bg-card)] rounded-lg p-3 text-center">
             <HardDrive className="w-4 h-4 text-teal-500 mx-auto mb-1" />
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {formatSize(displaySize)}
@@ -257,7 +257,7 @@ export function ScanProgress({
             <p className="text-[10px] text-[var(--fg-muted)]">{t('cleanable')}</p>
           </div>
           
-          <div className="bg-[var(--bg-card)] rounded-lg p-3 text-center">
+          <div className="glass-block bg-[var(--bg-card)] rounded-lg p-3 text-center">
             <FolderSearch className="w-4 h-4 text-amber-500 mx-auto mb-1" />
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {isCompleted ? displayTotal : completedCategories}/{displayTotal}

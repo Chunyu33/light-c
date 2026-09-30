@@ -5,6 +5,8 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 ## v2.16.14
 
 - Fixed dialogs growing taller than the window on short screens: the "Clear local data" dialog, the cleanup confirmation, the update prompt and the deep-clean warning now scroll their content inside, so the title and the buttons at the bottom stay reachable.
+- Added an optional "liquid glass" look: the title bar, cards and a floating rounded sidebar get a translucent glass finish, with scrollbars, switches and separators matching. Turn it on in Settings - General. It keeps the GPU busy and may make scrolling stutter on slower machines, so it is off by default.
+- Increased the minimum window height by 80px to avoid crowding the content.
 
 ## v2.16.13
 

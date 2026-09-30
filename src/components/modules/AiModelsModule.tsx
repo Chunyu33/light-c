@@ -23,6 +23,7 @@ import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
 import { DonutChart, ColumnChart, CHART_PALETTE, type ChartItem } from '../ui/charts';
 import { Select, type SelectOption } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import {
@@ -395,22 +396,14 @@ function DeepDiscoveryToggle({
       title={moduleT('aiModels.deepDiscoveryTip')}
     >
       <span className="text-xs font-medium text-[var(--fg-secondary)]">{moduleT('aiModels.deepDiscovery')}</span>
-      <button
-        type="button"
+      {/* 改用共享的 ui/Switch：全项目开关只保留一份实现，
+          否则散落在各模块里的自绘开关会漏掉主题适配（玻璃态就踩过这个坑） */}
+      <Switch
+        checked={enabled}
         disabled={disabled}
-        onClick={() => onChange(!enabled)}
-        className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-          enabled ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-hover)]'
-        } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-        aria-pressed={enabled}
+        onChange={onChange}
         aria-label={moduleT('aiModels.deepDiscovery')}
-      >
-        <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-            enabled ? 'left-[18px]' : 'left-0.5'
-          }`}
-        />
-      </button>
+      />
     </div>
   );
 }
@@ -432,7 +425,7 @@ function HeroOverview({
   const largestModelType = largestModel ? getModelType(largestModel) : null;
 
   return (
-    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+    <div className="glass-block rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
       <div className="grid grid-cols-[190px_minmax(0,1fr)] items-center gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -494,7 +487,7 @@ function ScanDurationPopover({ scanResult }: { scanResult: AiModelScanResult }) 
         {moduleT('aiModels.scanDuration')} {formatDuration(scanResult.scan_duration_ms)}
       </button>
       <div className="pointer-events-none absolute left-0 top-full z-20 w-[420px] pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
-        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-lg">
+        <div className="glass-overlay rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-lg">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-semibold text-[var(--text-primary)]">{moduleT('aiModels.scanDuration')}</p>
             <p className="text-xs text-[var(--text-muted)]">{moduleT('aiModels.total')} {formatDuration(scanResult.scan_duration_ms)}</p>
@@ -532,13 +525,15 @@ function InsightsRow({
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    // glass-metrics / glass-metric / glass-metric-icon 是给液态玻璃外观预留的语义钩子：
+    // 这三个类在关闭玻璃时没有任何样式，原始布局与配色完全不变（见 App.css 的 .glass 分区）。
+    <div className="glass-metrics grid gap-3 md:grid-cols-3">
       {insights.map(insight => {
         const Icon = insight.icon;
         return (
-          <div key={insight.label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
+          <div key={insight.label} className="glass-metric rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
             <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-green)]/10 text-[var(--brand-green)]">
+              <span className="glass-metric-icon flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--brand-green)]/10 text-[var(--brand-green)]">
                 <Icon className="h-4 w-4" />
               </span>
               <div className="min-w-0">
@@ -624,7 +619,7 @@ function PlatformUsageChart({ sources }: { sources: AiAssetSource[] }) {
   });
 
   return (
-    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+    <div className="glass-block rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('aiModels.platformUsage')}</p>
         <p className="text-xs text-[var(--text-muted)]">{moduleT('aiModels.sourceCount', { count: sources.length.toLocaleString() })}</p>
@@ -655,7 +650,7 @@ function ModelTypeChart({ stats }: { stats: Array<{ type: string; count: number;
   }));
 
   return (
-    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
+    <div className="glass-block rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-[var(--text-primary)]">{moduleT('aiModels.typeDistribution')}</p>
         <p className="text-xs text-[var(--text-muted)]">{moduleT('aiModels.typeCount', { count: stats.length.toLocaleString() })}</p>
@@ -721,7 +716,7 @@ function ModelListFilters({
     ...typeOptions.map(type => ({ value: type, label: type === '__unknown__' ? moduleT('aiModels.unknownType') : type })),
   ];
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
+    <div className="glass-block flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
       <FilterField label={moduleT('aiModels.platform') }>
         <Select value={platformFilter} options={platformOptions} onChange={onPlatformChange} widthClass="w-36" size="sm" />
       </FilterField>
@@ -798,7 +793,7 @@ function ModelTable({
 }) {
   const { t: moduleT } = useTranslation('modules');
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
+    <div className="glass-list overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>

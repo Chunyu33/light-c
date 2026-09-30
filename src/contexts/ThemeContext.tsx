@@ -17,11 +17,17 @@ interface ThemeContextValue {
   theme: AppliedTheme;
   /** 设置主题模式 */
   setMode: (mode: ThemeMode) => void;
+  /** 液态玻璃外观是否开启（与明暗模式正交，默认关闭） */
+  glass: boolean;
+  /** 开关液态玻璃 */
+  setGlass: (enabled: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const STORAGE_KEY = 'c-cleanup-theme';
+/** 液态玻璃单独持久化：它与明暗模式是两个正交的轴，切换明暗不该影响这个开关 */
+const GLASS_STORAGE_KEY = 'c-cleanup-glass';
 
 /** 获取系统主题 */
 function getSystemTheme(): AppliedTheme {
@@ -57,6 +63,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const [theme, setTheme] = useState<AppliedTheme>(() => resolveTheme(mode));
 
+  // 液态玻璃默认关闭：backdrop-filter 需要合成器持续重新采样背景，
+  // 在低配设备上会明显掉帧，所以必须是用户主动开启，不能默认打开。
+  const [glass, setGlassState] = useState<boolean>(
+    () => localStorage.getItem(GLASS_STORAGE_KEY) === 'enabled',
+  );
+
+  // 切换玻璃并持久化，写法与上面的 setMode 保持一致
+  const setGlass = useCallback((enabled: boolean) => {
+    setGlassState(enabled);
+    localStorage.setItem(GLASS_STORAGE_KEY, enabled ? 'enabled' : 'disabled');
+  }, []);
+
   // 设置主题模式
   const setMode = useCallback((newMode: ThemeMode) => {
     setModeState(newMode);
@@ -89,8 +107,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     document.documentElement.classList.add(theme);
   }, [theme]);
 
+  // 玻璃开关只切换 html 上的标记类，具体配色、模糊半径和背景层都由 App.css 的 .glass 规则统一负责，
+  // 这样新增表面时不需要再写任何 JS 逻辑。
+  useEffect(() => {
+    document.documentElement.classList.toggle('glass', glass);
+  }, [glass]);
+
   return (
-    <ThemeContext.Provider value={{ mode, theme, setMode }}>
+    <ThemeContext.Provider value={{ mode, theme, setMode, glass, setGlass }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -159,7 +159,7 @@ export function ModuleCard({
     <div 
       className={`
         /* 微信风格卡片：纯白背景 + 极淡阴影 + 大圆角 */
-        bg-[var(--bg-card)] rounded-2xl ${allowStickyContent ? 'overflow-visible' : 'overflow-hidden'}
+        glass-surface bg-[var(--bg-card)] rounded-2xl ${allowStickyContent ? 'overflow-visible' : 'overflow-hidden'}
         ${isPageVariant ? 'module-card--page flex min-h-full flex-col' : ''}
         transition-all duration-300 ease-out
         ${isPageVariant

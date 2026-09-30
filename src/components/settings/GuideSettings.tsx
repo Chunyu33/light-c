@@ -37,7 +37,7 @@ export function GuideSettings() {
           <BookOpen className="h-3.5 w-3.5" />
           {t('guide.title')}
         </h4>
-        <div className="space-y-4 rounded-2xl bg-[var(--bg-main)] p-5">
+        <div className="glass-block space-y-4 rounded-2xl bg-[var(--bg-main)] p-5">
           {GUIDE_ITEMS.map(({ key, icon: Icon }) => (
             <div key={key}>
               <p className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
@@ -57,7 +57,7 @@ export function GuideSettings() {
           <ShieldCheck className="h-3.5 w-3.5" />
           {t('guide.permissionsTitle')}
         </h4>
-        <div className="space-y-3 rounded-2xl bg-[var(--bg-main)] p-5">
+        <div className="glass-block space-y-3 rounded-2xl bg-[var(--bg-main)] p-5">
           <p className="text-sm font-medium text-[var(--text-primary)]">{t('guide.permissionsHeading')}</p>
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('guide.permissionsDesc')}</p>
           <p className="text-sm font-medium text-[var(--text-primary)]">{t('guide.securityTitle')}</p>
@@ -70,7 +70,7 @@ export function GuideSettings() {
           <Shield className="h-3.5 w-3.5" />
           {t('guide.riskTitle')}
         </h4>
-        <div className="space-y-3 rounded-2xl bg-[var(--bg-main)] p-5">
+        <div className="glass-block space-y-3 rounded-2xl bg-[var(--bg-main)] p-5">
           {RISK_LEVELS.map(({ key, className }) => (
             <div key={key} className="flex items-start gap-3">
               <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${className}`}>
@@ -87,7 +87,7 @@ export function GuideSettings() {
           <Shield className="h-3.5 w-3.5" />
           {t('guide.notesTitle')}
         </h4>
-        <div className="space-y-1 rounded-2xl bg-[var(--bg-main)] p-5 text-xs leading-relaxed text-[var(--text-muted)]">
+        <div className="glass-block space-y-1 rounded-2xl bg-[var(--bg-main)] p-5 text-xs leading-relaxed text-[var(--text-muted)]">
           {(t('guide.notes', { returnObjects: true }) as string[]).map((note) => (
             <p key={note}>• {note}</p>
           ))}
@@ -99,7 +99,7 @@ export function GuideSettings() {
           <ShieldCheck className="h-3.5 w-3.5" />
           {t('guide.disclaimerTitle')}
         </h4>
-        <p className="rounded-2xl bg-[var(--bg-main)] p-5 text-xs leading-relaxed text-[var(--text-muted)]">
+        <p className="glass-block rounded-2xl bg-[var(--bg-main)] p-5 text-xs leading-relaxed text-[var(--text-muted)]">
           {t('guide.disclaimer')}
         </p>
       </section>

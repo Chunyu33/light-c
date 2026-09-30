@@ -25,6 +25,7 @@ import { CategoryCard } from '../CategoryCard';
 import { ScanSummary } from '../ScanSummary';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
+import { Switch } from '../ui/Switch';
 import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import {
@@ -594,7 +595,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       {/* 删除进度遮罩仅覆盖实际文件操作；后续核验在页面内后台进行，避免长时间阻塞用户。 */}
       {isDeleting && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/45 flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
             </div>
@@ -661,16 +662,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               title={t('deepDiscoveryTitle')}
             >
               <span>{t('deepDiscovery')}</span>
-              <input
-                type="checkbox"
-                className="sr-only"
+              {/* 改用共享的 ui/Switch。原先这里自绘了一套"轨道 + 滑块"，
+                  底色用的是 --border-color，在亮色玻璃下几乎看不见滑块。 */}
+              <Switch
                 checked={deepScanEnabled}
                 disabled={moduleState.status === 'scanning'}
-                onChange={(event) => handleDeepScanToggle(event.target.checked)}
+                onChange={handleDeepScanToggle}
+                aria-label={t('deepDiscovery')}
               />
-              <span className={`relative w-8 h-4 rounded-full transition-colors ${deepScanEnabled ? 'bg-[var(--brand-green)]' : 'bg-[var(--border-color)]'}`}>
-                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${deepScanEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </span>
             </label>
             {moduleState.status === 'scanning' && deepScanEnabled && (
               <button
@@ -765,19 +764,19 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />{t('scanning.partition')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{scanProgress?.drive_letter || t('scanning.preparing')}</p>
                 </div>
-                <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Database className="w-3.5 h-3.5" />{t('scanning.processedRecords')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.processed ?? 0).toLocaleString()}</p>
                 </div>
-                <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />{t('scanning.candidateFiles')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.matched_count ?? 0).toLocaleString()}</p>
                 </div>
-                <div className="rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Timer className="w-3.5 h-3.5" />{t('scanning.elapsed')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{formatScanDuration(scanProgress?.elapsed_ms ?? 0)}</p>
                 </div>

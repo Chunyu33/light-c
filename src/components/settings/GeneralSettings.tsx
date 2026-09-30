@@ -7,7 +7,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, ClipboardList, ChevronRight, FolderOpen, HardDrive, History, Info, LayoutGrid, MonitorCog, RefreshCw, Rocket, Search, Trash2, Type } from 'lucide-react';
 import { Select } from '../ui/Select';
-import { useFontSize, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, useSettings, type Language, type ThemeMode } from '../../contexts';
+import { Switch } from '../ui/Switch';
+import { useFontSize, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, useSettings, useTheme, type Language, type ThemeMode } from '../../contexts';
 import { useToast } from '../Toast';
 import { clearSelectedLocalData, getStorageLocationInfo, getStorageWriteDiagnostic, listClearableDataItems, migrateLegacyPortableData, openInFolder, openLogsFolder, openStartupManager, openStorageSettings, pickFolderDialog, setDataDirectory, type ClearableDataItem, type StorageLocationInfo, type StorageWriteDiagnostic } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -24,6 +25,8 @@ const LANGUAGE_OPTIONS: { value: Language; labelKey: string }[] = [
 
 export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
   const { t } = useTranslation('settings');
+  // 玻璃开关直接从上下文取，避免再往 SettingsModal 传一层 props
+  const { glass, setGlass } = useTheme();
   const { t: commonT } = useTranslation('common');
   const { level: fontSizeLevel, setLevel: setFontSizeLevel, customFontSize, setCustomFontSize } = useFontSize();
   const { settings, updateSettings, switchLayoutMode, isLayoutSwitching } = useSettings();
@@ -206,7 +209,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
           <MonitorCog className="w-3.5 h-3.5" />
           {t('sections.general')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
           {/* 主题模式 */}
           <div className="flex items-center justify-between">
             <div>
@@ -229,6 +232,23 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 液态玻璃：默认关闭。开启后顶层表面会持续占用 GPU 合成资源，
+              所以把代价直接写在界面上，而不是等用户发现卡顿 */}
+          <div className="flex items-center justify-between gap-4 border-t border-[var(--border-color)] pt-4">
+            <div className="min-w-0">
+              {/* Beta 标记用 ASCII 括号：这是唯一一处硬编码后缀，
+                  用全角「（）」在西文界面里会显得是中文标点混入 */}
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t('theme.glassLabel')} (Beta)</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">{t('theme.glassDesc')}</p>
+              <p className="mt-1 text-xs text-[var(--color-warning)]">{t('theme.glassWarning')}</p>
+            </div>
+            <Switch
+              checked={glass}
+              onChange={setGlass}
+              aria-label={t('theme.glassLabel')}
+            />
           </div>
 
           {/* 使用通用下拉选择器，语言名称长度变化时不会撑开设置页布局。 */}
@@ -288,7 +308,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
                   transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="overflow-hidden"
                 >
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-3 py-2.5">
+                  <div className="glass-block mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-3 py-2.5">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[var(--text-secondary)]">{t('fontSize.customLabel')}</p>
                       <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{t('fontSize.customRange', { min: CUSTOM_FONT_SIZE_MIN, max: CUSTOM_FONT_SIZE_MAX })}</p>
@@ -387,7 +407,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
           <History className="w-3.5 h-3.5" />
           {t('sections.dataManagement')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl divide-y divide-[var(--border-color)]">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl divide-y divide-[var(--border-color)]">
           {/* 当前存储位置 */}
           <div className="space-y-3 p-4">
             <div className="flex items-center justify-between gap-3">
@@ -541,7 +561,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
           <Rocket className="w-3.5 h-3.5" />
           {t('sections.systemTools')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl divide-y divide-[var(--border-color)]">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl divide-y divide-[var(--border-color)]">
           {/* 开机启动管理 */}
           <button
             onClick={() => openStartupManager().catch(console.error)}

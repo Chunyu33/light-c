@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { FileBox, HardDrive, Shield } from 'lucide-react';
 import { Select, type SelectOption } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 import { useSettings } from '../../contexts';
 import { useTranslation } from 'react-i18next';
 
@@ -48,7 +49,7 @@ export function FeatureSettings() {
           <FileBox className="w-3.5 h-3.5" />
           {t('features.bigFiles.title')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.bigFiles.scanLimit')}</p>
@@ -87,7 +88,7 @@ export function FeatureSettings() {
           <HardDrive className="w-3.5 h-3.5" />
           {t('features.hotspot.title')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-6">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-6">
           {/* 展示深度 — 下拉选择，最大 4 层（实际扫描固定 6 层） */}
           <div className="flex items-center justify-between">
             <div>
@@ -143,18 +144,12 @@ export function FeatureSettings() {
                   {t('features.hotspot.ignoreSystemDesc')}
                 </p>
               </div>
-              <button
-                onClick={() => updateSettings({ hotspotIgnoreSystemDirs: !settings.hotspotIgnoreSystemDirs })}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ml-3 ${
-                  settings.hotspotIgnoreSystemDirs ? 'bg-[var(--brand-green)]' : 'bg-[var(--bg-switch)]'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow transition-transform duration-300 ${
-                    settings.hotspotIgnoreSystemDirs ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+              {/* 改用共享的 ui/Switch：原先这一处也是自绘的，尺寸与设置页其它开关不一致 */}
+              <Switch
+                checked={settings.hotspotIgnoreSystemDirs}
+                onChange={(checked) => updateSettings({ hotspotIgnoreSystemDirs: checked })}
+                aria-label={t('features.hotspot.ignoreSystem')}
+              />
             </div>
           </div>
 
@@ -199,7 +194,7 @@ export function FeatureSettings() {
           <HardDrive className="w-3.5 h-3.5" />
           {t('features.diskGrowth.title')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.diskGrowth.maxEntries')}</p>
@@ -229,7 +224,7 @@ export function FeatureSettings() {
           <p className="text-[11px] text-[var(--text-faint)]">
             {t('features.diskGrowth.range')}
           </p>
-          <div className="rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 space-y-3">
+          <div className="glass-block rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 space-y-3">
             <div>
               <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.diskGrowth.details')}</p>
               <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">

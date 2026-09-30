@@ -504,7 +504,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
       >
         {/* ====== 头部：面包屑 + 关闭按钮 ====== */}
         {/* 内部尺寸统一用 em，跟随全局字号缩放，避免只有外壳变大而内容不变 */}
-        <div className="flex items-center justify-between px-[1.43em] py-[0.86em] border-b border-[var(--border-default)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
+        <div className="glass-bar flex items-center justify-between px-[1.43em] py-[0.86em] border-b border-[var(--border-default)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
           <div className="flex-1 min-w-0 mr-[0.86em]">
             <ModalBreadcrumbs segments={breadcrumbSegments} initialDepth={initialDepth} onNavigate={handleBreadcrumbNavigate} />
           </div>
@@ -581,7 +581,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
 
         {/* ====== 底栏：统计信息 ====== */}
         {!loading && scanResult && scanResult.entries.length > 0 && (
-          <div className="flex items-center justify-between px-[1.43em] py-[0.71em] border-t border-[var(--border-default)] text-[0.86em] text-[var(--text-muted)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
+          <div className="glass-bar flex items-center justify-between px-[1.43em] py-[0.71em] border-t border-[var(--border-default)] text-[0.86em] text-[var(--text-muted)] bg-[var(--bg-card)]/80 backdrop-blur-sm">
             <span>
               {moduleT('drillDown.summary', { count: scanResult.entries.length, size: formatSize(scanResult.scanned_total_size) })}
             </span>

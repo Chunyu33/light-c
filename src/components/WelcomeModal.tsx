@@ -120,7 +120,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
         </div>
 
         {/* 底部操作区：复选框在左、主按钮在右，与设置类弹窗一致 */}
-        <div className="flex items-center justify-between gap-[0.86em] border-t border-[var(--border-color)] bg-[var(--bg-main)] px-[1.43em] py-[0.86em]">
+        <div className="glass-bar flex items-center justify-between gap-[0.86em] border-t border-[var(--border-color)] bg-[var(--bg-main)] px-[1.43em] py-[0.86em]">
           <label className="flex cursor-pointer select-none items-center gap-[0.57em]">
             <Checkbox
               checked={dontShowAgain}

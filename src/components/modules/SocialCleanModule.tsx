@@ -415,7 +415,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
             >
               <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
               <motion.div
-                className="relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4"
+                className="glass-overlay relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4"
                 initial={{ opacity: 0, scale: 0.96, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -755,7 +755,7 @@ function SocialDeleteConfirmModal({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-[0.86em] px-[1.43em] py-[1.14em] border-t border-[var(--border-default)] bg-[var(--bg-card)]">
+            <div className="glass-bar flex items-center justify-end gap-[0.86em] px-[1.43em] py-[1.14em] border-t border-[var(--border-default)] bg-[var(--bg-card)]">
               <button
                 onClick={onCancel}
                 className="px-[1.14em] py-[0.57em] rounded-lg text-[1em] font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -1058,7 +1058,7 @@ function FileListModal({
 
             {/* 来源筛选：标签可多选，再点一次已选中的标签即取消。
                 「全部」仅在存在多个来源时出现，单一来源时它和来源标签等价，显示出来反而冗余。 */}
-            <div className="px-6 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-3 text-xs shrink-0">
+            <div className="glass-bar px-6 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-3 text-xs shrink-0">
               <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto">
                 {sourceGroups.length > 1 && (
                   <button
@@ -1099,7 +1099,7 @@ function FileListModal({
                 {` (${visibleDeletablePaths.length.toLocaleString()})`}
               </button>
             </div>
-            <div className="px-6 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-4 text-xs font-medium text-[var(--fg-muted)] shrink-0">
+            <div className="glass-bar px-6 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-4 text-xs font-medium text-[var(--fg-muted)] shrink-0">
               <span className="w-8"></span>
               <span className="w-8 text-center">#</span>
               <span className="w-6"></span>
@@ -1142,7 +1142,7 @@ function FileListModal({
 
             {/* 底栏：选中统计 + 删除入口。删除作用域是全局选中项，不限于当前分类，
                 所以要把「被当前筛选隐藏」和「在其它分类」的数量分别说明清楚。 */}
-            <div className="px-6 py-3 border-t border-[var(--border-default)] bg-[var(--bg-elevated)] flex items-center justify-between gap-4 shrink-0">
+            <div className="glass-bar px-6 py-3 border-t border-[var(--border-default)] bg-[var(--bg-elevated)] flex items-center justify-between gap-4 shrink-0">
               <div className="flex-1 min-w-0 flex items-center gap-x-2 gap-y-1 text-xs text-[var(--fg-muted)] flex-wrap">
                 {visibleSelectedPaths.length > 0 ? (
                   <>
@@ -1192,21 +1192,28 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
   const RiskIcon = riskConfig.icon;
   const isCritical = file.risk_level === 'critical';
   
+  const canToggle = !isCritical;
+
   return (
-    <div 
-      style={style} 
+    <div
+      style={style}
+      // 整行可点击切换勾选：先前只有复选框本身能点，行内大片区域点了没反应。
+      // 行尾两个操作按钮各自 stopPropagation，它们的优先级高于"点行勾选"。
+      onClick={() => canToggle && onToggle()}
       className={`px-6 flex items-center gap-4 text-xs border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors
+        ${canToggle ? 'cursor-pointer' : ''}
         ${isCritical ? 'bg-red-500/5' : ''}`}
     >
-      {/* 复选框 */}
-      <div 
-        onClick={() => !isCritical && onToggle()}
+      {/* 复选框：只负责展示，点击交给整行统一处理。
+          这里**不能再挂 onClick** —— 否则点击复选框时自身的处理 + 冒泡到行的处理
+          会各跑一次，勾选紧接着又被取消，表现为"点了没反应"。 */}
+      <div
         className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors
-          ${isCritical 
-            ? 'border-red-300 bg-red-100 cursor-not-allowed' 
-            : isSelected 
-              ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
-              : 'border-[var(--fg-faint)] cursor-pointer'
+          ${isCritical
+            ? 'border-red-300 bg-red-100 cursor-not-allowed'
+            : isSelected
+              ? 'bg-emerald-500 border-emerald-500'
+              : 'border-[var(--fg-faint)]'
           }`}
         title={isCritical ? getSocialRiskTooltip(moduleT, file.risk_level) : undefined}
       >
@@ -1248,10 +1255,19 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       </span>
       
       <div className="w-16 flex items-center justify-end gap-0.5 shrink-0">
-        <button onClick={() => openInFolder(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title={t('openInFolder')}>
+        {/* 两个操作按钮阻止冒泡：点它们只执行自身动作，不触发整行的勾选切换 */}
+        <button
+          onClick={(event) => { event.stopPropagation(); openInFolder(file.path); }}
+          className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
+          title={t('openInFolder')}
+        >
           <FolderOpen className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => openFile(file.path)} className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600" title={t('openFile')}>
+        <button
+          onClick={(event) => { event.stopPropagation(); openFile(file.path); }}
+          className="p-1.5 hover:bg-[var(--bg-elevated)] rounded transition text-[var(--fg-muted)] hover:text-emerald-600"
+          title={t('openFile')}
+        >
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>

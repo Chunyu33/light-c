@@ -160,7 +160,7 @@ export function ClearLocalDataDialog({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-[0.86em] border-t border-[var(--border-color)] bg-[var(--bg-main)] px-[1.43em] py-[1.14em] shrink-0">
+            <div className="glass-bar flex items-center justify-between gap-[0.86em] border-t border-[var(--border-color)] bg-[var(--bg-main)] px-[1.43em] py-[1.14em] shrink-0">
               <p className="text-[0.86em] text-[var(--text-muted)]">
                 {t('clearData.summary', { count: selectedFileCount.toLocaleString(), size: formatSize(selectedSize) })}
               </p>

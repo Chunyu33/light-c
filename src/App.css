@@ -716,6 +716,385 @@
 }
 
 /* ============================================================================
+   液态玻璃外观（可选，默认关闭）
+   设计约束：
+   1. 玻璃必须「背后有东西可折射」。--bg-main 设为透明并在 body 铺一层渐变，
+      否则半透明 + backdrop-filter 叠在纯色背景上和不做玻璃毫无区别。
+   2. 变量层负责让**所有**表面自动变半透明，所以各模块组件零改动即可全局生效；
+      backdrop-filter 只加在 .glass-chrome / .glass-surface 这两个顶层语义类上。
+   3. 列表行、标签、hover 态一律不加模糊：虚拟列表滚动时会逐帧重建行，
+      对这些元素做背景重采样是最坏情况的开销。
+   4. 关闭时 --glass-blur 为 none，语义类照常保留但不产生任何合成开销，
+      因此组件里的类名不需要跟着开关切换，避免 JS 里再做条件分支。
+   ============================================================================ */
+
+:root {
+  /* 关闭态：语义类读到的就是 none，等价于完全没有玻璃 */
+  --glass-blur: none;
+}
+
+/* 浅色玻璃：半透明白表面。悬停态比卡片略暗，保持与关闭态一致的反馈方向 */
+html.glass:not(.dark) {
+  --glass-blur: blur(20px) saturate(180%);
+
+  --bg-main: transparent;
+  /* 透明度配比是这套外观最容易踩的地方：
+     弹窗内部的栏用 --bg-card，弹窗外壳多用 --bg-elevated，也有直接用 --bg-card 的。
+     两者都偏透时，栏会变成「比母体更薄的破洞」，把弹窗背后的应用模糊着透出来。
+     所以 card 要能看出背景色雾、elevated 要足够实以承载弹窗内容。 */
+  /* 这一档是给「弹窗外壳」用的：弹窗背后压着 bg-black/50 遮罩，
+     底色太透会变成一片中灰，次级文字直接掉到 AA 以下。
+     模块卡不走这里 —— 它由 .glass-surface 用 --glass-surface-bg 单独接管（更透），
+     所以调这里不会牺牲卡片的通透感。
+     0.45 是「通透」与「文字对比度」的折中点：0.58 在亮色下偏乳白（看不出玻璃），
+     0.34 又会让次级文字掉到 AA 以下；文字色已按半透明底加深，所以能取到 0.45。 */
+  --bg-card: rgba(255, 255, 255, 0.45);
+  --bg-elevated: rgba(255, 255, 255, 0.45);
+  --bg-hover: rgba(255, 255, 255, 0.6);
+  --bg-active: rgba(255, 255, 255, 0.72);
+  --bg-input: rgba(255, 255, 255, 0.55);
+
+  /* 半透明表面上的次级文字要相应加深。原来的 #757575 / #A1A1AA 是按纯白底选的，
+     叠加半透明表面后对比度掉到 3.0 / 1.7，描述文字和路径就"看不清"。
+     底色压到 0.45 后实测：辅助 #424b58 → 5.03:1、最淡 #48515f → 4.63:1，都过 AA
+     （最淡色不能再浅，否则在 0.45 的底上会掉到 AA 以下）。 */
+  --text-muted: #424b58;
+  --text-faint: #48515f;
+
+  /* 这里必须分清两种线，之前混用同一个变量，所以弹窗里的分隔线一直不对：
+     · 玻璃表面的**外沿** —— 应该是"白色反光"，走 --glass-edge；
+     · 面板**内部的分隔线** —— 应该是极淡的暗线，走 --border-color。
+     浅色下把 --border-color 设成白色 0.78，内部分隔线就成了刺眼的白线；
+     暗色下 0.12 白反而正常（深底需要亮线），所以只有亮色出问题。 */
+  --border-color: rgba(15, 23, 42, 0.09);
+  --border-muted: rgba(15, 23, 42, 0.05);
+  --glass-edge: rgba(255, 255, 255, 0.78);
+
+  /* 浮层专用表面：弹窗卡 / 下拉面板 / 气泡。它们悬在任意内容之上，
+     必须比基础表面实得多，否则背后的列表文字会透出来、盖不住。
+     浅色用高不透明度的白；深色**不能靠"多叠白"**（那会变成白板），要用实色深底。 */
+  --glass-overlay-bg: rgba(255, 255, 255, 0.93);
+
+  /* 滚动条：极细 + 轨道全透明 + 滑块半透明，融进玻璃里 */
+  --glass-scrollbar-thumb: rgba(15, 23, 42, 0.18);
+  --glass-scrollbar-thumb-hover: rgba(15, 23, 42, 0.32);
+
+  /* 表面配方：顶部内高光 + 大扩散柔和投影。
+     只做半透明、不做这两样，面板只会像"发白的盒子"，不像玻璃。 */
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+
+  /* 表面底色单独抽成变量：侧边栏面板要用伪元素绘制，只能读变量，读不到元素上的 background-color。
+     模块卡与顶栏也走这里，避免同一组颜色散落在多处。 */
+  --glass-surface-bg: rgba(255, 255, 255, 0.3);
+  --glass-chrome-bg: rgba(255, 255, 255, 0.4);
+}
+
+/* 深色玻璃：透明度要低于浅色，否则背景提亮后文字对比度不足。
+   配比原则同浅色：elevated 必须明显实于 card，避免弹窗内的栏变成破洞 */
+html.dark.glass {
+  --glass-blur: blur(20px) saturate(160%);
+
+  --bg-main: transparent;
+  /* 深色沿用与浅色相同的做法：表面是「在极光上叠一层白」，
+     而不是盖一块不透明的深色板 —— 后者会把背景整个遮死，玻璃感随之消失。 */
+  --bg-card: rgba(255, 255, 255, 0.07);
+  --bg-elevated: rgba(255, 255, 255, 0.1);
+  --bg-hover: rgba(255, 255, 255, 0.12);
+  --bg-active: rgba(255, 255, 255, 0.16);
+  --bg-input: rgba(255, 255, 255, 0.09);
+
+  --border-color: rgba(255, 255, 255, 0.14);
+  --border-muted: rgba(255, 255, 255, 0.07);
+  /* 深色下分隔线用亮线是对的（深底需要亮线），外沿反光同量级即可 */
+  --glass-edge: rgba(255, 255, 255, 0.14);
+
+  --glass-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --glass-scrollbar-thumb-hover: rgba(255, 255, 255, 0.34);
+
+  /* 深色浮层：用实色深底，而不是继续叠白 —— 叠白会把它变成白板 */
+  --glass-overlay-bg: rgba(24, 33, 48, 0.93);
+
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+
+  /* 深色下表面是"在极光上叠一层白"，量级与 --bg-card 一致 */
+  --glass-surface-bg: rgba(255, 255, 255, 0.07);
+  --glass-chrome-bg: rgba(255, 255, 255, 0.07);
+}
+
+/* ===== 背景层：极光色雾 =====
+   配色与构图取自 Evan 个人站点的 aurora 系统，色值原样搬用。
+   三层缺一不可，少任何一层都会显得廉价：
+     1. 底色是一组极淡的双色渐变（近白的薄荷 → 近白的淡蓝），不是灰底。
+     2. 彩色雾的 alpha 只有 0.11–0.18。压到 0.3 就会「发脏」——透过半透明面板看尤其明显。
+     3. 白色雾要盖在彩色雾之上，负责把整体压柔；再加一层点阵给背景一点材质。
+   层序：CSS 多背景里**先写的在上层**，所以白雾排在彩色雾之前、底色渐变排最后。
+   整层完全静态、只栅格化一次，不产生持续的合成开销。 */
+html.glass body {
+  background-color: transparent;
+}
+
+html.glass body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* 浅色的色雾必须比深色**浓得多**，否则没有"透明感"：
+     深色底够暗，色雾 0.2~0.3 就跳出来；浅色底接近纯白，同样的 alpha 几乎看不见，
+     透过半透明卡片看到的就是"更白的白"。所以浅色要往上顶。
+     白雾同时压到很低 —— 它原本 0.8 且落在视口中心，而内容区正好在中间，
+     等于在最该有色雾的地方把它冲掉了（这是浅色发闷的真正原因）。 */
+  background:
+    radial-gradient(circle 34vw at 84% 78%, rgba(7, 193, 96, 0.34) 0%, rgba(7, 193, 96, 0) 70%),
+    radial-gradient(circle 30vw at 96% 4%, rgba(90, 140, 255, 0.42) 0%, rgba(90, 140, 255, 0) 70%),
+    radial-gradient(circle 30vw at 34% 98%, rgba(180, 120, 255, 0.3) 0%, rgba(180, 120, 255, 0) 72%),
+    /* 绿色雾从左上角(4% 2%)挪到内容区(30% 0%)并压低 alpha：
+       原来整块压在侧边栏背后，导致侧边栏面板顶部浓绿、底部近白，
+       纵向色差高达 50+，看起来像上下两块拼在一起。 */
+    radial-gradient(circle 34vw at 30% 0%, rgba(7, 193, 96, 0.28) 0%, rgba(7, 193, 96, 0) 70%),
+    radial-gradient(circle 46vw at 52% 46%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 62%),
+    linear-gradient(168deg, #eaf4f0 0%, #e3edfa 100%);
+}
+
+html.dark.glass body::before {
+  background:
+    radial-gradient(circle 30vw at 98% 92%, rgba(45, 212, 124, 0.18) 0%, rgba(45, 212, 124, 0) 70%),
+    radial-gradient(circle 46vw at 44% 40%, rgba(180, 255, 220, 0.22) 0%, rgba(180, 255, 220, 0) 62%),
+    radial-gradient(circle 32vw at 22% 96%, rgba(178, 92, 255, 0.2) 0%, rgba(178, 92, 255, 0) 70%),
+    radial-gradient(circle 40vw at 96% 2%, rgba(74, 120, 255, 0.28) 0%, rgba(74, 120, 255, 0) 68%),
+    radial-gradient(circle 36vw at 6% 4%, rgba(7, 193, 96, 0.3) 0%, rgba(7, 193, 96, 0) 68%),
+    linear-gradient(168deg, #06090f 0%, #0c1526 100%);
+}
+
+/* 点阵材质单独一层：多背景里 mask 会作用到整层，没法只遮点阵 */
+html.glass body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(17, 17, 17, 0.055) 1px, transparent 1px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 32%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 32%, #000 0%, transparent 78%);
+}
+
+html.dark.glass body::after {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+/* 顶层结构表面：全应用只有这两类元素付 backdrop-filter 的合成代价。
+   注意前缀顺序必须「-webkit- 在前、标准属性在后」：
+   两者写在一起时压缩器会把它们当同一属性组只保留最后一个，
+   若标准属性被丢掉，getComputedStyle().backdropFilter 会读成 none，
+   非 WebKit 内核也会完全失效。 */
+.glass-chrome,
+.glass-surface {
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* 玻璃表面配方：大扩散柔和投影 + 顶部内高光，变量在 .glass 块里按明暗各给一套。
+   规则整体挂在 html.glass 下，关闭玻璃时选择器不匹配、完全不影响原有阴影，
+   所以不需要在组件里做任何开关判断。 */
+html.glass .glass-chrome {
+  /* 顶栏 / 标题栏在玻璃态下不再用硬边框分隔。
+     注意这里**不能加投影**：之前用"浮起阴影"来分层，但顶栏是横向满宽的条，
+     rgba(0,0,0,0.45) 0 12px 36px 会在它下沿形成一道暗带 ——
+     实测下沿出现 1px、Δ≈76 的硬跳变（header 底色撞上投影暗带），
+     看起来就是一条"间隔线"，与"去线条"的初衷正好相反。
+     只保留顶部内高光，边界交给底色本身。 */
+  border-color: transparent;
+  box-shadow: var(--glass-inner);
+}
+
+/* 模块卡与顶栏的透明度**单独调**，不复用 --bg-card。
+   原因：--bg-card 同时是 WelcomeModal / UpdateModal / ClearLocalDataDialog /
+   PortableUpdateDialog 的外壳底色，压低它会把这几个弹窗变成"薄膜"（之前踩过）。
+   而模块卡铺满整个内容区，是全应用最需要"透"的表面，必须能独立调。
+
+   浅色为什么要压到 0.4：暗色卡片是 rgba(255,255,255,0.07)，93% 的背景透出来，
+   所以通透；浅色原来 0.58 只有 42% 可见，在浅底上就"看不出玻璃"。
+   两侧对齐到同一量级才有同样的观感。 */
+html.glass .glass-surface {
+  background-color: var(--glass-surface-bg);
+}
+
+html.glass .glass-chrome {
+  background-color: var(--glass-chrome-bg);
+}
+
+html.glass .glass-surface {
+  /* 页面模式的模块卡自带 ring-1（Tailwind 用 box-shadow 实现），
+     直接赋值会把它覆盖掉，所以把描边一并写进阴影里，避免卡片丢轮廓。
+     这里用 --glass-edge（白色反光）而不是 --border-color（内部分隔线色）。 */
+  box-shadow: 0 0 0 1px var(--glass-edge), var(--glass-shadow), var(--glass-inner);
+}
+
+/* ===== 模块内部的玻璃化重排 =====
+   原则与 Evan 个人站点一致：去边框、去底色，靠留白和字重分层，
+   而不是把每块内容都套一个盒子（现在的写法是卡片里再套 border 盒子、盒子里再套色块图标）。
+   这些规则全部挂在 html.glass 下 —— 关掉玻璃时选择器不匹配，原样式 100% 保留，
+   所以这次改造是**可逆**的，组件里也没有任何开关判断。
+   新增一类内部块时，只要在 JSX 里加一个语义类，样式统一写在这里。 */
+html.glass .glass-metrics {
+  gap: 0;
+}
+
+/* 指标块：去掉边框与底色，左右内边距归零，让三组指标靠留白分开 */
+html.glass .glass-metric {
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* 宽屏三列时用一道极淡的竖线分组；窄屏会折成单列，竖线会错位，所以只在 md 以上生效 */
+@media (min-width: 768px) {
+  html.glass .glass-metric + .glass-metric {
+    border-left: 1px solid var(--border-muted);
+    padding-left: 1.5rem;
+  }
+}
+
+/* 图标保留品牌绿，但去掉外面那层淡绿方块 */
+html.glass .glass-metric-icon {
+  background: transparent;
+}
+
+/* 弹窗内部的顶栏 / 底栏：玻璃态下去掉自己的底色，与对话框连成一片，
+   只留 border-t / border-b 当分隔线。否则它们在对话框里是一块独立的"板子"，
+   和"去盒子、靠留白分层"的语言不一致。
+   同时去掉这些栏自带的 backdrop-blur —— 母体已经是玻璃层，
+   栏再模糊一次只会把弹窗背后的应用内容采样进来，产生一圈多余的模糊带。 */
+html.glass .glass-bar {
+  background-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 卡片内嵌的次级区块（筛选行、搜索行、分区等）：去边框去底色，交给留白分层。
+   只去掉"盒子"本身，**保留内边距** —— 这样批量套用到几十处也不会破坏任何布局。 */
+html.glass .glass-block {
+  border-color: transparent;
+  background-color: transparent;
+}
+
+/* 列表容器：只去掉最外圈边框。
+   **内部的行分隔线必须保留** —— 长列表没有行线会完全读不下去，那是功能性分隔，不是装饰。 */
+html.glass .glass-list {
+  border-color: transparent;
+}
+
+/* 浮层表面（弹窗卡 / 下拉面板 / 气泡）：换成更实的专用底色。
+   基础表面在暗色下只有 7% 白、浅色下 0.58，对"铺在背景上的卡片"够用，
+   但浮层悬在任意内容之上时盖不住 —— 实测暗色清理弹窗里能看清背后列表的文字。 */
+html.glass .glass-overlay {
+  background-color: var(--glass-overlay-bg);
+}
+
+/* ===== 侧边栏：液态玻璃下做成浮起的圆角面板 =====
+   两个硬约束：① 布局占位不变、收缩照常；② **视觉上只能有一个容器**。
+   内缩用 padding（border-box 下不影响外部宽度，且它定义了面板范围）；
+   面板本身用 ::before 绘制 —— 背景、圆角、投影必须落在同一个盒子上。
+
+   这里**不能用**"透明边框 + background-clip: padding-box"：
+   那样背景在 padding-box、而 box-shadow 参照的是 border-box，
+   结果外圈一道投影轮廓、内圈一块面板，看起来就是两个容器（已经踩过）。 */
+html.glass .sidebar-nav {
+  /* 内缩量只在这里定义一次，padding（管内容）和 ::before 的 inset（管面板）共用，
+     否则两边各写一份，改一处忘一处就会内容跑出面板 */
+  --sidebar-panel-inset-y: 1.5em;
+  --sidebar-panel-inset-x: 0.75em;
+
+  padding: var(--sidebar-panel-inset-y) var(--sidebar-panel-inset-x);
+  background-color: transparent;
+  border-right-color: transparent;
+  /* 抵消 .glass-chrome 加在外框上的效果 —— 这两条是关键：
+     · box-shadow 会沿外框画一圈投影轮廓；
+     · backdrop-filter 更隐蔽：它会把**整个外框范围**的背景都模糊一遍，
+       于是外框变成一个"模糊矩形"，里面再叠一块更亮的面板，看起来就是两层。
+     外框必须是完全什么都看不见的，模糊只留在 ::before 的面板上。 */
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  /* 建立局部层叠上下文，让 ::before 的 z-index: -1 只作用在这个子树内 */
+  isolation: isolate;
+  /* 高度跟着内容走，不撑满整列 —— 撑满会变成"一块背景板"，不像浮起的卡片。
+     align-self 覆盖 flex 默认的 stretch；菜单很长时由 max-height 兜住，
+     列表自身的 overflow-y: auto 负责滚动，不会溢出。 */
+  align-self: flex-start;
+  max-height: 100%;
+}
+
+html.glass .sidebar-nav::before {
+  content: '';
+  /* 注意：绝对定位的包含块是 **padding box**，它是"包含 padding 区域"的，
+     所以 inset:0 等于整个外框、一点内缩都没有 —— 面板会直接贴边。
+     必须显式写上内缩量，和上面的 padding 保持一致。 */
+  position: absolute;
+  inset: var(--sidebar-panel-inset-y) var(--sidebar-panel-inset-x);
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 1.1em;
+  /* 材质与模块卡统一（都用 --glass-surface-bg）。
+     之前用 --glass-chrome-bg（更白），侧边栏比卡片亮一档，本身就容易被看成"另一层"。 */
+  background-color: var(--glass-surface-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  /* 投影收紧：留白带只有 10.5px 宽，--glass-shadow 的 30px 模糊会整条盖住它，
+     在面板外面形成一圈"晕"，看起来就像多了一层。 */
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06), var(--glass-inner);
+}
+
+/* 收缩态只有 4.25em 宽，内缩必须收小，否则面板装不下图标 */
+html.glass .sidebar-nav--collapsed {
+  --sidebar-panel-inset-x: 0.5em;
+}
+
+html.glass .sidebar-nav--collapsed::before {
+  border-radius: 0.9em;
+}
+
+/* 面板自己就是一块玻璃，header 底下的那条分割线在玻璃里去掉了 */
+html.glass .sidebar-nav__header {
+  border-bottom-color: transparent;
+}
+
+/* ===== 液态玻璃下的全局滚动条 =====
+   注意：项目里已有 `* { scrollbar-color: ... }`，而 Chromium 121+ 一旦设置了标准属性
+   scrollbar-color / scrollbar-width，就会**忽略 ::-webkit-scrollbar 系列规则**。
+   所以这里两条都写：标准属性负责实际生效，伪元素留给不支持的旧内核。 */
+html.glass * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-scrollbar-thumb) transparent;
+}
+
+html.glass ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+html.glass ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.glass ::-webkit-scrollbar-thumb {
+  background-color: var(--glass-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+html.glass ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--glass-scrollbar-thumb-hover);
+}
+
+html.glass ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================================================
    滚动条样式 - 现代简约风格
    ============================================================================ */
 ::-webkit-scrollbar {

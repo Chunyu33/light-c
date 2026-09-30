@@ -332,7 +332,7 @@ function ChartTooltip({ tooltip }: { tooltip: ChartTooltipState | null }) {
 
   return (
     <div
-      className="pointer-events-none absolute z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 shadow-lg shadow-black/10"
+      className="glass-overlay pointer-events-none absolute z-30 w-48 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 shadow-lg shadow-black/10"
       style={{
         left: tooltip.x,
         top: tooltip.y,

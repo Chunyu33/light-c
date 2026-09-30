@@ -75,7 +75,7 @@ export function LeftoverWhitelistModal({
               ) : (
                 <div className="space-y-2">
                   {entries.map((entry) => (
-                    <div key={entry.path} className="flex items-center gap-3 rounded-lg bg-[var(--bg-main)] p-3">
+                    <div key={entry.path} className="glass-block flex items-center gap-3 rounded-lg bg-[var(--bg-main)] p-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm text-[var(--text-primary)]" title={entry.path}>{entry.path}</p>
                         <p className="mt-1 text-xs text-[var(--text-muted)]">{t('leftovers.whitelistAddedAt', { time: formatAddedTime(entry.addedAt) })}</p>

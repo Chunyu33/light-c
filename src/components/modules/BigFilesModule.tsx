@@ -379,7 +379,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
       {isDeleting && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
             </div>

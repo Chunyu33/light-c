@@ -15,9 +15,9 @@
         "label": "main",
         "title": "LightC",
         "width": 820,
-        "height": 610,
+        "height": 690,
         "minWidth": 820,
-        "minHeight": 610,
+        "minHeight": 690,
         "center": true,
         "decorations": false,
         "visible": true

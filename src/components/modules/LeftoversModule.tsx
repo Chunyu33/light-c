@@ -1070,7 +1070,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
                     {moduleT('leftovers.manualReviewDesc')}
                   </p>
                   {reviewItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-[0.57em] p-[0.57em] bg-[var(--bg-card)] rounded-lg">
+                    <div key={idx} className="glass-block flex items-center justify-between gap-[0.57em] p-[0.57em] bg-[var(--bg-card)] rounded-lg">
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.86em] font-medium text-[var(--text-primary)] truncate" title={item.path}>
                           {getFolderName(item.path)}
@@ -1125,7 +1125,7 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
               {expandedSection === 'failed' && (
                 <div className="px-[0.86em] pb-[0.86em] space-y-[0.57em]">
                   {failedItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-[0.57em] p-[0.57em] bg-[var(--bg-card)] rounded-lg">
+                    <div key={idx} className="glass-block flex items-center gap-[0.57em] p-[0.57em] bg-[var(--bg-card)] rounded-lg">
                       <XCircle className="w-[1.14em] h-[1.14em] text-[var(--color-danger)] shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[0.86em] font-medium text-[var(--text-primary)] truncate" title={item.path}>

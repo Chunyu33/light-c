@@ -182,7 +182,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
     <>
       {isDeleting && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
             </div>
@@ -257,7 +257,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
             </div>
 
             {backupPath && (
-              <div className="flex items-center justify-between p-3 bg-[var(--bg-main)] rounded-xl">
+              <div className="glass-block flex items-center justify-between p-3 bg-[var(--bg-main)] rounded-xl">
                 <span className="text-xs text-[var(--text-muted)]">
                   {moduleT('registry.backup')}: {backupPath}
                 </span>

@@ -75,7 +75,7 @@ function ShellIconRow({
   const isRemovedEntry = isNavigationEntry && entry.isLocked;
 
   return (
-    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
+    <div className="glass-block rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-green-10)]">
           {protectedEntry ? <Shield className="h-5 w-5 text-[var(--color-warning)]" /> : isNavigationEntry ? <PanelLeft className="h-5 w-5 text-[var(--brand-green)]" /> : <HardDriveDownload className="h-5 w-5 text-[var(--brand-green)]" />}
@@ -239,11 +239,11 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
           {entries && (
             <>
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-xl bg-[var(--bg-main)] p-3 text-center"><p className="text-xl font-bold text-[var(--text-primary)]">{entries.length}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.scannedNodes')}</p></div>
+                <div className="glass-block rounded-xl bg-[var(--bg-main)] p-3 text-center"><p className="text-xl font-bold text-[var(--text-primary)]">{entries.length}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.scannedNodes')}</p></div>
                 <div className="rounded-xl bg-[var(--brand-green-10)] p-3 text-center"><p className="text-xl font-bold text-[var(--brand-green)]">{actionableCount}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.actionableNodes')}</p></div>
                 <div className="rounded-xl bg-blue-500/10 p-3 text-center"><p className="text-xl font-bold text-blue-600 dark:text-blue-400">{entries.filter(entry => entry.isLocked).length}</p><p className="text-xs text-[var(--text-muted)]">{moduleT('shellIcons.lockedNodes')}</p></div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
+              <div className="glass-block flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
                 <div className="flex flex-wrap gap-2 text-xs text-[var(--text-muted)]"><span className="inline-flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-[var(--color-warning)]" />{moduleT('shellIcons.protectedHint')}</span><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-[var(--brand-green)]" />{moduleT('shellIcons.backupHint')}</span></div>
                 <div className="flex gap-2">
                   <button type="button" disabled={isOpeningBackup} onClick={() => { setIsOpeningBackup(true); void openShellIconBackupDir().catch(error => showToast({ type: 'error', title: moduleT('shellIcons.openBackupFailed'), description: String(error) })).finally(() => setIsOpeningBackup(false)); }} className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50"><FolderOpen className="h-3.5 w-3.5" />{moduleT('shellIcons.backupDir')}</button>

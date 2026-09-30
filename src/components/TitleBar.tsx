@@ -108,7 +108,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
 
   return (
     <div 
-      className="h-10 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0 select-none"
+      className="h-10 glass-chrome bg-[var(--bg-card)] border-b border-[var(--border-color)] flex items-center justify-between shrink-0 select-none"
       onDoubleClick={handleTitleBarDoubleClick}
       onMouseDown={handleTitleBarMouseDown}
       onMouseMove={handleTitleBarMouseMove}

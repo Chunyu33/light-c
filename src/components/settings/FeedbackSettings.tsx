@@ -31,7 +31,7 @@ export function FeedbackSettings() {
           <HelpCircle  className="w-3.5 h-3.5"/>
           {t('feedback.title')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div>
             <p className="text-xs text-[var(--text-muted)] mt-1">
               {t('feedback.description')}
@@ -84,7 +84,7 @@ export function FeedbackSettings() {
           <MessageCircle className="w-3.5 h-3.5" />
           {t('feedback.contact')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-4 space-y-3">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-4 space-y-3">
           {/* QQ群 */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

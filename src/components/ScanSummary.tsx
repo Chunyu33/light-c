@@ -88,7 +88,7 @@ function FailedFilesModal({
             </div>
 
             {/* 列表头部 */}
-            <div className="flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
+            <div className="glass-bar flex items-center px-5 py-2 border-b border-[var(--border-default)] bg-[var(--bg-card)] text-xs font-medium text-[var(--fg-muted)] shrink-0">
               <span className="flex-1">{t('filePath')}</span>
               <span className="w-32 text-right">{t('processingResult')}</span>
             </div>
@@ -140,7 +140,7 @@ function FailedFilesModal({
             </div>
 
             {/* 底部 */}
-            <div className="flex items-center justify-end px-5 py-3 border-t border-[var(--border-default)] bg-[var(--bg-card)] shrink-0">
+            <div className="glass-bar flex items-center justify-end px-5 py-3 border-t border-[var(--border-default)] bg-[var(--bg-card)] shrink-0">
               <button
                 onClick={onClose}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--bg-hover)] text-[var(--fg-primary)] hover:bg-[var(--bg-base)] transition-colors"
@@ -178,7 +178,7 @@ export function ScanSummary({
       {scanResult && (
         <div className="grid grid-cols-4 gap-3">
         {/* 发现文件 */}
-        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
+        <div className="glass-block bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <FileSearch className="w-4 h-4 text-emerald-500" />
             <span className="text-xs text-[var(--fg-muted)]">{t('filesFound')}</span>
@@ -189,7 +189,7 @@ export function ScanSummary({
         </div>
 
         {/* 可清理 */}
-        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
+        <div className="glass-block bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <Trash2 className="w-4 h-4 text-orange-500" />
             <span className="text-xs text-[var(--fg-muted)]">{t('cleanable')}</span>
@@ -200,7 +200,7 @@ export function ScanSummary({
         </div>
 
         {/* 已选中 */}
-        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
+        <div className="glass-block bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             <span className="text-xs text-[var(--fg-muted)]">{t('selected')}</span>
@@ -212,7 +212,7 @@ export function ScanSummary({
         </div>
 
         {/* 扫描耗时 */}
-        <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
+        <div className="glass-block bg-[var(--bg-card)] rounded-lg border border-[var(--border-default)] p-3">
           <div className="flex items-center gap-2 mb-1">
             <Clock className="w-4 h-4 text-teal-500" />
             <span className="text-xs text-[var(--fg-muted)]">{t('scanDuration')}</span>

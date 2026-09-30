@@ -22,7 +22,10 @@
     "desc": "Choose the app's appearance theme",
     "light": "Light",
     "dark": "Dark",
-    "system": "System"
+    "system": "System",
+    "glassLabel": "Liquid glass look",
+    "glassDesc": "Gives the title bar, sidebar and cards a translucent glass finish",
+    "glassWarning": "Keeps the GPU busy, so scrolling may stutter on slower machines. Turn it on only if your device can handle it."
   },
   "language": {
     "label": "Language",

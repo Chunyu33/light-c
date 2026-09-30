@@ -62,7 +62,7 @@ export function SupportAuthor() {
           <Coffee className="w-3.5 h-3.5" />
           {t('supportTitle')}
         </h4>
-        <div className="@container bg-[var(--bg-main)] rounded-2xl p-5">
+        <div className="glass-block @container bg-[var(--bg-main)] rounded-2xl p-5">
           {/* 左右两列：左列是赞赏码与支付方式切换（同属"扫码支持"这一件事），右列只放文案。
               这里用容器查询而不是视口断点：设置弹窗只占视口 76%，右侧内容区更窄，
               按视口宽度判断会在中等窗口下把文案压成一列几个字。 */}
@@ -145,7 +145,7 @@ export function SupportAuthor() {
                 {/* 关闭按钮 */}
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="absolute -top-2 -right-2 w-8 h-8 bg-[var(--bg-card)] rounded-full shadow-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
+                  className="glass-overlay absolute -top-2 -right-2 w-8 h-8 bg-[var(--bg-card)] rounded-full shadow-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
                 >
                   <X className="w-4 h-4" />
                 </button>

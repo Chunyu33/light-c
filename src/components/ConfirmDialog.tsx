@@ -115,7 +115,7 @@ export const ConfirmDialog = memo(function ConfirmDialog({
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex items-center justify-end gap-[0.86em] px-[1.43em] py-[1.14em] border-t border-[var(--border-default)] bg-[var(--bg-card)]">
+        <div className="glass-bar flex items-center justify-end gap-[0.86em] px-[1.43em] py-[1.14em] border-t border-[var(--border-default)] bg-[var(--bg-card)]">
           <button
             onClick={onCancel}
             className="px-[1.14em] py-[0.57em] rounded-lg text-[1em] font-medium text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] hover:bg-[var(--bg-hover)] transition-colors"

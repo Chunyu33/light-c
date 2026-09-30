@@ -89,7 +89,7 @@ function HealthBadge({ status, translate }: { status: DiskHealthInfo['health_sta
 
 function InfoItem({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+    <div className="glass-list min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
       {/* 磁盘字段来自系统接口，标签和值都限制为单行，避免异常厂商文本撑开卡片。 */}
       <p className="truncate text-[11px] font-medium text-[var(--text-muted)]" title={label}>{label}</p>
       <p className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)]" title={title ?? value}>
@@ -102,7 +102,7 @@ function InfoItem({ label, value, title }: { label: string; value: string; title
 function VolumeItem({ volume, translate }: { volume: DiskVolumeInfo; translate: Translate }) {
   const usagePercent = Math.min(Math.max(volume.usage_percent, 0), 100);
   return (
-    <div className="min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
+    <div className="glass-list min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
         <span className="min-w-0 truncate text-xs font-semibold text-[var(--text-primary)]" title={getVolumeLabel(volume)}>
           {getVolumeLabel(volume)}
@@ -129,7 +129,7 @@ function DiskInfoCard({ disk, translate }: { disk: DiskHealthInfo; translate: Tr
   const subtitle = `${disk.drive_letters.length > 0 ? disk.drive_letters.join(' / ') : translate('diskInfo.unassignedDrive')} · ${formatMediaType(disk.media_type, translate)} · ${disk.bus_type || translate('diskInfo.unknownBus')}`;
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
+    <article className="glass-list min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
       <div className="flex min-w-0 items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-green-10)] text-[var(--brand-green)]">
           <HardDrive className="h-4 w-4" />
@@ -205,7 +205,7 @@ export function DiskInfoSettings() {
       </div>
 
       {isLoading && (
-        <div className="flex items-center justify-center rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] py-12 text-sm text-[var(--text-muted)]">
+        <div className="glass-block flex items-center justify-center rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] py-12 text-sm text-[var(--text-muted)]">
           <Loader2 className="mr-2 h-4 w-4 animate-spin text-[var(--brand-green)]" /> {t('diskInfo.reading')}
         </div>
       )}

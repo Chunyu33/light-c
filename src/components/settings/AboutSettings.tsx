@@ -43,7 +43,7 @@ export function AboutSettings() {
           <Info className="w-3.5 h-3.5" />
           {t('about.appInfo')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-[var(--brand-green)] flex items-center justify-center">
               <span className="text-2xl font-bold text-white">C:</span>
@@ -97,7 +97,7 @@ export function AboutSettings() {
           <MonitorIcon className="w-3.5 h-3.5" />
           {t('about.systemInfo')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5">
           {loadingSystemInfo ? (
             <div className="flex items-center justify-center py-4">
               <RefreshCw className="w-5 h-5 text-[var(--brand-green)] animate-spin" />
@@ -181,7 +181,7 @@ export function AboutSettings() {
           <HelpCircle className="w-3.5 h-3.5" />
           {t('about.nameSection')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5">
           <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{t('about.nameDescription')}</p>
         </div>
       </div>
@@ -191,7 +191,7 @@ export function AboutSettings() {
           <Code2 className="w-3.5 h-3.5" />
           {t('about.developer')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">{t('about.author')}</span>
             <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
@@ -300,7 +300,7 @@ function MoreToolsSection() {
         {tools.map(({ name, icon, description, downloadUrl }) => (
           <div
             key={name}
-            className="rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] p-4"
+            className="glass-block rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] p-4"
           >
             <div className="flex items-center mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center">

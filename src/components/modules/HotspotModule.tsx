@@ -110,7 +110,7 @@ function HotspotDiagnostics({
   const stageLabel = getProgressStageLabel(latestLog?.stage);
 
   return (
-    <div className={`rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-4 py-3 text-xs ${compact ? 'space-y-2' : 'space-y-3'}`}>
+    <div className={`glass-block rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-4 py-3 text-xs ${compact ? 'space-y-2' : 'space-y-3'}`}>
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 md:gap-4">
         <div className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--brand-green)] text-white font-medium">
@@ -130,7 +130,7 @@ function HotspotDiagnostics({
           {visibleLogs.map((log, index) => (
             <div
               key={`${log.stage}-${index}`}
-              className="min-w-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] px-2.5 py-2"
+              className="glass-block min-w-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] px-2.5 py-2"
             >
               <div className="truncate text-[var(--text-muted)]">{getProgressStageLabel(log.stage)}</div>
               <div className="mt-0.5 text-[var(--text-primary)] font-semibold tabular-nums">

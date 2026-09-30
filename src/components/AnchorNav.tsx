@@ -127,7 +127,7 @@ export function AnchorNav({ scrollContainerRef }: AnchorNavProps) {
     >
       <div
         className={`
-          flex items-center justify-center w-8 h-8 rounded-lg
+          glass-overlay flex items-center justify-center w-8 h-8 rounded-lg
           bg-[var(--bg-card)] border border-[var(--border-default)]
           shadow-lg cursor-pointer
           transition-all duration-300 ease-out
@@ -140,7 +140,7 @@ export function AnchorNav({ scrollContainerRef }: AnchorNavProps) {
 
       <div
         className={`
-          absolute left-0 top-1/2 -translate-y-1/2
+          glass-overlay absolute left-0 top-1/2 -translate-y-1/2
           bg-[var(--bg-card)] border border-[var(--border-default)]
           rounded-xl shadow-xl overflow-hidden
           transition-all duration-300 ease-out

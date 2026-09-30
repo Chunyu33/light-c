@@ -139,7 +139,7 @@ export function SidebarNav() {
 
   return (
     <aside
-      className={`sidebar-nav${isCollapsed ? ' sidebar-nav--collapsed' : ''}${isResizing ? ' sidebar-nav--resizing' : ''}`}
+      className={`sidebar-nav glass-chrome${isCollapsed ? ' sidebar-nav--collapsed' : ''}${isResizing ? ' sidebar-nav--resizing' : ''}`}
       style={{ '--sidebar-nav-width': `${renderedSidebarWidth}px` } as CSSProperties}
       aria-label={t('sidebarLabel')}
     >

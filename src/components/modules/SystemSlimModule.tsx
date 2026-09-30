@@ -472,7 +472,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
               return (
                 <div
                   key={item.id}
-                  className={`bg-[var(--bg-base)] rounded-xl border border-[var(--border-default)] overflow-hidden transition-all ${
+                  className={`glass-list bg-[var(--bg-base)] rounded-xl border border-[var(--border-default)] overflow-hidden transition-all ${
                     item.actionable ? 'hover:border-emerald-500/30' : 'opacity-60'
                   }`}
                 >
@@ -601,7 +601,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
 
         {/* 底部说明 */}
         {status && (
-          <div className="bg-[var(--bg-elevated)] rounded-lg px-3 py-2 text-[10px] text-[var(--fg-muted)] leading-relaxed">
+          <div className="glass-block bg-[var(--bg-elevated)] rounded-lg px-3 py-2 text-[10px] text-[var(--fg-muted)] leading-relaxed">
             <strong className="text-[var(--fg-secondary)]">{moduleT('systemSlim.tip')}</strong>
             {moduleT('systemSlim.tipDesc')}
           </div>

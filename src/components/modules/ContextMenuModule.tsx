@@ -19,6 +19,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
@@ -516,7 +517,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
       {/* 删除进度遮罩 - Portal 渲染到 body 确保覆盖全屏 */}
       {isDeleting && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
+          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="w-16 h-16 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-[var(--color-danger)] animate-spin" />
             </div>
@@ -595,7 +596,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
 
             {/* 扫描统计 */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-[var(--bg-main)] rounded-xl text-center">
+              <div className="glass-block p-3 bg-[var(--bg-main)] rounded-xl text-center">
                 <p className="text-xl font-bold text-[var(--text-primary)] tabular-nums">
                   {scanResult.entries.length}
                 </p>
@@ -615,47 +616,40 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               </div>
             </div>
 
-            {/* 操作栏 */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {/* 全选/取消全选 */}
-                <button
-                  onClick={toggleSelectAll}
-                  className="text-sm text-[var(--brand-green)] hover:underline"
-                >
-                  {allFilteredSelected ? t('deselectAll') : t('selectAll')}
-                </button>
+            {/* 操作栏：筛选与计数留在这里；全选与删除按钮移到悬浮操作区，
+                与垃圾清理等模块共用同一套组件 —— 列表往下滚动时按钮始终可见 */}
+            <div className="flex items-center gap-3">
+              {/* 仅显示无效条目开关 */}
+              <button
+                onClick={() => setShowInvalidOnly((v) => !v)}
+                className={`
+                  text-xs px-2.5 py-1 rounded-lg border transition-colors
+                  ${showInvalidOnly
+                    ? 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] border-[var(--color-danger)]/20'
+                    : 'bg-[var(--bg-hover)] text-[var(--text-muted)] border-transparent'
+                  }
+                `}
+              >
+                {moduleT('contextMenu.invalidOnly')}
+              </button>
 
-                {/* 仅显示无效条目开关 */}
-                <button
-                  onClick={() => setShowInvalidOnly((v) => !v)}
-                  className={`
-                    text-xs px-2.5 py-1 rounded-lg border transition-colors
-                    ${showInvalidOnly
-                      ? 'bg-[var(--color-danger)]/10 text-[var(--color-danger)] border-[var(--color-danger)]/20'
-                      : 'bg-[var(--bg-hover)] text-[var(--text-muted)] border-transparent'
-                    }
-                  `}
-                >
-                  {moduleT('contextMenu.invalidOnly')}
-                </button>
+              <span className="text-sm text-[var(--text-muted)]">
+                {moduleT('contextMenu.selected', { count: selectedCount })}
+              </span>
+            </div>
 
-                <span className="text-sm text-[var(--text-muted)]">
-                  {moduleT('contextMenu.selected', { count: selectedCount })}
-                </span>
-              </div>
-
-              {/* 删除按钮 */}
+            {/* 操作按钮区：默认展开、跟随视口，下拉列表再长也能找到删除按钮 */}
+            <ModuleOperationToolbar moduleId="context">
+              <button
+                onClick={toggleSelectAll}
+                className="module-operation-toolbar__button module-operation-toolbar__button--muted"
+              >
+                {allFilteredSelected ? t('deselectAll') : t('selectAll')}
+              </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedCount === 0 || isDeleting}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
-                  ${selectedCount === 0 || isDeleting
-                    ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
-                    : 'bg-[var(--color-danger)] text-white hover:opacity-90'
-                  }
-                `}
+                className="module-operation-toolbar__button module-operation-toolbar__button--danger"
               >
                 {isDeleting
                   ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -663,7 +657,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
                 }
                 {moduleT('contextMenu.deleteSelected')}
               </button>
-            </div>
+            </ModuleOperationToolbar>
 
             {/* 错误提示 */}
             {deleteError && (

@@ -64,7 +64,7 @@ export function SecuritySettings() {
           <ShieldCheck className="w-3.5 h-3.5" />
           {t('security.title')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
           <div>
             <p className="text-sm font-medium text-[var(--text-primary)]">{t('security.verifyTitle')}</p>
             <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-1">
@@ -95,7 +95,7 @@ export function SecuritySettings() {
           <Download className="w-3.5 h-3.5" />
           {t('security.downloadTitle')}
         </h4>
-        <div className="bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
           <p className="text-xs text-[var(--text-muted)] leading-relaxed">
             {t('security.downloadDesc')}
           </p>
@@ -140,7 +140,7 @@ export function SecuritySettings() {
             <ExternalLink className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--brand-green)]" />
           </a>
 
-          <div className="rounded-xl bg-[var(--bg-card)] px-3 py-3">
+          <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{t('security.socialTitle')}</p>
@@ -212,7 +212,7 @@ function VerifyIntegrityResultCard({ result }: { result: VerifyIntegrityResult }
 
   if (result.status === 'network_error') {
     return (
-      <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
+      <div className="glass-block rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
         <div className="flex items-start gap-3">
           <Info className="w-4 h-4 text-[var(--text-muted)] mt-0.5 shrink-0" />
           <div className="min-w-0">
