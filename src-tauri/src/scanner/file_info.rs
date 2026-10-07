@@ -255,8 +255,10 @@ pub struct DeleteResult {
     pub failed_count: usize,
     /// 标记为重启后删除的文件数
     pub reboot_pending_count: usize,
-    /// 释放的空间大小（字节）
+    /// 释放的空间大小（字节）—— **只统计真正释放掉的**，不包含等重启的部分
     pub freed_size: u64,
+    /// 标记为"重启后删除"的文件总大小 —— 这些文件此刻并没有释放磁盘空间
+    pub reboot_pending_size: u64,
     /// 是否需要重启完成清理
     pub needs_reboot: bool,
     /// 失败的文件列表及原因
@@ -271,6 +273,7 @@ impl DeleteResult {
             failed_count: 0,
             reboot_pending_count: 0,
             freed_size: 0,
+            reboot_pending_size: 0,
             needs_reboot: false,
             failed_files: Vec::new(),
         }
@@ -286,7 +289,11 @@ impl DeleteResult {
     pub fn add_reboot_pending(&mut self, size: u64) {
         self.reboot_pending_count += 1;
         self.needs_reboot = true;
-        self.freed_size += size; // 文件将在重启后删除，计入释放空间
+        // 这些文件要重启后才真正删除，**此刻磁盘空间并没有释放**。
+        // 之前把它们的完整大小也加进 freed_size，导致"提示已释放好几 G、实际只释放 1 G 多"。
+        // 现在单独累计；是否需要重启已经由 needs_reboot / reboot_pending_count 表达，
+        // 界面上的"重启后释放"提示继续生效，只是"已释放"这个数字不再虚高。
+        self.reboot_pending_size += size;
     }
 
     /// 记录删除失败
