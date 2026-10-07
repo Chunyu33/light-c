@@ -8,9 +8,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createPortal } from 'react-dom';
 import { Database, Loader2, Trash2, CheckCircle2, Shield } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
@@ -180,26 +180,6 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
   return (
     <>
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
-            <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">{moduleT('registry.cleaning')}</h3>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {moduleT('registry.cleaningDesc', { count: selectedCount })}
-              </p>
-            </div>
-            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500 rounded-full animate-pulse" style={{ width: '100%' }} />
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
       <ModuleCard
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
@@ -215,6 +195,8 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         onScan={handleScan}
         error={moduleState.error}
       >
+        {/* 删除进度就地替换操作行里的删除按钮（见下方），既保留结果区参照，
+            也不额外占文档流 —— 注册表没有悬浮操作区可用。 */}
         {moduleState.status === 'idle' && !scanResult && (
           <div className="p-5">
             <EmptyState
@@ -280,22 +262,28 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
                   {moduleT('registry.selected', { count: selectedCount })} / {scanResult.entries.length}
                 </span>
               </div>
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={selectedCount === 0 || isDeleting}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  selectedCount === 0 || isDeleting
-                    ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
-                    : 'bg-red-500 text-white hover:bg-red-600'
-                }`}
-              >
-                {isDeleting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
+              {/* 删除中就地把按钮换成进度：注册表没有悬浮操作区，
+                  放在这里既不挤动结果区，也让用户在当前视线位置看到进展。 */}
+              {isDeleting ? (
+                <ModuleDeleteProgress
+                  variant="floating"
+                  phaseLabel={moduleT('registry.cleaning')}
+                  progressLabel={moduleT('registry.cleaningDesc', { count: selectedCount })}
+                />
+              ) : (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={selectedCount === 0}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                    selectedCount === 0
+                      ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
+                      : 'bg-red-500 text-white hover:bg-red-600'
+                  }`}
+                >
                   <Trash2 className="w-4 h-4" />
-                )}
-                {moduleT('registry.deleteSelected')}
-              </button>
+                  {moduleT('registry.deleteSelected')}
+                </button>
+              )}
             </div>
 
             {deleteError && (

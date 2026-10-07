@@ -4,9 +4,9 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## v2.16.15
 
-- Files left over from a previous Windows installation (Windows.old) are no longer deleted directly. The app now points you to Windows Disk Cleanup instead: these files are managed by the system, and removing them would also remove your ability to roll back to the previous version.
-- On computers where Windows is installed on a drive other than C, Disk Cleanup now opens on the right drive.
-- Cleanup failures now explain themselves more clearly, separating "not enough permission" from "file in use".
+- Files left over from a previous Windows installation (Windows.old) are no longer deleted directly. The app points you to Windows Disk Cleanup instead: these files are managed by the system, and removing them would also remove your ability to roll back. Disk Cleanup also opens on the right drive now when Windows is not installed on C.
+- The delete progress no longer covers the whole window; it shows inside the module instead, so the window can still be dragged and the title bar stays usable while it runs.
+- Other fixes: cleanup failures explain themselves more clearly, and the collapse arrow in the floating action area points the right way.
 
 ## v2.16.14
 

@@ -5,10 +5,10 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createPortal } from 'react-dom';
 import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
@@ -376,24 +376,6 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
   return (
     <>
-      {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
-            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
-            </div>
-            <div className="text-center">
-            <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{t('bigFiles.deleting')}</h3>
-              <p className="text-sm text-[var(--fg-muted)] mt-1">
-                {t('bigFiles.deletingDesc', { count: selectedFiles.size.toLocaleString() })}
-              </p>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
       {/* 删除确认弹窗 */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
@@ -440,11 +422,24 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
         }
         allowStickyContent
       >
-        {/* 展开内容 */}
-        <div>
-          {shouldShowOperationToolbar && files.length > 0 && !isScanning && (
+            {/* 删除进度改挂在悬浮操作区上（见上面的 busyContent）：
+                那是 position: fixed 的层，不占文档流，所以列表既不被撑开也没有位移 ——
+                大文件需要保留"我在删哪几个"的参照。 */}
+            {/* 展开内容 */}
+            <div>
+              {shouldShowOperationToolbar && files.length > 0 && !isScanning && (
             // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由大文件模块维护。
-            <ModuleOperationToolbar moduleId="bigFiles">
+            <ModuleOperationToolbar
+              moduleId="bigFiles"
+              busy={isDeleting}
+              busyContent={
+                <ModuleDeleteProgress
+                  variant="floating"
+                  phaseLabel={t('bigFiles.deleting')}
+                  progressLabel={t('bigFiles.deletingDesc', { count: selectedFiles.size.toLocaleString() })}
+                />
+              }
+            >
               <button
                 onClick={toggleSelectAll}
                 className="module-operation-toolbar__button module-operation-toolbar__button--muted"

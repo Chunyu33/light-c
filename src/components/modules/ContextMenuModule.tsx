@@ -6,7 +6,6 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { createPortal } from 'react-dom';
 import {
   MousePointerClick,
   Loader2,
@@ -19,6 +18,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -514,31 +514,6 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
 
   return (
     <>
-      {/* 删除进度遮罩 - Portal 渲染到 body 确保覆盖全屏 */}
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
-            <div className="w-16 h-16 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-[var(--color-danger)] animate-spin" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--text-primary)]">{moduleT('contextMenu.cleaning')}</h3>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
-                {moduleT('contextMenu.cleaningDesc', { count: selectedCount })}
-              </p>
-            </div>
-            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[var(--color-danger)] rounded-full animate-pulse"
-                style={{ width: '100%' }}
-              />
-            </div>
-            <p className="text-xs text-[var(--text-faint)]">{t('doNotCloseWindow')}</p>
-          </div>
-        </div>,
-        document.body
-      )}
-
       <ModuleCard
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
@@ -559,6 +534,9 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
           </span>
         }
       >
+        {/* 删除进度改挂在悬浮操作区上（见上面 busyContent）：
+            那是 position: fixed 的层，不占文档流，所以结果区既不被撑开也没有位移 ——
+            右键菜单需要保留"我在删哪几条"的参照。 */}
         {moduleState.status === 'idle' && !scanResult && (
           <div className="p-5">
             <EmptyState
@@ -639,7 +617,18 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
             </div>
 
             {/* 操作按钮区：默认展开、跟随视口，下拉列表再长也能找到删除按钮 */}
-            <ModuleOperationToolbar moduleId="context">
+            <ModuleOperationToolbar
+              moduleId="context"
+              busy={isDeleting}
+              busyContent={
+                <ModuleDeleteProgress
+                  variant="floating"
+                  phaseLabel={moduleT('contextMenu.cleaning')}
+                  progressLabel={moduleT('contextMenu.cleaningDesc', { count: selectedCount })}
+                  hint={t('doNotCloseWindow')}
+                />
+              }
+            >
               <button
                 onClick={toggleSelectAll}
                 className="module-operation-toolbar__button module-operation-toolbar__button--muted"

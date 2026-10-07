@@ -4,7 +4,6 @@
 // ============================================================================
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import i18n from '../../i18n';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,7 +11,6 @@ import {
   Database,
   FileSearch,
   HardDrive,
-  Loader2,
   ShieldCheck,
   StopCircle,
   Timer,
@@ -20,6 +18,7 @@ import {
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { CategoryCard } from '../CategoryCard';
 import { ScanSummary } from '../ScanSummary';
@@ -356,6 +355,11 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const handleDelete = useCallback(async () => {
     if (selectedPaths.size === 0 && selectedCategoryNames.size === 0) return;
 
+    // 与 handleScan 共用同一个"忙"标记：删除期间点「重新扫描」或切「深度发现」都会
+    // 清空 scanResult，把正在进行中的删除的界面上下文拆掉（handleScan 那里的注释也提到了这点）。
+    // 原来的标记只在扫描时置位，删除时是空的，等于没拦住。
+    scanningRef.current = true;
+
     // 先给出准备阶段反馈，后端展开深度分类时用户不会看到无响应的遮罩。
     setDeleteProgress({
       phase: 'preparing',
@@ -462,6 +466,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     } finally {
       setIsDeleting(false);
       setDeleteProgress(null);
+      // 与上面的置位配对，退出时务必恢复，否则之后再也扫不了。
+      scanningRef.current = false;
     }
   }, [deepScanResult, excludedDeepPaths, fullySelectedDeepCategoryNames, scanMode, selectedFileCount, selectedPaths, selectedCategoryNames, showToast, t, triggerHealthRefresh, updateModuleState]);
 
@@ -595,39 +601,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
   return (
     <>
-      {/* 删除进度遮罩仅覆盖实际文件操作；后续核验在页面内后台进行，避免长时间阻塞用户。 */}
-      {isDeleting && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/45 flex items-center justify-center">
-          <div className="glass-overlay bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4">
-            <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-[var(--fg-primary)]">
-                {getDeletePhaseLabel(deleteProgress?.phase ?? 'preparing')}
-              </h3>
-              <p className="text-sm text-[var(--fg-muted)] mt-1">
-                {t('deleteProgress.processed', { current: deleteProcessedCount.toLocaleString(), total: deleteTotalCount.toLocaleString() })}
-              </p>
-            </div>
-            <div className="w-full h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-rose-500 rounded-full transition-all duration-300"
-                style={{ width: `${deleteProgressPercent}%` }}
-              />
-            </div>
-            <div className="w-full grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--fg-muted)]">
-              <span>{t('deleteProgress.freed', { size: formatSize(deleteProgress?.freed_physical_size ?? 0) })}</span>
-              <span className="text-right">{t('deleteProgress.failed', { count: deleteProgress?.failed_count ?? 0 })}</span>
-              <span>{t('deleteProgress.speed', { speed: formatDeleteSpeed(deleteProgress) })}</span>
-              <span className="text-right">{getDeleteRemainingTime(deleteProgress)}</span>
-            </div>
-            <p className="text-xs text-[var(--fg-faint)]">{t('deleteProgress.doNotClose')}</p>
-          </div>
-        </div>,
-        document.body
-      )}
-
       {/* 删除确认弹窗 */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
@@ -652,8 +625,11 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         description={t('desc')}
         icon={<Trash2 className="w-6 h-6 text-[var(--brand-green)]" />}
         status={moduleState.status}
-        fileCount={moduleState.fileCount}
+        // 删除期间不显示上一次扫描的计数 —— 那批文件正在被清掉，继续摆在标题右侧会让人误以为还有东西可删。
+        // fileCount 归零会让 ModuleCard 走"已完成但无结果"分支，所以同时关掉那个徽标。
+        fileCount={isDeleting ? 0 : moduleState.fileCount}
         totalSize={moduleState.totalSize}
+        hideDoneBadge={isDeleting}
         expanded={isExpanded}
         onToggleExpand={() => setExpandedModule(isExpanded ? null : 'junk')}
         onScan={handleScan}
@@ -689,7 +665,24 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       >
         {/* 展开内容 */}
         <div className="p-4 space-y-3">
-          {shouldShowOperationToolbar && scanResult && scanResult.total_file_count > 0 && (
+          {/* 删除期间只显示进度面板，下面的统计卡与分类列表都是"删除前"的数据，
+              继续摆着会让人以为没删干净。删除本身在后端线程执行，界面不必阻塞。 */}
+          {isDeleting && (
+            <ModuleDeleteProgress
+              phaseLabel={getDeletePhaseLabel(deleteProgress?.phase ?? 'preparing')}
+              progressLabel={t('deleteProgress.processed', { current: deleteProcessedCount.toLocaleString(), total: deleteTotalCount.toLocaleString() })}
+              percent={deleteProgressPercent}
+              details={[
+                t('deleteProgress.freed', { size: formatSize(deleteProgress?.freed_physical_size ?? 0) }),
+                t('deleteProgress.failed', { count: deleteProgress?.failed_count ?? 0 }),
+                t('deleteProgress.speed', { speed: formatDeleteSpeed(deleteProgress) }),
+                getDeleteRemainingTime(deleteProgress),
+              ]}
+              hint={t('deleteProgress.doNotClose')}
+            />
+          )}
+
+          {!isDeleting && shouldShowOperationToolbar && scanResult && scanResult.total_file_count > 0 && (
             // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由垃圾清理模块维护。
             <ModuleOperationToolbar moduleId="junk">
               <button
@@ -718,7 +711,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
           {/* 扫描结果摘要：有扫描数据时展示统计卡；清理完成后 scanResult 被清空，
               此时仅有 deleteResult 时仍展示清理结果卡 */}
-          {(scanResult || deleteResult) && (
+          {!isDeleting && (scanResult || deleteResult) && (
             <ScanSummary
               scanResult={scanResult}
               deleteResult={deleteResult}
@@ -794,7 +787,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             </div>
           )}
 
-          {deepScanResult && deepScanResult.drives.length > 0 && (
+          {!isDeleting && deepScanResult && deepScanResult.drives.length > 0 && (
             <div className="flex flex-wrap gap-2 text-[11px] text-[var(--fg-muted)]">
               {deepScanResult.drives.map((drive) => (
                 <span key={drive.drive_letter} className="px-2 py-1 rounded-md bg-[var(--bg-hover)]" title={drive.warning ?? undefined}>
@@ -805,7 +798,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           )}
 
           {/* 分类列表 */}
-          {scanResult ? (
+          {!isDeleting && scanResult ? (
             <div className="space-y-2">
               {scanResult.categories
                 .filter((c) => c.files.length > 0)

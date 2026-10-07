@@ -29,6 +29,7 @@ import {
   Clock
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { EmptyState } from '../EmptyState';
@@ -403,40 +404,6 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
   return (
     <>
       {/* 删除进度遮罩 */}
-      {createPortal(
-        <AnimatePresence>
-          {isDeleting && (
-            <motion.div
-              className="fixed inset-0 z-[9999] flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-            >
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-              <motion.div
-                className="glass-overlay relative bg-[var(--bg-card)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4"
-                initial={{ opacity: 0, scale: 0.96, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: 10 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
-                </div>
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-[var(--fg-primary)]">{moduleT('social.deleting')}</h3>
-                  <p className="text-sm text-[var(--fg-muted)] mt-1">
-                    {moduleT('social.deletingDesc', { count: deletingCount })}
-                  </p>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-
       {/* 删除确认弹窗 */}
       <SocialDeleteConfirmModal
         isOpen={showDeleteConfirm}
@@ -466,11 +433,24 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         error={moduleState.error}
         allowStickyContent
       >
-        {/* 展开内容 */}
-        <div className="min-h-[300px]">
-          {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && (
+            {/* 删除进度改挂在悬浮操作区上（见上面的 busyContent）：
+                那是 position: fixed 的层，不占文档流，所以列表既不被撑开也没有位移 ——
+                社交专清需要保留"我在删哪几条"的参照。 */}
+            {/* 展开内容 */}
+            <div className="min-h-[300px]">
+              {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && (
             // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由社交软件模块维护。
-            <ModuleOperationToolbar moduleId="social">
+            <ModuleOperationToolbar
+              moduleId="social"
+              busy={isDeleting}
+              busyContent={
+                <ModuleDeleteProgress
+                  variant="floating"
+                  phaseLabel={moduleT('social.deleting')}
+                  progressLabel={moduleT('social.deletingDesc', { count: deletingCount })}
+                />
+              }
+            >
               <button
                 onClick={toggleSelectAll}
                 className="module-operation-toolbar__button module-operation-toolbar__button--muted"
