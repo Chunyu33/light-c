@@ -629,7 +629,9 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                       {category.files.length > 20 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setFileModalData({ categoryId: category.id, name: moduleT(`social.category.${category.id}.name`) }); }}
-                          className="w-full px-4 py-2 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 border-t border-[var(--border-default)] transition"
+                          // 不再画上边框：它上面已经是数据行的分隔线，再加一条会让这一块显得很密。
+                          // 用主题色文字本身表达"可点"，悬停给一层淡底作为反馈。
+                          className="w-full rounded-b-xl px-4 py-2.5 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 transition"
                         >
                           {moduleT('social.viewFiles')} ({category.files.length.toLocaleString()} {moduleT('social.files')}) →
                         </button>
@@ -780,9 +782,12 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
   const RiskIcon = riskConfig.icon;
   const isCritical = file.risk_level === 'critical';
   
+  // 不再逐行画分隔线：卡片本身有外框、分类之间也有分隔，再给每条数据加线会非常密
+  //（Evan 反馈"数据行分割是边框…太密集了"）。改用略大的行高 + 悬停底色来区隔。
+  // 这是组件类名的改动，所以**所有外观模式下都生效**，不只是液态玻璃。
   return (
     <div
-      className={`px-4 py-2 flex items-center gap-2 text-xs border-b border-[var(--border-default)] last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors
+      className={`px-4 py-2.5 flex items-center gap-2 text-xs hover:bg-[var(--bg-hover)] transition-colors
         ${isCritical ? 'bg-red-500/5 cursor-not-allowed' : 'cursor-pointer'}
         ${isSelected && !isCritical ? 'bg-emerald-500/5' : ''}`}
       onClick={() => !isCritical && onToggle()}
