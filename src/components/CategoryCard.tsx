@@ -15,7 +15,7 @@ import {
   ExternalLink,
   Search,
 } from 'lucide-react';
-import { openInFolder, openFile, openRecycleBin } from '../api/commands';
+import { openInFolder, openFile, openRecycleBin, openDiskCleanup } from '../api/commands';
 import { stripWindowsDevicePrefix } from '../utils/searchEngine';
 import type { CategoryScanResult, FileInfo } from '../types';
 import { formatSize } from '../utils/format';
@@ -104,9 +104,15 @@ export function CategoryCard({
     overscan: 10, // 预渲染数量
   });
 
+  // 由系统托管的分类（旧版 Windows 安装）：应用内删不掉，也不该由应用删 ——
+  // 删了用户就失去回退旧版本的能力。这里统一拦掉勾选，只保留
+  // 「看占用大小 + 引导到系统磁盘清理」两条路径。
+  const isSystemManaged = category.system_managed === true;
+
   const handleCategoryToggle = useCallback(() => {
+    if (isSystemManaged) return;
     onToggleCategory(category.display_name, category.files, !isAllSelected);
-  }, [category.display_name, category.files, isAllSelected, onToggleCategory]);
+  }, [category.display_name, category.files, isAllSelected, onToggleCategory, isSystemManaged]);
 
   const handleExpand = useCallback(() => {
     setExpanded(prev => !prev);
@@ -128,10 +134,12 @@ export function CategoryCard({
             <ChevronDown className="w-5 h-5" />
           </div>
 
-          {/* 复选框 - 微信绿 */}
+          {/* 复选框 - 微信绿；系统托管的分类不提供勾选，显示为禁用态 */}
           <div onClick={(e) => { e.stopPropagation(); handleCategoryToggle(); }}>
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors
-              ${isAllSelected ? 'bg-[var(--brand-green)] border-[var(--brand-green)]' : isPartialSelected ? 'bg-[var(--brand-green)]/50 border-[var(--brand-green)]' : 'border-[var(--text-faint)] hover:border-[var(--text-muted)]'}`}>
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
+              ${isSystemManaged
+                ? 'border-[var(--text-faint)]/40 opacity-40 cursor-not-allowed'
+                : `${isAllSelected ? 'bg-[var(--brand-green)] border-[var(--brand-green)]' : isPartialSelected ? 'bg-[var(--brand-green)]/50 border-[var(--brand-green)]' : 'border-[var(--text-faint)] hover:border-[var(--text-muted)]'} cursor-pointer`}`}>
               {(isAllSelected || isPartialSelected) && (
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   {isAllSelected ? <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /> : <path strokeLinecap="round" d="M5 12h14" />}
@@ -188,8 +196,21 @@ export function CategoryCard({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
           >
-            {/* 风险提示 - 微信风格柔和橙 */}
-            {category.risk_level >= 3 && (
+            {/* 系统托管的分类：不给删除入口，改为引导系统磁盘清理。
+                这类目录应用内删不掉（权限/占用），而且删掉会让用户失去回退旧版本的能力，
+                所以规范做法是交给 Windows 自带的磁盘清理。 */}
+            {isSystemManaged ? (
+              <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex flex-wrap items-center gap-2 text-[13px] text-[var(--color-warning)]">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span className="flex-1 min-w-[12em]">{commonT('systemManagedHint')}</span>
+                <button
+                  onClick={() => openDiskCleanup()}
+                  className="shrink-0 px-2.5 py-1 rounded-lg border border-[var(--color-warning)]/40 hover:bg-[var(--color-warning)]/15 transition text-[12px] font-medium"
+                >
+                  {commonT('openDiskCleanup')}
+                </button>
+              </div>
+            ) : category.risk_level >= 3 && (
               <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[13px] text-[var(--color-warning)]">
                 <AlertTriangle className="w-4 h-4" />
                 <span>{commonT('highRiskWarning')}</span>
@@ -207,6 +228,7 @@ export function CategoryCard({
                         key={file.path}
                         file={file}
                         selected={isSelected}
+                        selectable={!isSystemManaged}
                         onToggle={() => onToggleFile(file.path)}
                         onSearch={() => onSearchFile(file)}
                       style={{
@@ -246,12 +268,14 @@ export function CategoryCard({
 interface VirtualFileItemProps {
   file: FileInfo;
   selected: boolean;
+  /** 该项是否可勾选。系统托管的分类整片不可选，行也不显示可点光标。 */
+  selectable?: boolean;
   onToggle: () => void;
   onSearch: () => void;
   style: React.CSSProperties;
 }
 
-const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle, onSearch, style }: VirtualFileItemProps) {
+const VirtualFileItem = memo(function VirtualFileItem({ file, selected, selectable = true, onToggle, onSearch, style }: VirtualFileItemProps) {
   const { t } = useTranslation('common');
   // 回收站的真实删除路径是隐藏的 $R 文件，界面展示元数据中的原始文件名，避免与 Explorer 看到的内容脱节。
   const displayPath = file.category === 'RecycleBin'
@@ -264,9 +288,10 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, onToggle
   return (
     <div
       style={style}
-      className={`px-5 flex items-center gap-4 cursor-pointer transition-colors
+      className={`px-5 flex items-center gap-4 transition-colors
+        ${selectable ? 'cursor-pointer' : 'cursor-default'}
         ${selected ? 'bg-[var(--brand-green-10)]' : 'hover:bg-[var(--bg-hover)]'}`}
-      onClick={onToggle}
+      onClick={() => { if (selectable) onToggle(); }}
     >
       {/* 复选框 - 微信绿 */}
       <div className={`w-4 h-4 rounded border flex items-center justify-center

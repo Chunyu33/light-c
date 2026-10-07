@@ -107,6 +107,8 @@
   "selectedPage": "（已選當前頁 {{count}} 個，清理時包含完整分類）",
   "selectedFiles": "（已選 {{count}} 個，{{size}}）",
   "highRiskWarning": "此分類風險等級較高，請謹慎選擇刪除",
+  "systemManagedHint": "這類檔案由系統託管，本應用無法安全刪除；刪除還會失去回復到舊版本的能力",
+  "openDiskCleanup": "開啟磁碟清理",
   "loadMore": "載入更多（已顯示 {{shown}} / {{total}}）",
   "originalLocation": "原位置：{{path}}",
   "searchDeletionAdvice": "搜尋該檔案能不能刪",

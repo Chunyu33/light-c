@@ -50,6 +50,8 @@ export interface CategoryScanResult {
   description: string;
   /** 风险等级 */
   risk_level: number;
+  /** 是否由系统托管：为 true 时不提供直接删除，只引导用户使用系统磁盘清理 */
+  system_managed: boolean;
   /** 该分类下的所有文件 */
   files: FileInfo[];
   /** 总大小（字节） */

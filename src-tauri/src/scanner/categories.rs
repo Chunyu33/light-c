@@ -127,6 +127,16 @@ impl JunkCategory {
         }
     }
 
+    /// 该分类是否由系统托管 —— 由系统托管的分类不参与本应用的直接删除，只引导系统工具。
+    ///
+    /// 目前只有旧版 Windows 安装（Windows.old / $Windows.~BT / $Windows.~WS）：
+    /// 这些目录归系统所有、默认保留 10 天用于回退旧版本，Windows 只开放
+    /// 「磁盘清理 / 存储感知」两个入口。应用内直接删除会失败；即便删成功，
+    /// 也意味着用户失去回退旧版本的能力，所以不该由本应用代劳。
+    pub fn is_system_managed(&self) -> bool {
+        matches!(self, JunkCategory::OldWindowsInstallation)
+    }
+
     /// 获取该分类需要扫描的路径列表
     pub fn get_scan_paths(&self) -> Vec<ScanPath> {
         match self {

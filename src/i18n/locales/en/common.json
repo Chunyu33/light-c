@@ -92,6 +92,8 @@
   "selectedPage": "({{count}} selected on this page; the full category will be cleaned)",
   "selectedFiles": "({{count}} selected, {{size}})",
   "highRiskWarning": "This category has elevated risk. Choose files carefully.",
+  "systemManagedHint": "Windows manages these files. The app cannot remove them safely, and deleting them would also remove your ability to roll back to the previous version.",
+  "openDiskCleanup": "Open Disk Cleanup",
   "loadMore": "Load more ({{shown}} / {{total}} shown)",
   "originalLocation": "Original location: {{path}}",
   "searchDeletionAdvice": "Search whether this file can be deleted",

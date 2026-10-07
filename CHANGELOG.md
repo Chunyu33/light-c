@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.16.15
+
+- Files left over from a previous Windows installation (Windows.old) are no longer deleted directly. The app now points you to Windows Disk Cleanup instead: these files are managed by the system, and removing them would also remove your ability to roll back to the previous version.
+- On computers where Windows is installed on a drive other than C, Disk Cleanup now opens on the right drive.
+- Cleanup failures now explain themselves more clearly, separating "not enough permission" from "file in use".
+
 ## v2.16.14
 
 - Fixed dialogs growing taller than the window on short screens: the "Clear local data" dialog, the cleanup confirmation, the update prompt and the deep-clean warning now scroll their content inside, so the title and the buttons at the bottom stay reachable.

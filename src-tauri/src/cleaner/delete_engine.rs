@@ -211,12 +211,27 @@ impl DeleteEngine {
     }
 
     /// 删除目录，返回 (大小, 是否标记为重启删除)
+    ///
+    /// 注意这里**不排"重启后删除"**，与 delete_file 不同：
+    /// MoveFileExW + MOVEFILE_DELAY_UNTIL_REBOOT 要求目录为空，
+    /// 而 remove_dir_all 失败时里面通常还剩着内容，排了也不会生效，
+    /// 只会让用户误以为"重启后就删掉了"。所以改做错误分类，把原因说清楚。
     fn delete_directory(&self, path: &Path, size: u64) -> Result<(u64, bool), String> {
         match fs::remove_dir_all(path) {
             Ok(_) => Ok((size, false)),
             Err(e) => {
+                // 错误分类对齐 delete_file：区分"权限不足"与"被占用"。
+                // 权限不足时额外给一句可操作建议 —— 由系统托管的目录（如旧版 Windows 安装
+                // Windows.old）本来就该交给系统磁盘清理，硬删还会丢掉回退旧版本的能力。
+                #[cfg(windows)]
+                let is_sharing_violation = e.raw_os_error() == Some(32); // ERROR_SHARING_VIOLATION
+                #[cfg(not(windows))]
+                let is_sharing_violation = false;
+
                 if e.kind() == std::io::ErrorKind::PermissionDenied {
-                    Err(format!("权限不足: {}", e))
+                    Err(format!("权限不足: {}（系统托管的目录请改用系统磁盘清理）", e))
+                } else if is_sharing_violation {
+                    Err(format!("目录内有文件被占用: {}", e))
                 } else {
                     Err(format!("删除目录失败: {}", e))
                 }
@@ -377,5 +392,12 @@ mod tests {
             "C:\\ProgramData\\Microsoft\\Windows Defender\\Quarantine\\entry.bin"
         )));
         assert!(!engine.is_protected_path(Path::new("C:\\Temp\\test.tmp")));
+        // 旧版 Windows 安装由系统托管：应用内删不掉，且中途失败会留下"删一半"的状态，
+        // 只能走磁盘清理 / 存储感知，所以这里必须拦住（扫描侧不受影响，仍会照常列出大小）。
+        assert!(engine.is_protected_path(Path::new("C:\\Windows.old")));
+        assert!(engine.is_protected_path(Path::new(
+            "C:\\Windows.old\\Windows\\System32\\old.dll"
+        )));
+        assert!(engine.is_protected_path(Path::new("C:\\$Windows.~BT")));
     }
 }

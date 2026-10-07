@@ -23,6 +23,13 @@ pub const PROTECTED_PATH_PREFIXES: &[&str] = &[
     "c:\\programdata\\microsoft\\windows defender",
     "c:\\recovery",
     "c:\\$recycle.bin",
+    // 旧版 Windows 安装（系统升级后保留约 10 天用于回退旧版本）。
+    // 这些目录归系统所有、内部权限不一致：直接 remove_dir_all 会在中途失败并留下
+    // "删一半"的状态，而清理它们只有磁盘清理 / 存储感知两个受支持的入口。
+    // 前端已把该分类标为系统托管、不提供删除，这里是第二道闸门，防止有别的路径绕过去。
+    "c:\\windows.old",
+    "c:\\$windows.~bt",
+    "c:\\$windows.~ws",
 ];
 
 /// 绝对禁止删除的文件名（小写，精确匹配）

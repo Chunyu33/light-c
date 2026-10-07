@@ -18,9 +18,13 @@ pub fn open_disk_cleanup() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
+        // 盘符不能写死 C：Windows 可以装在别的盘上。这里与垃圾清理分类扫描（SYSTEMDRIVE）
+        // 用同一个来源，否则非 C 盘系统上打开磁盘清理会定位到 C 盘，用户找不到目标项。
+        // cleanmgr /d 只接受盘符字母、不带冒号，system_drive_letter() 返回的正是字母。
+        let drive_letter = crate::system_info::system_drive_letter().to_string();
         Command::new("cleanmgr")
             .arg("/d")
-            .arg("C")
+            .arg(drive_letter)
             .spawn()
             .map_err(|e| format!("无法启动磁盘清理工具: {}", e))?;
         Ok(())

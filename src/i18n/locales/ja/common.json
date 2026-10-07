@@ -92,6 +92,8 @@
   "selectedPage": "（このページで {{count}} 件選択。クリーン時はカテゴリ全体を対象）",
   "selectedFiles": "（{{count}} 件、{{size}} を選択）",
   "highRiskWarning": "このカテゴリはリスクが高めです。慎重に選択してください。",
+  "systemManagedHint": "これらのファイルはシステムが管理しており、アプリからは安全に削除できません。削除すると以前のバージョンに戻せなくなります。",
+  "openDiskCleanup": "ディスクのクリーンアップを開く",
   "loadMore": "さらに読み込む（{{shown}} / {{total}} 件表示）",
   "originalLocation": "元の場所：{{path}}",
   "searchDeletionAdvice": "このファイルを削除できるか検索",

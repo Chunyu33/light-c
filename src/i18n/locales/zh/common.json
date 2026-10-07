@@ -92,6 +92,8 @@
   "selectedPage": "（已选当前页 {{count}} 个，清理时包含完整分类）",
   "selectedFiles": "（已选 {{count}} 个，{{size}}）",
   "highRiskWarning": "此分类风险等级较高，请谨慎选择删除",
+  "systemManagedHint": "这类文件由系统托管，本应用无法安全删除；删除还会失去回退到旧版本的能力",
+  "openDiskCleanup": "打开磁盘清理",
   "loadMore": "加载更多（已显示 {{shown}} / {{total}}）",
   "originalLocation": "原位置：{{path}}",
   "searchDeletionAdvice": "搜索该文件能不能删",

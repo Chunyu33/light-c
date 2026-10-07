@@ -519,13 +519,16 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     if (selected) {
       const allPaths = new Set<string>();
       scanResult.categories.forEach((category) => {
+        // 系统托管的分类（旧版 Windows 安装）不参与全选：应用内删不掉，
+        // 删了还会丢掉回退旧版本的能力，只能走系统磁盘清理。
+        if (category.system_managed) return;
         category.files.forEach((file) => {
           allPaths.add(file.path);
         });
       });
       setSelectedCategoryNames(new Set(
         scanResult.categories
-          .filter((category) => category.has_more)
+          .filter((category) => category.has_more && !category.system_managed)
           .map((category) => category.display_name),
       ));
       setSelectedPaths(allPaths);

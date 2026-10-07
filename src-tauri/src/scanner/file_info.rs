@@ -69,6 +69,9 @@ pub struct CategoryScanResult {
     pub description: String,
     /// 风险等级
     pub risk_level: u8,
+    /// 是否由系统托管。为 true 时前端不提供直接删除，只引导用户使用系统磁盘清理 ——
+    /// 这类目录（如 Windows.old）应用内删不掉，而且是系统的回退数据。
+    pub system_managed: bool,
     /// 该分类下的所有文件
     pub files: Vec<FileInfo>,
     /// 总大小（字节）
@@ -86,6 +89,7 @@ impl CategoryScanResult {
             display_name: category.display_name().to_string(),
             description: category.description().to_string(),
             risk_level: category.risk_level(),
+            system_managed: category.is_system_managed(),
             category,
             files: Vec::new(),
             total_size: 0,
