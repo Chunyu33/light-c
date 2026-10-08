@@ -551,8 +551,12 @@ impl SocialScanner {
                     }
 
                     // 前提二：目录内部（含深层）存在微信数据目录名。
-                    // 盘符根目录只做"前提一"的直接命中判断，不在这里下钻，避免扫进系统目录。
-                    if location.is_empty() {
+                    // 盘符根目录下的**系统目录**跳过（Windows / Program Files / $Recycle.Bin…），
+                    // 其余顶层目录照常下钻 —— 这是 Issue #87 的修复点：
+                    // 用户把微信数据放到 `D:\weixin\xwechat_files` 这类自建目录时，
+                    // 顶层目录名本身不是数据目录名，只有下钻才找得到。原先这里直接 continue，
+                    // 等于对所有盘符根下的自建目录视而不见。
+                    if location.is_empty() && Self::is_system_top_level_dir(&path) {
                         continue;
                     }
                     if visited_roots(&enumerated_roots, &path) {

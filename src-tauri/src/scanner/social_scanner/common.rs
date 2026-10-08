@@ -106,4 +106,32 @@ impl SocialScanner {
             .trim_end_matches('\\')
             .to_lowercase()
     }
+
+    /// 判断盘符根目录下的某个目录是不是系统自带的。
+    ///
+    /// 从盘符根下钻查找社交软件数据目录时，必须先跳过这些：它们不可能存放聊天数据，
+    /// 却包含成千上万个子目录，下钻进去纯属浪费时间（尤其 C:\Windows）。
+    /// 反过来，**除了这些之外的顶层目录都要下钻** —— 用户自定义的
+    /// `D:\QQ\Tencent Files`、`D:\weixin\xwechat_files` 就藏在里面（Issue #87）。
+    pub(super) fn is_system_top_level_dir(path: &Path) -> bool {
+        const SYSTEM_DIR_NAMES: [&str; 10] = [
+            "windows",
+            "program files",
+            "program files (x86)",
+            "programdata",
+            "$recycle.bin",
+            "system volume information",
+            "recovery",
+            "perflogs",
+            "msocache",
+            "config.msi",
+        ];
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| {
+                SYSTEM_DIR_NAMES
+                    .iter()
+                    .any(|system| name.eq_ignore_ascii_case(system))
+            })
+    }
 }

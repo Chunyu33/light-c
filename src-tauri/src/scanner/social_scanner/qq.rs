@@ -361,40 +361,59 @@ impl SocialScanner {
     }
 
     /// 全盘搜索 Tencent Files 文件夹
+    ///
+    /// Issue #87：用户把聊天记录位置改到 `D:\QQ\Tencent Files` 后扫不到 ——
+    /// 原因是候选基目录只有 Users / Documents / Data，而 `QQ` 是盘符根下的自建目录，
+    /// 三个基目录里都没有它。现在盘符根也纳入搜索（跳过系统目录），
+    /// 并对根下每个顶层目录做有界下钻，而不是只看一层。
     pub(super) fn search_qq_files_on_all_drives(&self) -> Option<Vec<PathBuf>> {
         let mut found_paths = Vec::new();
 
-        for drive in &self.available_drives {
-            // 搜索常见位置
-            let common_locations = ["Users", "Documents", "Data"];
+        // 含 ""（盘符根目录）：自定义保存位置基本都长这样 —— `D:\QQ\Tencent Files`。
+        // 系统目录在下面会被跳过，所以不会扫进 Windows / Program Files。
+        let common_locations = ["", "Users", "Documents", "Data", "software", "Programs", "downloads"];
 
+        for drive in &self.available_drives {
             for location in &common_locations {
                 let search_base = PathBuf::from(drive).join(location);
-                if !search_base.exists() {
+                if !search_base.is_dir() {
                     continue;
                 }
+                let Ok(entries) = std::fs::read_dir(&search_base) else {
+                    continue;
+                };
 
-                if let Ok(entries) = std::fs::read_dir(&search_base) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        let path = entry.path();
-                        if path.is_dir() {
-                            // 检查是否是 Tencent Files 目录
-                            if path
-                                .file_name()
-                                .map(|n| n.to_string_lossy().to_lowercase() == "tencent files")
-                                .unwrap_or(false)
-                            {
-                                info!("全盘搜索发现QQ目录: {}", path.display());
-                                found_paths.push(path.clone());
-                            }
+                for entry in entries.filter_map(|e| e.ok()) {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    // 盘符根下的系统目录不下钻：里面不可能放聊天数据，只会白花时间。
+                    if location.is_empty() && Self::is_system_top_level_dir(&path) {
+                        continue;
+                    }
 
-                            // 检查子目录
-                            let tencent_in_subdir = path.join("Tencent Files");
-                            if tencent_in_subdir.exists() {
-                                info!("全盘搜索发现QQ目录: {}", tencent_in_subdir.display());
-                                found_paths.push(tencent_in_subdir);
-                            }
-                        }
+                    // 情况一：目录本身就叫 Tencent Files
+                    if path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_lowercase() == "tencent files")
+                        .unwrap_or(false)
+                    {
+                        info!("全盘搜索发现QQ目录: {}", path.display());
+                        found_paths.push(path.clone());
+                        continue;
+                    }
+
+                    // 情况二：目录下面还有一层才到 Tencent Files。
+                    // 复用微信那边的有界查找（内部带目录检查次数上限），
+                    // `D:\QQ\Tencent Files` 正是一层的差距，只看一层会漏。
+                    //
+                    // 深度取 2 而不是更大：这个查找现在会作用于盘符根下的**每个**非系统目录，
+                    // 深度每加一层，大目录（比如 D:\Games）里的扫描成本就翻一截，
+                    // 而自定义存储位置最常见的结构就是"自建目录 / 数据目录"这一层。
+                    if let Some(found) = Self::find_directory_by_name(&path, "Tencent Files", 2) {
+                        info!("全盘搜索发现QQ目录: {}", found.display());
+                        found_paths.push(found);
                     }
                 }
             }
@@ -418,6 +437,35 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+    /// Issue #87 的守卫：盘符根下的系统目录必须跳过，其余目录不能跳过。
+    /// 用户的自建目录（`D:\QQ`、`D:\weixin`）就在"其余"里 ——
+    /// 一旦这里放宽成"根目录一律不下钻"，#87 立刻重现。
+    #[test]
+    fn skips_only_system_directories_at_drive_root() {
+        for system in [
+            r"C:\Windows",
+            r"C:\Program Files",
+            r"C:\Program Files (x86)",
+            r"C:\ProgramData",
+            r"D:\$Recycle.Bin",
+            r"D:\System Volume Information",
+        ] {
+            assert!(
+                SocialScanner::is_system_top_level_dir(Path::new(system)),
+                "{} 应被识别为系统目录",
+                system
+            );
+        }
+
+        for custom in [r"D:\QQ", r"D:\weixin", r"D:\Tencent Files", r"D:\my data"] {
+            assert!(
+                !SocialScanner::is_system_top_level_dir(Path::new(custom)),
+                "{} 不是系统目录，跳过它就会漏扫（Issue #87）",
+                custom
+            );
+        }
+    }
 
     fn fixture(name: &str) -> PathBuf {
         let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
