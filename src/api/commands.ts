@@ -163,8 +163,13 @@ export async function scanJunkFiles(request?: ScanRequest): Promise<ScanResult> 
 }
 
 /** 扫描所有固定分区的深度垃圾，NTFS 分区优先使用 MFT。 */
-export async function scanDeepJunkFiles(): Promise<DeepJunkScanResult> {
-  return invoke<DeepJunkScanResult>('scan_deep_junk_files');
+/**
+ * 深度扫描垃圾文件。
+ * @param maxDepth 目录递归层数上限，来自设置页的「深度发现扫描深度」。
+ *                 后端还会再收敛一次（1-24 内兜底），传异常值不会让扫描失控。
+ */
+export async function scanDeepJunkFiles(maxDepth: number): Promise<DeepJunkScanResult> {
+  return invoke<DeepJunkScanResult>('scan_deep_junk_files', { maxDepth });
 }
 
 /** 取消深度垃圾扫描。 */

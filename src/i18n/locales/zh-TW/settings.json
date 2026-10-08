@@ -198,6 +198,13 @@
     }
   },
   "features": {
+    "junkDeepScan": {
+      "title": "垃圾清理",
+      "depth": "深度發現掃描深度",
+      "depthDesc": "每多一層就能掃到藏得更深的快取目錄，但需要走訪的目錄數可能成倍增加，掃描會明顯變慢。",
+      "unit": "層",
+      "range": "邊界範圍：{{min}} - {{max}} 層"
+    },
     "bigFiles": {
       "title": "大檔案清理",
       "scanLimit": "掃描檔案數",

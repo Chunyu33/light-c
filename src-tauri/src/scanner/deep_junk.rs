@@ -92,6 +92,34 @@ fn is_cancelled() -> bool {
     DEEP_JUNK_SCAN_CANCELLED.load(Ordering::SeqCst)
 }
 
+/// 深度扫描的递归层数上限，由设置页的「深度发现扫描深度」传入。
+///
+/// 用模块级状态而不是逐层传参：扫描链路要经过 MFT 补扫、受控遍历补扫等多条路径，
+/// 逐层加参数会散落到五六个函数签名上；这里和取消标志放在一起，与文件既有写法一致，
+/// 也保证"本次扫描用哪个深度"只有一处真相。
+static DEEP_SCAN_MAX_DEPTH: AtomicU64 = AtomicU64::new(DEFAULT_DEEP_SCAN_DEPTH);
+
+/// 默认层数，与前端 `junkDeepScanDepth` 的默认值保持一致（设置页默认 16）。
+/// 原先写死 12 层偏保守 —— 深度扫描本来就是为了找藏得深的缓存，太浅会漏。
+const DEFAULT_DEEP_SCAN_DEPTH: u64 = 16;
+
+/// 上限兜底：即使前端传了异常值，也不会让遍历深度失控导致扫描时间爆炸。
+const MAX_DEEP_SCAN_DEPTH: u64 = 24;
+
+/// 设置本次深度扫描的递归层数。命令入口在 `reset_cancelled()` 之后调用。
+/// 传 `None`（老前端或直接调用命令）时退回默认值，保证行为可预期。
+pub fn set_scan_depth(depth: Option<u32>) {
+    let resolved = depth
+        .map(|value| (value as u64).clamp(1, MAX_DEEP_SCAN_DEPTH))
+        .unwrap_or(DEFAULT_DEEP_SCAN_DEPTH);
+    DEEP_SCAN_MAX_DEPTH.store(resolved, Ordering::SeqCst);
+}
+
+/// 读取本次扫描的递归层数上限。
+fn scan_depth() -> usize {
+    DEEP_SCAN_MAX_DEPTH.load(Ordering::SeqCst) as usize
+}
+
 /// 执行所有固定分区的深度垃圾扫描。
 pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
     let started_at = std::time::Instant::now();
@@ -571,7 +599,8 @@ fn scan_non_ntfs_drive(
         }
 
         for entry in WalkDir::new(root)
-            .max_depth(12)
+            // 递归层数改由设置页控制（默认 16、上限 24），不再写死。
+            .max_depth(scan_depth())
             .follow_links(false)
             .into_iter()
             .filter_map(Result::ok)
@@ -796,7 +825,8 @@ fn scan_supplement_roots(
         if is_cancelled() {
             break;
         }
-        scan_supplement_root(&root, 12, results, &mut visited);
+        // 没有单独限深的补扫根目录，跟着设置页的层数走。
+        scan_supplement_root(&root, scan_depth(), results, &mut visited);
     }
 
     // 深度受限的补充根：只覆盖根目录附近的真实垃圾，避免深入无意义的多层子目录。
@@ -804,7 +834,9 @@ fn scan_supplement_roots(
         if is_cancelled() {
             break;
         }
-        scan_supplement_root(&root, max_depth, results, &mut visited);
+        // 这些根目录自带限深（避免在超深的目录树里跑太久），取两者较大值：
+        // 设置页调大时能生效，调小时仍保留各根目录自己的下限，不会因为用户调小就漏扫。
+        scan_supplement_root(&root, max_depth.max(scan_depth()), results, &mut visited);
     }
 }
 

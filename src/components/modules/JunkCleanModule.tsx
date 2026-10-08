@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import i18n from '../../i18n';
+import { useSettings } from '../../contexts';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
@@ -134,6 +135,8 @@ function getDeleteRemainingTime(progress: EnhancedDeleteProgress | null): string
 
 export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t } = useTranslation('junkClean');
+  // 深度扫描的递归层数来自设置页，扫描时作为参数传给命令。
+  const { settings } = useSettings();
   const {
     moduleState,
     expandedModule,
@@ -285,7 +288,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
     try {
       const result = currentScanMode === 'deep'
-        ? await scanDeepJunkFiles()
+        ? await scanDeepJunkFiles(settings.junkDeepScanDepth)
         : await scanJunkFiles();
       setScanResult(result);
       if (currentScanMode === 'deep') setDeepScanResult(result as DeepJunkScanResult);
@@ -321,7 +324,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       scanningRef.current = false;
       setScanProgress(null);
     }
-  }, [deepScanEnabled, updateModuleState, setExpandedModule]);
+  }, [deepScanEnabled, updateModuleState, setExpandedModule, settings.junkDeepScanDepth]);
 
   const handleStopScan = useCallback(async () => {
     if (!scanningRef.current || scanMode !== 'deep') return;

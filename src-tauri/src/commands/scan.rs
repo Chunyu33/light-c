@@ -63,9 +63,12 @@ pub async fn scan_junk_files(request: Option<ScanRequest>) -> Result<ScanResult,
 
 /// 执行所有固定分区的深度垃圾扫描，NTFS 优先使用 MFT。
 #[tauri::command]
-pub async fn scan_deep_junk_files(window: Window) -> Result<deep_junk::DeepJunkScanResult, String> {
+pub async fn scan_deep_junk_files(window: Window, max_depth: Option<u32>) -> Result<deep_junk::DeepJunkScanResult, String> {
     info!("开始深度扫描垃圾文件");
     deep_junk::reset_cancelled();
+    // 递归层数由设置页传入。必须在 spawn_blocking 之前写入 ——
+    // 扫描线程读的是模块级状态，晚一步就还是上一轮的深度。
+    deep_junk::set_scan_depth(max_depth);
 
     let result = tokio::task::spawn_blocking(move || deep_junk::scan_all(&window))
         .await

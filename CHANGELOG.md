@@ -6,8 +6,8 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 - Files left over from a previous Windows installation (Windows.old) are no longer deleted directly. The app points you to Windows Disk Cleanup instead: these files are managed by the system, and removing them would also remove your ability to roll back. Disk Cleanup also opens on the right drive now when Windows is not installed on C.
 - The delete progress no longer covers the whole window; it shows inside the module instead, so the window can still be dragged and the title bar stays usable while it runs.
-- The file list in social app cleanup no longer draws a line under every row or above the "view all files" row; spacing and hover separate them now, so it reads far less busy.
-- Other fixes: the "freed" figure in a cleanup result no longer overstates what was freed (files that were busy and only got scheduled for deletion on the next reboot used to be counted, even though no space was released yet). Cleanup failures also explain themselves more clearly, and the liquid glass look no longer adds a stray white line above the top bar, tints separators, or leaves a shadow outside the bottom corners of a module card.
+- Deep discovery gained a scan depth setting under Settings - Features. It looks deeper than before by default, which finds more cache folders; higher values scan more slowly, and you can adjust it between 4 and 24 levels.
+- Other fixes: the "freed" figure in a cleanup result no longer overstates what was freed (files that were busy and only got scheduled for deletion on the next reboot used to be counted, even though no space was released yet); the file list in social app cleanup no longer draws a line under every row; and the liquid glass look no longer adds a stray white line above the top bar, tints separators, or leaves a shadow outside the bottom corners of a module card.
 
 ## v2.16.14
 

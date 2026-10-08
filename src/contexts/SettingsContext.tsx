@@ -23,6 +23,11 @@ interface AppSettings {
   hotspotIgnoreSystemDirs: boolean;
   /** 大文件清理返回的最大文件数（默认 50） */
   bigFilesScanLimit: number;
+  /**
+   * 垃圾清理「深度发现」扫描的目录递归层数（4-24，默认 16）。
+   * 调大能扫到更深的缓存目录，但每一层都会成倍增加要遍历的目录数，扫描明显变慢。
+   */
+  junkDeepScanDepth: number;
   /** 磁盘变化分析最多展示变化目录数量（默认 300） */
   diskGrowthMaxEntries: number;
   /** 清理日志最多保留文件数（默认 10） */
@@ -54,6 +59,9 @@ const defaultSettings: AppSettings = {
   hotspotSizeThreshold: 50, // 默认 50MB
   hotspotIgnoreSystemDirs: true, // 默认忽略系统目录
   bigFilesScanLimit: 50, // 默认扫描 50 个大文件，避免初次结果列表过长
+  // 比原先写死的 12 层放宽一档：深度扫描本来就是为了找藏得深的缓存，太浅会漏。
+  // 上限留到 24，用户嫌慢可以自己调回去。
+  junkDeepScanDepth: 16,
   diskGrowthMaxEntries: 300, // 默认最多展示 300 个变化目录
   cleanupLogRetention: 10, // 默认保留 10 份清理日志，兼容历史行为
 };
@@ -80,6 +88,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
     hotspotDepth: Math.min(4, Math.max(2, Number(settings.hotspotDepth) || defaultSettings.hotspotDepth)),
     hotspotSizeThreshold: Math.min(500, Math.max(10, Number(settings.hotspotSizeThreshold) || defaultSettings.hotspotSizeThreshold)),
     bigFilesScanLimit: Math.min(500, Math.max(10, Math.floor(Number(settings.bigFilesScanLimit) || defaultSettings.bigFilesScanLimit))),
+    junkDeepScanDepth: Math.min(24, Math.max(4, Math.floor(Number(settings.junkDeepScanDepth) || defaultSettings.junkDeepScanDepth))),
     diskGrowthMaxEntries: Math.min(1000, Math.max(50, Number(settings.diskGrowthMaxEntries) || defaultSettings.diskGrowthMaxEntries)),
     cleanupLogRetention: Math.min(100, Math.max(1, Math.floor(Number(settings.cleanupLogRetention) || defaultSettings.cleanupLogRetention))),
   };

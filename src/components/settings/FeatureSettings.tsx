@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react';
-import { FileBox, HardDrive, Shield } from 'lucide-react';
+import { FileBox, HardDrive, Shield, Trash2 } from 'lucide-react';
 import { Select, type SelectOption } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useSettings } from '../../contexts';
@@ -25,10 +25,34 @@ function clampBigFilesScanLimit(value: number): number {
   return Math.min(BIG_FILES_SCAN_LIMIT_MAX, Math.max(BIG_FILES_SCAN_LIMIT_MIN, Math.floor(value || 50)));
 }
 
+const JUNK_DEEP_SCAN_DEPTH_MIN = 4;
+const JUNK_DEEP_SCAN_DEPTH_MAX = 24;
+const JUNK_DEEP_SCAN_DEPTH_DEFAULT = 16;
+
+function clampJunkDeepScanDepth(value: number): number {
+  // 这个值直接决定后端遍历的目录层数 —— 每往下加一层，要走的目录数可能成倍增长，
+  // 所以两端都要兜：设置页先收敛一次，命令层还会再收敛一次。
+  return Math.min(
+    JUNK_DEEP_SCAN_DEPTH_MAX,
+    Math.max(JUNK_DEEP_SCAN_DEPTH_MIN, Math.floor(value || JUNK_DEEP_SCAN_DEPTH_DEFAULT)),
+  );
+}
+
 export function FeatureSettings() {
   const { settings, updateSettings } = useSettings();
   const { t } = useTranslation('settings');
   const [bigFilesScanLimitDraft, setBigFilesScanLimitDraft] = useState(String(settings.bigFilesScanLimit));
+  const [junkDeepScanDepthDraft, setJunkDeepScanDepthDraft] = useState(String(settings.junkDeepScanDepth));
+
+  useEffect(() => {
+    setJunkDeepScanDepthDraft(String(settings.junkDeepScanDepth));
+  }, [settings.junkDeepScanDepth]);
+
+  const commitJunkDeepScanDepth = () => {
+    const nextDepth = clampJunkDeepScanDepth(Number(junkDeepScanDepthDraft));
+    updateSettings({ junkDeepScanDepth: nextDepth });
+    setJunkDeepScanDepthDraft(String(nextDepth));
+  };
 
   useEffect(() => {
     setBigFilesScanLimitDraft(String(settings.bigFilesScanLimit));
@@ -43,6 +67,45 @@ export function FeatureSettings() {
 
   return (
     <div className="flex flex-col w-0 min-w-full space-y-4 pb-2">
+      {/* 垃圾清理：深度发现的扫描深度（Evan 要求放在本页最顶部） */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+          <Trash2 className="w-3.5 h-3.5" />
+          {t('features.junkDeepScan.title')}
+        </h4>
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t('features.junkDeepScan.depth')}</p>
+              {/* 必须写清代价：深度是成倍影响扫描时间的，用户得知道自己在换什么 */}
+              <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                {t('features.junkDeepScan.depthDesc')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <input
+                type="number"
+                min={JUNK_DEEP_SCAN_DEPTH_MIN}
+                max={JUNK_DEEP_SCAN_DEPTH_MAX}
+                value={junkDeepScanDepthDraft}
+                onBlur={commitJunkDeepScanDepth}
+                onChange={(event) => setJunkDeepScanDepthDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="h-9 w-24 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-right text-sm font-semibold text-[var(--brand-green)] outline-none transition focus:border-[var(--brand-green)]"
+              />
+              <span className="text-xs text-[var(--text-muted)]">{t('features.junkDeepScan.unit')}</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-[var(--text-faint)]">
+            {t('features.junkDeepScan.range', { min: JUNK_DEEP_SCAN_DEPTH_MIN, max: JUNK_DEEP_SCAN_DEPTH_MAX })}
+          </p>
+        </div>
+      </div>
+
       {/* 大文件清理 */}
       <div className="space-y-3">
         <h4 className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
