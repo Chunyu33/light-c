@@ -113,7 +113,7 @@
       "depth": "ディープ検出のスキャン深度",
       "depthDesc": "1 階層増やすごとにより深い場所のキャッシュまで探せますが、走査するフォルダ数が倍増することがあり、スキャンは明らかに遅くなります。",
       "unit": "階層",
-      "range": "範囲：{{min}} - {{max}} 階層"
+      "range": "範囲：{{min}} - {{max}} 階層 · 既定値：{{default}}"
     },
     "bigFiles": { "title": "大容量ファイルのクリーンアップ", "scanLimit": "スキャンするファイル数", "scanLimitDesc": "1 回のスキャンで返す最大ファイル数を設定します。多いほど候補を見つけやすくなりますが、表示と確認の負担が増えます。", "range": "範囲：{{min}} - {{max}} 件。ドライブを切り替えると古い結果を消し、別ドライブのファイルが混ざらないようにします。" },
     "hotspot": { "title": "大容量フォルダー分析", "depth": "表示階層", "depthDesc": "結果に表示するフォルダー階層数", "minSize": "最小表示サイズ", "minSizeDesc": "このサイズ未満のフォルダーをスキャン対象から除外します。", "ignoreSystem": "詳細スキャンでシステムフォルダーを除外", "ignoreSystemDesc": "オフにすると保護フォルダー内の大きなファイルも検出できますが、スキャン時間が大幅に延びます。", "autoIgnored": "自動的に除外するフォルダー", "autoIgnoredDesc": "以下のフォルダーはスキャン時にスキップまたは保護され、クリーンアップ候補には表示されません：", "systemCore": "C:\\Windows — システム中核。削除すると Windows が停止する可能性があります", "programFiles": "Program Files / Program Files (x86) — インストール先。表示のみ", "windowsComponents": "WinSxS / System32 / SysWOW64 — Windows コンポーネント領域", "systemReserved": "$Recycle.Bin / System Volume Information — システム予約フォルダー", "appCache": "DriverStore / WindowsApps / assembly — ドライバーと Store キャッシュ" },

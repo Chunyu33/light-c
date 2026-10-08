@@ -113,7 +113,7 @@
       "depth": "Deep discovery scan depth",
       "depthDesc": "Each extra level reaches cache folders buried deeper, but the number of folders to walk can multiply and the scan gets noticeably slower.",
       "unit": "levels",
-      "range": "Range: {{min}} - {{max}} levels"
+      "range": "Range: {{min}} - {{max}} levels · Default: {{default}}"
     },
     "bigFiles": { "title": "Large file cleanup", "scanLimit": "Files per scan", "scanLimitDesc": "Controls the maximum number of files returned per scan. Higher values find more candidates but increase rendering and review cost.", "range": "Range: {{min}} - {{max}} items. Switching drives clears old results so files from different drives are not mixed." },
     "hotspot": { "title": "Large folder analysis", "depth": "Display depth", "depthDesc": "Number of folder levels shown in results", "minSize": "Minimum display size", "minSizeDesc": "Folders below this size are excluded to reduce noise.", "ignoreSystem": "Skip system folders in deep scans", "ignoreSystemDesc": "Turn this off to find unusually large files in protected folders, at the cost of a much longer scan.", "autoIgnored": "Automatically ignored folders", "autoIgnoredDesc": "The following folders are skipped or protected during scans and will not appear as cleanup candidates:", "systemCore": "C:\\Windows — Core system folder; deleting it can crash Windows", "programFiles": "Program Files / Program Files (x86) — Installed software; view only", "windowsComponents": "WinSxS / System32 / SysWOW64 — Windows component storage", "systemReserved": "$Recycle.Bin / System Volume Information — System-reserved folders", "appCache": "DriverStore / WindowsApps / assembly — Driver and Store-app caches" },

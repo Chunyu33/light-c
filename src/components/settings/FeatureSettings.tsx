@@ -101,7 +101,11 @@ export function FeatureSettings() {
             </div>
           </div>
           <p className="text-[11px] text-[var(--text-faint)]">
-            {t('features.junkDeepScan.range', { min: JUNK_DEEP_SCAN_DEPTH_MIN, max: JUNK_DEEP_SCAN_DEPTH_MAX })}
+            {t('features.junkDeepScan.range', {
+              min: JUNK_DEEP_SCAN_DEPTH_MIN,
+              max: JUNK_DEEP_SCAN_DEPTH_MAX,
+              default: JUNK_DEEP_SCAN_DEPTH_DEFAULT,
+            })}
           </p>
         </div>
       </div>
