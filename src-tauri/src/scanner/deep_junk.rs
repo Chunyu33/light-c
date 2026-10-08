@@ -713,6 +713,15 @@ fn system_level_cache_roots(root: &Path) -> Vec<PathBuf> {
         root.join("Windows\\SystemTemp"),
         root.join("Windows\\Logs\\WindowsUpdate"),
         root.join("Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\Packages\\Microsoft.WindowsStore_8wekyb3d8bbwe\\LocalCache"),
+        // 以下为此前未覆盖、但同样只含可重建数据的目录。
+        // ⚠️ Windows\Logs\CBS **刻意不加** —— is_windows_log 里明确排除了它，
+        //    因为组件安装日志是排查更新故障的依据，属于"有用"而非垃圾。
+        root.join("Windows\\Panther"),                        // 安装/升级日志与残留
+        root.join("Windows\\Performance\\WinSAT"),            // 体验指数（Windows 体验评分）数据，可重建
+        root.join("Windows\\ServiceProfiles\\LocalService\\AppData\\Local\\Temp"), // 服务账户临时目录，会持续堆积
+        root.join("ProgramData\\USOShared\\Logs"),            // 更新协调器日志
+        root.join("ProgramData\\NVIDIA Corporation\\NV_Cache"), // 显卡着色器缓存，驱动会自行重建
+        root.join("ProgramData\\NVIDIA\\Downloader"),          // 驱动安装包残留
     ]
 }
 
@@ -974,6 +983,9 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
         &[
             "\\windows\\prefetch\\",
             "\\appdata\\local\\microsoft\\windows\\caches\\",
+            // 体验指数数据与显卡着色器缓存，都是删掉后系统/驱动自行重建的内容。
+            "\\windows\\performance\\winsat\\",
+            "\\programdata\\nvidia corporation\\nv_cache\\",
         ],
     ) {
         return Some(JunkCategory::SystemCache);
@@ -1023,8 +1035,21 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     if contains_any(
         &normalized,
         &[
+            // 安装/升级日志（Windows\Panther）与更新协调器日志（USOShared\Logs）：
+            // 同属排障历史记录，删掉不影响功能，但体积会随更新持续增长。
+            "\\windows\\panther\\",
+            "\\programdata\\usoshared\\logs\\",
+        ],
+    ) {
+        return Some(JunkCategory::LogFiles);
+    }
+    if contains_any(
+        &normalized,
+        &[
             "\\appdata\\local\\downloaded installations\\",
             "\\windows\\installer\\$patchcache$\\",
+            // NVIDIA 驱动下载器留下的安装包，装完即无用。
+            "\\programdata\\nvidia\\downloader\\",
         ],
     ) {
         return Some(JunkCategory::InstallerTemp);
@@ -1214,6 +1239,12 @@ fn is_user_profile_cache(path: &str) -> bool {
         "startupcache",
         "cache-tmp",
         "crash reports",
+        // 包管理器缓存：npm / pnpm 的缓存动辄数 GB，且 100% 可重建（重新安装时重新下载）。
+        // 这两个名字此前没收录 —— "npm-cache" 不等于 "cache"，不会命中上面的精确段匹配。
+        "npm-cache",
+        "cacheddata",
+        ".pnpm-store",
+        // VS Code 的 CachedData 存放编译后的 JS，重启即重建，同样是明确的缓存名。
     ];
 
     segments
@@ -1316,6 +1347,58 @@ mod tests {
             r"D:\Users\Alice\AppData\Local\Packages\App\EBWebView\Default\Cache\data"
         ));
         assert!(!is_deep_junk_path(r"D:\$Recycle.Bin\S-1-5-21\$R123"));
+    }
+
+    /// 本轮新增的目录与缓存目录名：既要命中新的可重建内容，也不能把有用数据卷进来。
+    #[test]
+    fn matches_newly_added_cache_roots_and_names() {
+        // 新增的系统级目录
+        assert!(is_deep_junk_path(r"C:\Windows\Panther\setupact.log"));
+        assert!(is_deep_junk_path(
+            r"C:\Windows\Performance\WinSAT\winsat.wmv"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\ProgramData\USOShared\Logs\System\UpdateStore.etl"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\ProgramData\NVIDIA Corporation\NV_Cache\abc.bin"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\ProgramData\NVIDIA\Downloader\setup.exe"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Windows\ServiceProfiles\LocalService\AppData\Local\Temp\tmp.tmp"
+        ));
+        // 新收录的缓存目录名（包管理器 / 编辑器）
+        assert!(is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Local\npm-cache\_cacache\blob"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Roaming\npm-cache\index-v5\entry"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Local\.pnpm-store\v3\files\x"
+        ));
+        assert!(is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Roaming\Code\CachedData\abc\cache.bin"
+        ));
+
+        // 反例一：CBS 日志是**刻意保留**的（组件安装日志用于排查更新故障），不能被新规则卷进来。
+        assert!(!is_deep_junk_path(r"C:\Windows\Logs\CBS\CBS.log"));
+        // 反例二：缓存目录之外的同名前缀目录不能误伤（npm 的项目目录不是缓存）。
+        assert!(!is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Local\npm\my-project\index.js"
+        ));
+        assert!(!is_deep_junk_path(
+            r"C:\Users\Alice\AppData\Roaming\Code\User\settings.json"
+        ));
+        // 反例三：仍然属于排除区。
+        assert!(!is_deep_junk_path(
+            r"C:\Windows\System32\LogFiles\W3SVC1\log.log"
+        ));
+        assert!(!is_deep_junk_path(
+            r"C:\ProgramData\Package Cache\vc_runtime\a.msi"
+        ));
     }
 
     #[test]
