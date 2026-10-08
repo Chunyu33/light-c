@@ -63,10 +63,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   const [theme, setTheme] = useState<AppliedTheme>(() => resolveTheme(mode));
 
-  // 液态玻璃默认关闭：backdrop-filter 需要合成器持续重新采样背景，
-  // 在低配设备上会明显掉帧，所以必须是用户主动开启，不能默认打开。
+  // 液态玻璃默认开启（v2.16.15 起）。它现在是产品的主视觉，默认给到最好的一面；
+  // 低配设备上 backdrop-filter 确实会掉帧，用户可以在「设置 - 通用」里关掉。
+  //
+  // 判断刻意写成「不等于 disabled」而不是「等于 enabled」：
+  // 老用户本地没有这个键，这样他们升级后也能拿到新的默认值，
+  // 而主动关过的用户存的是 'disabled'，不会被重新打开。
   const [glass, setGlassState] = useState<boolean>(
-    () => localStorage.getItem(GLASS_STORAGE_KEY) === 'enabled',
+    () => localStorage.getItem(GLASS_STORAGE_KEY) !== 'disabled',
   );
 
   // 切换玻璃并持久化，写法与上面的 setMode 保持一致
