@@ -14,7 +14,6 @@ import {
   HardDrive,
   ShieldCheck,
   StopCircle,
-  Timer,
   Trash2,
 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
@@ -81,7 +80,8 @@ function mergeDeepCategoryPage(result: ScanResult, page: CategoryScanResult): Sc
  * 深度扫描只返回分类首屏；当前页全部选中且仍有后续页时，删除应覆盖完整分类。
  * 这样用户看到分类总量时，不会因为分页而只清理首屏几百 MB。
  */
-const DEEP_SCAN_STAGES = ['discover', 'mft', 'path', 'filter', 'metadata', 'result', 'summary'];
+// 阶段名 → 中文标签的映射；原先还有一个按阶段估算进度的 DEEP_SCAN_STAGES 常量，
+// 因为估算值会往回跳已整体移除，这个常量也随之删除。
 
 function getScanStageLabel(stage: string, isDeep: boolean): string {
   if (!isDeep) return i18n.t('scanStages.quick', { ns: 'junkClean' });
@@ -95,11 +95,6 @@ function getScanStageLabel(stage: string, isDeep: boolean): string {
     case 'summary': return i18n.t('scanStages.summary', { ns: 'junkClean' });
     default: return i18n.t('scanStages.default', { ns: 'junkClean' });
   }
-}
-
-function getScanStageIndex(stage: string): number {
-  const index = DEEP_SCAN_STAGES.indexOf(stage);
-  return index < 0 ? 0 : index;
 }
 
 function formatScanDuration(milliseconds: number): string {
@@ -167,10 +162,10 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);
   const scanningRef = useRef(false);
   const cancelRequestedRef = useRef(false);
-  const scanStageIndex = scanProgress ? getScanStageIndex(scanProgress.stage) : 0;
-  const scanProgressPercent = scanMode === 'deep'
-    ? Math.min(96, Math.round(((scanStageIndex + 0.65) / DEEP_SCAN_STAGES.length) * 100))
-    : 35;
+  // 这里原来按「阶段序号」估算一个扫描百分比：后端并不上报进度总量
+  //（DeepJunkScanProgress 只有 stage / processed / matched_count / elapsed_ms），
+  // 阶段一变、或换分区重新走阶段，序号就可能变小 → 进度条往回退。
+  // 没有真实的分子分母就不显示百分比，只显示已用时间。
 
   // 计算选中文件大小
   const selectedSize = useMemo(() => {
@@ -744,25 +739,23 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                     </p>
                   </div>
                 </div>
-                <span className="text-xs font-semibold text-[var(--brand-green)] tabular-nums shrink-0">
-                  {scanProgressPercent}%
-                </span>
-              </div>
-
-              <div>
-                <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[var(--brand-green)] transition-all duration-500"
-                    style={{ width: `${scanProgressPercent}%` }}
-                  />
-                </div>
-                <div className="mt-2 flex justify-between text-[11px] text-[var(--fg-muted)]">
-                  <span>{scanProgress ? getScanStageLabel(scanProgress.stage, scanMode === 'deep') : t('scanning.starting')}</span>
-                  <span>{scanProgress ? formatScanDuration(scanProgress.elapsed_ms) : t('scanning.preparing')}</span>
+                {/* 原先这里放按阶段估算的百分比，会在阶段切换时往回跳。
+                    改成只显示已用时间：不撒谎，也比假进度更有参考价值。 */}
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-semibold text-[var(--brand-green)] tabular-nums">
+                    {formatScanDuration(scanProgress?.elapsed_ms ?? 0)}
+                  </p>
+                  <p className="text-[10px] text-[var(--fg-muted)]">{t('scanning.elapsed')}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {/* 不确定进度：整条脉冲表示"正在进行"。
+                  不画按比例填充的进度条 —— 没有真实的分子分母，画出来就是在编。 */}
+              <div className="h-2 rounded-full bg-[var(--bg-card)] overflow-hidden">
+                <div className="h-full w-full rounded-full bg-[var(--brand-green)] animate-pulse" />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />{t('scanning.partition')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{scanProgress?.drive_letter || t('scanning.preparing')}</p>
@@ -774,10 +767,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                 <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
                   <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />{t('scanning.candidateFiles')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.matched_count ?? 0).toLocaleString()}</p>
-                </div>
-                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Timer className="w-3.5 h-3.5" />{t('scanning.elapsed')}</div>
-                  <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{formatScanDuration(scanProgress?.elapsed_ms ?? 0)}</p>
                 </div>
               </div>
 
