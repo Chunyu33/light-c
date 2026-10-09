@@ -423,12 +423,16 @@ function ChangeRow({
       <button
         onClick={() => growth && onShowDetails(growth)}
         disabled={!growth}
-        className={`text-[13px] font-medium tabular-nums w-24 text-right shrink-0 ${style.color} ${
+        className={`flex w-24 shrink-0 items-center justify-end gap-1 text-[13px] font-medium tabular-nums ${style.color} ${
           growth ? 'hover:underline underline-offset-4 cursor-pointer' : 'cursor-default'
         }`}
         title={growth ? moduleT('diskGrowth.viewDetails') : undefined}
       >
         {diff === 0 ? '-' : formatDiff(diff)}
+        {/* 原先只有鼠标悬停才出现下划线，不悬停完全看不出这一列能点开明细，
+            所以补一个常驻的箭头提示。动画极轻：只向右推 3px、播 3 次就停
+            （见 App.css 的 .hint-nudge），不会在几十行列表里一直动。 */}
+        {growth && <ChevronRight className="hint-nudge h-3 w-3 shrink-0" aria-hidden="true" />}
       </button>
 
       <div className="flex w-16 shrink-0 justify-end gap-0.5 opacity-0 transition group-hover:opacity-100">
@@ -1244,7 +1248,11 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
               <div className="w-20 shrink-0 text-center">{moduleT('diskGrowth.changeTime')}</div>
               <div className="w-24 shrink-0 text-right">{moduleT('diskGrowth.changeLevel')}</div>
               <div className="w-20 shrink-0 text-right">{moduleT('diskGrowth.currentSizeHeader')}</div>
-              <div className="w-24 shrink-0 text-right">{moduleT('diskGrowth.differenceHeader')}</div>
+              {/* 末尾留出与数据列箭头同宽的空位，否则数字会比表头右边界多缩进一格、列对不齐 */}
+              <div className="flex w-24 shrink-0 items-center justify-end gap-1">
+                {moduleT('diskGrowth.differenceHeader')}
+                <span className="h-3 w-3 shrink-0" aria-hidden="true" />
+              </div>
               <div className="w-16 shrink-0" />
             </div>
 

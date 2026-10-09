@@ -1359,6 +1359,32 @@ body {
   }
 }
 
+/* 可点击提示：向右轻推 3px，1.6s 一轮，**只播 3 次就停**。
+   用途是"这一列能点开看明细"的常驻提示（磁盘变化分析的「变化量」）——
+   原先只有鼠标悬停时才出现下划线，不悬停完全看不出可点击。
+   刻意不写成无限循环：这类列表一次能出几十行，常年动会非常吵；
+   播 3 次足够被看到，之后保持静止。 */
+@keyframes hint-nudge {
+  0%,
+  60%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(3px);
+  }
+}
+
+.hint-nudge {
+  animation: hint-nudge 1.6s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-nudge {
+    animation: none;
+  }
+}
+
 /* ============================================================================
    页面模式下不要卡片外投影
    根因不在阴影参数，而在外层容器：App.tsx 里带 data-module-id 的那层开了
