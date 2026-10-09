@@ -15,7 +15,7 @@ export { ScanProgress } from './ScanProgress';
 export { ModuleScanProgress } from './ModuleScanProgress';
 export { ModuleOperationToolbar } from './ModuleOperationToolbar';
 export { ConfirmDialog } from './ConfirmDialog';
-export { BackButton } from './BackButton';
+// BackButton 已废弃删除（全项目零引用，页面返回统一用顶栏的返回入口）
 export { BackToTopButton } from './BackToTopButton';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastType, ToastItem } from './Toast';
