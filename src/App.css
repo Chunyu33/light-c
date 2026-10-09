@@ -996,7 +996,12 @@ html.glass .glass-list {
 /* 浮层表面（弹窗卡 / 下拉面板 / 气泡）：换成更实的专用底色。
    基础表面在暗色下只有 7% 白、浅色下 0.58，对"铺在背景上的卡片"够用，
    但浮层悬在任意内容之上时盖不住 —— 实测暗色清理弹窗里能看清背后列表的文字。 */
-html.glass .glass-overlay {
+/* 用 :where() 把 html.glass 的权重降到 0，这条规则原来算 (0,2,1)，
+   压过了所有 Tailwind 的 hover:bg-*（(0,2,0)）—— 结果是"悬停变绿 / 变灰"
+   在玻璃模式下全部失效：回到顶部的按钮背景不变、文字却变白，
+   于是亮色下成了白底白箭头（Evan 反馈）。降到 (0,1,0) 后 hover 类稳定胜出，
+   没有自带底色的控件仍走这个默认值。 */
+:where(html.glass) .glass-overlay {
   background-color: var(--glass-overlay-bg);
 }
 
@@ -1359,24 +1364,24 @@ body {
   }
 }
 
-/* 可点击提示：向右轻推 3px，1.6s 一轮，**只播 3 次就停**。
+/* 可点击提示：向右轻推 3px，**持续循环**，一轮 2.4s。
    用途是"这一列能点开看明细"的常驻提示（磁盘变化分析的「变化量」）——
    原先只有鼠标悬停时才出现下划线，不悬停完全看不出可点击。
-   刻意不写成无限循环：这类列表一次能出几十行，常年动会非常吵；
-   播 3 次足够被看到，之后保持静止。 */
+   周期刻意拉长到 2.4s：列表一次能出几十行，箭头又是同时循环，
+   周期太短会明显成"一片在闪"；2.4s + 只用 3px 位移，读起来接近呼吸而不是闪烁。 */
 @keyframes hint-nudge {
   0%,
-  60%,
+  55%,
   100% {
     transform: translateX(0);
   }
-  30% {
+  22% {
     transform: translateX(3px);
   }
 }
 
 .hint-nudge {
-  animation: hint-nudge 1.6s ease-in-out 3;
+  animation: hint-nudge 2.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
