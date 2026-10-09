@@ -2,6 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- The change-amount column in disk change analysis now shows a small arrow, so it is clear that the column opens a detail view.
+- Fixed the icon becoming unreadable when hovering the back-to-top button and the support-author close button in light liquid glass.
+
 ## v2.16.15
 
 - The liquid glass look is on by default now. Turn it off under Settings - General if it stutters on a lower-end machine.
