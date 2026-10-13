@@ -520,7 +520,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                     const selected = selectedNames.has(packageInfo.published_name);
                     const driverClassBadge = getDriverClassBadge(packageInfo.class_name || 'unknown', moduleT);
                     return (
-                      <label key={packageInfo.published_name} className={`block rounded-xl border p-2.5 transition ${getPackageCardClass()} ${packageInfo.actionable ? '' : 'opacity-80'}`}>
+                      <label key={packageInfo.published_name} className={`glass-item block rounded-xl border p-2.5 transition ${getPackageCardClass()} ${packageInfo.actionable ? '' : 'opacity-80'}`}>
                         <div className="flex items-start gap-2.5">
                           <div className="mt-0.5 shrink-0">
                             <Checkbox

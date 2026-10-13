@@ -768,6 +768,8 @@ html.glass:not(.dark) {
   --glass-toolbar-bg: rgba(255, 255, 255, 0.78);
   /* 玻璃的"白色反光边" —— 不是灰色分割线。成对定义，明暗各一份。 */
   --glass-toolbar-border: rgba(255, 255, 255, 0.78);
+  /* 列表项卡片（驱动包卡片等）的反光边。比操作栏稍弱一点，避免整屏卡片边都发亮。 */
+  --glass-item-border: rgba(255, 255, 255, 0.72);
   --bg-hover: rgba(255, 255, 255, 0.6);
   --bg-active: rgba(255, 255, 255, 0.72);
   --bg-input: rgba(255, 255, 255, 0.55);
@@ -823,6 +825,7 @@ html.dark.glass {
   /* 深色玻璃下同样：高不透明 + 强模糊，保住液态玻璃质感 */
   --glass-toolbar-bg: rgba(38, 38, 38, 0.78);
   --glass-toolbar-border: rgba(255, 255, 255, 0.18);
+  --glass-item-border: rgba(255, 255, 255, 0.16);
   --bg-hover: rgba(255, 255, 255, 0.12);
   --bg-active: rgba(255, 255, 255, 0.16);
   --bg-input: rgba(255, 255, 255, 0.09);
@@ -1028,6 +1031,22 @@ html.glass .glass-list {
 @layer utilities {
   :where(html.glass) .glass-overlay {
     background-color: var(--glass-overlay-bg);
+  }
+}
+
+/* 列表项卡片（驱动包卡片等）：玻璃态下把灰色分割线换成**白色反光边**，
+   再补上顶部内高光与浮起柔投影 —— 这两味是玻璃质感的来源。
+   底色不动：组件自己的 --bg-card 在玻璃态下本来就是半透明的 ✓
+   ⚠️ 列表行**不加 blur** —— 行数多，逐行重采样背景是最坏情况（项目既有约定）。
+   ⚠️ border-color 必须放进 @layer utilities：无层规则会压过 hover:border-*，
+      会让"悬停边框变绿"失效（这个坑今天已经踩过一次）。 */
+html.glass .glass-item {
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+}
+
+@layer utilities {
+  :where(html.glass) .glass-item {
+    border-color: var(--glass-item-border);
   }
 }
 
