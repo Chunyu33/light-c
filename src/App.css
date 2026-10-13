@@ -137,11 +137,13 @@
      ② 改成 color-mix(var(--bg-elevated) 96%) 仍然没用 ✗ ——
         玻璃主题下 --bg-elevated 本身就是 rgba(255,255,255,0.45)，
         对一个 45% 的颜色再取 96%，结果还是 ~43%，等于没改。
-     正解是用"主题底色的不透明版本"（html.glass 里定义、非玻璃态自动回落到 --bg-elevated）。
-     这块是悬浮层，内容会从它下面滚过去，必须真的挡得住。 */
-  background: var(--glass-elevated-solid, var(--bg-elevated));
+     现在用 --glass-toolbar-bg：玻璃态是 84% + 强模糊，非玻璃态回落到 --bg-elevated。
+     悬浮层下面会滚过内容，靠「高不透明 + 强模糊」挡住，同时保住液态玻璃质感。 */
+  background: var(--glass-toolbar-bg, var(--bg-elevated));
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(12px);
+  /* 前缀写在标准属性前面（原因见 .driver-toolbar 的注释） */
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
 }
 
 .module-operation-toolbar__actions {
@@ -757,11 +759,15 @@ html.glass:not(.dark) {
      0.34 又会让次级文字掉到 AA 以下；文字色已按半透明底加深，所以能取到 0.45。 */
   --bg-card: rgba(255, 255, 255, 0.45);
   --bg-elevated: rgba(255, 255, 255, 0.45);
-  /* 吸顶/悬浮操作栏专用：这类元素**下面会滚过内容**，半透明必然糊成一片。
-     注意不能用 color-mix(var(--bg-elevated) 96%) —— 那是对一个本来就只有 45%
-     的颜色再取 96%，结果仍是 ~43%，等于没改（之前就是这么错的）。
-     要的是"主题底色的不透明版本"。 */
-  --glass-elevated-solid: #FFFFFF;
+  /* 吸顶/悬浮操作栏专用底色。
+     这类元素**下面会滚过内容**，所以要比普通玻璃面更实 —— 但也不能全不透明，
+     那就不是液态玻璃了。做法是「高不透明度 + 强模糊」：底色调到 84%，
+     配合 20px 模糊，下面的文字会糊成一片色块 —— 既挡得住内容，又保留玻璃质感。
+     ⚠️ 不要写成 color-mix(var(--bg-elevated) 96%)：那是对一个已经只有 45% 的颜色
+     再取 96%，结果仍是 ~43%，等于没改（2026-10-13 就是这么改错的）。 */
+  --glass-toolbar-bg: rgba(255, 255, 255, 0.78);
+  /* 玻璃的"白色反光边" —— 不是灰色分割线。成对定义，明暗各一份。 */
+  --glass-toolbar-border: rgba(255, 255, 255, 0.78);
   --bg-hover: rgba(255, 255, 255, 0.6);
   --bg-active: rgba(255, 255, 255, 0.72);
   --bg-input: rgba(255, 255, 255, 0.55);
@@ -814,8 +820,9 @@ html.dark.glass {
      而不是盖一块不透明的深色板 —— 后者会把背景整个遮死，玻璃感随之消失。 */
   --bg-card: rgba(255, 255, 255, 0.07);
   --bg-elevated: rgba(255, 255, 255, 0.1);
-  /* 深色玻璃下同样给吸顶/悬浮操作栏一个不透明底色（暗色的悬浮面）。 */
-  --glass-elevated-solid: #262626;
+  /* 深色玻璃下同样：高不透明 + 强模糊，保住液态玻璃质感 */
+  --glass-toolbar-bg: rgba(38, 38, 38, 0.78);
+  --glass-toolbar-border: rgba(255, 255, 255, 0.18);
   --bg-hover: rgba(255, 255, 255, 0.12);
   --bg-active: rgba(255, 255, 255, 0.16);
   --bg-input: rgba(255, 255, 255, 0.09);
@@ -1029,7 +1036,17 @@ html.glass .glass-list {
    半透明就会把下面的文字透上来和按钮叠在一起 —— 这里换成不透明底色。
    这条规则是无层的，按级联层规则会稳定压过组件上的 bg-[var(--bg-elevated)] 工具类。 */
 html.glass .driver-toolbar {
-  background-color: var(--glass-elevated-solid);
+  background-color: var(--glass-toolbar-bg);
+  /* 按项目自己的玻璃配方补齐三味：白边 + 顶部内高光 + 浮起柔投影。
+     只做半透明会变成"发白的盒子"，不像玻璃 —— 这三味不能少。
+     直接用主题里已有的变量，明暗两套自动跟随，不写死颜色。 */
+  border-color: var(--glass-toolbar-border);
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  /* ⚠️ 前缀必须写在标准属性**前面**：两者连写时 Lightning CSS 视为同一属性组、
+     只保留最后一个；「标准在前」会让产物里只剩 -webkit- 版本，非 WebKit 内核实效。
+     模糊是这个方案的关键：78% 的底色 + 20px 模糊 = 内容糊成色块，挡得住又玻璃。 */
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
 }
 
 /* ===== 侧边栏：液态玻璃下做成浮起的圆角面板 =====
