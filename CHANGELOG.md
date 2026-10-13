@@ -2,7 +2,7 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.16.16
 
 - Driver cleanup now lists only the packages that can be removed safely by default; the switch in the top right reveals all of them.
 - Social app cleanup now finds WeChat storage moved to another drive, including when it sits directly at the drive root.
