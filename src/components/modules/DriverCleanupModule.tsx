@@ -485,24 +485,24 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 </div>
               )}
 
-              {/* 列表上方说明当前展示范围，并给出「看全部」的开关。
-                  默认隐藏的驱动不是被删了，也不是不能处理 —— 只是用户看着拿不定主意。 */}
+              {/* 默认只列出有明确依据、用户能自己判断的驱动包。
+                  其余（正在使用 / 信息不完整 / 未确认过时）放在右侧开关后面。
+                  ⚠️ 这里刻意做成一行轻量说明，不再用整块带边框的容器 ——
+                  它只是个辅助说明，不该和列表抢视觉重量。 */}
               {scanResult.packages.length > 0 && (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-[var(--fg-primary)]">
-                      {showAllDrivers
-                        ? moduleT('driverUi.listAll', { total: scanResult.packages.length })
-                        : moduleT('driverUi.listFiltered', {
-                            shown: visiblePackages.length,
-                            hidden: hiddenDriverCount,
-                          })}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-[var(--fg-muted)]">
-                      {moduleT('driverUi.showAllDrivers')}
-                    </p>
-                  </div>
-                  <Switch checked={showAllDrivers} onChange={setShowAllDrivers} />
+                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] text-[var(--fg-muted)]">
+                  <span>
+                    {showAllDrivers
+                      ? moduleT('driverUi.allList', { total: scanResult.packages.length })
+                      : moduleT('driverUi.filteredList', {
+                          shown: visiblePackages.length,
+                          hidden: hiddenDriverCount,
+                        })}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span>{moduleT('driverUi.showAllToggle')}</span>
+                    <Switch checked={showAllDrivers} onChange={setShowAllDrivers} />
+                  </span>
                 </div>
               )}
 
