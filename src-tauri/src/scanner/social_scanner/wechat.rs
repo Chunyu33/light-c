@@ -94,14 +94,17 @@ impl SocialScanner {
         }
 
         // ----------------------------------------------------------------
-        // 步骤 3: 全盘搜索备选（如果上述路径都不存在）
+        // 步骤 3: 全盘搜索备选（无条件执行）
         // ----------------------------------------------------------------
-        if found_base_paths.is_empty() {
-            info!("微信默认路径不存在，启动全盘搜索...");
-            if let Some(search_paths) = self.search_wechat_files_on_all_drives() {
-                for path in search_paths {
-                    Self::add_candidate(&mut found_base_paths, path);
-                }
+        // ⚠️ 这里**不能**再拿"默认路径都不存在"当条件（Issue #89）：
+        // 微信搬家后旧目录常常还留在「文档\xwechat_files」（可能已经空了），
+        // 而 add_candidate 只判断目录是否存在 → 旧目录占住位置 → 搜索被整个跳过 →
+        // 真正在 D:\xwechat_files 上的数据永远扫不到。
+        // 现在无条件搜索；下钻只做一层，成本可控（每盘一次根目录 readdir + 每个非系统目录一层）。
+        info!("搜索各磁盘根目录与常见位置下的微信数据目录...");
+        if let Some(search_paths) = self.search_wechat_files_on_all_drives() {
+            for path in search_paths {
+                Self::add_candidate(&mut found_base_paths, path);
             }
         }
 
@@ -564,12 +567,11 @@ impl SocialScanner {
                     }
                     enumerated_roots.insert(SocialScanner::normalize_path_key(&path));
                     for data_dir_name in WECHAT_DATA_DIR_NAMES {
-                        // 深度取 2（与 QQ 侧一致），不是原来的 5。
-                        // 这个查找原先只从 Documents / Users 这类小目录触发，改完盘符根下钻之后，
-                        // 它会对盘符根下的**每个**非系统目录执行 —— 深度 5 碰上一个几万文件的
-                        // 大目录（D:\Games 之类）就是几秒起步，而自定义存储位置最常见的结构
-                        // 就是"自建目录 / 数据目录"一层。另外两侧保持一致也更好维护。
-                        if let Some(found) = Self::find_directory_by_name(&path, data_dir_name, 2) {
+                        // 深度取 1（与 QQ 侧一致）。搜索现在**无条件**执行（见步骤 3 的说明），
+                        // 所以必须把每个非系统顶层目录的成本压到最低：一层下钻 =
+                        // 该目录的一次 readdir，够覆盖「自建目录 / 数据目录」这种最常见的结构
+                        //（D:\weixin\xwechat_files）；更深的自定义布局交给注册表值兜底。
+                        if let Some(found) = Self::find_directory_by_name(&path, data_dir_name, 1) {
                             info!("全盘搜索发现: {}", found.display());
                             found_paths.push(found);
                         }

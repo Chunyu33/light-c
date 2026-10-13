@@ -51,12 +51,13 @@ impl SocialScanner {
             Self::add_candidate(&mut found_base_paths, candidate);
         }
 
-        // 全盘搜索备选
-        if found_base_paths.is_empty() {
-            if let Some(search_paths) = self.search_qq_files_on_all_drives() {
-                for path in search_paths {
-                    Self::add_candidate(&mut found_base_paths, path);
-                }
+        // 全盘搜索备选（无条件执行）
+        // ⚠️ 与微信侧同理（Issue #89）：自带的候选目录只要"存在"就会占住位置，
+        // 而用户把数据搬到别的盘之后，原位置的旧目录往往还在（可能已空）——
+        // 那样搜索就被整个跳过，D:\ 上的数据永远扫不到。
+        if let Some(search_paths) = self.search_qq_files_on_all_drives() {
+            for path in search_paths {
+                Self::add_candidate(&mut found_base_paths, path);
             }
         }
 
@@ -405,13 +406,12 @@ impl SocialScanner {
                     }
 
                     // 情况二：目录下面还有一层才到 Tencent Files。
-                    // 复用微信那边的有界查找（内部带目录检查次数上限），
-                    // `D:\QQ\Tencent Files` 正是一层的差距，只看一层会漏。
+                    // 复用微信那边的有界查找（内部带目录检查次数上限）。
                     //
-                    // 深度取 2 而不是更大：这个查找现在会作用于盘符根下的**每个**非系统目录，
-                    // 深度每加一层，大目录（比如 D:\Games）里的扫描成本就翻一截，
-                    // 而自定义存储位置最常见的结构就是"自建目录 / 数据目录"这一层。
-                    if let Some(found) = Self::find_directory_by_name(&path, "Tencent Files", 2) {
+                    // 深度取 1：搜索现在**无条件**执行（每个盘符根下每个非系统目录都要过一遍），
+                    // 一层下钻 = 该目录一次 readdir，足以覆盖「自建目录 / 数据目录」这种最常见的结构
+                    //（D:\QQ\Tencent Files），再深就交给注册表值兜底，避免在大目录上白花时间。
+                    if let Some(found) = Self::find_directory_by_name(&path, "Tencent Files", 1) {
                         info!("全盘搜索发现QQ目录: {}", found.display());
                         found_paths.push(found);
                     }
