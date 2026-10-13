@@ -5,7 +5,9 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 ## Unreleased
 
 - The change-amount column in disk change analysis now shows a small arrow, so it is clear that the column opens a detail view.
-- Fixed the icon becoming unreadable when hovering the back-to-top button and the support-author close button in light liquid glass.
+- Fixed the icon becoming unreadable when hovering the back-to-top button in light liquid glass.
+- Social app cleanup now finds WeChat storage moved to another drive, including when it sits directly at the drive root.
+- The free space in the header updates right after a cleanup instead of waiting for a restart.
 
 ## v2.16.15
 
