@@ -225,9 +225,15 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     }
   }, []);
 
-  // 触发健康评分刷新
+  // 触发健康评分刷新。
+  // ⚠️ 顺带把磁盘可用空间也重读一遍（Issue #90）：各模块清理完成后调的都是这个函数，
+  // 而右上角显示的可用空间来自本组件挂载时读的那一次快照 —— 不重读就会出现
+  //「已经清理出空间、资源管理器里也变了，但右上角数字不动，要重启软件才对」。
   const triggerHealthRefresh = useCallback(() => {
     setHealthRefreshTrigger(n => n + 1);
+    void getDiskInfo()
+      .then(setDiskInfo)
+      .catch(error => console.error('刷新磁盘信息失败:', error));
   }, []);
 
   // 触发一键扫描
