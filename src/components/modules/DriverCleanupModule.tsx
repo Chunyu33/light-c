@@ -215,6 +215,14 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
     [scanResult, showAllDrivers],
   );
   const hiddenDriverCount = (scanResult?.packages.length ?? 0) - visiblePackages.length;
+  // 操作栏里那行展示范围的文案：默认说清"只显示可安全处理的、隐藏了多少"，
+  // 打开开关后说清"现在看的是全部"。文案可能偏长，操作栏里会限宽截断。
+  const listScopeText = showAllDrivers
+    ? moduleT('driverUi.allList', { total: scanResult?.packages.length ?? 0 })
+    : moduleT('driverUi.filteredList', {
+        shown: visiblePackages.length,
+        hidden: hiddenDriverCount,
+      });
 
   useEffect(() => {
     const toolbar = toolbarRef.current;
@@ -439,6 +447,16 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 ref={toolbarRef}
                 className={`sticky top-2 z-20 mx-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2 py-1.5 shadow-sm transition-[width,box-shadow,background-color] duration-200 ease-out ${isToolbarSticky ? 'w-fit shadow-md' : 'w-full'}`}
               >
+                {/* 展示范围 + 「显示全部」开关，跟操作按钮共用同一行 —— 它只是辅助说明，
+                    不该单独占一行。文案限宽截断（完整内容看 title），避免把操作栏撑宽。 */}
+                <span className="max-w-[13em] truncate px-1 text-xs text-[var(--fg-muted)]" title={listScopeText}>
+                  {listScopeText}
+                </span>
+                <span className="flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]">
+                  {moduleT('driverUi.showAllToggle')}
+                  <Switch checked={showAllDrivers} onChange={setShowAllDrivers} />
+                </span>
+                <span className="h-4 w-px shrink-0 bg-[var(--border-default)]" aria-hidden="true" />
                 <span className="inline-flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]" title={moduleT('driverUi.backupHint')}>
                   <Archive className="h-3.5 w-3.5 text-[var(--brand-green)]" />{moduleT('driverUi.backup')}
                 </span>
@@ -482,27 +500,6 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 <div className="flex items-start gap-2 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
                   <ShieldAlert className="w-4 h-4 shrink-0" />
                   <span>{moduleT('driverUi.adminHint')}</span>
-                </div>
-              )}
-
-              {/* 默认只列出有明确依据、用户能自己判断的驱动包。
-                  其余（正在使用 / 信息不完整 / 未确认过时）放在右侧开关后面。
-                  ⚠️ 这里刻意做成一行轻量说明，不再用整块带边框的容器 ——
-                  它只是个辅助说明，不该和列表抢视觉重量。 */}
-              {scanResult.packages.length > 0 && (
-                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] text-[var(--fg-muted)]">
-                  <span>
-                    {showAllDrivers
-                      ? moduleT('driverUi.allList', { total: scanResult.packages.length })
-                      : moduleT('driverUi.filteredList', {
-                          shown: visiblePackages.length,
-                          hidden: hiddenDriverCount,
-                        })}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span>{moduleT('driverUi.showAllToggle')}</span>
-                    <Switch checked={showAllDrivers} onChange={setShowAllDrivers} />
-                  </span>
                 </div>
               )}
 
