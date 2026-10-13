@@ -132,7 +132,10 @@
   padding: 0.35em;
   border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
   border-radius: 0.8em;
-  background: color-mix(in srgb, var(--bg-elevated) 78%, transparent);
+  /* 不透明度提到 96%：这块工具栏是**浮在可滚动内容之上**的，
+     78% 时下面的列表文字会透上来、和按钮叠在一起（Evan 反馈"过于透明"）。
+     保留一点点透明 + blur 维持浮起的质感，但正文必须读得清。 */
+  background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(12px);
 }

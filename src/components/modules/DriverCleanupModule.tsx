@@ -11,6 +11,7 @@ import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { Checkbox } from '../ui/Checkbox';
+import { Switch } from '../ui/Switch';
 import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import {
@@ -192,6 +193,28 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
   const [restoring, setRestoring] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [isToolbarSticky, setIsToolbarSticky] = useState(false);
+  // 默认只展示"用户能自己拿主意"的驱动包（见 isActionableWithEvidence）。
+  // 以前一股脑全列出来，有用户反馈整屏都是「信息不完整」，看了也不知道该不该删。
+  // 全部驱动没被删掉，只是移到开关后面。
+  const [showAllDrivers, setShowAllDrivers] = useState(false);
+
+  const visiblePackages = useMemo(
+    () =>
+      (scanResult?.packages ?? []).filter((packageInfo) => {
+        if (showAllDrivers) return true;
+        // 默认视图只保留"有明确依据、用户能自己判断"的两类：
+        //   old_confirmed —— 在设备匹配列表里被更高排名驱动替代（就是后端算的"高置信"）
+        //   recommended   —— 未关联设备，且同一驱动族存在更新版本
+        // 其余三类都放到「显示全部驱动」后面：
+        //   in_use           正在使用，本来就不能删
+        //   unknown          信息不完整，用户看了也无从判断（有用户反馈整屏都是这个）
+        //   no_newer_version 未确认过时，删了就没有别的版本可回退
+        if (!packageInfo.actionable) return false;
+        return packageInfo.status === 'old_confirmed' || packageInfo.status === 'recommended';
+      }),
+    [scanResult, showAllDrivers],
+  );
+  const hiddenDriverCount = (scanResult?.packages.length ?? 0) - visiblePackages.length;
 
   useEffect(() => {
     const toolbar = toolbarRef.current;
@@ -462,11 +485,41 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 </div>
               )}
 
-              {scanResult.packages.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title={t('noThirdPartyDrivers')} description={t('noDriversDescription')} tone="success" />
+              {/* 列表上方说明当前展示范围，并给出「看全部」的开关。
+                  默认隐藏的驱动不是被删了，也不是不能处理 —— 只是用户看着拿不定主意。 */}
+              {scanResult.packages.length > 0 && (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-[var(--fg-primary)]">
+                      {showAllDrivers
+                        ? moduleT('driverUi.listAll', { total: scanResult.packages.length })
+                        : moduleT('driverUi.listFiltered', {
+                            shown: visiblePackages.length,
+                            hidden: hiddenDriverCount,
+                          })}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[var(--fg-muted)]">
+                      {moduleT('driverUi.showAllDrivers')}
+                    </p>
+                  </div>
+                  <Switch checked={showAllDrivers} onChange={setShowAllDrivers} />
+                </div>
+              )}
+
+              {visiblePackages.length === 0 ? (
+                scanResult.packages.length === 0 ? (
+                  <EmptyState icon={CheckCircle2} title={t('noThirdPartyDrivers')} description={t('noDriversDescription')} tone="success" />
+                ) : (
+                  <EmptyState
+                    icon={CheckCircle2}
+                    title={moduleT('driverUi.noActionable')}
+                    description={moduleT('driverUi.noActionableDesc')}
+                    tone="success"
+                  />
+                )
               ) : (
                 <div className="space-y-2">
-                  {scanResult.packages.map((packageInfo) => {
+                  {visiblePackages.map((packageInfo) => {
                     const selected = selectedNames.has(packageInfo.published_name);
                     const driverClassBadge = getDriverClassBadge(packageInfo.class_name || 'unknown', moduleT);
                     return (

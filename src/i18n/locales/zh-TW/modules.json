@@ -582,7 +582,7 @@
     "confirmDesc": "確定清理“{{name}}”的臨時檔案嗎？此操作將刪除該目錄下的所有檔案，但保留目錄本身。",
     "occupiedWarning": "被佔用的檔案將被跳過，不會影響正在執行的程式。"
   },
-  "driverUi": {
+  "driverUi": { "filteredList": "只顯示可安全處理的 {{shown}} 個 · 已隱藏 {{hidden}} 個", "allList": "顯示全部 {{total}} 個驅動", "showAllToggle": "「顯示全部」會一併列出正在使用與資訊不完整的驅動，請自行判斷", "noActionableDesc": "打開上面的開關可以看到其餘驅動；判斷不了的建議保留。", 
     "packageCount": "個驅動包",
     "noActionable": "未發現可處理項",
     "checking": "檢測中...",

@@ -4,10 +4,10 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## Unreleased
 
-- The change-amount column in disk change analysis now shows a small arrow, so it is clear that the column opens a detail view.
-- Fixed the icon becoming unreadable when hovering the back-to-top button in light liquid glass.
+- Driver cleanup now lists only the packages that can be removed safely by default; the switch in the top right reveals all of them.
 - Social app cleanup now finds WeChat storage moved to another drive, including when it sits directly at the drive root.
 - The free space in the header updates right after a cleanup instead of waiting for a restart.
+- Other fixes: the change-amount column in disk change analysis hints that it is clickable; several button icons were unreadable in light liquid glass, and the floating toolbar was too transparent.
 
 ## v2.16.15
 
