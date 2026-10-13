@@ -445,14 +445,14 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
             <div className="space-y-2">
               <div
                 ref={toolbarRef}
-                className={`sticky top-2 z-20 mx-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2 py-1.5 shadow-sm transition-[width,box-shadow,background-color] duration-200 ease-out ${isToolbarSticky ? 'w-fit shadow-md' : 'w-full'}`}
+                className={`driver-toolbar sticky top-2 z-20 mx-auto flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2 py-1.5 shadow-sm transition-[width,box-shadow,background-color] duration-200 ease-out ${isToolbarSticky ? 'w-fit shadow-md' : 'w-full'}`}
               >
-                {/* 展示范围 + 「显示全部」开关，跟操作按钮共用同一行 —— 它只是辅助说明，
-                    不该单独占一行。文案限宽截断（完整内容看 title），避免把操作栏撑宽。 */}
-                <span className="max-w-[13em] truncate px-1 text-xs text-[var(--fg-muted)]" title={listScopeText}>
-                  {listScopeText}
-                </span>
-                <span className="flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]">
+                {/* 「显示全部」开关，和操作按钮共用同一行。
+                    展示范围的文案不直接显示出来（占宽又没必要），挂在 title 上，hover 可见。 */}
+                <span
+                  className="flex items-center gap-1 px-1 text-xs text-[var(--fg-muted)]"
+                  title={listScopeText}
+                >
                   {moduleT('driverUi.showAllToggle')}
                   <Switch checked={showAllDrivers} onChange={setShowAllDrivers} />
                 </span>

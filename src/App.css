@@ -132,10 +132,14 @@
   padding: 0.35em;
   border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
   border-radius: 0.8em;
-  /* 不透明度提到 96%：这块工具栏是**浮在可滚动内容之上**的，
-     78% 时下面的列表文字会透上来、和按钮叠在一起（Evan 反馈"过于透明"）。
-     保留一点点透明 + blur 维持浮起的质感，但正文必须读得清。 */
-  background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
+  /* 不透明度这块踩过两次坑，记录清楚：
+     ① 原来写死 78% —— 太透，内容透上来和按钮叠在一起。
+     ② 改成 color-mix(var(--bg-elevated) 96%) 仍然没用 ✗ ——
+        玻璃主题下 --bg-elevated 本身就是 rgba(255,255,255,0.45)，
+        对一个 45% 的颜色再取 96%，结果还是 ~43%，等于没改。
+     正解是用"主题底色的不透明版本"（html.glass 里定义、非玻璃态自动回落到 --bg-elevated）。
+     这块是悬浮层，内容会从它下面滚过去，必须真的挡得住。 */
+  background: var(--glass-elevated-solid, var(--bg-elevated));
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
   backdrop-filter: blur(12px);
 }
@@ -753,6 +757,11 @@ html.glass:not(.dark) {
      0.34 又会让次级文字掉到 AA 以下；文字色已按半透明底加深，所以能取到 0.45。 */
   --bg-card: rgba(255, 255, 255, 0.45);
   --bg-elevated: rgba(255, 255, 255, 0.45);
+  /* 吸顶/悬浮操作栏专用：这类元素**下面会滚过内容**，半透明必然糊成一片。
+     注意不能用 color-mix(var(--bg-elevated) 96%) —— 那是对一个本来就只有 45%
+     的颜色再取 96%，结果仍是 ~43%，等于没改（之前就是这么错的）。
+     要的是"主题底色的不透明版本"。 */
+  --glass-elevated-solid: #FFFFFF;
   --bg-hover: rgba(255, 255, 255, 0.6);
   --bg-active: rgba(255, 255, 255, 0.72);
   --bg-input: rgba(255, 255, 255, 0.55);
@@ -805,6 +814,8 @@ html.dark.glass {
      而不是盖一块不透明的深色板 —— 后者会把背景整个遮死，玻璃感随之消失。 */
   --bg-card: rgba(255, 255, 255, 0.07);
   --bg-elevated: rgba(255, 255, 255, 0.1);
+  /* 深色玻璃下同样给吸顶/悬浮操作栏一个不透明底色（暗色的悬浮面）。 */
+  --glass-elevated-solid: #262626;
   --bg-hover: rgba(255, 255, 255, 0.12);
   --bg-active: rgba(255, 255, 255, 0.16);
   --bg-input: rgba(255, 255, 255, 0.09);
@@ -1011,6 +1022,14 @@ html.glass .glass-list {
   :where(html.glass) .glass-overlay {
     background-color: var(--glass-overlay-bg);
   }
+}
+
+/* 驱动模块自带的吸顶操作栏（它**不使用** ModuleOperationToolbar，是自己的一套）。
+   玻璃主题下 --bg-elevated 只有 45% 不透明，而它是 sticky 的、列表内容会从下面滚过去，
+   半透明就会把下面的文字透上来和按钮叠在一起 —— 这里换成不透明底色。
+   这条规则是无层的，按级联层规则会稳定压过组件上的 bg-[var(--bg-elevated)] 工具类。 */
+html.glass .driver-toolbar {
+  background-color: var(--glass-elevated-solid);
 }
 
 /* ===== 侧边栏：液态玻璃下做成浮起的圆角面板 =====
