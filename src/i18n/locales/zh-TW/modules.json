@@ -626,7 +626,7 @@
     "driverDirectoryUnavailable": "驅動目錄資訊不可用",
     "searchAria": "搜尋 {{provider}} {{name}}",
     "openDriverAria": "開啟 {{provider}} 驅動所在目錄",
-    "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。",
+    "confirmDeleteDesc": "將永久刪除「{{name}}」，佔用約 {{size}}。刪除前會自動備份，可在此模組還原。",
     "confirmDeleteTarget": "選中的 {{count}} 個驅動包",
     "unknownSize": "未知",
     "confirmRestoreDesc": "將讀取當前資料目錄 driver_backups 下的全部 INF 備份，並交由 Windows pnputil 遞迴安裝。",
