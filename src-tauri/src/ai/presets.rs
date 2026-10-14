@@ -31,7 +31,12 @@ pub struct AiProviderPreset {
     pub protocol: AiProtocol,
     /// 默认接口地址（**不带结尾斜杠**，拼接路径时统一补）
     pub base_url: &'static str,
-    /// 默认模型，仅作提示：密钥填好后会去拉真实模型列表
+    /// 默认模型：**刻意全部留空**。
+    ///
+    /// 硬编码模型名有真实风险 —— 服务商改名或下线很常见，拉回来的列表里未必还有这个名字，
+    /// 用户一保存就是个失效的模型名，调用直接报错。留空则强制从拉取结果里选。
+    /// 交互上不会变差：设置页「测试连接」成功后会自动选中列表第一项；
+    /// 万一拉不到列表，界面会退化成手填输入框。
     pub default_model: &'static str,
     /// 是否本地推理：界面据此提示"数据不会离开本机"
     pub local: bool,
@@ -44,7 +49,7 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
         name: "DeepSeek",
         protocol: AiProtocol::OpenAi,
         base_url: "https://api.deepseek.com/v1",
-        default_model: "deepseek-chat",
+        default_model: "",
         local: false,
     },
     AiProviderPreset {
@@ -52,7 +57,7 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
         name: "OpenAI",
         protocol: AiProtocol::OpenAi,
         base_url: "https://api.openai.com/v1",
-        default_model: "gpt-4o-mini",
+        default_model: "",
         local: false,
     },
     AiProviderPreset {
@@ -60,7 +65,7 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
         name: "Kimi（月之暗面）",
         protocol: AiProtocol::OpenAi,
         base_url: "https://api.moonshot.cn/v1",
-        default_model: "moonshot-v1-8k",
+        default_model: "",
         local: false,
     },
     AiProviderPreset {
@@ -69,7 +74,7 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
         protocol: AiProtocol::OpenAi,
         // 百炼的 OpenAI 兼容模式专用路径，与原生 DashScope 接口不同
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        default_model: "qwen-plus",
+        default_model: "",
         local: false,
     },
     AiProviderPreset {
@@ -77,7 +82,7 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
         name: "智谱 GLM",
         protocol: AiProtocol::OpenAi,
         base_url: "https://open.bigmodel.cn/api/paas/v4",
-        default_model: "glm-4-flash",
+        default_model: "",
         local: false,
     },
     AiProviderPreset {
