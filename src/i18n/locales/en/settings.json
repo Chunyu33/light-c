@@ -61,10 +61,13 @@
     "dataDirDesc": "Where AI conversations are stored; leave empty to follow the main data folder",
     "dataDirDefault": "Default: the ai folder inside the data folder",
     "profileAdd": "Add provider",
-    "profileDelete": "Remove this profile",
+    "profileDelete": "Remove",
     "profileNoModel": "No model selected yet",
     "dataDirPick": "Change folder",
-    "dataDirReset": "Use default"
+    "dataDirReset": "Use default",
+    "profileUnnamed": "Unnamed provider",
+    "profileReady": "Key configured",
+    "profileNoKey": "No key yet"
   },
   "tabs": {
     "ai": "AI assistant",

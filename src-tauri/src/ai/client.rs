@@ -366,6 +366,17 @@ where
         AiProtocol::Anthropic => build_anthropic_body(&request, &model),
     };
     body["stream"] = serde_json::json!(true);
+    // 工具声明与"要不要流式"是两件独立的事：流式下工具参数会分片到达，
+    // 由 stream.rs 按索引拼回去，所以这里照样声明，不必为了工具放弃流式。
+    if !request.tools.is_empty() {
+        let declarations = match protocol {
+            AiProtocol::OpenAi => openai_tools(&request.tools),
+            AiProtocol::Anthropic => anthropic_tools(&request.tools),
+        };
+        if !declarations.is_empty() {
+            body["tools"] = serde_json::json!(declarations);
+        }
+    }
 
     let send = match protocol {
         AiProtocol::OpenAi => {
@@ -416,14 +427,16 @@ where
         on_delta(&delta);
     }
 
-    if full.trim().is_empty() {
+    let tool_calls = decoder.take_tool_calls();
+    // 只有正文空**且**没有工具调用才算真的没内容：
+    // 模型决定调工具时正文本来就可能为空，那不是错误。
+    if full.trim().is_empty() && tool_calls.is_empty() {
         return Err("服务端没有返回任何内容，请确认所选模型支持流式输出。".to_string());
     }
     Ok(AiChatReply {
         content: full,
         model,
-        // 流式路径不带工具：工具调用走非流式（参数是分片 JSON，拼接易错且对提案无价值）
-        tool_calls: Vec::new(),
+        tool_calls,
     })
 }
 

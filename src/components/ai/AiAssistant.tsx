@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { aiChat, aiChatStream, appendAiSessionMessage, clearAiSession, getAiConfig, listenAiStream, listAiProviders, loadAiSession, localDateKey } from '../../api/ai';
+import { aiChatStream, appendAiSessionMessage, clearAiSession, getAiConfig, listenAiStream, listAiProviders, loadAiSession, localDateKey } from '../../api/ai';
 import type { AiChatMessage, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { AiMarkIcon } from './AiMarkIcon';
@@ -244,11 +244,10 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         if (actions?.selectItems) tools.push('select_items');
         if (actions?.deleteItems) tools.push('propose_delete');
 
-        const reply = tools.length > 0
-          // 带工具时走非流式：工具参数是分片吐出来的半个 JSON，拼接容易出错，
-          // 而且"提案"本来就不需要边生成边看。
-          ? await aiChat({ messages: trimHistory(request), tools })
-          : await aiChatStream({ messages: trimHistory(request) }, streamId);
+        // 一律走流式。工具调用以前会因此丢掉，所以当时只能"带工具就不流式"——
+        // 代价是垃圾清理这类模块**永远看不到边生成边显示**，得不偿失。
+        // 现在解码器会把分片的工具参数按索引拼回来（见 stream.rs），两者兼得。
+        const reply = await aiChatStream({ messages: trimHistory(request), tools }, streamId);
 
         // 模型没回话、而是要求执行动作
         if ((reply.toolCalls?.length ?? 0) > 0) {

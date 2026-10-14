@@ -61,10 +61,13 @@
     "dataDirDesc": "AI 会話の保存先。空欄ならメインのデータフォルダーに従います",
     "dataDirDefault": "既定：データフォルダー内の ai フォルダー",
     "profileAdd": "プロバイダーを追加",
-    "profileDelete": "この設定を削除",
+    "profileDelete": "削除",
     "profileNoModel": "モデル未選択",
     "dataDirPick": "フォルダーを変更",
-    "dataDirReset": "既定に戻す"
+    "dataDirReset": "既定に戻す",
+    "profileUnnamed": "名称未設定",
+    "profileReady": "キー設定済み",
+    "profileNoKey": "キー未設定"
   },
   "tabs": {
     "ai": "AI アシスタント",

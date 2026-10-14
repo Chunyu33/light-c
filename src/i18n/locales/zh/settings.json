@@ -61,10 +61,13 @@
     "dataDirDesc": "AI 对话记录的存放位置，留空则跟随主数据目录",
     "dataDirDefault": "默认：数据目录下的 ai 文件夹",
     "profileAdd": "新增服务商",
-    "profileDelete": "删除这份配置",
+    "profileDelete": "删除",
     "profileNoModel": "还没有选择模型",
     "dataDirPick": "更改目录",
-    "dataDirReset": "恢复默认"
+    "dataDirReset": "恢复默认",
+    "profileUnnamed": "未命名服务商",
+    "profileReady": "已配置密钥",
+    "profileNoKey": "还没有填写密钥"
   },
   "tabs": {
     "ai": "AI 助手",

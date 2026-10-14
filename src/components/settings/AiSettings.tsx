@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, CheckCircle2, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Plus, Sparkles } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { useToast } from '../Toast';
 import {
@@ -302,53 +302,60 @@ export function AiSettings() {
         </h4>
 
         <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
-          {/* 服务商档案栏：点标签切换，+ 新增，悬停出现删除。
-              多份配置并存，切换只改一个 id，不搬动其它设置。 */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* 服务商列表：参考 deepseek harness —— 竖排列表、每行一个删除、
+              底部整行「新增服务商」。
+              ⚠️ 只剩一条时**也允许删除**：之前按"至少保留一条"藏起删除按钮，
+              用户想清空就得先加一条再删，非常别扭（Evan 反馈过）。*/}
+          <div className="space-y-1.5">
             {saved?.profiles.map((profile) => {
               const isActive = profile.id === saved.activeProfileId;
               const label =
                 profile.name ||
                 providers.find((item) => item.id === profile.providerId)?.name ||
-                profile.providerId;
+                profile.providerId ||
+                t('aiAssistant.profileUnnamed');
               return (
-                <span
+                <div
                   key={profile.id}
-                  className={`group inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-xs transition-colors ${
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 transition-colors ${
                     isActive
-                      ? 'border-[var(--brand-green)] bg-[var(--brand-green-10)] text-[var(--brand-green)]'
-                      : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                      ? 'border-[var(--brand-green)] bg-[var(--brand-green-10)]'
+                      : 'border-[var(--border-color)] hover:bg-[var(--bg-hover)]'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => void handleSwitchProfile(profile.id)}
-                    className="max-w-[12em] truncate"
-                    title={profile.model || t('aiAssistant.profileNoModel')}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   >
-                    {label}
-                    {profile.model ? ` · ${profile.model}` : ''}
+                    {/* 圆点 = 是否已配置密钥，一眼看出哪条能用 */}
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        profile.hasApiKey ? 'bg-[var(--brand-green)]' : 'bg-[var(--text-muted)]'
+                      }`}
+                      title={profile.hasApiKey ? t('aiAssistant.profileReady') : t('aiAssistant.profileNoKey')}
+                    />
+                    <span className="truncate text-sm text-[var(--text-primary)]">{label}</span>
+                    {profile.model ? (
+                      <span className="truncate text-xs text-[var(--text-muted)]">· {profile.model}</span>
+                    ) : null}
                   </button>
-                  {saved.profiles.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteProfile(profile.id)}
-                      title={t('aiAssistant.profileDelete')}
-                      aria-label={t('aiAssistant.profileDelete')}
-                      className="opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteProfile(profile.id)}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                  >
+                    {t('aiAssistant.profileDelete')}
+                  </button>
+                </div>
               );
             })}
             <button
               type="button"
               onClick={() => void handleAddProfile()}
-              className="inline-flex items-center gap-1 rounded-xl border border-dashed border-[var(--border-color)] px-2.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-color)] py-2 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-3.5 w-3.5" />
               {t('aiAssistant.profileAdd')}
             </button>
           </div>
