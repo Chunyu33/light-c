@@ -163,10 +163,14 @@ export function AiChatPanel({
         <img src={previewUrl} alt="" className="max-h-full max-w-full rounded-xl shadow-2xl" />
       </div>
     ) : null}
-    /* 尺寸全部用 em + vw/vh 计算，不写死像素：em 跟随全局字号设置缩放，
-       上限再被视口夹住，窗口变小会自动收窄。
-       ⚠️ calc() 里的减号**必须带空格** —— 在 Tailwind 里写成下划线 `_-_`。
-       写成 `calc(100vh-8em)` 是无效 CSS，整条属性会被浏览器丢掉（这个坑踩过）。 */
+    {/* 尺寸全部用 em + vw/vh 计算，不写死像素：em 跟随全局字号设置缩放，
+        上限再被视口夹住，窗口变小会自动收窄。
+        ⚠️ calc 里的减号必须带空格 —— Tailwind 里要写成下划线形式，
+        否则整条属性会被浏览器丢掉（这个坑踩过）。
+        ⚠️ 上面这两句原本写成 JS 注释，自从 return 被包进 Fragment 之后，
+        它就成了 JSX 的兄弟节点；而 JSX 里裸写 JS 注释会被当**文本渲染到界面上**。
+        所以这里必须是花括号包起来的形式。（注释里也不能出现闭合符本身，
+        否则这段注释会提前结束。） */}
     <motion.div
       /* 应用根节点设了 select-none（防止界面像网页一样被拖选），
          但对话内容**必须能选中复制** —— 这里显式覆盖回来。 */

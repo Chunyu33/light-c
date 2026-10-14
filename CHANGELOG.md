@@ -2,6 +2,14 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- New AI assistant: open it from the floating button in the lower right, ask what the files on screen are and whether they can be removed, then turn the answer into a selection or a deletion
+- Configure several AI providers and keep them saved side by side, switching provider or model at any time; screenshots can be attached to a question
+- Conversations and screenshots are kept locally, with copy, retry and click-to-enlarge; the location is configurable and is included in "clear local data"
+- Every module now has an "ask the assistant" entry next to each row, for questions about that specific item
+
+
 ## v2.16.16
 
 - Driver cleanup now lists only the packages that can be removed safely by default; the switch in the top right reveals all of them.
