@@ -9,5 +9,9 @@
   "thinking": "正在思考…",
   "askHint": "咨询 AI 助手",
   "resizeHint": "拖动调整大小，双击恢复默认",
-  "resizeHintCustom": "拖动调整大小，双击恢复默认"
+  "resizeHintCustom": "拖动调整大小，双击恢复默认",
+  "tool": {
+    "selectNotFound": "没有找到你说的这些项，数据可能已经变化，请重新扫描后再试。",
+    "selected": "已按你的要求勾选 {{count}} 项：{{names}}。确认无误后可以在界面上执行删除。"
+  }
 }

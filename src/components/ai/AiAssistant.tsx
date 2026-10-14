@@ -11,11 +11,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
-import { aiChatStream, appendAiSessionMessage, clearAiSession, listenAiStream, loadAiSession, localDateKey } from '../../api/ai';
-import type { AiChatMessage } from '../../types/ai';
+import { aiChat, aiChatStream, appendAiSessionMessage, clearAiSession, listenAiStream, loadAiSession, localDateKey } from '../../api/ai';
+import type { AiChatMessage, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { buildRequestMessages, getModuleDisplayName } from './aiContext';
 import { getModuleDataSummary } from './moduleDataRegistry';
+import { getModuleActions } from './moduleActionRegistry';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
 
 /** 只保留最近若干轮对话：更早的内容交给后续版本的滚动摘要处理。 */
@@ -80,6 +81,45 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     })();
   }, [activeModuleId]);
 
+  /**
+   * 执行模型请求的工具调用，把结果作为一条**本地消息**写进对话。
+   *
+   * 结果文案由这里生成、不交给模型转述 —— 做了什么、影响了几项，
+   * 一律以本地事实为准，避免出现"AI 说自己删了、其实没删"。
+   */
+  const runToolCalls = useCallback(
+    (moduleId: string, calls: AiToolCall[]) => {
+      const actions = getModuleActions(moduleId);
+      for (const call of calls) {
+        // 其它工具（例如删除提案）留给后续版本，这里不静默执行
+        if (call.name !== 'select_items') continue;
+
+        const rawIds = (call.arguments as { ids?: unknown }).ids;
+        const ids = Array.isArray(rawIds)
+          ? rawIds.filter((id): id is string => typeof id === 'string')
+          : [];
+
+        // 一律拿 id 反查模块当前数据：提案到执行之间用户可能又改过勾选、模块可能重扫过，
+        // 解析不到的项直接剔除，绝不照着旧 id 硬执行。
+        const resolved = actions?.resolveTargets?.(ids) ?? [];
+        if (resolved.length === 0) {
+          pushMessage(moduleId, { role: 'assistant', content: t('tool.selectNotFound') });
+          continue;
+        }
+
+        actions?.selectItems?.(resolved.map((target) => target.id));
+        pushMessage(moduleId, {
+          role: 'assistant',
+          content: t('tool.selected', {
+            count: resolved.length,
+            names: resolved.map((target) => target.label).join('、'),
+          }),
+        });
+      }
+    },
+    [pushMessage, t],
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
       if (sendingRef.current) return;
@@ -117,7 +157,26 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         // 每次发送现取"当前模块的数据摘要"：用户可能刚扫完或刚勾选，缓存一秒都会答错。
         const dataSummary = getModuleDataSummary(moduleId);
         const request = buildRequestMessages(nextMessages, moduleId, dataSummary);
-        const reply = await aiChatStream({ messages: trimHistory(request) }, streamId);
+
+        // 本次允许的工具：**只按该模块登记了哪些动作来给**。
+        // 只分析不删除的模块（磁盘变化分析、AI 模型空间）一个都不给 ——
+        // 模型连"提议删除"的入口都看不到，也就无从提议。
+        const actions = getModuleActions(moduleId);
+        const tools: string[] = [];
+        if (actions?.selectItems) tools.push('select_items');
+        if (actions?.deleteItems) tools.push('propose_delete');
+
+        const reply = tools.length > 0
+          // 带工具时走非流式：工具参数是分片吐出来的半个 JSON，拼接容易出错，
+          // 而且"提案"本来就不需要边生成边看。
+          ? await aiChat({ messages: trimHistory(request), tools })
+          : await aiChatStream({ messages: trimHistory(request) }, streamId);
+
+        // 模型没回话、而是要求执行动作
+        if ((reply.toolCalls?.length ?? 0) > 0) {
+          runToolCalls(moduleId, reply.toolCalls ?? []);
+          return;
+        }
 
         // 以命令返回的完整正文入库：事件只负责过程中的实时显示
         pushMessage(moduleId, { role: 'assistant', content: reply.content });

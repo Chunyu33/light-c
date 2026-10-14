@@ -52,14 +52,30 @@ export interface AiChatMessage {
   content: string;
 }
 
+/** 模型请求调用某个工具。 */
+export interface AiToolCall {
+  callId: string;
+  name: string;
+  /** 已解析成对象的参数；解析失败时为空对象 */
+  arguments: Record<string, unknown>;
+}
+
 export interface AiChatRequest {
   messages: AiChatMessage[];
   /** 单次覆盖模型；不传则用设置里保存的 */
   model?: string;
   temperature?: number;
+  /**
+   * 本次允许使用的工具名。
+   * **由前端按「该模块登记了哪些动作」决定** —— 只分析不删除的模块不会传
+   * propose_delete，模型也就看不到这个工具，无从提议删除。
+   */
+  tools?: string[];
 }
 
 export interface AiChatReply {
   content: string;
   model: string;
+  /** 有值时表示模型想做某个动作而不是回话 */
+  toolCalls?: AiToolCall[];
 }

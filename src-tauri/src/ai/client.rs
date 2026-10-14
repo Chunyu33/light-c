@@ -9,6 +9,7 @@
 use super::config::read_config;
 use super::presets::{find_preset, AiProtocol};
 use super::stream::StreamDecoder;
+use super::tools::{anthropic_tools, openai_tools, parse_tool_calls, AiToolCall};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -39,6 +40,11 @@ pub struct AiChatRequest {
     /// 采样温度；不填用服务端默认
     #[serde(default)]
     pub temperature: Option<f32>,
+    /// 本次允许使用的工具名。
+    /// **由前端按「该模块登记了哪些动作」决定** —— 只分析不删除的模块不会传
+    /// propose_delete，于是模型连这个工具都看不到，也就无从提议删除。
+    #[serde(default)]
+    pub tools: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -46,6 +52,9 @@ pub struct AiChatRequest {
 pub struct AiChatReply {
     pub content: String,
     pub model: String,
+    /// 模型请求调用的工具。有值时 content 通常为空 —— 它不是"回复"，而是一个动作意图。
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<AiToolCall>,
 }
 
 /// 拼接接口地址，容忍 base_url 带或不带结尾斜杠。
@@ -220,9 +229,24 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
     }
 
     let client = http_client(CHAT_TIMEOUT_SECS)?;
+    // 先按协议构造请求体，再按需挂上工具声明。
+    // 两种协议的工具形状不同，但"要不要带工具"对上层是同一件事。
+    let mut body = match protocol {
+        AiProtocol::OpenAi => build_openai_body(&request, &model),
+        AiProtocol::Anthropic => build_anthropic_body(&request, &model),
+    };
+    if !request.tools.is_empty() {
+        let declarations = match protocol {
+            AiProtocol::OpenAi => openai_tools(&request.tools),
+            AiProtocol::Anthropic => anthropic_tools(&request.tools),
+        };
+        if !declarations.is_empty() {
+            body["tools"] = serde_json::json!(declarations);
+        }
+    }
+
     let response = match protocol {
         AiProtocol::OpenAi => {
-            let body = build_openai_body(&request, &model);
             client
                 .post(join_url(&base_url, "/chat/completions"))
                 .bearer_auth(&api_key)
@@ -231,7 +255,6 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
                 .await
         }
         AiProtocol::Anthropic => {
-            let body = build_anthropic_body(&request, &model);
             client
                 .post(join_url(&base_url, "/v1/messages"))
                 .header("x-api-key", &api_key)
@@ -257,10 +280,23 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
     let content = match protocol {
         AiProtocol::OpenAi => parse_openai_reply(&value),
         AiProtocol::Anthropic => parse_anthropic_reply(&value),
-    }
-    .ok_or_else(|| format!("响应里没有找到回复正文，可能模型不支持该调用方式。原始响应片段: {}", text.chars().take(300).collect::<String>()))?;
+    };
+    let tool_calls = parse_tool_calls(protocol, &value);
 
-    Ok(AiChatReply { content, model })
+    // 有工具调用时 content 通常是空的 —— 那是动作意图，不是失败；
+    // 两者都没有才算真的没解析出东西。
+    if content.is_none() && tool_calls.is_empty() {
+        return Err(format!(
+            "响应里没有找到回复正文，可能模型不支持该调用方式。原始响应片段: {}",
+            text.chars().take(300).collect::<String>()
+        ));
+    }
+
+    Ok(AiChatReply {
+        content: content.unwrap_or_default(),
+        model,
+        tool_calls,
+    })
 }
 
 /// 拉取可用模型列表。设置页的「测试连接」用的就是它 ——
@@ -379,7 +415,12 @@ where
     if full.trim().is_empty() {
         return Err("服务端没有返回任何内容，请确认所选模型支持流式输出。".to_string());
     }
-    Ok(AiChatReply { content: full, model })
+    Ok(AiChatReply {
+        content: full,
+        model,
+        // 流式路径不带工具：工具调用走非流式（参数是分片 JSON，拼接易错且对提案无价值）
+        tool_calls: Vec::new(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +446,8 @@ mod tests {
             ],
             model: None,
             temperature: Some(0.3),
+            // 默认不带工具：工具声明由前端按模块能力决定
+            tools: Vec::new(),
         }
     }
 

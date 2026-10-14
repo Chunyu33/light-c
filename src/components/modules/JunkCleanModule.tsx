@@ -175,13 +175,13 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         `用户已勾选 ${selectedPaths.size} 个文件。`,
       ].join('\n');
     },
-    // 可操作项 = 分类。⚠️ id 目前用 display_name（后端没有给稳定键），
-    // 同一语言会话内稳定；换语言后历史 id 会对不上，后续应由后端补一个稳定 name。
+    // 可操作项 = 分类。id 用 **category 枚举**（序列化成 "RecycleBin" 这种稳定键），
+    // 不用 display_name —— 后者是本地化名称，换语言后历史里的 id 就对不上了。
     targets: () => {
       const result = deepScanResult ?? scanResult;
       if (!result) return [];
       return result.categories.map((category) => ({
-        id: category.display_name,
+        id: category.category,
         label: category.display_name,
         detail: [
           formatSize(category.total_size),
@@ -189,9 +189,24 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           `已勾选 ${category.files.filter((file) => selectedPaths.has(file.path)).length} 个`,
           category.description,
         ].join(' · '),
-        // 系统托管项（如回收站相关）清空后无法恢复，卡片上要单独标出来
-        irreversible: category.system_managed,
+        // 回收站清空后无法恢复，卡片上要单独标出来。
+        // 注意不能用 system_managed：那个字段是给 Windows.old 这类系统托管目录用的。
+        irreversible: category.category === 'RecycleBin',
       }));
+    },
+    // P3a：把 AI 点名的分类勾上。**复用模块自己的 toggleCategorySelection** ——
+    // 它已经处理了"整类勾选要连带勾上分页加载的文件"等细节，
+    // 另写一套必然分叉（而且那正是"AI 和手动操作结果不一致"的来源）。
+    onSelect: (ids) => {
+      const result = deepScanResult ?? scanResult;
+      if (!result) return;
+      for (const id of ids) {
+        const category = result.categories.find((item) => item.category === id);
+        if (!category) continue;
+        // 系统托管项（旧版 Windows 安装）应用内删不掉，不参与勾选
+        if (category.system_managed) continue;
+        toggleCategorySelection(category.display_name, category.files, true);
+      }
     },
   });
   const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);

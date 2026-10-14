@@ -19,6 +19,7 @@ mod config;
 mod presets;
 mod session;
 mod stream;
+mod tools;
 
 // 对外导出：只导出命令层与前端类型真正用得到的东西。
 // 注意 AiStoredConfig 含明文密钥，**只允许在 Rust 侧流转**，命令层不得把它返回给前端。
