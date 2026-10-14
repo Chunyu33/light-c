@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 多盘全盘变化分析模块
 //
@@ -820,6 +821,20 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const scanRunIdRef = useRef(0);
 
   const [scanSummary, setScanSummary] = useState<DiskGrowthScanResponse | null>(null);
+  // 接入 AI 助手（**只读**：磁盘变化分析只做分析，不提供删除动作）。
+  useAiModuleBridge('disk-growth', {
+    summary: () => {
+      if (!scanSummary) return null;
+      return [
+        `盘 ${scanSummary.drive_letter}（${scanSummary.root_path}）共 ${scanSummary.total_files_scanned} 个文件，`,
+        `占用 ${formatSize(scanSummary.total_size)}，本次扫描耗时约 ${Math.round(scanSummary.scan_duration_ms / 1000)} 秒。`,
+        scanSummary.previous_scan_time
+          ? `已有一份历史快照（${scanSummary.previous_scan_time}），可以对比出这段时间里哪些目录长大了。`
+          : '这是首次快照，还没有可对比的历史数据；下次扫描之后就能看出增减来自哪里。',
+      ].join('');
+    },
+  });
+
   const [growthReport, setGrowthReport] = useState<DiskGrowthReport | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);

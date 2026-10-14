@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 系统瘦身模块组件
 // 在仪表盘中展示系统瘦身功能
@@ -155,6 +156,19 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
 
   // 本地状态
   const [status, setStatus] = useState<SystemSlimStatus | null>(null);
+  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
+  useAiModuleBridge('system-slim', {
+    summary: () => {
+      if (!status) return null;
+      return [
+        `系统瘦身可处理 ${status.items.length} 项，合计可释放约 ${formatSize(status.total_reclaimable)}。`,
+        status.is_admin
+          ? '当前已取得管理员权限，可以处理需要权限的项目。'
+          : '当前没有管理员权限，需要权限的项目只能给出说明、无法直接处理。',
+      ].join('');
+    },
+  });
+
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   // 正在执行的瘦身操作进度：DISM 清理可能持续数分钟，必须有阶段与百分比反馈。
