@@ -1,0 +1,10 @@
+{
+  "ballTitle": "AI assistant",
+  "panelTitle": "AI assistant",
+  "collapse": "Collapse",
+  "clear": "Clear chat",
+  "emptyHint": "Ask about the data in the current module, or whether a folder is safe to remove. The assistant answers from what it is told and never deletes anything on its own.",
+  "inputPlaceholder": "Ask something… (Enter to send, Shift+Enter for a new line)",
+  "send": "Send",
+  "thinking": "Thinking…"
+}

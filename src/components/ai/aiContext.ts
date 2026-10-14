@@ -1,0 +1,76 @@
+// ============================================================================
+// AI 对话上下文构造
+//
+// 分三层（见 docs/dev/AI助手-设计方案.md）：
+//   ① 系统提示 —— 固定且体积很小，本文件负责
+//   ② 模块数据摘要 —— 下一阶段由各模块提供适配器
+//   ③ 对话历史 —— 由面板维护（保留最近若干轮）
+//
+// ⚠️ 明确禁止的做法：把模块的原始列表塞进 prompt。
+// 垃圾清理一次能扫出几千个文件，全量注入会直接把上下文撑爆，又慢又贵还答不准。
+// 正确的做法是"摘要 + 让 AI 用工具按需取明细"。
+// ============================================================================
+
+import type { AiChatMessage } from '../../types/ai';
+
+/**
+ * 各模块对 AI 的说明：显示名 + 一句话职责。
+ * 只交代"这个模块在做什么"，不含任何用户数据。
+ */
+const MODULE_INFO: Record<string, { name: string; role: string }> = {
+  'junk-clean': { name: '垃圾清理', role: '扫描系统与各类应用的临时文件、缓存，由用户勾选后删除。' },
+  'big-files': { name: '大文件清理', role: '按大小找出占空间的大文件，供用户判断后删除。' },
+  'social-clean': { name: '社交软件专清', role: '定位微信、QQ 等聊天软件产生的缓存。' },
+  'system-slim': { name: '系统瘦身', role: '处理系统组件、休眠文件、还原点等系统级占用。' },
+  'driver-cleanup': { name: '旧驱动清理', role: '识别被更高版本替代的旧驱动包，删除前会自动备份。' },
+  leftovers: { name: '残留清理', role: '查找软件卸载后遗留的目录与文件。' },
+  registry: { name: '注册表清理', role: '检查孤立键值与无效引用。' },
+  'context-menu': { name: '右键菜单管理', role: '管理资源管理器右键菜单项。' },
+  hotspot: { name: '大目录分析', role: '递归分析目录占用，定位空间被谁吃掉。' },
+  'disk-growth': { name: '磁盘变化分析', role: '对比两次快照，找出空间增减的来源。' },
+  'ai-models': { name: 'AI 模型空间', role: '统计本地大模型文件占用。' },
+  'shell-icons': { name: '外壳入口管理', role: '管理系统「此电脑」等位置的第三方入口。' },
+};
+
+/** 组装系统提示：应用身份 + 当前模块角色 + 行为约束。 */
+export function buildSystemPrompt(moduleId: string | null): string {
+  const info = moduleId ? MODULE_INFO[moduleId] : undefined;
+
+  const lines = [
+    '你是 LightC 内置的助手，帮助用户理解自己在软件里看到的数据、判断哪些内容可以清理。',
+    '',
+    info
+      ? `当前用户正停留在「${info.name}」模块：${info.role}`
+      : '当前没有打开具体的功能模块。',
+    '',
+    '行为约束：',
+    '1. 只依据对话中提供的信息回答；没有把握时明确说"我不确定"，不要编造文件路径、大小或结论。',
+    '2. 涉及删除操作时，永远只给出建议和风险提示 —— 不要声称你已经执行了删除，实际执行必须由用户在界面上确认。',
+    '3. 回答简洁，优先给结论，其次给理由；不要长篇复述背景。',
+    '4. 用用户正在使用的语言回答。',
+  ];
+  return lines.join('\n');
+}
+
+/** 会话开场的消息序列（只有一条 system，用户消息后续追加）。 */
+export function buildInitialMessages(moduleId: string | null): AiChatMessage[] {
+  return [{ role: 'system', content: buildSystemPrompt(moduleId) }];
+}
+
+/**
+ * 切换模块时刷新 system 消息，其余历史保留 ——
+ * 这样"在垃圾清理里问过的问题"换个模块还能接着聊，但助手知道你现在在哪。
+ */
+export function withRefreshedSystemPrompt(
+  history: AiChatMessage[],
+  moduleId: string | null,
+): AiChatMessage[] {
+  const rest = history.filter((message) => message.role !== 'system');
+  return [buildInitialMessages(moduleId)[0], ...rest];
+}
+
+/** 取模块显示名。未知模块返回空串，界面据此不显示"· xxx"尾巴。 */
+export function getModuleDisplayName(moduleId: string | null): string {
+  if (!moduleId) return '';
+  return MODULE_INFO[moduleId]?.name ?? '';
+}

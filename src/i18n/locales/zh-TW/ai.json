@@ -1,0 +1,10 @@
+{
+  "ballTitle": "AI 助手",
+  "panelTitle": "AI 助手",
+  "collapse": "收合",
+  "clear": "清空對話",
+  "emptyHint": "可以問我目前模組裡的資料是什麼、某個資料夾能不能刪。助手只依據對話裡的資訊回答，不會自己動手刪除任何東西。",
+  "inputPlaceholder": "問點什麼…（Enter 送出，Shift+Enter 換行）",
+  "send": "傳送",
+  "thinking": "正在思考…"
+}

@@ -19,6 +19,7 @@ import {
   // Footer,
   AnchorNav,
   BackToTopButton,
+  AiAssistant,
   SidebarNav,
 } from './components';
 import { DashboardProvider, useDashboardActions, FontSizeProvider, SettingsProvider, useSettings } from './contexts';
@@ -133,6 +134,9 @@ function DashboardContent() {
       {/* 侧边导航：卡片模式滚动到锚点，页面模式切换当前模块。 */}
       {!isSidebarLayout && <AnchorNav scrollContainerRef={scrollContainerRef} />}
       <BackToTopButton scrollContainerRef={scrollContainerRef} />
+      {/* AI 助手：横向新增的独立浮层，不参与任何模块逻辑。
+          传入当前模块 id，让助手知道用户正停留在哪个模块。 */}
+      <AiAssistant activeModuleId={visibleModuleId} />
 
       {/* 主内容区 - 页面模式下模块实例仍常驻，但 inactive 模块会自行跳过重结果 DOM。 */}
       <main className={`flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)]${isSidebarLayout ? ' sidebar-layout' : ''}`}>

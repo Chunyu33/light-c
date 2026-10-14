@@ -1068,6 +1068,18 @@ html.glass .driver-toolbar {
   backdrop-filter: blur(20px) saturate(160%);
 }
 
+/* AI 对话面板：它是浮在模块内容之上的浮层，必须真的挡得住内容 ——
+   所以沿用操作栏那套「高不透明 + 强模糊 + 白边 + 顶部内高光 + 浮起柔投影」，
+   而不是用普通卡片表面（玻璃态下只有 0.45 不透明，正文会透上来）。
+   刻意不叠加 glass-item 钩子：自带全套配方，避免两条规则抢同一个属性。 */
+html.glass .ai-panel {
+  background-color: var(--glass-toolbar-bg, var(--bg-elevated));
+  border-color: var(--glass-toolbar-border, var(--border-color));
+  box-shadow: var(--glass-shadow), var(--glass-inner);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+
 /* ===== 侧边栏：液态玻璃下做成浮起的圆角面板 =====
    两个硬约束：① 布局占位不变、收缩照常；② **视觉上只能有一个容器**。
    内缩用 padding（border-box 下不影响外部宽度，且它定义了面板范围）；

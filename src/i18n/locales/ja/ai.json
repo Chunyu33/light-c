@@ -1,0 +1,10 @@
+{
+  "ballTitle": "AI アシスタント",
+  "panelTitle": "AI アシスタント",
+  "collapse": "折りたたむ",
+  "clear": "会話を消去",
+  "emptyHint": "現在のモジュールのデータや、フォルダを削除してよいか質問できます。アシスタントは会話で与えられた情報だけを根拠に答え、自分で削除は行いません。",
+  "inputPlaceholder": "質問を入力…（Enter で送信、Shift+Enter で改行）",
+  "send": "送信",
+  "thinking": "考え中…"
+}
