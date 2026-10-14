@@ -62,7 +62,9 @@
     "dataDirDefault": "既定：データフォルダー内の ai フォルダー",
     "profileAdd": "プロバイダーを追加",
     "profileDelete": "この設定を削除",
-    "profileNoModel": "モデル未選択"
+    "profileNoModel": "モデル未選択",
+    "dataDirPick": "フォルダーを変更",
+    "dataDirReset": "既定に戻す"
   },
   "tabs": {
     "ai": "AI アシスタント",

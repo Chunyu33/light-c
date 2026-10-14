@@ -62,7 +62,9 @@
     "dataDirDefault": "默认：数据目录下的 ai 文件夹",
     "profileAdd": "新增服务商",
     "profileDelete": "删除这份配置",
-    "profileNoModel": "还没有选择模型"
+    "profileNoModel": "还没有选择模型",
+    "dataDirPick": "更改目录",
+    "dataDirReset": "恢复默认"
   },
   "tabs": {
     "ai": "AI 助手",

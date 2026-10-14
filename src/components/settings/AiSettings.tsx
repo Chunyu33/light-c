@@ -19,6 +19,7 @@ import {
   setAiDataDir,
   testAiConnection,
 } from '../../api/ai';
+import { pickFolderDialog } from '../../api/commands';
 import type { AiProviderPreset, AiPublicConfig } from '../../types/ai';
 
 /** 统一的设置行：左侧标题与描述，右侧控件。 */
@@ -68,6 +69,48 @@ function TextField({
   );
 }
 
+/**
+ * 可输入 + 带候选的输入框。
+ *
+ * 用原生 datalist 而不是自定义下拉：**只读下拉在"列表还没拉到"时会变成点不动的空框**
+ * （用户反馈过"模型这里不能编辑"就是这么来的）。datalist 形态下任何时候都能直接打字，
+ * 有候选时又能从候选里挑，两种需求同时满足。
+ */
+function ComboField({
+  value,
+  onChange,
+  options,
+  placeholder,
+  listId,
+  widthClass = 'w-64',
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  options: string[];
+  placeholder?: string;
+  listId: string;
+  widthClass?: string;
+}) {
+  return (
+    <>
+      <input
+        type="text"
+        list={listId}
+        value={value}
+        placeholder={placeholder}
+        spellCheck={false}
+        onChange={(event) => onChange(event.target.value)}
+        className={`${widthClass} rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--brand-green)]`}
+      />
+      <datalist id={listId}>
+        {options.map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
 export function AiSettings() {
   const { t } = useTranslation('settings');
   const { showToast } = useToast();
@@ -110,6 +153,19 @@ export function AiSettings() {
         // 模型下拉直接读档案里缓存的列表：重启后也还在，不用每次进来重新拉
         setModelOptions(active?.models ?? []);
         setDataDir(config.dataDir || '');
+
+        // 模型列表为空时自动拉一次：用户不该为了"看见有哪些模型"先去点一次测试连接。
+        // 失败在这里静默忽略 —— 多半是还没填密钥或没联网，点「测试连接」会给明确错误。
+        if (active && active.hasApiKey && active.models.length === 0) {
+          void testAiConnection()
+            .then((models) => {
+              if (cancelled || models.length === 0) return;
+              setModelOptions(models);
+              // 还没选模型就顺手选第一个，省一步
+              if (!active.model) setModel(models[0]);
+            })
+            .catch(() => undefined);
+        }
       } catch (error) {
         if (!cancelled) setErrorMessage(String(error));
       } finally {
@@ -250,9 +306,21 @@ export function AiSettings() {
     [applyConfig],
   );
 
-  const modelSelectOptions = useMemo(
-    () => modelOptions.map((id) => ({ value: id, label: id })),
-    [modelOptions],
+  /**
+   * 选择 AI 数据目录。reset = 恢复默认位置（跟随主数据目录）。
+   * 选完**立即保存** —— 文件夹选择器点完还要用户再去找"保存"按钮很反直觉。
+   */
+  const handlePickDataDir = useCallback(
+    async (reset: boolean) => {
+      try {
+        const folder = reset ? '' : await pickFolderDialog();
+        if (folder === null) return; // 用户取消
+        applyConfig(await setAiDataDir(folder));
+      } catch (error) {
+        setErrorMessage(String(error));
+      }
+    },
+    [applyConfig],
   );
 
   return (
@@ -351,21 +419,15 @@ export function AiSettings() {
 
           <div className="border-t border-[var(--border-color)] pt-5">
             <SettingRow title={t('aiAssistant.model')} description={t('aiAssistant.modelDesc')}>
-              {modelSelectOptions.length > 0 ? (
-                <Select<string>
-                  value={model}
-                  options={modelSelectOptions}
-                  onChange={setModel}
-                  widthClass="w-64"
-                />
-              ) : (
-                <TextField
-                  value={model}
-                  onChange={setModel}
-                  placeholder={currentPreset?.defaultModel || 'model-name'}
-                  widthClass="w-64"
-                />
-              )}
+              {/* 一个框搞定：能直接打字，也能从拉取到的候选里选。
+                  下面紧跟一行"拉取到的模型数"提示，让用户知道候选是不是已经就绪。 */}
+              <ComboField
+                value={model}
+                onChange={setModel}
+                options={modelOptions}
+                placeholder={currentPreset?.defaultModel || 'model-name'}
+                listId="ai-model-options"
+              />
             </SettingRow>
           </div>
 
@@ -374,14 +436,33 @@ export function AiSettings() {
               title={t('aiAssistant.dataDir')}
               description={t('aiAssistant.dataDirDesc')}
             >
-              {/* 留空 = 跟随主数据目录。这里不强制用文件夹选择器：
-                  高级设置里手填路径更省事，也方便直接粘贴。 */}
-              <TextField
-                value={dataDir}
-                onChange={setDataDir}
-                placeholder={t('aiAssistant.dataDirDefault')}
-                widthClass="w-64"
-              />
+              {/* 用"选文件夹"而不是手输：这是给普通用户用的设置，
+                  手打路径既容易打错，也没法确认那个目录到底能不能写。
+                  AI 数据目录是**全局**设置，不属于任何一份服务商档案。 */}
+              <div className="flex items-center gap-2">
+                <span
+                  className="max-w-[18em] truncate text-xs text-[var(--text-muted)]"
+                  title={dataDir || t('aiAssistant.dataDirDefault')}
+                >
+                  {dataDir || t('aiAssistant.dataDirDefault')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handlePickDataDir(false)}
+                  className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+                >
+                  {t('aiAssistant.dataDirPick')}
+                </button>
+                {dataDir ? (
+                  <button
+                    type="button"
+                    onClick={() => void handlePickDataDir(true)}
+                    className="shrink-0 rounded-xl px-2 py-2 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
+                  >
+                    {t('aiAssistant.dataDirReset')}
+                  </button>
+                ) : null}
+              </div>
             </SettingRow>
           </div>
 
