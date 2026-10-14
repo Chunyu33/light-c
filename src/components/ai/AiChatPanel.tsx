@@ -9,7 +9,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { AlertCircle, Check, Copy, Eraser, Loader2, Minus, RefreshCw, Send, User } from 'lucide-react';
+import { AlertCircle, Check, Copy, Eraser, Loader2, Minus, RefreshCw, Send, Settings, User } from 'lucide-react';
+import { Select } from '../ui/Select';
 import type { AiChatMessage } from '../../types/ai';
 import { AiDeleteRequestCard, type AiDeleteRequestItem } from './AiDeleteRequestCard';
 import { AiDeleteResultCard } from './AiDeleteResultCard';
@@ -39,6 +40,12 @@ interface AiChatPanelProps {
   moduleName: string;
   /** 当前使用的模型 · 服务商，显示在标题栏下方 —— 用户必须知道自己正在用的是什么 */
   modelLabel: string;
+  /** 当前档案可选的模型，用于输入框旁的就地切换 */
+  modelOptions: string[];
+  activeModel: string;
+  onSwitchModel: (model: string) => void;
+  /** 是否已配置密钥。没配置时不允许输入，也不允许发送 —— 否则用户白打一串再吃一个报错 */
+  canChat: boolean;
   onSend: (text: string) => void;
   onCollapse: () => void;
   onClear: () => void;
@@ -57,6 +64,10 @@ export function AiChatPanel({
   errorMessage,
   moduleName,
   modelLabel,
+  modelOptions,
+  activeModel,
+  onSwitchModel,
+  canChat,
   onSend,
   onCollapse,
   onClear,
@@ -284,9 +295,36 @@ export function AiChatPanel({
         </div>
       ) : null}
 
-      <footer className="flex shrink-0 items-end gap-2 border-t border-[var(--border-color)] p-2.5">
+      {/* 没配置密钥时：把"为什么不能打字"直接说清楚，并给出去哪配的指引 */}
+      {!canChat ? (
+        <div className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 text-[11px] text-[var(--text-muted)]">
+          <Settings className="mt-0.5 h-3 w-3 shrink-0" />
+          <span className="min-w-0">{t('needConfig')}</span>
+        </div>
+      ) : null}
+
+      {/* 输入框上方一行：当前模型可就地切换。
+          对话中途发现答得不对，换模型不该还要跳去设置页。 */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-color)] px-2.5 pt-2">
+        {modelOptions.length > 0 ? (
+          <Select<string>
+            value={activeModel}
+            options={modelOptions.map((id) => ({ value: id, label: id }))}
+            onChange={onSwitchModel}
+            size="sm"
+            widthClass="w-44"
+          />
+        ) : (
+          <span className="truncate text-[11px] text-[var(--text-muted)]">
+            {activeModel || t('noModel')}
+          </span>
+        )}
+      </div>
+
+      <footer className="flex shrink-0 items-end gap-2 border-t-0 p-2.5">
         <textarea
           value={draft}
+          disabled={!canChat}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             // Enter 发送、Shift+Enter 换行：长问题可以分行写
@@ -296,13 +334,13 @@ export function AiChatPanel({
             }
           }}
           rows={2}
-          placeholder={t('inputPlaceholder')}
-          className="min-h-[2.6em] min-w-0 flex-1 resize-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--brand-green)]"
+          placeholder={canChat ? t('inputPlaceholder') : t('needConfigPlaceholder')}
+          className="min-h-[2.6em] min-w-0 flex-1 resize-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--brand-green)] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={isSending || !draft.trim()}
+          disabled={!canChat || isSending || !draft.trim()}
           title={t('send')}
           aria-label={t('send')}
           className="shrink-0 rounded-xl bg-[var(--brand-green)] p-2 text-white transition-colors hover:bg-[var(--brand-green-hover)] disabled:cursor-not-allowed disabled:opacity-50"

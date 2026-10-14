@@ -10,8 +10,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { aiChatStream, appendAiSessionMessage, clearAiSession, getAiConfig, listenAiStream, listAiProviders, loadAiSession, localDateKey } from '../../api/ai';
-import type { AiChatMessage, AiToolCall } from '../../types/ai';
+import {
+  aiChatStream,
+  appendAiSessionMessage,
+  clearAiSession,
+  getAiConfig,
+  listenAiStream,
+  listAiProviders,
+  loadAiSession,
+  localDateKey,
+  saveAiProfile,
+} from '../../api/ai';
+import type { AiChatMessage, AiPublicConfig, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { AiMarkIcon } from './AiMarkIcon';
 import { buildRequestMessages, getModuleDisplayName } from './aiContext';
@@ -56,27 +66,70 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
    * 必须让用户看得到：出问题时（答得差、报错）第一句话一定是"这是什么模型"。
    * 每次打开面板时读一次 —— 用户可能在设置里改过配置，面板还开着。
    */
-  const [activeModelLabel, setActiveModelLabel] = useState('');
+  /**
+   * 当前配置（整份）。存整份而不是一段显示文本，是因为面板还要据此判断：
+   * 有没有配置密钥、有哪些模型可选、当前选的是哪个 —— 没配置时要禁用输入与发送。
+   */
+  const [aiConfig, setAiConfig] = useState<AiPublicConfig | null>(null);
+  /** 服务商 id → 显示名，用于面板顶部那行"模型 · 服务商" */
+  const [providerNames, setProviderNames] = useState<Record<string, string>>({});
+
+  const reloadAiConfig = useCallback(async () => {
+    try {
+      const [config, providers] = await Promise.all([getAiConfig(), listAiProviders()]);
+      setAiConfig(config);
+      setProviderNames(
+        Object.fromEntries(providers.map((item) => [item.id, item.name])) as Record<string, string>,
+      );
+    } catch (error) {
+      console.error('读取当前 AI 配置失败:', error);
+    }
+  }, []);
+
+  // 打开面板时刷新：用户可能刚在设置里改过配置
   useEffect(() => {
     if (!isOpen) return;
-    void (async () => {
+    void reloadAiConfig();
+  }, [isOpen, reloadAiConfig]);
+
+  /** 当前档案：显示与判断都以它为准。 */
+  const activeProfile = useMemo(
+    () =>
+      aiConfig
+        ? aiConfig.profiles.find((item) => item.id === aiConfig.activeProfileId) ?? aiConfig.profiles[0]
+        : undefined,
+    [aiConfig],
+  );
+
+  /** 能不能对话：**必须有密钥**。没配置时不让人白打一长串字再报错。 */
+  const canChat = Boolean(activeProfile?.hasApiKey);
+
+  const activeModelLabel = activeProfile
+    ? [activeProfile.model || t('noModel'), providerNames[activeProfile.providerId] || activeProfile.providerId]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+
+  /** 就地切换模型：写回当前档案，下一句话即生效。 */
+  const handleSwitchModel = useCallback(
+    async (model: string) => {
+      if (!activeProfile || !aiConfig) return;
       try {
-        const [config, providers] = await Promise.all([getAiConfig(), listAiProviders()]);
-        // 显示"当前档案"的模型与服务商：多档案之后，全局字段已经不是配置单位
-        const active =
-          config.profiles.find((item) => item.id === config.activeProfileId) ?? config.profiles[0];
-        if (!active) {
-          setActiveModelLabel('');
-          return;
-        }
-        const providerName =
-          providers.find((item) => item.id === active.providerId)?.name || active.providerId || '';
-        setActiveModelLabel([active.model || '未选择模型', providerName].filter(Boolean).join(' · '));
+        const next = await saveAiProfile({
+          id: activeProfile.id,
+          name: activeProfile.name,
+          providerId: activeProfile.providerId,
+          baseUrl: activeProfile.baseUrl,
+          model,
+          apiKey: '', // 留空 = 不改动已保存的密钥
+        });
+        setAiConfig(next);
       } catch (error) {
-        console.error('读取当前 AI 配置失败:', error);
+        console.error('切换模型失败:', error);
       }
-    })();
-  }, [isOpen]);
+    },
+    [activeProfile, aiConfig],
+  );
   const currentHistory = historyByModule[activeModuleId ?? ''] ?? [];
 
   /** 写一条消息到该模块的历史（内存） */
@@ -340,6 +393,10 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           errorMessage={errorMessage}
           moduleName={moduleName}
           modelLabel={activeModelLabel}
+          modelOptions={activeProfile?.models ?? []}
+          activeModel={activeProfile?.model ?? ''}
+          canChat={canChat}
+          onSwitchModel={handleSwitchModel}
           onSend={(text) => void handleSend(text)}
           onCollapse={handleToggle}
           onClear={handleClear}

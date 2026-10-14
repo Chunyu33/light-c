@@ -67,7 +67,9 @@
     "dataDirReset": "Use default",
     "profileUnnamed": "Unnamed provider",
     "profileReady": "Key configured",
-    "profileNoKey": "No key yet"
+    "profileNoKey": "No key yet",
+    "profileEdit": "Edit",
+    "profileCancel": "Cancel"
   },
   "tabs": {
     "ai": "AI assistant",

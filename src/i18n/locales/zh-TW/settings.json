@@ -67,7 +67,9 @@
     "dataDirReset": "恢復預設",
     "profileUnnamed": "未命名服務商",
     "profileReady": "已設定金鑰",
-    "profileNoKey": "還沒有填寫金鑰"
+    "profileNoKey": "還沒有填寫金鑰",
+    "profileEdit": "編輯",
+    "profileCancel": "取消"
   },
   "tabs": {
     "ai": "AI 助手",

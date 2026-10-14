@@ -28,5 +28,8 @@
     "needsReboot": "Some changes need Explorer to restart before they take effect."
   },
   "copy": "Copy",
-  "retry": "Ask again"
+  "retry": "Ask again",
+  "needConfig": "No AI provider is configured yet. Add one with its API key under Settings - AI assistant, then you can ask questions here.",
+  "needConfigPlaceholder": "Configure a provider first",
+  "noModel": "No model selected"
 }

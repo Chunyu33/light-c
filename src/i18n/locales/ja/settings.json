@@ -67,7 +67,9 @@
     "dataDirReset": "既定に戻す",
     "profileUnnamed": "名称未設定",
     "profileReady": "キー設定済み",
-    "profileNoKey": "キー未設定"
+    "profileNoKey": "キー未設定",
+    "profileEdit": "編集",
+    "profileCancel": "キャンセル"
   },
   "tabs": {
     "ai": "AI アシスタント",

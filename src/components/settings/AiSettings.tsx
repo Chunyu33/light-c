@@ -92,6 +92,12 @@ export function AiSettings() {
   const [dataDir, setDataDir] = useState('');
   // 当前正在编辑的档案 id。表单里的字段都属于它。
   const [activeId, setActiveId] = useState('');
+  /**
+   * 是否展开了编辑区。
+   * 列表默认是**只读**的：字段只在点「编辑」或「新增」时展开，
+   * 平时不占版面、也不会让人误以为"随便改改就生效了"。
+   */
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,6 +188,7 @@ export function AiSettings() {
     setErrorMessage('');
     try {
       await persist();
+      setIsEditing(false); // 保存即完成：收起编辑区，回到只读列表
       showToast({ type: 'success', title: t('aiAssistant.saved') });
     } catch (error) {
       setErrorMessage(String(error));
@@ -248,6 +255,7 @@ export function AiSettings() {
   const handleAddProfile = useCallback(async () => {
     try {
       applyConfig(await saveAiProfile({ id: '', name: '', providerId: 'deepseek', baseUrl: '', model: '', apiKey: '' }));
+      setIsEditing(true); // 新增后直接展开，用户接着填密钥即可
     } catch (error) {
       setErrorMessage(String(error));
     }
@@ -275,6 +283,21 @@ export function AiSettings() {
     if (model && !modelOptions.includes(model)) options.unshift({ value: model, label: model });
     return options;
   }, [modelOptions, model]);
+
+  /** 点某一行的「编辑」：先切到它（表单永远编辑当前档案），再展开编辑区。 */
+  const handleStartEdit = useCallback(
+    async (profileId: string) => {
+      if (profileId !== activeId) await handleSwitchProfile(profileId);
+      setIsEditing(true);
+    },
+    [activeId, handleSwitchProfile],
+  );
+
+  /** 取消编辑：收起并**把表单恢复成已保存的样子**，丢弃这次改动。 */
+  const handleCancelEdit = useCallback(() => {
+    if (saved) applyConfig(saved);
+    setIsEditing(false);
+  }, [saved, applyConfig]);
 
   /**
    * 选择 AI 数据目录。reset = 恢复默认位置（跟随主数据目录）。
@@ -342,6 +365,13 @@ export function AiSettings() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => void handleStartEdit(profile.id)}
+                    className="shrink-0 rounded-lg border border-[var(--border-color)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+                  >
+                    {t('aiAssistant.profileEdit')}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void handleDeleteProfile(profile.id)}
                     className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
                   >
@@ -360,6 +390,8 @@ export function AiSettings() {
             </button>
           </div>
 
+          {isEditing ? (
+          <>
           <SettingRow title={t('aiAssistant.provider')} description={t('aiAssistant.providerDesc')}>
             <Select<string>
               value={providerId}
@@ -419,6 +451,9 @@ export function AiSettings() {
             </SettingRow>
           </div>
 
+
+          </>) : null}
+
           <div className="border-t border-[var(--border-color)] pt-5">
             <SettingRow
               title={t('aiAssistant.dataDir')}
@@ -454,6 +489,8 @@ export function AiSettings() {
             </SettingRow>
           </div>
 
+          {/* 动作行也只在编辑态出现：不编辑时看到「保存」会让人以为有未保存的改动 */}
+          {isEditing ? (
           <div className="border-t border-[var(--border-color)] pt-5 flex items-center justify-between gap-4">
             <div className="min-w-0 text-xs">
               {currentPreset?.local ? (
@@ -466,6 +503,13 @@ export function AiSettings() {
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="rounded-lg border border-[var(--border-color)] px-3 py-1.5 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+              >
+                {t('aiAssistant.profileCancel')}
+              </button>
               <button
                 type="button"
                 onClick={() => void handleTest()}
@@ -486,6 +530,7 @@ export function AiSettings() {
               </button>
             </div>
           </div>
+          ) : null}
 
           {errorMessage ? (
             <div className="flex items-start gap-2 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-3 text-xs text-[var(--color-danger)]">

@@ -67,7 +67,9 @@
     "dataDirReset": "恢复默认",
     "profileUnnamed": "未命名服务商",
     "profileReady": "已配置密钥",
-    "profileNoKey": "还没有填写密钥"
+    "profileNoKey": "还没有填写密钥",
+    "profileEdit": "编辑",
+    "profileCancel": "取消"
   },
   "tabs": {
     "ai": "AI 助手",
