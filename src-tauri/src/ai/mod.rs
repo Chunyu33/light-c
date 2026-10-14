@@ -25,4 +25,4 @@ mod stream;
 pub use client::{chat_once, chat_stream, fetch_models, AiChatReply, AiChatRequest};
 pub use config::{read_config, read_public_config, save_config, AiPublicConfig, AiStoredConfig};
 pub use presets::{list_providers, AiProviderPreset};
-pub use session::{append_message, clear_session, load_session, AiSessionMessage};
+pub use session::{append_message, clear_session, load_session, sessions_root, AiSessionMessage};

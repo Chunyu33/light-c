@@ -28,6 +28,8 @@ export interface AiPublicConfig {
   model: string;
   apiKeyMasked: string;
   hasApiKey: boolean;
+  /** 自定义 AI 数据目录；为空表示跟随主数据目录（默认位置） */
+  dataDir: string;
 }
 
 /**
@@ -40,6 +42,8 @@ export interface AiConfigInput {
   baseUrl: string;
   model: string;
   apiKey: string;
+  /** 空字符串表示"改回默认位置" */
+  dataDir: string;
 }
 
 /** 对话消息。role 用 OpenAI 的写法（system / user / assistant），Anthropic 由后端转译。 */

@@ -952,6 +952,65 @@ pub fn set_data_dir(new_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// AI 对话记录的清理项 id。
+pub const AI_SESSION_ITEM_ID: &str = "ai_sessions";
+
+/// 构造「AI 对话记录」清理项。
+///
+/// 不放进上面的定长白名单：它的路径取决于「AI 数据目录」设置，可能不在主数据目录下，
+/// 而白名单里的项都是相对主数据目录的固定路径。做法与磁盘快照一致，按动态项处理 ——
+/// 关键是**与落盘用同一条解析路径**（ai::session::sessions_root），
+/// 否则会出现"显示有这个项、点了却删不到东西"。
+fn build_ai_session_item() -> ClearableDataItem {
+    let root = crate::ai::sessions_root();
+    let (file_count, size) = measure_directory(&root);
+    ClearableDataItem {
+        id: AI_SESSION_ITEM_ID.to_string(),
+        label: "AI 对话记录".to_string(),
+        description: "AI 助手在各模块里的对话历史，按模块与日期保存。".to_string(),
+        path: root.to_string_lossy().to_string(),
+        item_type: "directory".to_string(),
+        exists: root.is_dir(),
+        file_count,
+        size,
+        // 这是用户自己聊出来的内容，不是缓存，警示要说清"不可恢复"
+        warning: Some("对话记录属于个人数据，删除后无法恢复。服务商与密钥等配置不受影响。".to_string()),
+    }
+}
+
+/// 递归统计目录下的文件数与总字节数。读不进去的目录按 0 计，不让统计失败阻断列表。
+fn measure_directory(path: &Path) -> (usize, u64) {
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let Ok(entries) = fs::read_dir(path) else {
+        return (0, 0);
+    };
+    for entry in entries.filter_map(|item| item.ok()) {
+        let child = entry.path();
+        if child.is_dir() {
+            let (child_files, child_bytes) = measure_directory(&child);
+            files += child_files;
+            bytes += child_bytes;
+        } else if let Ok(metadata) = entry.metadata() {
+            files += 1;
+            bytes += metadata.len();
+        }
+    }
+    (files, bytes)
+}
+
+/// 删除 AI 对话记录（整个 sessions 目录）。
+fn clear_ai_sessions() -> Result<(usize, u64), String> {
+    let root = crate::ai::sessions_root();
+    if !root.is_dir() {
+        return Ok((0, 0));
+    }
+    let (file_count, total_size) = measure_directory(&root);
+    fs::remove_dir_all(&root)
+        .map_err(|error| format!("删除 AI 对话记录失败 {}: {}", root.display(), error))?;
+    Ok((file_count, total_size))
+}
+
 pub fn list_clearable_data_items() -> Result<Vec<ClearableDataItem>, String> {
     let data_dir = get_data_dir();
     let mut items = CLEARABLE_DATA_DEFINITIONS
@@ -959,6 +1018,8 @@ pub fn list_clearable_data_items() -> Result<Vec<ClearableDataItem>, String> {
         .map(|definition| build_clearable_data_item(&data_dir, definition))
         .collect::<Result<Vec<_>, _>>()?;
     items.extend(build_disk_growth_snapshot_items(&data_dir)?);
+    // AI 对话记录：路径可能不在主数据目录下，所以按动态项加入
+    items.push(build_ai_session_item());
     Ok(items)
 }
 
@@ -968,6 +1029,14 @@ pub fn clear_selected_local_data(item_ids: &[String]) -> Result<ClearLocalDataRe
     let mut total_size = 0u64;
 
     for item_id in item_ids {
+        // AI 对话记录是动态项（路径取决于 AI 数据目录设置），先于白名单处理
+        if item_id == AI_SESSION_ITEM_ID {
+            let (deleted_files, deleted_bytes) = clear_ai_sessions()?;
+            file_count += deleted_files;
+            total_size += deleted_bytes;
+            continue;
+        }
+
         if let Some(drive_letter) = parse_disk_growth_snapshot_item_id(item_id) {
             let snapshot_dir = data_dir.join(DISK_GROWTH_SNAPSHOT_DIR);
             let (deleted_files, deleted_bytes) =

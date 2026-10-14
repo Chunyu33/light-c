@@ -78,6 +78,8 @@ export function AiSettings() {
   const [model, setModel] = useState('');
   // 密钥输入框始终为空：留空 = 沿用已保存的密钥（后端约定）
   const [apiKey, setApiKey] = useState('');
+  // AI 数据目录：留空 = 跟随主数据目录（默认位置，显示为占位提示）
+  const [dataDir, setDataDir] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +93,7 @@ export function AiSettings() {
         setProviderId(config.providerId || preset?.id || 'deepseek');
         setBaseUrl(config.baseUrl || preset?.baseUrl || '');
         setModel(config.model || preset?.defaultModel || '');
+        setDataDir(config.dataDir || '');
       } catch (error) {
         if (!cancelled) setErrorMessage(String(error));
       } finally {
@@ -124,11 +127,11 @@ export function AiSettings() {
 
   /** 保存草稿。apiKey 为空时后端会沿用已保存的密钥。 */
   const persist = useCallback(async () => {
-    const next = await saveAiConfig({ providerId, baseUrl, model, apiKey });
+    const next = await saveAiConfig({ providerId, baseUrl, model, apiKey, dataDir });
     setSaved(next);
     setApiKey(''); // 保存成功后清空输入框，回到"掩码显示"状态
     return next;
-  }, [providerId, baseUrl, model, apiKey]);
+  }, [providerId, baseUrl, model, apiKey, dataDir]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -233,6 +236,22 @@ export function AiSettings() {
                   widthClass="w-64"
                 />
               )}
+            </SettingRow>
+          </div>
+
+          <div className="border-t border-[var(--border-color)] pt-5">
+            <SettingRow
+              title={t('aiAssistant.dataDir')}
+              description={t('aiAssistant.dataDirDesc')}
+            >
+              {/* 留空 = 跟随主数据目录。这里不强制用文件夹选择器：
+                  高级设置里手填路径更省事，也方便直接粘贴。 */}
+              <TextField
+                value={dataDir}
+                onChange={setDataDir}
+                placeholder={t('aiAssistant.dataDirDefault')}
+                widthClass="w-64"
+              />
             </SettingRow>
           </div>
 

@@ -24,6 +24,10 @@ pub struct AiStoredConfig {
     pub model: String,
     #[serde(default)]
     pub api_key: String,
+    /// AI 数据目录（会话记录等）。留空则用「数据目录/ai」。
+    /// 之所以做成可改：会话记录会一直增长，用户可能想单独放到别的盘。
+    #[serde(default)]
+    pub data_dir: String,
 }
 
 /// 可以安全交给前端的配置视图（密钥已掩码）。
@@ -37,6 +41,20 @@ pub struct AiPublicConfig {
     pub api_key_masked: String,
     /// 是否已存过密钥，界面据此显示"已配置 / 未配置"
     pub has_api_key: bool,
+    /// 自定义 AI 数据目录；为空表示用默认位置（跟随主数据目录）
+    pub data_dir: String,
+}
+
+/// 解析后的 AI 数据根目录：配置为空时回落到「数据目录/ai」。
+/// 会话落盘与"清空本地数据"都用它，保证两处永远指向同一个地方。
+pub fn resolve_data_dir() -> PathBuf {
+    let configured = read_config().data_dir;
+    let trimmed = configured.trim();
+    if trimmed.is_empty() {
+        crate::data_dir::get_data_dir().join("ai")
+    } else {
+        PathBuf::from(trimmed)
+    }
 }
 
 /// 配置文件所在目录：{数据目录}/ai
@@ -84,6 +102,7 @@ pub fn read_public_config() -> AiPublicConfig {
         model: stored.model,
         api_key_masked: mask_api_key(&stored.api_key),
         has_api_key: !stored.api_key.trim().is_empty(),
+        data_dir: stored.data_dir,
     }
 }
 

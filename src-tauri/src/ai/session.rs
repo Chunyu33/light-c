@@ -30,8 +30,12 @@ pub struct AiSessionMessage {
     pub at: i64,
 }
 
-fn sessions_root() -> PathBuf {
-    crate::data_dir::get_data_dir().join("ai").join("sessions")
+/// 会话根目录：{AI 数据目录}/sessions
+///
+/// 统一走 config 的解析逻辑，而不是自己拼一遍 ——
+/// 「清空本地数据」也要按同一个路径去算大小和删除，两处必须永远指向同一个地方。
+pub fn sessions_root() -> PathBuf {
+    super::config::resolve_data_dir().join("sessions")
 }
 
 /// 校验模块 id：只允许小写字母、数字与连字符（内置模块 id 都是这种形状）。
