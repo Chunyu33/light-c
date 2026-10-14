@@ -25,7 +25,10 @@
     "doneCount": "Deleted {{count}}",
     "failedCount": "{{count}} failed",
     "details": "Details",
-    "needsReboot": "Some changes need Explorer to restart before they take effect."
+    "needsReboot": "Some changes need Explorer to restart before they take effect.",
+    "wrongModule": "That proposal came from a different module, which you have since left. Go back to it, or ask again.",
+    "persisted": "Deleted {{count}} items.",
+    "persistedWithFailures": "Deleted {{count}} items; {{failed}} failed."
   },
   "copy": "Copy",
   "retry": "Ask again",

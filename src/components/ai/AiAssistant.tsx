@@ -192,12 +192,26 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const [deleteResult, setDeleteResult] = useState<AiDeleteOutcome | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // 切模块时清掉上一个模块残留的提案与结果卡片。
+  // 不清就会出现：在垃圾清理里生成的删除提案，切到旧驱动后**卡片还留在面板上**，
+  // 用户点确认才发现"当前模块没有删除能力" —— 看着像旧驱动也能触发删除，其实是串台。
+  useEffect(() => {
+    setPendingDelete(null);
+    setDeleteResult(null);
+  }, [activeModuleId]);
+
   /** 用户点了「确认删除」：这时才真正调用模块的删除入口。 */
   const handleConfirmDelete = useCallback(async () => {
     if (!pendingDelete) return;
     const { moduleId, ids } = pendingDelete;
     const actions = getModuleActions(moduleId);
     if (!actions?.deleteItems) {
+      // 走到这里说明提案所属的模块已经不可用（多半是切了模块或模块被卸载）。
+      // 明确告诉用户原因与怎么办，不要只让卡片默默消失。
+      setDeleteResult({
+        deletedCount: 0,
+        failures: [{ name: '', reason: t('delete.wrongModule') }],
+      });
       setPendingDelete(null);
       return;
     }
@@ -205,6 +219,17 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     try {
       const outcome = await actions.deleteItems(ids);
       setDeleteResult(outcome);
+      // 结果卡片是临时的（带回调、不可序列化），所以另外落一条文字记录：
+      // 否则用户切走模块再回来，会以为"这次删除根本没发生过"。
+      pushAndPersist(
+        moduleId,
+        outcome.failures.length > 0
+          ? t('delete.persistedWithFailures', {
+              count: outcome.deletedCount,
+              failed: outcome.failures.length,
+            })
+          : t('delete.persisted', { count: outcome.deletedCount }),
+      );
     } catch (error) {
       // 失败也要给用户一个明确交代，而不是卡片消失、什么都没发生
       setDeleteResult({ deletedCount: 0, failures: [{ name: '', reason: String(error) }] });
@@ -220,6 +245,19 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
    * 结果文案由这里生成、不交给模型转述 —— 做了什么、影响了几项，
    * 一律以本地事实为准，避免出现"AI 说自己删了、其实没删"。
    */
+  /** 推一条消息并**同时落盘**：工具执行结果也要进历史，否则切走再回来就看不到。 */
+  const pushAndPersist = useCallback(
+    (moduleId: string, content: string) => {
+      pushMessage(moduleId, { role: 'assistant', content });
+      void appendAiSessionMessage(moduleId, localDateKey(), {
+        role: 'assistant',
+        content,
+        at: Date.now(),
+      }).catch((error) => console.error('写入 AI 会话历史失败:', error));
+    },
+    [pushMessage],
+  );
+
   const runToolCalls = useCallback(
     (moduleId: string, calls: AiToolCall[]) => {
       const actions = getModuleActions(moduleId);
@@ -235,23 +273,23 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
         if (call.name === 'select_items') {
           if (resolved.length === 0) {
-            pushMessage(moduleId, { role: 'assistant', content: t('tool.selectNotFound') });
+            pushAndPersist(moduleId, t('tool.selectNotFound'));
             continue;
           }
           actions?.selectItems?.(resolved.map((target) => target.id));
-          pushMessage(moduleId, {
-            role: 'assistant',
-            content: t('tool.selected', {
+          pushAndPersist(
+            moduleId,
+            t('tool.selected', {
               count: resolved.length,
               names: resolved.map((target) => target.label).join('、'),
             }),
-          });
+          );
           continue;
         }
 
         if (call.name === 'propose_delete') {
           if (resolved.length === 0) {
-            pushMessage(moduleId, { role: 'assistant', content: t('tool.selectNotFound') });
+            pushAndPersist(moduleId, t('tool.selectNotFound'));
             continue;
           }
           // **不执行**，只弹出确认卡片 —— AI 只能提案，执行权在用户手里
@@ -264,7 +302,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         }
       }
     },
-    [pushMessage, t],
+    [pushMessage, pushAndPersist, t],
   );
 
   const handleSend = useCallback(
@@ -478,5 +516,20 @@ function trimHistory(messages: AiChatMessage[]): AiChatMessage[] {
   const systems = messages.filter((message) => message.role === 'system');
   const rest = messages.filter((message) => message.role !== 'system');
   const kept = rest.slice(Math.max(0, rest.length - MAX_HISTORY_MESSAGES));
-  return [...systems, ...kept];
+
+  // **只保留最近一条消息里的图片**。
+  // 图片是 base64 进请求的，而对话无状态、整个历史每轮重发 ——
+  // 一堆历史截图会让每轮请求变成好几 MB。旧图对"回答当前这个问题"帮助很小，
+  // 保留最近一张就够（用户通常就是针对刚发的图提问）。
+  let seenLatestImage = false;
+  const trimmed = [...kept].reverse().map((message) => {
+    if (!message.images || message.images.length === 0) return message;
+    if (!seenLatestImage) {
+      seenLatestImage = true;
+      return message;
+    }
+    return { ...message, images: undefined };
+  });
+
+  return [...systems, ...trimmed.reverse()];
 }

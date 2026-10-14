@@ -25,7 +25,10 @@
     "doneCount": "{{count}} 件を削除しました",
     "failedCount": "{{count}} 件失敗",
     "details": "詳細",
-    "needsReboot": "一部はエクスプローラーの再起動後に反映されます。"
+    "needsReboot": "一部はエクスプローラーの再起動後に反映されます。",
+    "wrongModule": "この削除提案は別のモジュールで作成されたものです（既に移動済み）。元のモジュールに戻すか、もう一度依頼してください。",
+    "persisted": "{{count}} 件を削除しました。",
+    "persistedWithFailures": "{{count}} 件を削除、{{failed}} 件失敗しました。"
   },
   "copy": "コピー",
   "retry": "この質問を再送",

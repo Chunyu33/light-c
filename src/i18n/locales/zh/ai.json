@@ -25,7 +25,10 @@
     "doneCount": "已删除 {{count}} 项",
     "failedCount": "{{count}} 项失败",
     "details": "查看详情",
-    "needsReboot": "部分内容需要重启资源管理器后才会生效。"
+    "needsReboot": "部分内容需要重启资源管理器后才会生效。",
+    "wrongModule": "这条删除提案来自其它模块（可能你已经切走了）。切回原模块再确认，或重新提一次。",
+    "persisted": "已删除 {{count}} 项。",
+    "persistedWithFailures": "已删除 {{count}} 项，{{failed}} 项失败。"
   },
   "copy": "复制",
   "retry": "重试这条提问",

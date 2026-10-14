@@ -25,7 +25,10 @@
     "doneCount": "已刪除 {{count}} 項",
     "failedCount": "{{count}} 項失敗",
     "details": "查看詳情",
-    "needsReboot": "部分內容需要重啟資源管理器後才會生效。"
+    "needsReboot": "部分內容需要重啟資源管理器後才會生效。",
+    "wrongModule": "這則刪除提案來自其它模組（你可能已經切走）。切回原模組再確認，或重新提一次。",
+    "persisted": "已刪除 {{count}} 項。",
+    "persistedWithFailures": "已刪除 {{count}} 項，{{failed}} 項失敗。"
   },
   "copy": "複製",
   "retry": "重試這則提問",

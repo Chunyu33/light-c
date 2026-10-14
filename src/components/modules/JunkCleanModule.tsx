@@ -129,6 +129,35 @@ function getDeleteRemainingTime(progress: EnhancedDeleteProgress | null): string
 // 组件实现
 // ============================================================================
 
+/**
+ * 把删除失败明细按原因归并。
+ *
+ * 一次清理失败几十上百条很常见，逐条列出只会淹没信息。归并后每条 =
+ * 一类原因 + 条数 + 一个例子路径，用户一眼看出"卡在哪"。
+ * 最多 6 类，避免原因本身就很多时又变回长列表。
+ */
+function groupFailuresByReason(
+  failed: { path: string; failure_reason?: unknown }[],
+): { name: string; reason: string }[] {
+  const groups = new Map<string, { count: number; example: string }>();
+  for (const file of failed) {
+    const reason = file.failure_reason ? JSON.stringify(file.failure_reason) : '未知原因';
+    const existing = groups.get(reason);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(reason, { count: 1, example: file.path });
+    }
+  }
+  return [...groups.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 6)
+    .map(([reason, info]) => ({
+      name: info.count > 1 ? `${info.count} 项（例如 ${info.example}）` : info.example,
+      reason,
+    }));
+}
+
 export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t } = useTranslation('junkClean');
   // 深度扫描的递归层数来自设置页，扫描时作为参数传给命令。
@@ -235,14 +264,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         deletedCount: outcome.success_count,
         freedBytes: outcome.freed_physical_size,
         needsReboot: outcome.reboot_pending_count > 0,
-        // 失败明细只取前若干条：卡片是可展开列表，几百条没必要全塞
-        failures: outcome.file_results
-          .filter((file) => !file.success)
-          .slice(0, 20)
-          .map((file) => ({
-            name: file.path,
-            reason: file.failure_reason ? JSON.stringify(file.failure_reason) : '未知原因',
-          })),
+        // 失败明细**按原因归并**再给：一次清理失败几十条是常事，
+        // 逐条列出来只是噪音，用户真正要的是"哪几类原因、各多少条、举个例子"。
+        failures: groupFailuresByReason(outcome.file_results.filter((file) => !file.success)),
       };
     },
   });
