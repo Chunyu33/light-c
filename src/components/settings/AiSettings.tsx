@@ -69,48 +69,6 @@ function TextField({
   );
 }
 
-/**
- * 可输入 + 带候选的输入框。
- *
- * 用原生 datalist 而不是自定义下拉：**只读下拉在"列表还没拉到"时会变成点不动的空框**
- * （用户反馈过"模型这里不能编辑"就是这么来的）。datalist 形态下任何时候都能直接打字，
- * 有候选时又能从候选里挑，两种需求同时满足。
- */
-function ComboField({
-  value,
-  onChange,
-  options,
-  placeholder,
-  listId,
-  widthClass = 'w-64',
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  options: string[];
-  placeholder?: string;
-  listId: string;
-  widthClass?: string;
-}) {
-  return (
-    <>
-      <input
-        type="text"
-        list={listId}
-        value={value}
-        placeholder={placeholder}
-        spellCheck={false}
-        onChange={(event) => onChange(event.target.value)}
-        className={`${widthClass} rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--brand-green)]`}
-      />
-      <datalist id={listId}>
-        {options.map((option) => (
-          <option key={option} value={option} />
-        ))}
-      </datalist>
-    </>
-  );
-}
-
 export function AiSettings() {
   const { t } = useTranslation('settings');
   const { showToast } = useToast();
@@ -307,6 +265,18 @@ export function AiSettings() {
   );
 
   /**
+   * 下拉选项：拉取到的模型 + **当前模型本身**。
+   *
+   * 必须把当前值也放进去：模型可能不在拉取结果里（列表还没拉到、或这个模型已下线），
+   * 那种情况下 Select 找不到匹配项会显示成空白，用户会以为配置丢了。
+   */
+  const modelSelectOptions = useMemo(() => {
+    const options = modelOptions.map((id) => ({ value: id, label: id }));
+    if (model && !modelOptions.includes(model)) options.unshift({ value: model, label: model });
+    return options;
+  }, [modelOptions, model]);
+
+  /**
    * 选择 AI 数据目录。reset = 恢复默认位置（跟随主数据目录）。
    * 选完**立即保存** —— 文件夹选择器点完还要用户再去找"保存"按钮很反直觉。
    */
@@ -419,15 +389,26 @@ export function AiSettings() {
 
           <div className="border-t border-[var(--border-color)] pt-5">
             <SettingRow title={t('aiAssistant.model')} description={t('aiAssistant.modelDesc')}>
-              {/* 一个框搞定：能直接打字，也能从拉取到的候选里选。
-                  下面紧跟一行"拉取到的模型数"提示，让用户知道候选是不是已经就绪。 */}
-              <ComboField
-                value={model}
-                onChange={setModel}
-                options={modelOptions}
-                placeholder={currentPreset?.defaultModel || 'model-name'}
-                listId="ai-model-options"
-              />
+              {/* 用项目自己的 Select（与通用设置里"语言"那个是同一个组件），
+                  不自己造下拉 —— 之前用原生 datalist 时它会按已输入内容过滤候选，
+                  结果当前值把其它候选项全筛掉了，看起来"选不上"。 */}
+              {modelSelectOptions.length > 0 ? (
+                <Select<string>
+                  value={model}
+                  options={modelSelectOptions}
+                  onChange={setModel}
+                  widthClass="w-64"
+                />
+              ) : (
+                /* 连当前值都没有（没配过、也没拉到列表）：退化成文本输入，
+                   避免出现一个点不动的空下拉。 */
+                <TextField
+                  value={model}
+                  onChange={setModel}
+                  placeholder={currentPreset?.defaultModel || 'model-name'}
+                  widthClass="w-64"
+                />
+              )}
             </SettingRow>
           </div>
 
