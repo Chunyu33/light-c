@@ -12,6 +12,7 @@ import { AboutSettings } from './settings/AboutSettings';
 import { FeedbackSettings } from './settings/FeedbackSettings';
 import { FeatureSettings } from './settings/FeatureSettings';
 import { GeneralSettings } from './settings/GeneralSettings';
+import { AiSettings } from './settings/AiSettings';
 import { GuideSettings } from './settings/GuideSettings';
 import { SecuritySettings } from './settings/SecuritySettings';
 import { DiskInfoSettings } from './settings/DiskInfoSettings';
@@ -250,6 +251,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
             <div className="min-h-0 flex-1 overflow-auto p-5">
               {activeTab === 'general' && <GeneralSettings mode={mode} setMode={setMode} />}
+              {activeTab === 'ai' && <AiSettings />}
               {activeTab === 'features' && <FeatureSettings />}
               {activeTab === 'disk-info' && <DiskInfoSettings />}
               {activeTab === 'guide' && <GuideSettings />}

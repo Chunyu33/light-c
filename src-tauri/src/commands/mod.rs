@@ -6,6 +6,7 @@
 // lib.rs 只需 `use commands::*` 即可注册全部命令。
 // ============================================================================
 
+mod ai;
 mod ai_models;
 mod app;
 mod data;
@@ -26,6 +27,7 @@ pub(crate) mod tools;
 mod verify;
 
 // 公共类型（供前端和其他模块使用）
+pub use ai::*;
 pub use ai_models::*;
 pub use app::*;
 pub use data::*;

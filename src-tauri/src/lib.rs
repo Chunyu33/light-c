@@ -4,6 +4,7 @@
 // ============================================================================
 
 // 模块声明
+mod ai;
 mod ai_models;
 mod cleaner;
 mod commands;
@@ -163,6 +164,12 @@ pub fn run() {
             open_shell_icon_backup_dir,
             open_shell_icon_log,
             open_shell_icon_registry,
+            // AI 助手（横向新增能力：只增加命令，不改动既有模块逻辑）
+            list_ai_providers,
+            get_ai_config,
+            save_ai_config,
+            test_ai_connection,
+            ai_chat,
         ])
         .run(context)
         .expect("启动应用程序时发生错误");

@@ -2,12 +2,13 @@
 // 设置页面共享配置
 // ============================================================================
 
-import { BookOpen, HardDrive, Info, LayoutGrid, LayoutPanelLeft, MessageSquare, Monitor, Moon, PanelLeft, Settings, ShieldCheck, SlidersHorizontal, Sun, type LucideIcon } from 'lucide-react';
+import { BookOpen, HardDrive, Info, LayoutGrid, LayoutPanelLeft, MessageSquare, Monitor, Moon, PanelLeft, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, type LucideIcon } from 'lucide-react';
 import { FONT_SIZE_CONFIGS, type FontSizeLevel, type ThemeMode } from '../../contexts';
 import type { SettingsTabDefinition } from './types';
 
 export const SETTINGS_TABS: SettingsTabDefinition[] = [
   { id: 'general', label: 'tabs.general', icon: Settings },
+  { id: 'ai', label: 'tabs.ai', icon: Sparkles },
   { id: 'features', label: 'tabs.features', icon: SlidersHorizontal },
   { id: 'disk-info', label: 'tabs.diskInfo', icon: HardDrive },
   { id: 'guide', label: 'tabs.guide', icon: BookOpen },
