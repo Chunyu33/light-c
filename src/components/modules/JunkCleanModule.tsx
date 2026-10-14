@@ -237,6 +237,20 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         toggleCategorySelection(category.display_name, category.files, true);
       }
     },
+    // 只读读取：让助手能"往下看"某个分类里到底有哪些文件（一次一页）。
+    // 摘要只给到分类，这里才给到文件级 —— 但**不是全给**，一次最多一页，
+    // 由模型自己决定要不要继续读。
+    readItems: (targetId, offset, limit) => {
+      const result = deepScanResult ?? scanResult;
+      const category = result?.categories.find((item) => item.category === targetId);
+      if (!category) return null;
+      return {
+        total: category.file_count,
+        lines: category.files
+          .slice(offset, offset + limit)
+          .map((file) => `${file.path}  ${formatSize(file.size)}`),
+      };
+    },
     // P3b：AI 提案 + 用户确认之后才会走到这里。
     // **复用 handleDelete**（不另写删除逻辑），并显式把目标路径传进去 ——
     // 刚写进 state 的勾选在同一个 tick 里读不到。

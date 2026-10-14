@@ -12,7 +12,8 @@
   "resizeHintCustom": "拖动调整大小，双击恢复默认",
   "tool": {
     "selectNotFound": "没有找到你说的这些项，数据可能已经变化，请重新扫描后再试。",
-    "selected": "已按你的要求勾选 {{count}} 项：{{names}}。确认无误后可以在界面上执行删除。"
+    "selected": "已按你的要求勾选 {{count}} 项：{{names}}。确认无误后可以在界面上执行删除。",
+    "readEmpty": "没有读到内容：这一项可能已经不存在，或者当前还没有扫描数据。"
   },
   "delete": {
     "title": "AI 请求删除以下内容",

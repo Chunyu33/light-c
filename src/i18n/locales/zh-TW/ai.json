@@ -12,7 +12,8 @@
   "resizeHintCustom": "拖曳調整大小，雙擊恢復預設",
   "tool": {
     "selectNotFound": "找不到你說的這些項目，資料可能已經變動，請重新掃描後再試。",
-    "selected": "已依你的要求勾選 {{count}} 項：{{names}}。確認無誤後可以在介面上執行刪除。"
+    "selected": "已依你的要求勾選 {{count}} 項：{{names}}。確認無誤後可以在介面上執行刪除。",
+    "readEmpty": "沒有讀到內容：這一項可能已經不存在，或目前還沒有掃描資料。"
   },
   "delete": {
     "title": "AI 請求刪除以下內容",

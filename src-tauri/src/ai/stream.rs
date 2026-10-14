@@ -14,7 +14,9 @@
 // ============================================================================
 
 use super::presets::AiProtocol;
-use super::tools::{AiToolCall, TOOL_PROPOSE_DELETE, TOOL_SELECT_ITEMS};
+use super::tools::{
+    AiToolCall, TOOL_PROPOSE_DELETE, TOOL_READ_ITEMS, TOOL_READ_ITEM_DETAIL, TOOL_SELECT_ITEMS,
+};
 use std::collections::BTreeMap;
 
 /// 一次工具调用的分片累积。
@@ -145,7 +147,11 @@ impl StreamDecoder {
         std::mem::take(&mut self.partial_tools)
             .into_iter()
             .filter(|(_, call)| {
-                !call.name.is_empty() && (call.name == TOOL_SELECT_ITEMS || call.name == TOOL_PROPOSE_DELETE)
+                !call.name.is_empty()
+                    && (call.name == TOOL_SELECT_ITEMS
+                        || call.name == TOOL_PROPOSE_DELETE
+                        || call.name == TOOL_READ_ITEMS
+                        || call.name == TOOL_READ_ITEM_DETAIL)
             })
             .map(|(_, call)| AiToolCall {
                 call_id: call.id,

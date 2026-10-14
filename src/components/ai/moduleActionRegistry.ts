@@ -38,6 +38,17 @@ export interface AiDeleteOutcome {
   needsReboot?: boolean;
 }
 
+/**
+ * 一页明细。**由模块提供内容，由公共层负责说明"这只是其中一部分"** ——
+ * 截断提示不交给模块自觉，否则很容易漏，而模型会因此以为自己看到了全部。
+ */
+export interface AiReadPage {
+  /** 每行一条，模块自己格式化好（路径、大小等） */
+  lines: string[];
+  /** 总条数，用来告诉模型这一页占了多少 */
+  total: number;
+}
+
 export interface ModuleActions {
   /**
    * 把 id 列表解析成可展示的目标摘要。
@@ -49,6 +60,13 @@ export interface ModuleActions {
   selectItems?: (ids: string[]) => void;
   /** P3b：执行删除。**必须调用模块原有的删除入口**。 */
   deleteItems?: (ids: string[]) => Promise<AiDeleteOutcome>;
+  /**
+   * 只读：读取某个分类下的一页明细。
+   * **不登记就不会声明对应工具** —— 渐进增强，不影响没实现的模块。
+   */
+  readItems?: (targetId: string, offset: number, limit: number) => AiReadPage | null;
+  /** 只读：读取单条条目的完整信息。 */
+  readItemDetail?: (itemId: string) => string | null;
 }
 
 const actions = new Map<string, ModuleActions>();

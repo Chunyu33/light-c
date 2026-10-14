@@ -12,7 +12,8 @@
   "resizeHintCustom": "Drag to resize, double-click to reset",
   "tool": {
     "selectNotFound": "Those items are no longer there. The data may have changed; please scan again.",
-    "selected": "Selected {{count}} for you: {{names}}. Delete them from the page when you are ready."
+    "selected": "Selected {{count}} for you: {{names}}. Delete them from the page when you are ready.",
+    "readEmpty": "Nothing to read: that item may no longer exist, or there is no scan data yet."
   },
   "delete": {
     "title": "The assistant asks to delete:",

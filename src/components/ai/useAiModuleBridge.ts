@@ -17,7 +17,7 @@
 //    AI 删走了另一条路"的分裂。
 // ============================================================================
 
-import type { AiDeleteOutcome } from './moduleActionRegistry';
+import type { AiDeleteOutcome, AiReadPage } from './moduleActionRegistry';
 import { useModuleActions } from './moduleActionRegistry';
 import { useModuleDataSummary } from './moduleDataRegistry';
 
@@ -31,6 +31,21 @@ export interface AiModuleTarget {
   irreversible?: boolean;
 }
 
+/**
+ * 把一页明细渲染成给模型看的文本，**并强制附上"这是第几条到第几条、共多少条"**。
+ *
+ * 这一句是整个渐进式读取里最关键的约束：模型只有在明确知道自己没看全时，
+ * 才会说"还需要再看"；否则它会默认看到的就是全部，直接给出错误结论。
+ */
+export function formatReadPage(page: AiReadPage, offset: number): string {
+  const shown = page.lines.length;
+  const more = page.total > offset + shown;
+  const footer = more
+    ? `\n\n（以上是第 ${offset + 1} 到 ${offset + shown} 条，共 ${page.total} 条，**还有更多未显示**；需要时再调用并加大 offset）`
+    : `\n\n（以上是全部 ${page.total} 条）`;
+  return page.lines.join('\n') + footer;
+}
+
 export interface AiModuleBridge {
   /** 一段自然语言摘要：扫描了什么、多大多小、用户当前在做什么。返回 null 表示还没有数据。 */
   summary?: () => string | null;
@@ -40,6 +55,14 @@ export interface AiModuleBridge {
   onSelect?: (ids: string[]) => void;
   /** AI 请求删除时，**用户确认之后**才会调用（P3b）。必须走模块原有删除入口。 */
   onDelete?: (ids: string[]) => Promise<AiDeleteOutcome>;
+
+  /**
+   * 只读：读取某个可操作项下的一页明细。
+   * 登记了它，模型才会拿到 read_items 工具 —— 也才知道自己"能往下看"。
+   */
+  readItems?: (targetId: string, offset: number, limit: number) => AiReadPage | null;
+  /** 只读：读取单条条目详情。 */
+  readItemDetail?: (itemId: string) => string | null;
 }
 
 /**
@@ -111,5 +134,8 @@ export function useAiModuleBridge(moduleId: string, bridge: AiModuleBridge): voi
       : undefined,
     selectItems: bridge.onSelect,
     deleteItems: bridge.onDelete,
+    // 只读能力直接透传：没有登记就是 undefined，前端据此决定要不要声明工具
+    readItems: bridge.readItems,
+    readItemDetail: bridge.readItemDetail,
   });
 }

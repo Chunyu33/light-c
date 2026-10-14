@@ -31,6 +31,14 @@ pub struct AiToolCall {
 /// 允许使用的工具名。由前端按「该模块登记了哪些动作」决定传哪些。
 pub const TOOL_SELECT_ITEMS: &str = "select_items";
 pub const TOOL_PROPOSE_DELETE: &str = "propose_delete";
+pub const TOOL_READ_ITEMS: &str = "read_items";
+pub const TOOL_READ_ITEM_DETAIL: &str = "read_item_detail";
+
+/// 只读工具：它们**不改任何东西**，所以不受"必须用户明确要求才调用"的限制 ——
+/// 用户问"这个分类里都有什么"时正应该调用它们。
+pub fn is_read_only_tool(name: &str) -> bool {
+    name == TOOL_READ_ITEMS || name == TOOL_READ_ITEM_DETAIL
+}
 
 /// 单个工具的描述与参数 schema（两种协议共用这段内容，只是外层包装不同）。
 fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
@@ -65,6 +73,34 @@ fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
                     }
                 },
                 "required": ["ids"]
+            }),
+        )),
+        TOOL_READ_ITEMS => Some((
+            "读取某个分类（可操作项）下的一页明细。\
+             ⚠️ 这是**只读**操作：用户问「这个分类里有什么」「具体是哪些文件」时直接调用。\
+             ⚠️ 一次只返回一页：请看末尾写明的「第 N 到 M 条，共 X 条」，\
+             没看到全部就不要下「全部都…」这类结论；需要更多就再调一次并加大 offset。",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "target_id": {
+                        "type": "string",
+                        "description": "要读取的分类 id；必须是摘要里给出的 [id: xxx] 中的 xxx"
+                    },
+                    "offset": { "type": "integer", "description": "从第几条开始，默认 0" },
+                    "limit": { "type": "integer", "description": "这一页读多少条，默认 30、上限 100" }
+                },
+                "required": ["target_id"]
+            }),
+        )),
+        TOOL_READ_ITEM_DETAIL => Some((
+            "读取单个条目的完整信息（完整路径、大小、时间等）。\n             ⚠️ 只读操作。item_id 必须是摘要或 read_items 结果里出现过的项。",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "item_id": { "type": "string", "description": "条目 id（通常就是完整路径）" }
+                },
+                "required": ["item_id"]
             }),
         )),
         // 不认识的工具名直接忽略：前端传错不该让整个请求失败

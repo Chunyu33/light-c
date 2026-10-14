@@ -30,6 +30,7 @@ import { buildRequestMessages, getModuleDisplayName } from './aiContext';
 import { getModuleDataSummary } from './moduleDataRegistry';
 import { getModuleActions } from './moduleActionRegistry';
 import type { AiDeleteOutcome, AiDeleteTargetSummary } from './moduleActionRegistry';
+import { formatReadPage } from './useAiModuleBridge';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
 import type { AttachedImage } from './imageAttach';
 
@@ -267,6 +268,27 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           ? rawIds.filter((id): id is string => typeof id === 'string')
           : [];
 
+        // 只读读取：**先把结果落进对话**，模型下一轮就能引用这些内容。
+        // 这两个工具不改任何东西，所以不受"必须用户明确要求"的限制。
+        if (call.name === 'read_items') {
+          const args = call.arguments as { target_id?: unknown; offset?: unknown; limit?: unknown };
+          const targetId = typeof args.target_id === 'string' ? args.target_id : '';
+          const offset = Math.max(0, Number(args.offset) || 0);
+          // 上限 100：再大就把上下文吃光了，而"看得多"并不等于"答得准"
+          const limit = Math.min(100, Math.max(1, Number(args.limit) || 30));
+          const page = actions?.readItems?.(targetId, offset, limit) ?? null;
+          pushAndPersist(moduleId, page ? formatReadPage(page, offset) : t('tool.readEmpty'));
+          continue;
+        }
+
+        if (call.name === 'read_item_detail') {
+          const args = call.arguments as { item_id?: unknown };
+          const itemId = typeof args.item_id === 'string' ? args.item_id : '';
+          const detail = actions?.readItemDetail?.(itemId) ?? null;
+          pushAndPersist(moduleId, detail || t('tool.readEmpty'));
+          continue;
+        }
+
         // 一律拿 id 反查模块当前数据：提案到执行之间用户可能又改过勾选、模块可能重扫过，
         // 解析不到的项直接剔除，绝不照着旧 id 硬执行。
         const resolved = actions?.resolveTargets?.(ids) ?? [];
@@ -379,6 +401,9 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         const tools: string[] = [];
         if (actions?.selectItems) tools.push('select_items');
         if (actions?.deleteItems) tools.push('propose_delete');
+        // 只读工具：登记了读取能力才声明。没实现的模块，模型压根不知道自己能往下看。
+        if (actions?.readItems) tools.push('read_items');
+        if (actions?.readItemDetail) tools.push('read_item_detail');
 
         // 一律走流式。工具调用以前会因此丢掉，所以当时只能"带工具就不流式"——
         // 代价是垃圾清理这类模块**永远看不到边生成边显示**，得不偿失。
