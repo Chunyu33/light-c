@@ -282,6 +282,17 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
   const [scanResult, setScanResult] = useState<ContextMenuScanResult | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('context-menu', {
+    // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.entries ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.display_name}  ${item.reg_root}\\${item.reg_subpath}  （键名 ${item.key_name}）`,
+        ),
+      };
+    },
     summary: () => {
       if (!scanResult) return null;
       return `扫描到 ${scanResult.entries.length} 项右键菜单入口，其中 ${scanResult.invalid_count} 项指向已失效的程序。`;

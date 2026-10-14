@@ -156,6 +156,17 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
   const [entries, setEntries] = useState<ShellIconInfo[] | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('shell-icons', {
+    // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
+    readItems: (_targetId, offset, limit) => {
+      const list = entries ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.name}  ${item.clsid}  （${item.hive}）`,
+        ),
+      };
+    },
     summary: () => {
       if (!entries || entries.length === 0) return null;
       const names = entries.slice(0, 8).map((entry) => entry.name).filter(Boolean).join('、');

@@ -503,6 +503,17 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   const [scanResult, setScanResult] = useState<HotspotScanResult | null>(null);
   // 接入 AI 助手（**只读**：大目录分析只做分析，不提供删除动作）。
   useAiModuleBridge('hotspot', {
+    // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.entries ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.path}  ${formatSize(item.total_size)}  （${item.file_count} 个文件）`,
+        ),
+      };
+    },
     summary: () => {
       if (!scanResult) return null;
       return [

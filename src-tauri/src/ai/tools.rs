@@ -76,7 +76,7 @@ fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
             }),
         )),
         TOOL_READ_ITEMS => Some((
-            "读取某个分类（可操作项）下的一页明细。\
+            "读取模块数据的下一页明细。\
              ⚠️ 这是**只读**操作：用户问「这个分类里有什么」「具体是哪些文件」时直接调用。\
              ⚠️ 一次只返回一页：请看末尾写明的「第 N 到 M 条，共 X 条」，\
              没看到全部就不要下「全部都…」这类结论；需要更多就再调一次并加大 offset。",
@@ -85,12 +85,13 @@ fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
                 "properties": {
                     "target_id": {
                         "type": "string",
-                        "description": "要读取的分类 id；必须是摘要里给出的 [id: xxx] 中的 xxx"
+                        "description": "要读取的分类 id（摘要里 [id: xxx] 中的 xxx）。\
+                                        模块只有一条主列表时**留空即可**。"
                     },
                     "offset": { "type": "integer", "description": "从第几条开始，默认 0" },
                     "limit": { "type": "integer", "description": "这一页读多少条，默认 30、上限 100" }
                 },
-                "required": ["target_id"]
+                "required": []
             }),
         )),
         TOOL_READ_ITEM_DETAIL => Some((

@@ -42,6 +42,17 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [scanResult, setScanResult] = useState<RegistryScanResult | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('registry', {
+    // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.entries ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.path}  ${item.name}${item.issue ? `  （问题：${item.issue}）` : ''}`,
+        ),
+      };
+    },
     summary: () => {
       if (!scanResult) return null;
       return `扫描到 ${scanResult.entries.length} 项可疑的注册表残留，其中 ${scanResult.total_count} 项被判定为可安全清理。`;

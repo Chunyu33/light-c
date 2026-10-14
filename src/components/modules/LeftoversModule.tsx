@@ -65,6 +65,17 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   const [scanResult, setScanResult] = useState<LeftoverScanResult | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('leftovers', {
+    // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.leftovers ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.path}  ${formatSize(item.size)}  （${item.app_name}，${item.file_count} 个文件）`,
+        ),
+      };
+    },
     summary: () => {
       if (!scanResult) return null;
       return `扫描到 ${scanResult.leftovers.length} 项软件残留，合计约 ${formatSize(scanResult.total_size)}。`;
