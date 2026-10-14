@@ -26,5 +26,7 @@
     "failedCount": "{{count}} 项失败",
     "details": "查看详情",
     "needsReboot": "部分内容需要重启资源管理器后才会生效。"
-  }
+  },
+  "copy": "复制",
+  "retry": "重试这条提问"
 }

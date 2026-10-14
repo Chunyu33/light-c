@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 社交软件专清模块组件 - 带风险分级
 // 支持智能路径溯源和文件类型深度分类
@@ -121,6 +122,19 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
 
   // 本地状态
   const [scanResult, setScanResult] = useState<SocialScanResult | null>(null);
+  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
+  useAiModuleBridge('social-clean', {
+    summary: () => {
+      if (!scanResult) return null;
+      const apps = scanResult.detected_apps.slice(0, 8).join('、');
+      return [
+        `扫描到 ${scanResult.total_files} 个文件，合计 ${formatSize(scanResult.total_size)}；`,
+        `其中可清理 ${scanResult.deletable_files} 个（${formatSize(scanResult.deletable_size)}）。`,
+        apps ? `涉及的聊天软件：${apps}${scanResult.detected_apps.length > 8 ? ' 等' : ''}。` : '未检测到已安装的聊天软件。',
+      ].join('');
+    },
+  });
+
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

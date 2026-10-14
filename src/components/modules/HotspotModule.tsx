@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 大目录分析模块
 // 深度分析 AppData 目录，定位占用空间的元凶
@@ -493,6 +494,17 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
 
   // 本地状态
   const [scanResult, setScanResult] = useState<HotspotScanResult | null>(null);
+  // 接入 AI 助手（**只读**：大目录分析只做分析，不提供删除动作）。
+  useAiModuleBridge('hotspot', {
+    summary: () => {
+      if (!scanResult) return null;
+      return [
+        `已递归扫描 ${scanResult.total_folders_scanned} 个目录，累计 ${formatSize(scanResult.scanned_total_size)}。`,
+        scanResult.is_full_scan ? '这是全盘扫描结果。' : '当前是限量扫描，只覆盖了部分目录。',
+      ].join('');
+    },
+  });
+
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   // 深度扫描开关状态

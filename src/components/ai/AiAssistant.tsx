@@ -249,6 +249,25 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     [activeModuleId, historyByModule, pushMessage],
   );
 
+  /**
+   * 重试某条用户消息：把历史截断到它之前，再重发一次。
+   * 网络/接口出错、或者对回答不满意时用。
+   *
+   * 磁盘上的会话文件是追加写的，不回改 —— 重试内容会再追加一份，
+   * 旧的那次留在文件里但界面上已经不再显示（避免为了"重试"去动文件写入逻辑）。
+   */
+  const handleRetry = useCallback(
+    (index: number) => {
+      const moduleId = activeModuleId ?? '';
+      const history = historyByModule[moduleId] ?? [];
+      const target = history[index];
+      if (!target || target.role !== 'user') return;
+      setHistoryByModule((previous) => ({ ...previous, [moduleId]: history.slice(0, index) }));
+      void handleSend(target.content);
+    },
+    [activeModuleId, historyByModule, handleSend],
+  );
+
   /** 清空当前模块的对话：**内存与磁盘一起清**，否则重开面板历史会"复活"。 */
   const handleClear = useCallback(() => {
     const moduleId = activeModuleId ?? '';
@@ -289,6 +308,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           isDeleting={isDeleting}
           onConfirmDelete={() => void handleConfirmDelete()}
           onCancelDelete={() => setPendingDelete(null)}
+          onRetry={handleRetry}
           isSending={isSending}
           errorMessage={errorMessage}
           moduleName={moduleName}

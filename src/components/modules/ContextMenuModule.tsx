@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 右键菜单清理模块
 // 扫描 Windows 注册表中注册的右键菜单项，
@@ -279,6 +280,14 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
 
   // ── 本地状态 ──────────────────────────────────────────────────────────────
   const [scanResult, setScanResult] = useState<ContextMenuScanResult | null>(null);
+  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
+  useAiModuleBridge('context-menu', {
+    summary: () => {
+      if (!scanResult) return null;
+      return `扫描到 ${scanResult.entries.length} 项右键菜单入口，其中 ${scanResult.invalid_count} 项指向已失效的程序。`;
+    },
+  });
+
   /** 用 id 作为 key 维护选中集合 */
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

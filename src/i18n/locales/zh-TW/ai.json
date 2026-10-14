@@ -26,5 +26,7 @@
     "failedCount": "{{count}} 項失敗",
     "details": "查看詳情",
     "needsReboot": "部分內容需要重啟資源管理器後才會生效。"
-  }
+  },
+  "copy": "複製",
+  "retry": "重試這則提問"
 }

@@ -26,5 +26,7 @@
     "failedCount": "{{count}} 件失敗",
     "details": "詳細",
     "needsReboot": "一部はエクスプローラーの再起動後に反映されます。"
-  }
+  },
+  "copy": "コピー",
+  "retry": "この質問を再送"
 }

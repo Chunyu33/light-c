@@ -26,5 +26,7 @@
     "failedCount": "{{count}} failed",
     "details": "Details",
     "needsReboot": "Some changes need Explorer to restart before they take effect."
-  }
+  },
+  "copy": "Copy",
+  "retry": "Ask again"
 }

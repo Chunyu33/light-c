@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 外壳入口包含“此电脑”和左侧导航窗格，不涉及真实磁盘驱动器。
 // 后端负责重新校验 CLSID、Hive、入口类型和系统保护边界，前端只维护选择与交互状态。
@@ -153,6 +154,18 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
   const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('shellIcons');
   const { showToast } = useToast();
   const [entries, setEntries] = useState<ShellIconInfo[] | null>(null);
+  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
+  useAiModuleBridge('shell-icons', {
+    summary: () => {
+      if (!entries || entries.length === 0) return null;
+      const names = entries.slice(0, 8).map((entry) => entry.name).filter(Boolean).join('、');
+      return [
+        `共 ${entries.length} 项第三方外壳入口（桌面「此电脑」等位置）。`,
+        names ? `包括：${names}${entries.length > 8 ? ' 等' : ''}。` : '',
+      ].filter(Boolean).join('');
+    },
+  });
+
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [busyTarget, setBusyTarget] = useState<string | null>(null);
   const [isOpeningBackup, setIsOpeningBackup] = useState(false);

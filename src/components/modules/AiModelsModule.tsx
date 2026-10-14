@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
@@ -83,6 +84,18 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const lastScanTriggerRef = useRef(0);
 
   const [scanResult, setScanResult] = useState<AiModelScanResult | null>(null);
+  // 接入 AI 助手（**只读**：这里只统计占用，不提供删除动作）。
+  useAiModuleBridge('ai-models', {
+    summary: () => {
+      if (!scanResult) return null;
+      return [
+        `共 ${scanResult.total_model_count} 个模型文件，合计 ${formatSize(scanResult.total_size)}，`,
+        `来自 ${scanResult.source_count} 个位置。`,
+        scanResult.warnings.length > 0 ? `注意：${scanResult.warnings.slice(0, 3).join('；')}` : '',
+      ].filter(Boolean).join('');
+    },
+  });
+
   const [enableDeepDiscovery, setEnableDeepDiscovery] = useState(() => loadDeepDiscovery());
   const [viewMode, setViewMode] = useState<AiModelViewMode>('overview');
   const [platformFilter, setPlatformFilter] = useState('all');

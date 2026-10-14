@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { AlertCircle, Eraser, Loader2, Minus, Send, User } from 'lucide-react';
+import { AlertCircle, Check, Copy, Eraser, Loader2, Minus, RefreshCw, Send, User } from 'lucide-react';
 import type { AiChatMessage } from '../../types/ai';
 import { AiDeleteRequestCard, type AiDeleteRequestItem } from './AiDeleteRequestCard';
 import { AiDeleteResultCard } from './AiDeleteResultCard';
@@ -31,6 +31,8 @@ interface AiChatPanelProps {
   isDeleting: boolean;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
+  /** 重试某条用户消息（网络或接口出错时用）：组件只上报序号，截断与重发由上层决定 */
+  onRetry: (index: number) => void;
   isSending: boolean;
   errorMessage: string;
   /** 当前模块显示名，只用于标题，让用户知道在跟"哪个模块的助手"说话 */
@@ -48,6 +50,7 @@ export function AiChatPanel({
   isDeleting,
   onConfirmDelete,
   onCancelDelete,
+  onRetry,
   isSending,
   errorMessage,
   moduleName,
@@ -58,6 +61,21 @@ export function AiChatPanel({
   const { t } = useTranslation('ai');
   const [draft, setDraft] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  /** 刚复制成功的那条消息序号：图标短暂变成对勾，给"确实复制了"一个反馈 */
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const handleCopy = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedIndex(index);
+      setTimeout(
+        () => setCopiedIndex((previous) => (previous === index ? null : previous)),
+        1500,
+      );
+    } catch (error) {
+      console.error('复制对话内容失败:', error);
+    }
+  };
 
   // 新消息进来时滚到底部；用 scrollTop 而不是 scrollIntoView，避免连带滚动整个页面。
   useEffect(() => {
@@ -135,9 +153,10 @@ export function AiChatPanel({
           visibleMessages.map((message, index) => {
             const isUser = message.role === 'user';
             return (
-              <div key={index} className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
-                {/* 默认头像：用户用中性小人、助手用品牌色星标 —— 一眼分清谁在说话。
-                    用户侧镜像排布，气泡贴近右侧。 */}
+              <div
+                key={index}
+                className={`group flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}
+              >
                 <div
                   className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                     isUser
@@ -155,6 +174,30 @@ export function AiChatPanel({
                   {/* 助手返回的是 Markdown，要渲染（走 React 节点，不用内联 HTML）；
                       用户自己的输入按纯文本放，不解析 —— 免得手打的标记被吃掉。 */}
                   {isUser ? message.content : renderMarkdown(message.content)}
+                </div>
+                {/* 悬停才出现的小动作条：复制每条、重试仅对用户消息（网络/接口出错时用） */}
+                <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    type="button"
+                    onClick={() => void handleCopy(message.content, index)}
+                    title={t('copy')}
+                    aria-label={t('copy')}
+                    className="rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                  >
+                    {copiedIndex === index ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  </button>
+                  {isUser ? (
+                    <button
+                      type="button"
+                      onClick={() => onRetry(index)}
+                      disabled={isSending}
+                      title={t('retry')}
+                      aria-label={t('retry')}
+                      className="rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );

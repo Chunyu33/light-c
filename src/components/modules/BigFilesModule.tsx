@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 大文件清理模块组件
 // 在仪表盘中展示大文件扫描和清理功能
@@ -76,6 +77,24 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
   // 本地状态
   const [files, setFiles] = useState<LargeFileEntry[]>([]);
+  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
+  useAiModuleBridge('big-files', {
+    summary: () => {
+      if (files.length === 0) return null;
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      const topThree = [...files]
+        .sort((a, b) => b.size - a.size)
+        .slice(0, 3)
+        .map((file) => `${file.source_label || '未知来源'} ${formatSize(file.size)}`)
+        .join('、');
+      return [
+        `共 ${files.length} 个大文件，合计 ${formatSize(totalSize)}；`,
+        `当前已勾选 ${selectedFiles.size} 个。`,
+        `最大的三个：${topThree}。`,
+      ].join('');
+    },
+  });
+
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [currentPath, setCurrentPath] = useState('');
   const [scanBackend, setScanBackend] = useState(''); // "mft" | "walkdir"

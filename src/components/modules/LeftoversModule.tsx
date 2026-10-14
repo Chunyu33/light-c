@@ -1,3 +1,4 @@
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 卸载残留扫描模块（支持模拟器、残留驱动深度检测）
 // 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
@@ -62,6 +63,14 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 本地状态
   const [scanResult, setScanResult] = useState<LeftoverScanResult | null>(null);
+  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
+  useAiModuleBridge('leftovers', {
+    summary: () => {
+      if (!scanResult) return null;
+      return `扫描到 ${scanResult.leftovers.length} 项软件残留，合计约 ${formatSize(scanResult.total_size)}。`;
+    },
+  });
+
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
