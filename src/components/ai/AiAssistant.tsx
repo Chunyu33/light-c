@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { aiChat, aiChatStream, appendAiSessionMessage, clearAiSession, listenAiStream, loadAiSession, localDateKey } from '../../api/ai';
+import { aiChat, aiChatStream, appendAiSessionMessage, clearAiSession, getAiConfig, listenAiStream, listAiProviders, loadAiSession, localDateKey } from '../../api/ai';
 import type { AiChatMessage, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { AiMarkIcon } from './AiMarkIcon';
@@ -49,6 +49,27 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const loadedModulesRef = useRef<Set<string>>(new Set());
 
   const moduleName = useMemo(() => getModuleDisplayName(activeModuleId), [activeModuleId]);
+
+  /**
+   * 当前实际使用的模型与服务商，只用于**显示**。
+   *
+   * 必须让用户看得到：出问题时（答得差、报错）第一句话一定是"这是什么模型"。
+   * 每次打开面板时读一次 —— 用户可能在设置里改过配置，面板还开着。
+   */
+  const [activeModelLabel, setActiveModelLabel] = useState('');
+  useEffect(() => {
+    if (!isOpen) return;
+    void (async () => {
+      try {
+        const [config, providers] = await Promise.all([getAiConfig(), listAiProviders()]);
+        const providerName =
+          providers.find((item) => item.id === config.providerId)?.name || config.providerId || '';
+        setActiveModelLabel([config.model || '未选择模型', providerName].filter(Boolean).join(' · '));
+      } catch (error) {
+        console.error('读取当前 AI 配置失败:', error);
+      }
+    })();
+  }, [isOpen]);
   const currentHistory = historyByModule[activeModuleId ?? ''] ?? [];
 
   /** 写一条消息到该模块的历史（内存） */
@@ -312,6 +333,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           isSending={isSending}
           errorMessage={errorMessage}
           moduleName={moduleName}
+          modelLabel={activeModelLabel}
           onSend={(text) => void handleSend(text)}
           onCollapse={handleToggle}
           onClear={handleClear}

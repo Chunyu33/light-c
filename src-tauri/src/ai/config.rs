@@ -28,6 +28,17 @@ pub struct AiStoredConfig {
     /// 之所以做成可改：会话记录会一直增长，用户可能想单独放到别的盘。
     #[serde(default)]
     pub data_dir: String,
+    /// **上次成功拉取到的模型列表**。
+    ///
+    /// 必须缓存下来，否则设置页只能显示一个孤零零的模型名 —— 用户既看不到
+    /// 自己其实有几可选，也无法判断这个名字是不是还有效。
+    /// （历史问题：早期预设带过 default_model，用户保存后一直显示那个名字，
+    ///   即使它早就不在该密钥可用的列表里了。）
+    #[serde(default)]
+    pub models: Vec<String>,
+    /// 模型列表的拉取时间（Unix 秒）。用于提示"列表可能过期，点一下重新拉取"。
+    #[serde(default)]
+    pub models_fetched_at: i64,
 }
 
 /// 可以安全交给前端的配置视图（密钥已掩码）。
@@ -43,6 +54,22 @@ pub struct AiPublicConfig {
     pub has_api_key: bool,
     /// 自定义 AI 数据目录；为空表示用默认位置（跟随主数据目录）
     pub data_dir: String,
+    /// 上次拉到的模型列表，设置页用它做下拉候选
+    pub models: Vec<String>,
+    /// 模型列表的拉取时间（Unix 秒），0 表示从未拉过
+    pub models_fetched_at: i64,
+}
+
+/// 保存模型列表缓存：拉取成功后调用，让列表能在重启后仍然可见。
+/// 只改这两个字段，其余配置原样保留 —— 这个函数不该有别的副作用。
+pub fn cache_fetched_models(models: Vec<String>) -> Result<(), String> {
+    let mut stored = read_config();
+    stored.models = models;
+    stored.models_fetched_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0);
+    save_config(stored)
 }
 
 /// 解析后的 AI 数据根目录：配置为空时回落到「数据目录/ai」。
@@ -103,6 +130,8 @@ pub fn read_public_config() -> AiPublicConfig {
         api_key_masked: mask_api_key(&stored.api_key),
         has_api_key: !stored.api_key.trim().is_empty(),
         data_dir: stored.data_dir,
+        models: stored.models,
+        models_fetched_at: stored.models_fetched_at,
     }
 }
 

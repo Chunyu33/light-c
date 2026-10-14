@@ -28,8 +28,16 @@ pub fn get_ai_config() -> AiPublicConfig {
 #[tauri::command]
 pub fn save_ai_config(config: AiStoredConfig) -> Result<AiPublicConfig, String> {
     let mut next = config;
+    let previous = crate::ai::read_config();
     if next.api_key.trim().is_empty() {
-        next.api_key = crate::ai::read_config().api_key;
+        next.api_key = previous.api_key.clone();
+    }
+    // ⚠️ 模型缓存不在前端表单里，直接写下去就是空数组 ——
+    // 那样用户每次改设置都会把辛苦拉到的模型列表丢掉。
+    // 只有"服务商或地址变了"才清空：那种情况下旧列表确实已经不对应当前配置。
+    if next.provider_id == previous.provider_id && next.base_url == previous.base_url {
+        next.models = previous.models;
+        next.models_fetched_at = previous.models_fetched_at;
     }
     crate::ai::save_config(next)?;
     Ok(crate::ai::read_public_config())
@@ -38,7 +46,13 @@ pub fn save_ai_config(config: AiStoredConfig) -> Result<AiPublicConfig, String> 
 /// 测试连通性：能成功拉到模型列表，说明地址、密钥、网络三者都通了。
 #[tauri::command]
 pub async fn test_ai_connection() -> Result<Vec<String>, String> {
-    crate::ai::fetch_models().await
+    let models = crate::ai::fetch_models().await?;
+    // 拉到了就缓存：设置页与面板都要显示"有哪些模型可选"，
+    // 不能只让它在这一次会话里可见。缓存失败不影响本次测试的成功结论。
+    if let Err(error) = crate::ai::cache_fetched_models(models.clone()) {
+        log::warn!("缓存模型列表失败: {}", error);
+    }
+    Ok(models)
 }
 
 /// 发一次对话（非流式）。

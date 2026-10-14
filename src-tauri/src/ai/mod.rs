@@ -24,6 +24,8 @@ mod tools;
 // 对外导出：只导出命令层与前端类型真正用得到的东西。
 // 注意 AiStoredConfig 含明文密钥，**只允许在 Rust 侧流转**，命令层不得把它返回给前端。
 pub use client::{chat_once, chat_stream, fetch_models, AiChatReply, AiChatRequest};
-pub use config::{read_config, read_public_config, save_config, AiPublicConfig, AiStoredConfig};
+pub use config::{
+    cache_fetched_models, read_config, read_public_config, save_config, AiPublicConfig, AiStoredConfig,
+};
 pub use presets::{list_providers, AiProviderPreset};
 pub use session::{append_message, clear_session, load_session, sessions_root, AiSessionMessage};

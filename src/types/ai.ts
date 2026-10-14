@@ -30,6 +30,10 @@ export interface AiPublicConfig {
   hasApiKey: boolean;
   /** 自定义 AI 数据目录；为空表示跟随主数据目录（默认位置） */
   dataDir: string;
+  /** 上次成功拉取到的模型列表，设置页用它做下拉候选 */
+  models: string[];
+  /** 模型列表的拉取时间（Unix 秒），0 表示从未拉过 */
+  modelsFetchedAt: number;
 }
 
 /**

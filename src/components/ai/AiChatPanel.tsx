@@ -37,6 +37,8 @@ interface AiChatPanelProps {
   errorMessage: string;
   /** 当前模块显示名，只用于标题，让用户知道在跟"哪个模块的助手"说话 */
   moduleName: string;
+  /** 当前使用的模型 · 服务商，显示在标题栏下方 —— 用户必须知道自己正在用的是什么 */
+  modelLabel: string;
   onSend: (text: string) => void;
   onCollapse: () => void;
   onClear: () => void;
@@ -54,6 +56,7 @@ export function AiChatPanel({
   isSending,
   errorMessage,
   moduleName,
+  modelLabel,
   onSend,
   onCollapse,
   onClear,
@@ -145,6 +148,14 @@ export function AiChatPanel({
           <Minus className="h-3.5 w-3.5" />
         </button>
       </header>
+
+      {/* 当前配置：模型 · 服务商。放在对话区上方而不是标题栏里，
+          因为它会随设置变化，需要能被一眼看到。 */}
+      {modelLabel ? (
+        <div className="shrink-0 border-b border-[var(--border-color)] px-3 pb-1.5 text-[10px] text-[var(--text-muted)]">
+          {modelLabel}
+        </div>
+      ) : null}
 
       <div ref={listRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         {visibleMessages.length === 0 ? (
