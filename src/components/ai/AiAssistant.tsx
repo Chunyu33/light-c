@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
-import { aiChatStream, listenAiStream } from '../../api/ai';
+import { aiChatStream, appendAiSessionMessage, clearAiSession, listenAiStream, loadAiSession, localDateKey } from '../../api/ai';
 import type { AiChatMessage } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { buildRequestMessages, getModuleDisplayName } from './aiContext';
@@ -29,9 +29,12 @@ interface AiAssistantProps {
 export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const { t } = useTranslation('ai');
   const [isOpen, setIsOpen] = useState(false);
-  // 历史里**只放 user/assistant**：system 提示依赖"当前模块 + 当前数据"，
-  // 每次发送现取（见 handleSend），存进历史必然过期。
-  const [messages, setMessages] = useState<AiChatMessage[]>([]);
+  /**
+   * **按模块隔离**的会话历史：每个模块一份，切换模块就换一套，没有就是空的。
+   * 用「模块 id → 消息数组」而不是单一数组，是为了让"在垃圾清理聊过的话"
+   * 不会出现在旧驱动的面板里（Evan 反馈过这个串台）。
+   */
+  const [historyByModule, setHistoryByModule] = useState<Record<string, AiChatMessage[]>>({});
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   // 流式增量拼起来的"正在生成的回答"。它不进历史 —— 只有命令返回的完整正文才入库，
@@ -40,20 +43,66 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
   // 用 ref 保存"正在请求"的标记，避免快速连点导致并发请求
   const sendingRef = useRef(false);
+  // 已经向磁盘要过历史的模块，避免来回切换时反复读文件
+  const loadedModulesRef = useRef<Set<string>>(new Set());
 
   const moduleName = useMemo(() => getModuleDisplayName(activeModuleId), [activeModuleId]);
+  const currentHistory = historyByModule[activeModuleId ?? ''] ?? [];
+
+  /** 写一条消息到该模块的历史（内存） */
+  const pushMessage = useCallback((moduleId: string, message: AiChatMessage) => {
+    setHistoryByModule((previous) => ({
+      ...previous,
+      [moduleId]: [...(previous[moduleId] ?? []), message],
+    }));
+  }, []);
+
+  /**
+   * 首次进入某个模块时，把当天的历史从磁盘读回来。
+   * 落盘失败、读盘失败都只在控制台报错 —— 会话记录是附属能力，不该阻断对话本身。
+   */
+  useEffect(() => {
+    const moduleId = activeModuleId ?? '';
+    if (!moduleId || loadedModulesRef.current.has(moduleId)) return;
+    loadedModulesRef.current.add(moduleId);
+
+    void (async () => {
+      try {
+        const stored = await loadAiSession(moduleId, localDateKey());
+        if (stored.length === 0) return;
+        setHistoryByModule((previous) => ({
+          ...previous,
+          [moduleId]: stored.map((item) => ({ role: item.role, content: item.content })),
+        }));
+      } catch (error) {
+        console.error('读取 AI 会话历史失败:', error);
+      }
+    })();
+  }, [activeModuleId]);
 
   const handleSend = useCallback(
     async (text: string) => {
       if (sendingRef.current) return;
       sendingRef.current = true;
+
+      // 抓一份"发送时"的模块与历史：用户可能在生成过程中切模块，
+      // 这一轮的结果必须落回发起时那个模块，而不是"当前"模块（否则又串台了）。
+      const moduleId = activeModuleId ?? '';
+      const history = historyByModule[moduleId] ?? [];
       setIsSending(true);
       setErrorMessage('');
-
-      const nextMessages: AiChatMessage[] = [...messages, { role: 'user', content: text }];
-      setMessages(nextMessages);
       setStreamingText('');
 
+      const userMessage: AiChatMessage = { role: 'user', content: text };
+      pushMessage(moduleId, userMessage);
+      // 落盘失败只记日志：会话记录是附属能力，不该让对话本身失败
+      void appendAiSessionMessage(moduleId, localDateKey(), {
+        role: 'user',
+        content: text,
+        at: Date.now(),
+      }).catch((error) => console.error('写入 AI 会话历史失败:', error));
+
+      const nextMessages: AiChatMessage[] = [...history, userMessage];
       // 每次请求一个独立的流标识：事件是全局广播的，靠它过滤掉别人的增量。
       const streamId = `s${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let unlisten: (() => void) | null = null;
@@ -66,15 +115,17 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         });
 
         // 每次发送现取"当前模块的数据摘要"：用户可能刚扫完或刚勾选，缓存一秒都会答错。
-        const dataSummary = getModuleDataSummary(activeModuleId);
-        const request = buildRequestMessages(nextMessages, activeModuleId, dataSummary);
-        const reply = await aiChatStream(
-          { messages: trimHistory(request) },
-          streamId,
-        );
+        const dataSummary = getModuleDataSummary(moduleId);
+        const request = buildRequestMessages(nextMessages, moduleId, dataSummary);
+        const reply = await aiChatStream({ messages: trimHistory(request) }, streamId);
 
         // 以命令返回的完整正文入库：事件只负责过程中的实时显示
-        setMessages((previous) => [...previous, { role: 'assistant', content: reply.content }]);
+        pushMessage(moduleId, { role: 'assistant', content: reply.content });
+        void appendAiSessionMessage(moduleId, localDateKey(), {
+          role: 'assistant',
+          content: reply.content,
+          at: Date.now(),
+        }).catch((error) => console.error('写入 AI 会话历史失败:', error));
       } catch (error) {
         // 失败时保留用户输入在历史里，方便直接重试；错误单独展示，不混进对话正文。
         setErrorMessage(String(error));
@@ -86,13 +137,18 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         setIsSending(false);
       }
     },
-    [messages, activeModuleId],
+    [activeModuleId, historyByModule, pushMessage],
   );
 
+  /** 清空当前模块的对话：**内存与磁盘一起清**，否则重开面板历史会"复活"。 */
   const handleClear = useCallback(() => {
-    setMessages([]);
+    const moduleId = activeModuleId ?? '';
+    setHistoryByModule((previous) => ({ ...previous, [moduleId]: [] }));
     setErrorMessage('');
-  }, []);
+    void clearAiSession(moduleId, localDateKey()).catch((error) =>
+      console.error('清空 AI 会话历史失败:', error),
+    );
+  }, [activeModuleId]);
 
   const handleToggle = useCallback(() => {
     setIsOpen((previous) => !previous);
@@ -117,7 +173,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       {isOpen ? (
         <AiChatPanel
           key="panel"
-          messages={messages}
+          messages={currentHistory}
           streamingText={streamingText}
           isSending={isSending}
           errorMessage={errorMessage}

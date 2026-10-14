@@ -1,0 +1,151 @@
+// ============================================================================
+// AI 会话落盘
+//
+// 位置：{数据目录}/ai/sessions/{模块 id}/{YYYY-MM-DD}.jsonl
+//
+// 三个选择都有实际理由：
+// - **按模块分目录**：切换模块时只需加载该模块的历史，这既是"模块隔离"，
+//   也避免了"在旧驱动里看到垃圾清理对话"这种串台。
+// - **按日期分文件**：jsonl 是追加写，一次崩溃不会毁掉整份历史；
+//   清理过期会话也只需删文件，不用读改写。
+// - **日期由前端传入**：本机时区的"今天"前端最清楚，后端为此引入日期库不划算。
+//
+// ⚠️ module_id 与 date 会被拼进文件路径，**必须先校验**：
+//    否则 `..\\..\\` 这类输入就能写到数据目录之外（路径穿越）。
+// ============================================================================
+
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
+
+/// 一条会话消息。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSessionMessage {
+    /// 只允许 user / assistant；system 提示是每次现取的，不落盘
+    pub role: String,
+    pub content: String,
+    /// Unix 毫秒时间戳，便于按时间排序与展示
+    pub at: i64,
+}
+
+fn sessions_root() -> PathBuf {
+    crate::data_dir::get_data_dir().join("ai").join("sessions")
+}
+
+/// 校验模块 id：只允许小写字母、数字与连字符（内置模块 id 都是这种形状）。
+/// 拒绝路径分隔符与 `..`，从源头堵住路径穿越。
+fn is_safe_segment(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-')
+}
+
+/// 校验日期：必须是严格的 YYYY-MM-DD。
+fn is_safe_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10 {
+        return false;
+    }
+    bytes.iter().enumerate().all(|(index, byte)| match index {
+        4 | 7 => *byte == b'-',
+        _ => byte.is_ascii_digit(),
+    })
+}
+
+fn session_file(module_id: &str, date: &str) -> Result<PathBuf, String> {
+    if !is_safe_segment(module_id) {
+        return Err(format!("非法的模块标识: {}", module_id));
+    }
+    if !is_safe_date(date) {
+        return Err(format!("非法的日期格式（应为 YYYY-MM-DD）: {}", date));
+    }
+    Ok(sessions_root().join(module_id).join(format!("{}.jsonl", date)))
+}
+
+/// 追加一条消息。目录不存在时自动创建。
+pub fn append_message(module_id: &str, date: &str, message: AiSessionMessage) -> Result<(), String> {
+    let path = session_file(module_id, date)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("创建会话目录失败 {}: {}", parent.display(), error))?;
+    }
+
+    let line = serde_json::to_string(&message).map_err(|error| format!("序列化会话消息失败: {}", error))?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|error| format!("打开会话文件失败 {}: {}", path.display(), error))?;
+    writeln!(file, "{}", line).map_err(|error| format!("写入会话消息失败: {}", error))?;
+    Ok(())
+}
+
+/// 读取某模块某天的全部消息。
+/// 文件不存在返回空列表（"还没有历史"是正常状态，不是错误）；
+/// 单行解析失败只跳过该行 —— 一条坏数据不该让整份历史读不出来。
+pub fn load_session(module_id: &str, date: &str) -> Result<Vec<AiSessionMessage>, String> {
+    let path = session_file(module_id, date)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let text = fs::read_to_string(&path)
+        .map_err(|error| format!("读取会话文件失败 {}: {}", path.display(), error))?;
+
+    let mut messages = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<AiSessionMessage>(line) {
+            Ok(message) => messages.push(message),
+            Err(error) => log::warn!("跳过损坏的会话记录 {} 第 {} 行: {}", path.display(), index + 1, error),
+        }
+    }
+    Ok(messages)
+}
+
+/// 删除某模块某天的会话文件（界面的「清空对话」）。
+/// 文件本来就不存在时也算成功 —— 目标是"清空后是这个状态"，不是"必须删掉一个文件"。
+pub fn clear_session(module_id: &str, date: &str) -> Result<(), String> {
+    let path = session_file(module_id, date)?;
+    if !path.exists() {
+        return Ok(());
+    }
+    fs::remove_file(&path).map_err(|error| format!("删除会话文件失败 {}: {}", path.display(), error))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_path_traversal_in_module_id_and_date() {
+        // 这两个是拼进路径的，必须挡住
+        assert!(!is_safe_segment("../../windows"));
+        assert!(!is_safe_segment("junk/clean"));
+        assert!(!is_safe_segment("junk\\clean"));
+        assert!(!is_safe_segment(""));
+        assert!(is_safe_segment("junk-clean"));
+        assert!(is_safe_segment("driver-cleanup"));
+    }
+
+    #[test]
+    fn rejects_malformed_dates() {
+        assert!(!is_safe_date("2026-1-1"));
+        assert!(!is_safe_date("2026/10/14"));
+        assert!(!is_safe_date("../2026-10"));
+        assert!(is_safe_date("2026-10-14"));
+    }
+
+    #[test]
+    fn session_file_is_built_under_the_module_directory() {
+        let path = session_file("junk-clean", "2026-10-14").expect("合法输入应通过");
+        let text = path.to_string_lossy().replace('\\', "/");
+        assert!(text.ends_with("ai/sessions/junk-clean/2026-10-14.jsonl"), "实际得到 {}", text);
+    }
+}

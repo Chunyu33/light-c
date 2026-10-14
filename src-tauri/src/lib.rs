@@ -171,6 +171,9 @@ pub fn run() {
             test_ai_connection,
             ai_chat,
             ai_chat_stream,
+            append_ai_session_message,
+            load_ai_session,
+            clear_ai_session,
         ])
         .run(context)
         .expect("启动应用程序时发生错误");

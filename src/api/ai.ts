@@ -68,3 +68,40 @@ export async function listenAiStream(
 export async function aiChatStream(request: AiChatRequest, streamId: string): Promise<AiChatReply> {
   return invoke<AiChatReply>('ai_chat_stream', { request, streamId });
 }
+
+/** 落盘的一条会话消息，与后端 ai/session.rs 的 AiSessionMessage 对应。 */
+export interface AiSessionMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  /** Unix 毫秒时间戳 */
+  at: number;
+}
+
+/**
+ * 本地日期键（YYYY-MM-DD）。
+ * 用本地时间手工拼，**不能用 toISOString** —— 那是 UTC，
+ * 东八区晚上 8 点之后会算成"明天"，会话就会跨日错位。
+ */
+export function localDateKey(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** 追加一条会话消息到本地文件（{AI数据目录}/ai/sessions/{模块}/{日期}.jsonl）。 */
+export async function appendAiSessionMessage(
+  moduleId: string,
+  date: string,
+  message: AiSessionMessage,
+): Promise<void> {
+  return invoke<void>('append_ai_session_message', { moduleId, date, message });
+}
+
+/** 清空某模块某天的会话历史。 */
+export async function clearAiSession(moduleId: string, date: string): Promise<void> {
+  return invoke<void>('clear_ai_session', { moduleId, date });
+}
+
+/** 读取某模块某天的会话历史；没有历史时返回空数组。 */
+export async function loadAiSession(moduleId: string, date: string): Promise<AiSessionMessage[]> {
+  return invoke<AiSessionMessage[]>('load_ai_session', { moduleId, date });
+}

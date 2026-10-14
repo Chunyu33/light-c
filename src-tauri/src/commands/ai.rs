@@ -5,7 +5,9 @@
 // 真正的业务逻辑都在 src/ai/ 下，不要写在这里。
 // ============================================================================
 
-use crate::ai::{AiChatReply, AiChatRequest, AiProviderPreset, AiPublicConfig, AiStoredConfig};
+use crate::ai::{
+    AiChatReply, AiChatRequest, AiProviderPreset, AiPublicConfig, AiSessionMessage, AiStoredConfig,
+};
 
 /// 返回内置服务商预设，供设置页渲染下拉框。
 #[tauri::command]
@@ -53,6 +55,30 @@ pub struct AiStreamDelta {
     /// 与发起请求时传入的一致；前端据此过滤（同一时刻只允许一个流，加上更稳妥）
     pub stream_id: String,
     pub text: String,
+}
+
+/// 追加一条会话消息。
+/// 模块 id 与日期由前端给出（后端不为此引入日期库），语义与安全校验在 ai::session 里。
+#[tauri::command]
+pub fn append_ai_session_message(
+    module_id: String,
+    date: String,
+    message: AiSessionMessage,
+) -> Result<(), String> {
+    crate::ai::append_message(&module_id, &date, message)
+}
+
+/// 清空某模块某天的会话历史（界面的「清空对话」）。
+/// 只删当天的文件：更早的历史留给'按日期清理'，不做隐式的大范围删除。
+#[tauri::command]
+pub fn clear_ai_session(module_id: String, date: String) -> Result<(), String> {
+    crate::ai::clear_session(&module_id, &date)
+}
+
+/// 读取某模块某天的会话历史。文件不存在返回空列表（"还没有历史"是正常状态）。
+#[tauri::command]
+pub fn load_ai_session(module_id: String, date: String) -> Result<Vec<AiSessionMessage>, String> {
+    crate::ai::load_session(&module_id, &date)
 }
 
 /// 流式对话：增量通过事件推送，命令最终返回完整正文。

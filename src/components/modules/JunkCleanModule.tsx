@@ -168,13 +168,16 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     if (!result) return null;
     const lines = [
       `扫描结果：共 ${result.total_file_count} 个文件，合计 ${formatSize(result.total_size)}。`,
-      `用户已勾选 ${selectedCategoryNames.size} 个分类、${selectedPaths.size} 个文件。`,
-      '分类明细（名称：大小 / 文件数 / 勾选状态 / 这类文件的含义）：',
+      // ⚠️ 勾选数必须按**文件路径集合**统计，不能读 selectedCategoryNames：
+      // 那个集合只在"整类被勾选"时才写入，扫描后的默认勾选走的是 selectedPaths，
+      // 读分类集合一定得到 0 —— 会让助手说"你一个分类都没选"（踩过一次）。
+      `用户已勾选 ${selectedPaths.size} 个文件。`,
+      '分类明细（名称：大小 / 文件数 / 该分类已勾选文件数 / 这类文件的含义）：',
     ];
     for (const category of result.categories) {
-      const selected = selectedCategoryNames.has(category.display_name) ? '已勾选' : '未勾选';
+      const selectedInCategory = category.files.filter((file) => selectedPaths.has(file.path)).length;
       lines.push(
-        `- ${category.display_name}：${formatSize(category.total_size)} / ${category.file_count} 个文件 / ${selected} / ${category.description}`,
+        `- ${category.display_name}：${formatSize(category.total_size)} / ${category.file_count} 个文件 / 已勾选 ${selectedInCategory} 个 / ${category.description}`,
       );
     }
     return lines.join('\n');
