@@ -10,7 +10,7 @@ import { listen } from '@tauri-apps/api/event';
 import type {
   AiChatReply,
   AiChatRequest,
-  AiConfigInput,
+  AiProfileInput,
   AiProviderPreset,
   AiPublicConfig,
 } from '../types/ai';
@@ -25,9 +25,28 @@ export async function getAiConfig(): Promise<AiPublicConfig> {
   return invoke<AiPublicConfig>('get_ai_config');
 }
 
-/** 保存配置。apiKey 传空字符串表示保留已保存的密钥。 */
-export async function saveAiConfig(config: AiConfigInput): Promise<AiPublicConfig> {
-  return invoke<AiPublicConfig>('save_ai_config', { config });
+/**
+ * 新增或更新一份服务商档案。
+ * `id` 为空 = 新增；`apiKey` 为空 = 不改动已保存的密钥
+ * （前端只拿得到掩码，回传不了明文，留空是唯一的"不改"表达方式）。
+ */
+export async function saveAiProfile(profile: AiProfileInput): Promise<AiPublicConfig> {
+  return invoke<AiPublicConfig>('save_ai_profile', { profile });
+}
+
+/** 删除一份服务商档案；删掉的正好是当前档案时，后端会切到剩下的第一份。 */
+export async function deleteAiProfile(profileId: string): Promise<AiPublicConfig> {
+  return invoke<AiPublicConfig>('delete_ai_profile', { profileId });
+}
+
+/** 切换当前使用的服务商档案。 */
+export async function setActiveAiProfile(profileId: string): Promise<AiPublicConfig> {
+  return invoke<AiPublicConfig>('set_active_ai_profile', { profileId });
+}
+
+/** 设置 AI 数据目录（全局设置，不属于任何服务商）。 */
+export async function setAiDataDir(dataDir: string): Promise<AiPublicConfig> {
+  return invoke<AiPublicConfig>('set_ai_data_dir', { dataDir });
 }
 
 /**

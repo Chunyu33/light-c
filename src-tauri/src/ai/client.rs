@@ -75,26 +75,30 @@ fn http_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
 /// 地址留空时回落到预设默认值，用户只填密钥也能用。
 fn resolve_connection() -> Result<(AiProtocol, String, String, String), String> {
     let stored = read_config();
-    let preset = find_preset(&stored.provider_id);
+    // 一切以"当前档案"为准：用户切了服务商，下一次调用就该换一套
+    let profile = stored
+        .active_profile()
+        .ok_or_else(|| "还没有添加 AI 服务商，请到「设置 - AI 助手」里添加。".to_string())?;
+    let preset = find_preset(&profile.provider_id);
 
-    let api_key = stored.api_key.trim().to_string();
+    let api_key = profile.api_key.trim().to_string();
     if api_key.is_empty() {
-        return Err("还没有配置 API Key，请到「设置 - AI 助手」里填写。".to_string());
+        return Err("当前服务商还没有填写 API Key，请到「设置 - AI 助手」里填写。".to_string());
     }
 
-    let base_url = if stored.base_url.trim().is_empty() {
+    let base_url = if profile.base_url.trim().is_empty() {
         preset.base_url.to_string()
     } else {
-        stored.base_url.trim().to_string()
+        profile.base_url.trim().to_string()
     };
     if base_url.is_empty() {
         return Err("还没有填写接口地址，请到「设置 - AI 助手」里填写。".to_string());
     }
 
-    let model = if stored.model.trim().is_empty() {
+    let model = if profile.model.trim().is_empty() {
         preset.default_model.to_string()
     } else {
-        stored.model.trim().to_string()
+        profile.model.trim().to_string()
     };
 
     Ok((preset.protocol, base_url, api_key, model))

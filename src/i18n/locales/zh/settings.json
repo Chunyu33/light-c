@@ -59,7 +59,10 @@
     "privacyNote": "说明：对话请求由软件后端直接发送给服务商，密钥不会出现在界面代码里；AI 助手是新增的独立功能，不会影响其它模块的扫描与清理逻辑。",
     "dataDir": "AI 数据目录",
     "dataDirDesc": "AI 对话记录的存放位置，留空则跟随主数据目录",
-    "dataDirDefault": "默认：数据目录下的 ai 文件夹"
+    "dataDirDefault": "默认：数据目录下的 ai 文件夹",
+    "profileAdd": "新增服务商",
+    "profileDelete": "删除这份配置",
+    "profileNoModel": "还没有选择模型"
   },
   "tabs": {
     "ai": "AI 助手",

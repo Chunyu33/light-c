@@ -21,33 +21,42 @@ export interface AiProviderPreset {
   local: boolean;
 }
 
-/** 后端返回给界面的配置视图：密钥已掩码。 */
-export interface AiPublicConfig {
+/** 一份服务商档案的界面视图：密钥已掩码。 */
+export interface AiPublicProfile {
+  id: string;
+  name: string;
   providerId: string;
   baseUrl: string;
   model: string;
   apiKeyMasked: string;
   hasApiKey: boolean;
-  /** 自定义 AI 数据目录；为空表示跟随主数据目录（默认位置） */
-  dataDir: string;
-  /** 上次成功拉取到的模型列表，设置页用它做下拉候选 */
+  /** 上次成功拉取到的模型列表 */
   models: string[];
-  /** 模型列表的拉取时间（Unix 秒），0 表示从未拉过 */
   modelsFetchedAt: number;
+  /** 思考强度；空字符串 = 不发送该参数 */
+  reasoningEffort: string;
+}
+
+/** 后端返回给界面的配置视图：多份档案 + 当前选中。 */
+export interface AiPublicConfig {
+  activeProfileId: string;
+  profiles: AiPublicProfile[];
+  /** 自定义 AI 数据目录；为空表示跟随主数据目录（全局设置，不属于某份档案） */
+  dataDir: string;
 }
 
 /**
- * 保存配置时的提交体。
- * `apiKey` 传空字符串表示"不改动已保存的密钥" ——
- * 否则用户每次只想换个模型，都得把密钥重新粘贴一遍。
+ * 提交一份档案。
+ * `id` 为空 = 新增；`apiKey` 为空 = 不改动已保存的密钥
+ * （前端只拿得到掩码，回传不了明文，留空是唯一的"不改"表达方式）。
  */
-export interface AiConfigInput {
+export interface AiProfileInput {
+  id: string;
+  name: string;
   providerId: string;
   baseUrl: string;
   model: string;
   apiKey: string;
-  /** 空字符串表示"改回默认位置" */
-  dataDir: string;
 }
 
 /** 对话消息。role 用 OpenAI 的写法（system / user / assistant），Anthropic 由后端转译。 */

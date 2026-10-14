@@ -62,9 +62,16 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     void (async () => {
       try {
         const [config, providers] = await Promise.all([getAiConfig(), listAiProviders()]);
+        // 显示"当前档案"的模型与服务商：多档案之后，全局字段已经不是配置单位
+        const active =
+          config.profiles.find((item) => item.id === config.activeProfileId) ?? config.profiles[0];
+        if (!active) {
+          setActiveModelLabel('');
+          return;
+        }
         const providerName =
-          providers.find((item) => item.id === config.providerId)?.name || config.providerId || '';
-        setActiveModelLabel([config.model || '未选择模型', providerName].filter(Boolean).join(' · '));
+          providers.find((item) => item.id === active.providerId)?.name || active.providerId || '';
+        setActiveModelLabel([active.model || '未选择模型', providerName].filter(Boolean).join(' · '));
       } catch (error) {
         console.error('读取当前 AI 配置失败:', error);
       }

@@ -59,7 +59,10 @@
     "privacyNote": "Requests are sent to the provider by the app backend, and the key never appears in the interface code. The assistant is an added, self-contained feature and does not change how any module scans or cleans.",
     "dataDir": "AI data folder",
     "dataDirDesc": "Where AI conversations are stored; leave empty to follow the main data folder",
-    "dataDirDefault": "Default: the ai folder inside the data folder"
+    "dataDirDefault": "Default: the ai folder inside the data folder",
+    "profileAdd": "Add provider",
+    "profileDelete": "Remove this profile",
+    "profileNoModel": "No model selected yet"
   },
   "tabs": {
     "ai": "AI assistant",

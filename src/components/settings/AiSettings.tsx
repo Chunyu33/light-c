@@ -7,10 +7,18 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { useToast } from '../Toast';
-import { getAiConfig, listAiProviders, saveAiConfig, testAiConnection } from '../../api/ai';
+import {
+  deleteAiProfile,
+  getAiConfig,
+  listAiProviders,
+  saveAiProfile,
+  setActiveAiProfile,
+  setAiDataDir,
+  testAiConnection,
+} from '../../api/ai';
 import type { AiProviderPreset, AiPublicConfig } from '../../types/ai';
 
 /** 统一的设置行：左侧标题与描述，右侧控件。 */
@@ -78,8 +86,11 @@ export function AiSettings() {
   const [model, setModel] = useState('');
   // 密钥输入框始终为空：留空 = 沿用已保存的密钥（后端约定）
   const [apiKey, setApiKey] = useState('');
-  // AI 数据目录：留空 = 跟随主数据目录（默认位置，显示为占位提示）
+  // AI 数据目录：留空 = 跟随主数据目录（默认位置，显示为占位提示）。
+  // 它是**全局设置**，不属于某个服务商 —— 换服务商不该把聊天记录也搬走。
   const [dataDir, setDataDir] = useState('');
+  // 当前正在编辑的档案 id。表单里的字段都属于它。
+  const [activeId, setActiveId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -89,10 +100,15 @@ export function AiSettings() {
         if (cancelled) return;
         setProviders(presetList);
         setSaved(config);
-        const preset = presetList.find((item) => item.id === config.providerId);
-        setProviderId(config.providerId || preset?.id || 'deepseek');
-        setBaseUrl(config.baseUrl || preset?.baseUrl || '');
-        setModel(config.model || preset?.defaultModel || '');
+        // 表单初值取自"当前档案"，不是某个全局字段 —— 多档案之后只有档案才是配置单位
+        const active = config.profiles.find((item) => item.id === config.activeProfileId) ?? config.profiles[0];
+        const preset = presetList.find((item) => item.id === active?.providerId);
+        setActiveId(active?.id ?? '');
+        setProviderId(active?.providerId || preset?.id || 'deepseek');
+        setBaseUrl(active?.baseUrl || preset?.baseUrl || '');
+        setModel(active?.model || '');
+        // 模型下拉直接读档案里缓存的列表：重启后也还在，不用每次进来重新拉
+        setModelOptions(active?.models ?? []);
         setDataDir(config.dataDir || '');
       } catch (error) {
         if (!cancelled) setErrorMessage(String(error));
@@ -104,6 +120,12 @@ export function AiSettings() {
       cancelled = true;
     };
   }, []);
+
+  /** 当前档案：密钥状态与新档案名都取它 —— 多档案之后没有"全局密钥"这种东西。 */
+  const activeProfile = useMemo(
+    () => saved?.profiles.find((item) => item.id === saved.activeProfileId) ?? saved?.profiles[0],
+    [saved],
+  );
 
   const currentPreset = useMemo(
     () => providers.find((item) => item.id === providerId),
@@ -127,11 +149,19 @@ export function AiSettings() {
 
   /** 保存草稿。apiKey 为空时后端会沿用已保存的密钥。 */
   const persist = useCallback(async () => {
-    const next = await saveAiConfig({ providerId, baseUrl, model, apiKey, dataDir });
-    setSaved(next);
+    // 密钥留空 = 后端沿用已保存的（前端只拿得到掩码，回传不了明文）
+    // name 原样带回：档案名由用户维护，这里不该覆盖掉
+    const next = await saveAiProfile({ id: activeId, name: activeProfile?.name ?? '', providerId, baseUrl, model, apiKey });
+    // 数据目录是全局的，单独保存；它不属于任何一份档案
+    const withDir = await setAiDataDir(dataDir);
+    setSaved(withDir);
+    setActiveId(withDir.activeProfileId);
+    // 保存后端会回填 id（新增档案时），这里同步一次，否则再保存会又插入一份
+    const active = withDir.profiles.find((item) => item.id === withDir.activeProfileId);
+    if (active) setActiveId(active.id);
     setApiKey(''); // 保存成功后清空输入框，回到"掩码显示"状态
     return next;
-  }, [providerId, baseUrl, model, apiKey, dataDir]);
+  }, [activeId, providerId, baseUrl, model, apiKey, dataDir]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -171,6 +201,55 @@ export function AiSettings() {
     }
   }, [persist, model, showToast, t]);
 
+  /** 把一个配置应用到表单上（切换档案、保存后回填都走这里，保证只有一处同步逻辑）。 */
+  const applyConfig = useCallback(
+    (config: AiPublicConfig) => {
+      const active = config.profiles.find((item) => item.id === config.activeProfileId) ?? config.profiles[0];
+      const preset = providers.find((item) => item.id === active?.providerId);
+      setSaved(config);
+      setActiveId(active?.id ?? '');
+      setProviderId(active?.providerId || preset?.id || 'deepseek');
+      setBaseUrl(active?.baseUrl || preset?.baseUrl || '');
+      setModel(active?.model || '');
+      setModelOptions(active?.models ?? []);
+      setApiKey('');
+      setErrorMessage('');
+    },
+    [providers],
+  );
+
+  const handleSwitchProfile = useCallback(
+    async (profileId: string) => {
+      if (profileId === activeId) return;
+      try {
+        applyConfig(await setActiveAiProfile(profileId));
+      } catch (error) {
+        setErrorMessage(String(error));
+      }
+    },
+    [activeId, applyConfig],
+  );
+
+  /** 新增：直接建一份空档案并切过去，用户接着填密钥即可。 */
+  const handleAddProfile = useCallback(async () => {
+    try {
+      applyConfig(await saveAiProfile({ id: '', name: '', providerId: 'deepseek', baseUrl: '', model: '', apiKey: '' }));
+    } catch (error) {
+      setErrorMessage(String(error));
+    }
+  }, [applyConfig]);
+
+  const handleDeleteProfile = useCallback(
+    async (profileId: string) => {
+      try {
+        applyConfig(await deleteAiProfile(profileId));
+      } catch (error) {
+        setErrorMessage(String(error));
+      }
+    },
+    [applyConfig],
+  );
+
   const modelSelectOptions = useMemo(
     () => modelOptions.map((id) => ({ value: id, label: id })),
     [modelOptions],
@@ -185,6 +264,57 @@ export function AiSettings() {
         </h4>
 
         <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
+          {/* 服务商档案栏：点标签切换，+ 新增，悬停出现删除。
+              多份配置并存，切换只改一个 id，不搬动其它设置。 */}
+          <div className="flex flex-wrap items-center gap-2">
+            {saved?.profiles.map((profile) => {
+              const isActive = profile.id === saved.activeProfileId;
+              const label =
+                profile.name ||
+                providers.find((item) => item.id === profile.providerId)?.name ||
+                profile.providerId;
+              return (
+                <span
+                  key={profile.id}
+                  className={`group inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-xs transition-colors ${
+                    isActive
+                      ? 'border-[var(--brand-green)] bg-[var(--brand-green-10)] text-[var(--brand-green)]'
+                      : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => void handleSwitchProfile(profile.id)}
+                    className="max-w-[12em] truncate"
+                    title={profile.model || t('aiAssistant.profileNoModel')}
+                  >
+                    {label}
+                    {profile.model ? ` · ${profile.model}` : ''}
+                  </button>
+                  {saved.profiles.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteProfile(profile.id)}
+                      title={t('aiAssistant.profileDelete')}
+                      aria-label={t('aiAssistant.profileDelete')}
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </span>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => void handleAddProfile()}
+              className="inline-flex items-center gap-1 rounded-xl border border-dashed border-[var(--border-color)] px-2.5 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
+            >
+              <Plus className="h-3 w-3" />
+              {t('aiAssistant.profileAdd')}
+            </button>
+          </div>
+
           <SettingRow title={t('aiAssistant.provider')} description={t('aiAssistant.providerDesc')}>
             <Select<string>
               value={providerId}
@@ -204,15 +334,15 @@ export function AiSettings() {
             <SettingRow
               title={t('aiAssistant.apiKey')}
               description={
-                saved?.hasApiKey
-                  ? t('aiAssistant.apiKeySaved', { masked: saved.apiKeyMasked })
+                activeProfile?.hasApiKey
+                  ? t('aiAssistant.apiKeySaved', { masked: activeProfile?.apiKeyMasked ?? '' })
                   : t('aiAssistant.apiKeyDesc')
               }
             >
               <TextField
                 value={apiKey}
                 onChange={setApiKey}
-                placeholder={saved?.hasApiKey ? t('aiAssistant.apiKeyKeep') : 'sk-...'}
+                placeholder={activeProfile?.hasApiKey ? t('aiAssistant.apiKeyKeep') : 'sk-...'}
                 widthClass="w-64"
                 password
               />

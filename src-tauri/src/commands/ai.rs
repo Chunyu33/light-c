@@ -6,7 +6,7 @@
 // ============================================================================
 
 use crate::ai::{
-    AiChatReply, AiChatRequest, AiProviderPreset, AiPublicConfig, AiSessionMessage, AiStoredConfig,
+    AiChatReply, AiChatRequest, AiProfile, AiProviderPreset, AiPublicConfig, AiSessionMessage,
 };
 
 /// 返回内置服务商预设，供设置页渲染下拉框。
@@ -26,20 +26,29 @@ pub fn get_ai_config() -> AiPublicConfig {
 /// 约定：前端传来的 apiKey 为空字符串时表示"不改动已保存的密钥" ——
 /// 否则用户每次只想换个模型，都得把密钥重新粘贴一遍。
 #[tauri::command]
-pub fn save_ai_config(config: AiStoredConfig) -> Result<AiPublicConfig, String> {
-    let mut next = config;
-    let previous = crate::ai::read_config();
-    if next.api_key.trim().is_empty() {
-        next.api_key = previous.api_key.clone();
-    }
-    // ⚠️ 模型缓存不在前端表单里，直接写下去就是空数组 ——
-    // 那样用户每次改设置都会把辛苦拉到的模型列表丢掉。
-    // 只有"服务商或地址变了"才清空：那种情况下旧列表确实已经不对应当前配置。
-    if next.provider_id == previous.provider_id && next.base_url == previous.base_url {
-        next.models = previous.models;
-        next.models_fetched_at = previous.models_fetched_at;
-    }
-    crate::ai::save_config(next)?;
+pub fn save_ai_profile(profile: AiProfile) -> Result<AiPublicConfig, String> {
+    crate::ai::upsert_profile(profile)?;
+    Ok(crate::ai::read_public_config())
+}
+
+/// 删除一份服务商档案。删掉的正好是当前档案时，后端会自动切到剩下的第一份。
+#[tauri::command]
+pub fn delete_ai_profile(profile_id: String) -> Result<AiPublicConfig, String> {
+    crate::ai::delete_profile(&profile_id)?;
+    Ok(crate::ai::read_public_config())
+}
+
+/// 切换当前使用的服务商档案。
+#[tauri::command]
+pub fn set_active_ai_profile(profile_id: String) -> Result<AiPublicConfig, String> {
+    crate::ai::set_active_profile(&profile_id)?;
+    Ok(crate::ai::read_public_config())
+}
+
+/// 设置 AI 数据目录（全局，不属于任何服务商 —— 换服务商不该把聊天记录搬走）。
+#[tauri::command]
+pub fn set_ai_data_dir(data_dir: String) -> Result<AiPublicConfig, String> {
+    crate::ai::set_data_dir(data_dir)?;
     Ok(crate::ai::read_public_config())
 }
 

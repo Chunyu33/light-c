@@ -167,7 +167,10 @@ pub fn run() {
             // AI 助手（横向新增能力：只增加命令，不改动既有模块逻辑）
             list_ai_providers,
             get_ai_config,
-            save_ai_config,
+            save_ai_profile,
+            delete_ai_profile,
+            set_active_ai_profile,
+            set_ai_data_dir,
             test_ai_connection,
             ai_chat,
             ai_chat_stream,
