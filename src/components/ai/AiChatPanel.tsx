@@ -8,8 +8,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
 import { AlertCircle, Eraser, Loader2, Minus, Send, Sparkles, User } from 'lucide-react';
 import type { AiChatMessage } from '../../types/ai';
+import { renderMarkdown } from './renderMarkdown';
 
 interface AiChatPanelProps {
   messages: AiChatMessage[];
@@ -51,10 +53,17 @@ export function AiChatPanel({
   const visibleMessages = messages.filter((message) => message.role !== 'system');
 
   return (
-    /* 尺寸全部用 em + vw/vh 计算，不写死像素：
-       - em 跟随全局字号设置一起缩放；
-       - 上限再被视口夹住，窗口变小会自动收窄，不会顶出屏幕。 */
-    <div className="ai-panel fixed right-5 bottom-5 z-40 flex w-[28em] max-w-[calc(100vw-2.5em)] max-h-[min(38em,calc(100vh-8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg">
+    /* 尺寸全部用 em + vw/vh 计算，不写死像素：em 跟随全局字号设置缩放，
+       上限再被视口夹住，窗口变小会自动收窄。
+       ⚠️ calc() 里的减号**必须带空格** —— 在 Tailwind 里写成下划线 `_-_`。
+       写成 `calc(100vh-8em)` 是无效 CSS，整条属性会被浏览器丢掉（这个坑踩过）。 */
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.97 }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      className="ai-panel fixed right-5 bottom-5 z-40 flex w-[min(28em,calc(100vw_-_2.5em))] max-h-[min(38em,calc(100vh_-_8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg"
+    >
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]">
@@ -105,7 +114,9 @@ export function AiChatPanel({
                     isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--bg-card)] text-[var(--text-primary)]'
                   }`}
                 >
-                  {message.content}
+                  {/* 助手返回的是 Markdown，要渲染（走 React 节点，不用内联 HTML）；
+                      用户自己的输入按纯文本放，不解析 —— 免得手打的标记被吃掉。 */}
+                  {isUser ? message.content : renderMarkdown(message.content)}
                 </div>
               </div>
             );
@@ -153,6 +164,6 @@ export function AiChatPanel({
           <Send className="h-3.5 w-3.5" />
         </button>
       </footer>
-    </div>
+    </motion.div>
   );
 }

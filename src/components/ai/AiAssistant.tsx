@@ -9,6 +9,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { aiChat } from '../../api/ai';
 import type { AiChatMessage } from '../../types/ai';
@@ -76,9 +77,12 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   }, []);
 
   return (
-    <>
+    /* AnimatePresence 负责"离场动画"：React 卸载节点时它会把 exit 播完再移除。
+       两个子节点都要有稳定 key，否则切换时会被当成同一个节点、动画不触发。 */
+    <AnimatePresence mode="wait">
       {isOpen ? (
         <AiChatPanel
+          key="panel"
           messages={messages}
           isSending={isSending}
           errorMessage={errorMessage}
@@ -88,18 +92,26 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           onClear={handleClear}
         />
       ) : (
-        <button
+        <motion.button
+          key="ball"
           type="button"
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.6 }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          /* 悬停/按下的缩放交给 framer-motion（不再写 CSS 的 hover:scale-*，否则两者会打架） */
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.94 }}
           onClick={handleToggle}
           title={t('ballTitle')}
           aria-label={t('ballTitle')}
           /* 位置刻意压在「回到顶部」按钮上方：两者都在右下角，不这样会叠在一起。 */
-          className="glass-item fixed right-5 bottom-[4.75rem] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--brand-green)] shadow-lg transition-transform hover:scale-105 active:scale-95"
+          className="glass-item fixed right-5 bottom-[4.75rem] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--brand-green)] shadow-lg"
         >
           <Sparkles className="h-5 w-5" />
-        </button>
+        </motion.button>
       )}
-    </>
+    </AnimatePresence>
   );
 }
 
