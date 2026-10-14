@@ -49,7 +49,7 @@ import type {
   ScanResult,
 } from '../../types';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
-import { useModuleDataSummary } from '../ai/moduleDataRegistry';
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 
 const DEEP_SCAN_STORAGE_KEY = 'lightc.junkClean.deepScan';
 
@@ -161,26 +161,38 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [scanProgress, setScanProgress] = useState<DeepJunkScanProgress | null>(null);
   const [scanMode, setScanMode] = useState<'quick' | 'deep' | null>(null);
 
-  // 给 AI 助手提供"当前模块在展示什么"的摘要。
-  // 只给统计与分类，**不给文件级明细** —— 一次扫描能有几千个文件，全量塞进 prompt 会直接撑爆上下文。
-  useModuleDataSummary('junk-clean', () => {
-    const result = deepScanResult ?? scanResult;
-    if (!result) return null;
-    const lines = [
-      `扫描结果：共 ${result.total_file_count} 个文件，合计 ${formatSize(result.total_size)}。`,
-      // ⚠️ 勾选数必须按**文件路径集合**统计，不能读 selectedCategoryNames：
-      // 那个集合只在"整类被勾选"时才写入，扫描后的默认勾选走的是 selectedPaths，
-      // 读分类集合一定得到 0 —— 会让助手说"你一个分类都没选"（踩过一次）。
-      `用户已勾选 ${selectedPaths.size} 个文件。`,
-      '分类明细（名称：大小 / 文件数 / 该分类已勾选文件数 / 这类文件的含义）：',
-    ];
-    for (const category of result.categories) {
-      const selectedInCategory = category.files.filter((file) => selectedPaths.has(file.path)).length;
-      lines.push(
-        `- ${category.display_name}：${formatSize(category.total_size)} / ${category.file_count} 个文件 / 已勾选 ${selectedInCategory} 个 / ${category.description}`,
-      );
-    }
-    return lines.join('\n');
+  // 接入 AI 助手：模块侧只写这一处。
+  // 分工：模块说清"数据长什么样、哪些能被操作"，管道（id 格式、注入时机、
+  // 确认卡片、权限）全在公共层 —— 所以各模块的写法形状一致，便于长期维护。
+  useAiModuleBridge('junk-clean', {
+    summary: () => {
+      const result = deepScanResult ?? scanResult;
+      if (!result) return null;
+      return [
+        `扫描结果：共 ${result.total_file_count} 个文件，合计 ${formatSize(result.total_size)}。`,
+        // 勾选数必须按**文件路径集合**统计：分类集合只在"整类被勾选"时才写入，
+        // 扫描后的默认勾选走的是 selectedPaths（踩过：读分类集合会得到 0）
+        `用户已勾选 ${selectedPaths.size} 个文件。`,
+      ].join('\n');
+    },
+    // 可操作项 = 分类。⚠️ id 目前用 display_name（后端没有给稳定键），
+    // 同一语言会话内稳定；换语言后历史 id 会对不上，后续应由后端补一个稳定 name。
+    targets: () => {
+      const result = deepScanResult ?? scanResult;
+      if (!result) return [];
+      return result.categories.map((category) => ({
+        id: category.display_name,
+        label: category.display_name,
+        detail: [
+          formatSize(category.total_size),
+          `${category.file_count} 个文件`,
+          `已勾选 ${category.files.filter((file) => selectedPaths.has(file.path)).length} 个`,
+          category.description,
+        ].join(' · '),
+        // 系统托管项（如回收站相关）清空后无法恢复，卡片上要单独标出来
+        irreversible: category.system_managed,
+      }));
+    },
   });
   const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);
   const scanningRef = useRef(false);
