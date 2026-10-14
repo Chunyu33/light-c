@@ -16,6 +16,8 @@ import { usePanelSize } from './usePanelSize';
 
 interface AiChatPanelProps {
   messages: AiChatMessage[];
+  /** 正在流式生成的内容；为空表示这一轮还没开始出字 */
+  streamingText: string;
   isSending: boolean;
   errorMessage: string;
   /** 当前模块显示名，只用于标题，让用户知道在跟"哪个模块的助手"说话 */
@@ -27,6 +29,7 @@ interface AiChatPanelProps {
 
 export function AiChatPanel({
   messages,
+  streamingText,
   isSending,
   errorMessage,
   moduleName,
@@ -140,7 +143,19 @@ export function AiChatPanel({
           })
         )}
 
-        {isSending ? (
+        {/* 正在生成的回答：边收边显示，让人看到"它在写字"而不是干等 */}
+        {streamingText ? (
+          <div className="flex items-start gap-2">
+            <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--brand-green-10)] text-[var(--brand-green)]">
+              <Sparkles className="h-3.5 w-3.5" />
+            </div>
+            <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--bg-card)] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--text-primary)]">
+              {renderMarkdown(streamingText)}
+              {/* 光标：暗示还在继续输出 */}
+              <span className="ml-0.5 inline-block h-3 w-1 translate-y-0.5 animate-pulse bg-[var(--brand-green)]" />
+            </div>
+          </div>
+        ) : isSending ? (
           <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             {t('thinking')}

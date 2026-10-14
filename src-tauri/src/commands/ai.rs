@@ -40,8 +40,45 @@ pub async fn test_ai_connection() -> Result<Vec<String>, String> {
 }
 
 /// 发一次对话（非流式）。
-/// 流式输出与「按当前模块注入上下文」属于后续阶段，这里先保证能问能答。
+/// 流式版本见 ai_chat_stream；非流式保留下来，便于排查"是不是流式解析的问题"。
 #[tauri::command]
 pub async fn ai_chat(request: AiChatRequest) -> Result<AiChatReply, String> {
     crate::ai::chat_once(request).await
+}
+
+/// 流式增量的推送数据体。
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiStreamDelta {
+    /// 与发起请求时传入的一致；前端据此过滤（同一时刻只允许一个流，加上更稳妥）
+    pub stream_id: String,
+    pub text: String,
+}
+
+/// 流式对话：增量通过事件推送，命令最终返回完整正文。
+///
+/// 为什么用事件而不是"返回值就是流"：Tauri 命令只能返回一次性结果，
+/// 要"边生成边显示"就必须在生成过程中主动往前端推。
+/// 命令返回的完整正文还能兜底 —— 即使前端漏掉了事件，也不会丢内容。
+#[tauri::command]
+pub async fn ai_chat_stream(
+    app: tauri::AppHandle,
+    request: AiChatRequest,
+    stream_id: String,
+) -> Result<AiChatReply, String> {
+    use tauri::Emitter;
+
+    let emitter = app.clone();
+    let event_stream_id = stream_id.clone();
+    crate::ai::chat_stream(request, move |delta: &str| {
+        // 事件发送失败不作为致命错误：命令的返回值里还有完整正文
+        let _ = emitter.emit(
+            "ai-stream-delta",
+            AiStreamDelta {
+                stream_id: event_stream_id.clone(),
+                text: delta.to_string(),
+            },
+        );
+    })
+    .await
 }

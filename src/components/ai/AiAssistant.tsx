@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
-import { aiChat } from '../../api/ai';
+import { aiChatStream, listenAiStream } from '../../api/ai';
 import type { AiChatMessage } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { buildRequestMessages, getModuleDisplayName } from './aiContext';
@@ -34,6 +34,9 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  // 流式增量拼起来的"正在生成的回答"。它不进历史 —— 只有命令返回的完整正文才入库，
+  // 这样即使漏掉几个事件，最终内容也不会残缺。
+  const [streamingText, setStreamingText] = useState('');
 
   // 用 ref 保存"正在请求"的标记，避免快速连点导致并发请求
   const sendingRef = useRef(false);
@@ -49,18 +52,36 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
       const nextMessages: AiChatMessage[] = [...messages, { role: 'user', content: text }];
       setMessages(nextMessages);
+      setStreamingText('');
+
+      // 每次请求一个独立的流标识：事件是全局广播的，靠它过滤掉别人的增量。
+      const streamId = `s${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      let unlisten: (() => void) | null = null;
 
       try {
-        // 每次发送现取"当前模块的数据摘要"，和请求一起交给后端 ——
-        // 用户可能刚扫完或刚勾选，缓存一秒都会让助手答错。
+        // 先挂监听再发请求，否则首批增量可能在挂上之前就到了
+        unlisten = await listenAiStream((delta) => {
+          if (delta.streamId !== streamId) return;
+          setStreamingText((previous) => previous + delta.text);
+        });
+
+        // 每次发送现取"当前模块的数据摘要"：用户可能刚扫完或刚勾选，缓存一秒都会答错。
         const dataSummary = getModuleDataSummary(activeModuleId);
         const request = buildRequestMessages(nextMessages, activeModuleId, dataSummary);
-        const reply = await aiChat({ messages: trimHistory(request) });
+        const reply = await aiChatStream(
+          { messages: trimHistory(request) },
+          streamId,
+        );
+
+        // 以命令返回的完整正文入库：事件只负责过程中的实时显示
         setMessages((previous) => [...previous, { role: 'assistant', content: reply.content }]);
       } catch (error) {
         // 失败时保留用户输入在历史里，方便直接重试；错误单独展示，不混进对话正文。
         setErrorMessage(String(error));
       } finally {
+        // 必须取消监听：否则一次对话留下一个永久监听器，下次的增量会被累加两遍
+        unlisten?.();
+        setStreamingText('');
         sendingRef.current = false;
         setIsSending(false);
       }
@@ -97,6 +118,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         <AiChatPanel
           key="panel"
           messages={messages}
+          streamingText={streamingText}
           isSending={isSending}
           errorMessage={errorMessage}
           moduleName={moduleName}

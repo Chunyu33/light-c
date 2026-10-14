@@ -6,6 +6,7 @@
 // ============================================================================
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import type {
   AiChatReply,
   AiChatRequest,
@@ -40,4 +41,30 @@ export async function testAiConnection(): Promise<string[]> {
 /** 发一次对话（非流式）。模块上下文注入属于后续阶段。 */
 export async function aiChat(request: AiChatRequest): Promise<AiChatReply> {
   return invoke<AiChatReply>('ai_chat', { request });
+}
+
+/** 流式增量的推送数据体，与后端 commands/ai.rs 的 AiStreamDelta 对应。 */
+export interface AiStreamDelta {
+  streamId: string;
+  text: string;
+}
+
+/**
+ * 监听流式增量。返回取消监听的函数。
+ *
+ * 注意：调用方必须在结束（成功或失败）时取消监听 —— 否则一次对话会留下一个
+ * 永久监听器，下次对话的增量就会被累加两遍。
+ */
+export async function listenAiStream(
+  onDelta: (delta: AiStreamDelta) => void,
+): Promise<() => void> {
+  return listen<AiStreamDelta>('ai-stream-delta', (event) => onDelta(event.payload));
+}
+
+/**
+ * 流式对话：增量通过事件推送（用于边生成边显示），
+ * 命令返回时给出完整正文 —— 前端以返回值为准，事件只负责"实时感"。
+ */
+export async function aiChatStream(request: AiChatRequest, streamId: string): Promise<AiChatReply> {
+  return invoke<AiChatReply>('ai_chat_stream', { request, streamId });
 }

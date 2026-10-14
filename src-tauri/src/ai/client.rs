@@ -8,6 +8,7 @@
 
 use super::config::read_config;
 use super::presets::{find_preset, AiProtocol};
+use super::stream::StreamDecoder;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -15,6 +16,9 @@ use std::time::Duration;
 const CHAT_TIMEOUT_SECS: u64 = 60;
 /// 拉模型列表是轻量请求，超时收紧，避免设置页"测试连接"卡太久。
 const MODELS_TIMEOUT_SECS: u64 = 20;
+/// 流式对话的整段超时。reqwest 的 timeout 覆盖"直到响应体读完"，
+/// 用对话那 60 秒会把长回答从中间切断，所以流式单独放宽。
+const STREAM_TIMEOUT_SECS: u64 = 300;
 /// Anthropic 要求显式给 max_tokens，这里给一个够用的默认值。
 const ANTHROPIC_MAX_TOKENS: u32 = 2048;
 
@@ -298,6 +302,84 @@ pub async fn fetch_models() -> Result<Vec<String>, String> {
         return Err("连上了，但这个服务商没有返回模型列表，请在设置里手动填写模型名。".to_string());
     }
     Ok(ids)
+}
+
+/// 流式对话：每收到一段增量就调用一次 `on_delta`，最后返回完整正文。
+///
+/// 用 `reqwest::Response::chunk()` 增量读取 —— 它不需要额外依赖，也不要求开 feature
+/// （`bytes_stream()` 会引入 futures-util）。SSE 的拆包与协议差异交给 stream.rs。
+pub async fn chat_stream<F>(request: AiChatRequest, mut on_delta: F) -> Result<AiChatReply, String>
+where
+    F: FnMut(&str),
+{
+    let (protocol, base_url, api_key, model) = resolve_connection()?;
+    let model = request.model.clone().unwrap_or(model);
+    if model.trim().is_empty() {
+        return Err("还没有选择模型，请在设置里拉取模型列表后选择，或手动填写模型名。".to_string());
+    }
+
+    let client = http_client(STREAM_TIMEOUT_SECS)?;
+    // 复用非流式的请求构造，只把 stream 打开：两种协议的请求体本来就只有这一处差异，
+    // 没必要为了流式再抄一份构造函数（抄一份就多一处会忘记同步的地方）。
+    let mut body = match protocol {
+        AiProtocol::OpenAi => build_openai_body(&request, &model),
+        AiProtocol::Anthropic => build_anthropic_body(&request, &model),
+    };
+    body["stream"] = serde_json::json!(true);
+
+    let send = match protocol {
+        AiProtocol::OpenAi => {
+            client
+                .post(join_url(&base_url, "/chat/completions"))
+                .bearer_auth(&api_key)
+                .json(&body)
+                .send()
+                .await
+        }
+        AiProtocol::Anthropic => {
+            client
+                .post(join_url(&base_url, "/v1/messages"))
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", "2023-06-01")
+                .json(&body)
+                .send()
+                .await
+        }
+    };
+    let mut response = send.map_err(|error| format!("网络请求失败: {}", error))?;
+
+    let status = response.status().as_u16();
+    if !(200..300).contains(&status) {
+        let text = response.text().await.unwrap_or_default();
+        return Err(describe_http_error(status, &text));
+    }
+
+    // 边收边发：用户能立刻看到字出来，而不是等整段返回
+    let mut decoder = StreamDecoder::new(protocol);
+    let mut full = String::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|error| format!("读取流式响应失败: {}", error))?
+    {
+        let text = String::from_utf8_lossy(&chunk);
+        for delta in decoder.push(&text) {
+            full.push_str(&delta);
+            on_delta(&delta);
+        }
+        if decoder.finished {
+            break;
+        }
+    }
+    for delta in decoder.finish() {
+        full.push_str(&delta);
+        on_delta(&delta);
+    }
+
+    if full.trim().is_empty() {
+        return Err("服务端没有返回任何内容，请确认所选模型支持流式输出。".to_string());
+    }
+    Ok(AiChatReply { content: full, model })
 }
 
 // ---------------------------------------------------------------------------

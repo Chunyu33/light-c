@@ -170,6 +170,7 @@ pub fn run() {
             save_ai_config,
             test_ai_connection,
             ai_chat,
+            ai_chat_stream,
         ])
         .run(context)
         .expect("启动应用程序时发生错误");
