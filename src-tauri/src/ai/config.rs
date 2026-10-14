@@ -258,10 +258,10 @@ pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
             if created.id.trim().is_empty() {
                 created.id = format!("p_{}", now_seconds());
             }
-            // 第一份档案自动设为当前，否则用户点完保存却没有任何生效配置
-            if config.profiles.is_empty() || config.active_profile_id.trim().is_empty() {
-                config.active_profile_id = created.id.clone();
-            }
+            // ⚠️ 新建的档案**必须设为当前**。
+            // 否则：界面里的表单永远编辑"当前档案"，用户新建后填的密钥会被存进旧档案，
+            // 新档案永远是空的（这是实现时靠读流程发现的一个真 bug）。
+            config.active_profile_id = created.id.clone();
             config.profiles.push(created);
         }
     }
