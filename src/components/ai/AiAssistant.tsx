@@ -7,7 +7,7 @@
 // 会话状态（消息、发送中、错误）都在这一层，面板只负责展示与输入。
 // ============================================================================
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
@@ -16,6 +16,7 @@ import type { AiChatMessage } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { buildRequestMessages, getModuleDisplayName } from './aiContext';
 import { getModuleDataSummary } from './moduleDataRegistry';
+import { clearAiAsk, useAiAskRequest } from './aiAsk';
 
 /** 只保留最近若干轮对话：更早的内容交给后续版本的滚动摘要处理。 */
 const MAX_HISTORY_MESSAGES = 16;
@@ -75,6 +76,18 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const handleToggle = useCallback(() => {
     setIsOpen((previous) => !previous);
   }, []);
+
+  // 模块里的「咨询 AI 助手」按钮 → 打开面板并直接发送，用户不用再打一遍。
+  // 用 id 去重：同一个问题连点两次也要能触发两次，但又不能被重建的 handleSend 重复触发。
+  const askRequest = useAiAskRequest();
+  const lastAskIdRef = useRef(0);
+  useEffect(() => {
+    if (!askRequest || askRequest.id === lastAskIdRef.current) return;
+    lastAskIdRef.current = askRequest.id;
+    setIsOpen(true);
+    void handleSend(askRequest.text);
+    clearAiAsk();
+  }, [askRequest, handleSend]);
 
   return (
     /* AnimatePresence 负责"离场动画"：React 卸载节点时它会把 exit 播完再移除。

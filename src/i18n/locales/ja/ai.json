@@ -6,5 +6,8 @@
   "emptyHint": "現在のモジュールのデータや、フォルダを削除してよいか質問できます。アシスタントは会話で与えられた情報だけを根拠に答え、自分で削除は行いません。",
   "inputPlaceholder": "質問を入力…（Enter で送信、Shift+Enter で改行）",
   "send": "送信",
-  "thinking": "考え中…"
+  "thinking": "考え中…",
+  "askHint": "AI アシスタントに質問",
+  "resizeHint": "ドラッグでサイズ変更、ダブルクリックで既定に戻す",
+  "resizeHintCustom": "ドラッグでサイズ変更、ダブルクリックで既定に戻す"
 }

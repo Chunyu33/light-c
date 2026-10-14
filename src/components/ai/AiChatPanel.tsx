@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Eraser, Loader2, Minus, Send, Sparkles, User } from 'lucide-react';
 import type { AiChatMessage } from '../../types/ai';
 import { renderMarkdown } from './renderMarkdown';
+import { usePanelSize } from './usePanelSize';
 
 interface AiChatPanelProps {
   messages: AiChatMessage[];
@@ -52,6 +53,9 @@ export function AiChatPanel({
 
   const visibleMessages = messages.filter((message) => message.role !== 'system');
 
+  // 尺寸可拖拽调整并持久化；未调整时用 CSS 里的 em + 视口计算值
+  const { sizeStyle, hasCustomSize, startResize, resetSize } = usePanelSize();
+
   return (
     /* 尺寸全部用 em + vw/vh 计算，不写死像素：em 跟随全局字号设置缩放，
        上限再被视口夹住，窗口变小会自动收窄。
@@ -62,8 +66,21 @@ export function AiChatPanel({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.97 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      style={sizeStyle}
       className="ai-panel fixed right-5 bottom-5 z-40 flex w-[min(28em,calc(100vw_-_2.5em))] max-h-[min(38em,calc(100vh_-_8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg"
     >
+      {/* 左上角拖拽手柄：面板固定在右下角，所以「左上角」才是符合直觉的缩放角。
+          双击恢复默认尺寸（回到跟随字号与窗口的自适应状态）。 */}
+      <div
+        onPointerDown={startResize}
+        onDoubleClick={resetSize}
+        title={hasCustomSize ? t('resizeHintCustom') : t('resizeHint')}
+        className="absolute left-0 top-0 z-10 h-5 w-5 cursor-nwse-resize"
+      >
+        {/* 极简的缩放标记：两道短斜线，不抢视觉但能让人知道这里可以拖 */}
+        <div className="pointer-events-none absolute left-1 top-1 h-2.5 w-2.5 border-l border-t border-[var(--text-muted)] opacity-50" />
+      </div>
+
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]">

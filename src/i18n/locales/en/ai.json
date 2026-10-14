@@ -6,5 +6,8 @@
   "emptyHint": "Ask about the data in the current module, or whether a folder is safe to remove. The assistant answers from what it is told and never deletes anything on its own.",
   "inputPlaceholder": "Ask something… (Enter to send, Shift+Enter for a new line)",
   "send": "Send",
-  "thinking": "Thinking…"
+  "thinking": "Thinking…",
+  "askHint": "Ask the AI assistant",
+  "resizeHint": "Drag to resize, double-click to reset",
+  "resizeHintCustom": "Drag to resize, double-click to reset"
 }

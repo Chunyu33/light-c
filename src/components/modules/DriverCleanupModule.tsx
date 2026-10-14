@@ -27,6 +27,7 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 import { openSearchUrl } from '../../utils/searchEngine';
 import { formatSize } from '../../utils/format';
 import { useModuleDataSummary } from '../ai/moduleDataRegistry';
+import { AiAskButton } from '../ai/AiAskButton';
 
 function findScrollParent(element: HTMLElement): HTMLElement | null {
   let parent = element.parentElement;
@@ -590,6 +591,13 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             >
                               <Search className="h-3.5 w-3.5" />
                             </button>
+                            {/* 快捷提问：复用「一键搜索」的同一句话，直接问 AI ——
+                                不用打开浏览器，也不用把关键字再打一遍。
+                                其它模块以后按同样方式挂 AiAskButton 即可保持一致。 */}
+                            <AiAskButton
+                              question={getDriverSearchQuery(packageInfo)}
+                              className="inline-flex h-7 w-7 items-center justify-center"
+                            />
                             <button
                               type="button"
                               title={packageInfo.driver_store_path ? moduleT('driverUi.driverDirectory') : moduleT('driverUi.driverDirectoryUnavailable')}

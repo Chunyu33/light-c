@@ -6,5 +6,8 @@
   "emptyHint": "可以問我目前模組裡的資料是什麼、某個資料夾能不能刪。助手只依據對話裡的資訊回答，不會自己動手刪除任何東西。",
   "inputPlaceholder": "問點什麼…（Enter 送出，Shift+Enter 換行）",
   "send": "傳送",
-  "thinking": "正在思考…"
+  "thinking": "正在思考…",
+  "askHint": "諮詢 AI 助手",
+  "resizeHint": "拖曳調整大小，雙擊恢復預設",
+  "resizeHintCustom": "拖曳調整大小，雙擊恢復預設"
 }
