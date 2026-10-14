@@ -92,6 +92,8 @@ export async function aiChatStream(request: AiChatRequest, streamId: string): Pr
 export interface AiSessionMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** 附件文件名（存于 AI 数据目录的 attachments 下）。**只存名字，不存 base64** */
+  images?: string[];
   /** Unix 毫秒时间戳 */
   at: number;
 }
@@ -104,6 +106,19 @@ export interface AiSessionMessage {
 export function localDateKey(date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * 保存一张图片附件，返回文件名。
+ * 图片存成独立文件、会话里只记文件名 —— 否则 jsonl 会被 base64 撑爆。
+ */
+export async function saveAiAttachment(dataBase64: string, mediaType: string): Promise<string> {
+  return invoke<string>('save_ai_attachment', { dataBase64, mediaType });
+}
+
+/** 读回一张附件，返回可直接放进 <img src> 的 data URL；文件不在时返回空串。 */
+export async function readAiAttachment(name: string): Promise<string> {
+  return invoke<string>('read_ai_attachment', { name });
 }
 
 /** 追加一条会话消息到本地文件（{AI数据目录}/ai/sessions/{模块}/{日期}.jsonl）。 */

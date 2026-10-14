@@ -34,5 +34,6 @@
   "noModel": "No model selected",
   "attachImage": "Add an image (or paste a screenshot)",
   "attachRemove": "Remove this image",
-  "attachTooMany": "Up to {{count}} images at a time"
+  "attachTooMany": "Up to {{count}} images at a time",
+  "previewImage": "Click to enlarge"
 }

@@ -19,6 +19,8 @@ import {
   listAiProviders,
   loadAiSession,
   localDateKey,
+  readAiAttachment,
+  saveAiAttachment,
   saveAiProfile,
 } from '../../api/ai';
 import type { AiChatMessage, AiPublicConfig, AiToolCall } from '../../types/ai';
@@ -154,10 +156,23 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       try {
         const stored = await loadAiSession(moduleId, localDateKey());
         if (stored.length === 0) return;
-        setHistoryByModule((previous) => ({
-          ...previous,
-          [moduleId]: stored.map((item) => ({ role: item.role, content: item.content })),
-        }));
+        // 把附件文件名读回成 data URL：这样重开面板也能看到当时发的图，
+        // 而且这些图会一并进入后续请求的上下文（与编辑器的行为一致）。
+        const restored = await Promise.all(
+          stored.map(async (item) => {
+            const names = item.images ?? [];
+            if (names.length === 0) return { role: item.role, content: item.content };
+            const dataUrls = await Promise.all(names.map((name) => readAiAttachment(name)));
+            return {
+              role: item.role,
+              content: item.content,
+              images: dataUrls
+                .filter((url) => url.length > 0)
+                .map((url) => ({ mediaType: 'image/jpeg', dataBase64: url.split(',')[1] ?? '' })),
+            };
+          }),
+        );
+        setHistoryByModule((previous) => ({ ...previous, [moduleId]: restored }));
       } catch (error) {
         console.error('读取 AI 会话历史失败:', error);
       }
@@ -269,12 +284,28 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       // 写进 jsonl 会让文件迅速膨胀，重新加载时也毫无用处。
       const persistedText =
         images.length > 0 ? `${text}\n[已附加 ${images.length} 张图片]`.trim() : text;
-      pushMessage(moduleId, { role: 'user', content: persistedText });
-      void appendAiSessionMessage(moduleId, localDateKey(), {
+      // 界面上保留缩略图（用的是刚压好的 data URL），所以这一条带上图片
+      pushMessage(moduleId, {
         role: 'user',
         content: persistedText,
-        at: Date.now(),
-      }).catch((error) => console.error('写入 AI 会话历史失败:', error));
+        images: images.map((image) => ({ mediaType: image.mediaType, dataBase64: image.base64 })),
+      });
+      // 落盘：图片另存成文件，会话记录里只放文件名
+      void (async () => {
+        try {
+          const names = await Promise.all(
+            images.map((image) => saveAiAttachment(image.base64, image.mediaType)),
+          );
+          await appendAiSessionMessage(moduleId, localDateKey(), {
+            role: 'user',
+            content: persistedText,
+            images: names,
+            at: Date.now(),
+          });
+        } catch (error) {
+          console.error('写入 AI 会话历史失败:', error);
+        }
+      })();
 
       // 发给模型的这一条**带上图片**（图片只活在这一轮请求里，不进历史状态）
       const nextMessages: AiChatMessage[] = [

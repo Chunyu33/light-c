@@ -14,6 +14,7 @@
 //    对外只通过 commands/ai.rs 暴露命令。
 // ============================================================================
 
+mod attachment;
 mod client;
 mod config;
 mod presets;
@@ -23,6 +24,7 @@ mod tools;
 
 // 对外导出：只导出命令层与前端类型真正用得到的东西。
 // 注意 AiStoredConfig 含明文密钥，**只允许在 Rust 侧流转**，命令层不得把它返回给前端。
+pub use attachment::{read_attachment, save_attachment};
 pub use client::{chat_once, chat_stream, fetch_models, AiChatReply, AiChatRequest};
 pub use config::{
     cache_fetched_models, delete_profile, read_public_config, set_active_profile, set_data_dir,

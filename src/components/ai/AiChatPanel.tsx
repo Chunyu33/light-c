@@ -82,6 +82,8 @@ export function AiChatPanel({
   const [attachments, setAttachments] = useState<AttachedImage[]>([]);
   /** 附件相关的提示（压缩失败、超出张数等），显示在输入区左下角 */
   const [attachError, setAttachError] = useState('');
+  /** 正在放大预览的图片（data URL）；为空表示没有预览 */
+  const [previewUrl, setPreviewUrl] = useState('');
 
   /** 单条消息最多带几张：再多对模型没有帮助，只会让每轮请求越来越重。 */
   const MAX_ATTACHMENTS = 4;
@@ -148,17 +150,32 @@ export function AiChatPanel({
   const { sizeStyle, hasCustomSize, startResize, resetSize } = usePanelSize();
 
   return (
+    <>
+    {/* 放大预览。刻意放在面板**之外**：面板用了 framer-motion（带 transform），
+        一旦有 transform，内部 position:fixed 的元素会被它的 overflow-hidden 裁掉。 */}
+    {previewUrl ? (
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6"
+        onClick={() => setPreviewUrl('')}
+        role="button"
+        tabIndex={-1}
+      >
+        <img src={previewUrl} alt="" className="max-h-full max-w-full rounded-xl shadow-2xl" />
+      </div>
+    ) : null}
     /* 尺寸全部用 em + vw/vh 计算，不写死像素：em 跟随全局字号设置缩放，
        上限再被视口夹住，窗口变小会自动收窄。
        ⚠️ calc() 里的减号**必须带空格** —— 在 Tailwind 里写成下划线 `_-_`。
        写成 `calc(100vh-8em)` 是无效 CSS，整条属性会被浏览器丢掉（这个坑踩过）。 */
     <motion.div
+      /* 应用根节点设了 select-none（防止界面像网页一样被拖选），
+         但对话内容**必须能选中复制** —— 这里显式覆盖回来。 */
       initial={{ opacity: 0, y: 12, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.97 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       style={sizeStyle}
-      className="ai-panel fixed right-5 bottom-5 z-40 flex w-[min(28em,calc(100vw_-_2.5em))] max-h-[min(38em,calc(100vh_-_8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg"
+      className="ai-panel fixed right-5 bottom-5 z-40 flex w-[min(28em,calc(100vw_-_2.5em))] max-h-[min(38em,calc(100vh_-_8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg select-text"
     >
       {/* 左上角拖拽手柄：面板固定在右下角，所以「左上角」才是符合直觉的缩放角。
           双击恢复默认尺寸（回到跟随字号与窗口的自适应状态）。 */}
@@ -215,28 +232,56 @@ export function AiChatPanel({
             return (
               <div
                 key={index}
-                className={`group flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}
+                className={`group flex flex-col gap-0.5 ${isUser ? 'items-end' : 'items-start'}`}
               >
+                <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
+                  <div
+                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                      isUser
+                        ? 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
+                        : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
+                    }`}
+                  >
+                    {isUser ? <User className="h-3.5 w-3.5" /> : <AiMarkIcon className="h-3.5 w-3.5" />}
+                  </div>
+                  <div
+                    className={`max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
+                      isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {/* 用户发的图片：缩略图在上、文字在下，点击放大。
+                        这里显示的是随消息一起存下来的图，所以重开面板也还在。 */}
+                    {isUser && message.images && message.images.length > 0 ? (
+                      <div className="mb-1.5 flex flex-wrap gap-1.5">
+                        {message.images.map((image, imageIndex) => (
+                          <button
+                            key={imageIndex}
+                            type="button"
+                            onClick={() => setPreviewUrl(`data:${image.mediaType};base64,${image.dataBase64}`)}
+                            title={t('previewImage')}
+                            className="overflow-hidden rounded-lg ring-1 ring-inset ring-white/30"
+                          >
+                            <img
+                              src={`data:${image.mediaType};base64,${image.dataBase64}`}
+                              alt=""
+                              className="h-16 w-16 object-cover transition-transform hover:scale-105"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {/* 助手返回的是 Markdown，要渲染（走 React 节点，不用内联 HTML）；
+                        用户自己的输入按纯文本放，不解析 —— 免得手打的标记被吃掉。 */}
+                    {isUser ? message.content : renderMarkdown(message.content)}
+                  </div>
+                </div>
+                {/* 动作条放在**气泡下方**（悬停出现）：复制每条、重试仅对用户消息。
+                    放在上方会和头像挤在一起，也不符合这类界面的习惯。 */}
                 <div
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                    isUser
-                      ? 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
-                      : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
+                  className={`flex items-center gap-0.5 pl-8 pr-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                    isUser ? 'justify-end self-end' : ''
                   }`}
                 >
-                  {isUser ? <User className="h-3.5 w-3.5" /> : <AiMarkIcon className="h-3.5 w-3.5" />}
-                </div>
-                <div
-                  className={`max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
-                    isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--bg-card)] text-[var(--text-primary)]'
-                  }`}
-                >
-                  {/* 助手返回的是 Markdown，要渲染（走 React 节点，不用内联 HTML）；
-                      用户自己的输入按纯文本放，不解析 —— 免得手打的标记被吃掉。 */}
-                  {isUser ? message.content : renderMarkdown(message.content)}
-                </div>
-                {/* 悬停才出现的小动作条：复制每条、重试仅对用户消息（网络/接口出错时用） */}
-                <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
                     onClick={() => void handleCopy(message.content, index)}
@@ -439,5 +484,6 @@ export function AiChatPanel({
         </div>
       </div>
     </motion.div>
+    </>
   );
 }

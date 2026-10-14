@@ -34,5 +34,6 @@
   "noModel": "モデル未選択",
   "attachImage": "画像を追加（スクリーンショットの貼り付けも可）",
   "attachRemove": "この画像を外す",
-  "attachTooMany": "一度に最大 {{count}} 枚まで"
+  "attachTooMany": "一度に最大 {{count}} 枚まで",
+  "previewImage": "クリックで拡大"
 }

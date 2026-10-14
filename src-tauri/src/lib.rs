@@ -174,6 +174,8 @@ pub fn run() {
             test_ai_connection,
             ai_chat,
             ai_chat_stream,
+            save_ai_attachment,
+            read_ai_attachment,
             append_ai_session_message,
             load_ai_session,
             clear_ai_session,

@@ -80,6 +80,18 @@ pub struct AiStreamDelta {
     pub text: String,
 }
 
+/// 保存一张对话里的图片附件，返回文件名（前端把它写进会话记录）。
+#[tauri::command]
+pub fn save_ai_attachment(data_base64: String, media_type: String) -> Result<String, String> {
+    crate::ai::save_attachment(&data_base64, &media_type)
+}
+
+/// 读回一张附件，返回可直接放进 <img src> 的 data URL；文件不在时返回空串。
+#[tauri::command]
+pub fn read_ai_attachment(name: String) -> Result<String, String> {
+    crate::ai::read_attachment(&name)
+}
+
 /// 追加一条会话消息。
 /// 模块 id 与日期由前端给出（后端不为此引入日期库），语义与安全校验在 ai::session 里。
 #[tauri::command]

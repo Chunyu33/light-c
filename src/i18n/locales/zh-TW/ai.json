@@ -34,5 +34,6 @@
   "noModel": "未選擇模型",
   "attachImage": "新增圖片（也可直接貼上截圖）",
   "attachRemove": "移除這張圖",
-  "attachTooMany": "最多一次帶 {{count}} 張圖片"
+  "attachTooMany": "最多一次帶 {{count}} 張圖片",
+  "previewImage": "點擊放大檢視"
 }

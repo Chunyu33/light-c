@@ -26,6 +26,10 @@ pub struct AiSessionMessage {
     /// 只允许 user / assistant；system 提示是每次现取的，不落盘
     pub role: String,
     pub content: String,
+    /// 附件文件名（存在 attachments 目录下）。
+    /// **只存文件名，不存 base64** —— 否则会话文件会被图片撑爆。
+    #[serde(default)]
+    pub images: Vec<String>,
     /// Unix 毫秒时间戳，便于按时间排序与展示
     pub at: i64,
 }

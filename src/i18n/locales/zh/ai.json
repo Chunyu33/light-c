@@ -34,5 +34,6 @@
   "noModel": "未选择模型",
   "attachImage": "添加图片（也可直接粘贴截图）",
   "attachRemove": "移除这张图",
-  "attachTooMany": "最多一次带 {{count}} 张图片"
+  "attachTooMany": "最多一次带 {{count}} 张图片",
+  "previewImage": "点击放大查看"
 }
