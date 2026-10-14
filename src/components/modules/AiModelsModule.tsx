@@ -1,4 +1,6 @@
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
+import { AiAskButton } from '../ai/AiAskButton';
+import { buildItemQuestion } from '../ai/aiQuestions';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
@@ -860,6 +862,11 @@ function ModelTable({
               <div className="flex shrink-0 items-center gap-1">
                 <IconButton title={moduleT('aiModels.openFolder')} onClick={() => onOpenPath(model.path)} icon={<FolderOpen className="w-4 h-4" />} />
                 <IconButton title={moduleT('aiModels.searchModel')} onClick={() => onSearchModel(model.name)} icon={<Search className="w-4 h-4" />} />
+                {/* 快捷提问：模型文件单独一套问法，用户真正关心的是"占这么大正常吗" */}
+                <AiAskButton
+                  question={buildItemQuestion(model.name, 'model')}
+                  className="inline-flex h-7 w-7 items-center justify-center"
+                />
                 <IconButton
                   title={moduleT('aiModels.deleteModel')}
                   onClick={() => onDeleteModel(model)}

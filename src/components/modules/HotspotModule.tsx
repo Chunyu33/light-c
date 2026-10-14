@@ -1,4 +1,6 @@
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
+import { AiAskButton } from '../ai/AiAskButton';
+import { buildItemQuestion } from '../ai/aiQuestions';
 // ============================================================================
 // 大目录分析模块
 // 深度分析 AppData 目录，定位占用空间的元凶
@@ -423,6 +425,11 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             >
               <Search className="w-4 h-4" />
             </button>
+            {/* 快捷提问：与大目录分析里的搜索按钮同级，行为保持一致 */}
+            <AiAskButton
+              question={buildItemQuestion(entry.path, 'folder')}
+              className="inline-flex h-7 w-7 items-center justify-center"
+            />
             
             {/* 打开文件夹按钮 */}
             <button

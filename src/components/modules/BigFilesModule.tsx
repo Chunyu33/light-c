@@ -1,4 +1,6 @@
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
+import { AiAskButton } from '../ai/AiAskButton';
+import { buildItemQuestion } from '../ai/aiQuestions';
 // ============================================================================
 // 大文件清理模块组件
 // 在仪表盘中展示大文件扫描和清理功能
@@ -630,6 +632,12 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                       >
                         <Search className="w-4 h-4" />
                       </button>
+                      {/* 快捷提问：问的是"这个文件是什么、能不能删"，
+                          所以用完整问句而不是搜索引擎关键字（见 aiQuestions 的说明）。 */}
+                      <AiAskButton
+                        question={buildItemQuestion(file.path, 'file')}
+                        className="inline-flex h-7 w-7 items-center justify-center"
+                      />
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

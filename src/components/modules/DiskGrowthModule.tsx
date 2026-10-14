@@ -1,4 +1,6 @@
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
+import { AiAskButton } from '../ai/AiAskButton';
+import { buildItemQuestion } from '../ai/aiQuestions';
 // ============================================================================
 // 多盘全盘变化分析模块
 //
@@ -444,6 +446,11 @@ function ChangeRow({
         >
           <Search className="w-4 h-4" />
         </button>
+        {/* 快捷提问：变大的目录只是"变化"，不等于可删，问句里说清是问用途 */}
+        <AiAskButton
+          question={buildItemQuestion(entry.path, 'folder')}
+          className="inline-flex h-7 w-7 items-center justify-center"
+        />
         <button
           onClick={() => onOpenFolder(entry.path)}
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition"
