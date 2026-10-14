@@ -179,6 +179,30 @@ function getDriverSearchQuery(packageInfo: DriverPackageInfo): string {
   return [packageInfo.provider_name, driverName, version, 'driver'].filter(Boolean).join(' ');
 }
 
+/**
+ * 给 AI 助手的问题。
+ *
+ * 与 getDriverSearchQuery 的区别很关键：那个拼的是**给搜索引擎的关键字**
+ * （`Microsoft oem7 10.0.26100.1882 driver`），用空格堆词；直接把这种关键字丢给 AI，
+ * 它结合「旧驱动清理」的上下文会读成"处理一下这个驱动"，于是开始提删除 ——
+ * 用户点快捷提问明明是想**了解这个驱动**。
+ *
+ * 所以这里用完整问句把意图说清楚，但字段仍然取自同一份数据，不另维护一套。
+ */
+function getDriverAiQuestion(packageInfo: DriverPackageInfo): string {
+  const driverName = packageInfo.original_name
+    .replace(/\.inf$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  const version = packageInfo.driver_version.match(/\d+(?:\.\d+){1,}/)?.[0] ?? '';
+  return [
+    `驱动「${driverName}」`,
+    packageInfo.provider_name ? `（厂商 ${packageInfo.provider_name}）` : '',
+    version ? `（版本 ${version}）` : '',
+    '是什么、有什么用？可以安全删除吗，删除后可能有什么影响？',
+  ].join('');
+}
+
 export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
@@ -592,11 +616,11 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             >
                               <Search className="h-3.5 w-3.5" />
                             </button>
-                            {/* 快捷提问：复用「一键搜索」的同一句话，直接问 AI ——
-                                不用打开浏览器，也不用把关键字再打一遍。
-                                其它模块以后按同样方式挂 AiAskButton 即可保持一致。 */}
+                            {/* 快捷提问：点它是**了解这个驱动**，不是要求操作 ——
+                                所以用完整问句（见 getDriverAiQuestion），
+                                而不是把搜索引擎的关键字原样丢过去。 */}
                             <AiAskButton
-                              question={getDriverSearchQuery(packageInfo)}
+                              question={getDriverAiQuestion(packageInfo)}
                               className="inline-flex h-7 w-7 items-center justify-center"
                             />
                             <button
