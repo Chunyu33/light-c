@@ -13,5 +13,18 @@
   "tool": {
     "selectNotFound": "指定された項目は見つかりませんでした。データが変わった可能性があるため、再スキャンしてください。",
     "selected": "ご指定の {{count}} 件を選択しました：{{names}}。確認後、画面から削除できます。"
+  },
+  "delete": {
+    "title": "AI が以下を削除しようとしています",
+    "total": "合計 {{count}} 件",
+    "warning": "削除前に自動でバックアップします。「復元不可」の項目は元に戻せません。",
+    "irreversible": "復元不可",
+    "confirm": "削除する",
+    "cancel": "キャンセル",
+    "doneWithSize": "{{count}} 件を削除し、{{size}} を解放しました",
+    "doneCount": "{{count}} 件を削除しました",
+    "failedCount": "{{count}} 件失敗",
+    "details": "詳細",
+    "needsReboot": "一部はエクスプローラーの再起動後に反映されます。"
   }
 }

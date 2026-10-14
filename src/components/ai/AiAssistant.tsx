@@ -10,13 +10,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
 import { aiChat, aiChatStream, appendAiSessionMessage, clearAiSession, listenAiStream, loadAiSession, localDateKey } from '../../api/ai';
 import type { AiChatMessage, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
+import { AiMarkIcon } from './AiMarkIcon';
 import { buildRequestMessages, getModuleDisplayName } from './aiContext';
 import { getModuleDataSummary } from './moduleDataRegistry';
 import { getModuleActions } from './moduleActionRegistry';
+import type { AiDeleteOutcome, AiDeleteTargetSummary } from './moduleActionRegistry';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
 
 /** 只保留最近若干轮对话：更早的内容交给后续版本的滚动摘要处理。 */
@@ -82,6 +83,41 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   }, [activeModuleId]);
 
   /**
+   * 待确认的删除提案。**它不是历史消息**：卡片带回调、不可序列化，
+   * 所以只作为临时状态展示在消息列表末尾，确认或取消后即消失。
+   */
+  const [pendingDelete, setPendingDelete] = useState<{
+    moduleId: string;
+    ids: string[];
+    items: AiDeleteTargetSummary[];
+  } | null>(null);
+  /** 最近一次删除结果，同样只在本次会话里展示 */
+  const [deleteResult, setDeleteResult] = useState<AiDeleteOutcome | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  /** 用户点了「确认删除」：这时才真正调用模块的删除入口。 */
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    const { moduleId, ids } = pendingDelete;
+    const actions = getModuleActions(moduleId);
+    if (!actions?.deleteItems) {
+      setPendingDelete(null);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const outcome = await actions.deleteItems(ids);
+      setDeleteResult(outcome);
+    } catch (error) {
+      // 失败也要给用户一个明确交代，而不是卡片消失、什么都没发生
+      setDeleteResult({ deletedCount: 0, failures: [{ name: '', reason: String(error) }] });
+    } finally {
+      setIsDeleting(false);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete]);
+
+  /**
    * 执行模型请求的工具调用，把结果作为一条**本地消息**写进对话。
    *
    * 结果文案由这里生成、不交给模型转述 —— 做了什么、影响了几项，
@@ -91,9 +127,6 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     (moduleId: string, calls: AiToolCall[]) => {
       const actions = getModuleActions(moduleId);
       for (const call of calls) {
-        // 其它工具（例如删除提案）留给后续版本，这里不静默执行
-        if (call.name !== 'select_items') continue;
-
         const rawIds = (call.arguments as { ids?: unknown }).ids;
         const ids = Array.isArray(rawIds)
           ? rawIds.filter((id): id is string => typeof id === 'string')
@@ -102,19 +135,36 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         // 一律拿 id 反查模块当前数据：提案到执行之间用户可能又改过勾选、模块可能重扫过，
         // 解析不到的项直接剔除，绝不照着旧 id 硬执行。
         const resolved = actions?.resolveTargets?.(ids) ?? [];
-        if (resolved.length === 0) {
-          pushMessage(moduleId, { role: 'assistant', content: t('tool.selectNotFound') });
+
+        if (call.name === 'select_items') {
+          if (resolved.length === 0) {
+            pushMessage(moduleId, { role: 'assistant', content: t('tool.selectNotFound') });
+            continue;
+          }
+          actions?.selectItems?.(resolved.map((target) => target.id));
+          pushMessage(moduleId, {
+            role: 'assistant',
+            content: t('tool.selected', {
+              count: resolved.length,
+              names: resolved.map((target) => target.label).join('、'),
+            }),
+          });
           continue;
         }
 
-        actions?.selectItems?.(resolved.map((target) => target.id));
-        pushMessage(moduleId, {
-          role: 'assistant',
-          content: t('tool.selected', {
-            count: resolved.length,
-            names: resolved.map((target) => target.label).join('、'),
-          }),
-        });
+        if (call.name === 'propose_delete') {
+          if (resolved.length === 0) {
+            pushMessage(moduleId, { role: 'assistant', content: t('tool.selectNotFound') });
+            continue;
+          }
+          // **不执行**，只弹出确认卡片 —— AI 只能提案，执行权在用户手里
+          setDeleteResult(null);
+          setPendingDelete({
+            moduleId,
+            ids: resolved.map((target) => target.id),
+            items: resolved,
+          });
+        }
       }
     },
     [pushMessage, t],
@@ -234,6 +284,11 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           key="panel"
           messages={currentHistory}
           streamingText={streamingText}
+          pendingDelete={pendingDelete?.items ?? null}
+          deleteResult={deleteResult}
+          isDeleting={isDeleting}
+          onConfirmDelete={() => void handleConfirmDelete()}
+          onCancelDelete={() => setPendingDelete(null)}
           isSending={isSending}
           errorMessage={errorMessage}
           moduleName={moduleName}
@@ -258,7 +313,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           /* 位置刻意压在「回到顶部」按钮上方：两者都在右下角，不这样会叠在一起。 */
           className="glass-item fixed right-5 bottom-[4.75rem] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--brand-green)] shadow-lg"
         >
-          <Sparkles className="h-5 w-5" />
+          <AiMarkIcon className="h-5 w-5" />
         </motion.button>
       )}
     </AnimatePresence>

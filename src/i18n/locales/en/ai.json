@@ -13,5 +13,18 @@
   "tool": {
     "selectNotFound": "Those items are no longer there. The data may have changed; please scan again.",
     "selected": "Selected {{count}} for you: {{names}}. Delete them from the page when you are ready."
+  },
+  "delete": {
+    "title": "The assistant asks to delete:",
+    "total": "{{count}} categories in total",
+    "warning": "A backup is taken first; items marked as irreversible cannot be recovered.",
+    "irreversible": "irreversible",
+    "confirm": "Delete",
+    "cancel": "Cancel",
+    "doneWithSize": "Deleted {{count}}, freed {{size}}",
+    "doneCount": "Deleted {{count}}",
+    "failedCount": "{{count}} failed",
+    "details": "Details",
+    "needsReboot": "Some changes need Explorer to restart before they take effect."
   }
 }

@@ -9,15 +9,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { AlertCircle, Eraser, Loader2, Minus, Send, Sparkles, User } from 'lucide-react';
+import { AlertCircle, Eraser, Loader2, Minus, Send, User } from 'lucide-react';
 import type { AiChatMessage } from '../../types/ai';
+import { AiDeleteRequestCard, type AiDeleteRequestItem } from './AiDeleteRequestCard';
+import { AiDeleteResultCard } from './AiDeleteResultCard';
+import { AiMarkIcon } from './AiMarkIcon';
+import type { AiDeleteOutcome } from './moduleActionRegistry';
 import { renderMarkdown } from './renderMarkdown';
 import { usePanelSize } from './usePanelSize';
+import { formatSize } from '../../utils/format';
 
 interface AiChatPanelProps {
   messages: AiChatMessage[];
   /** 正在流式生成的内容；为空表示这一轮还没开始出字 */
   streamingText: string;
+  /** 待确认的删除提案；非空时在消息列表下方显示确认卡片 */
+  pendingDelete: AiDeleteRequestItem[] | null;
+  /** 最近一次删除结果 */
+  deleteResult: AiDeleteOutcome | null;
+  /** 删除执行中：两个按钮都会禁用并转圈 */
+  isDeleting: boolean;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
   isSending: boolean;
   errorMessage: string;
   /** 当前模块显示名，只用于标题，让用户知道在跟"哪个模块的助手"说话 */
@@ -30,6 +43,11 @@ interface AiChatPanelProps {
 export function AiChatPanel({
   messages,
   streamingText,
+  pendingDelete,
+  deleteResult,
+  isDeleting,
+  onConfirmDelete,
+  onCancelDelete,
   isSending,
   errorMessage,
   moduleName,
@@ -85,7 +103,7 @@ export function AiChatPanel({
       </div>
 
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
-        <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
+        <AiMarkIcon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]">
           {t('panelTitle')}
           {moduleName ? <span className="text-[var(--text-muted)]"> · {moduleName}</span> : null}
@@ -127,7 +145,7 @@ export function AiChatPanel({
                       : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
                   }`}
                 >
-                  {isUser ? <User className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {isUser ? <User className="h-3.5 w-3.5" /> : <AiMarkIcon className="h-3.5 w-3.5" />}
                 </div>
                 <div
                   className={`max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
@@ -147,7 +165,7 @@ export function AiChatPanel({
         {streamingText ? (
           <div className="flex items-start gap-2">
             <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--brand-green-10)] text-[var(--brand-green)]">
-              <Sparkles className="h-3.5 w-3.5" />
+              <AiMarkIcon className="h-3.5 w-3.5" />
             </div>
             <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--bg-card)] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--text-primary)]">
               {renderMarkdown(streamingText)}
@@ -162,6 +180,48 @@ export function AiChatPanel({
           </div>
         ) : null}
       </div>
+
+      {/* 删除提案：**不执行、只确认**。AI 只能提案，执行权在用户手里。 */}
+      {pendingDelete && pendingDelete.length > 0 ? (
+        <div className="shrink-0 px-3 pb-2">
+          <AiDeleteRequestCard
+            title={t('delete.title')}
+            items={pendingDelete}
+            totalLabel={t('delete.total', { count: pendingDelete.length })}
+            warning={t('delete.warning')}
+            irreversibleLabel={t('delete.irreversible')}
+            confirmLabel={t('delete.confirm')}
+            cancelLabel={t('delete.cancel')}
+            busy={isDeleting}
+            onConfirm={onConfirmDelete}
+            onCancel={onCancelDelete}
+          />
+        </div>
+      ) : null}
+
+      {/* 删除结果：数字全部来自后端返回，不由模型转述 */}
+      {deleteResult ? (
+        <div className="shrink-0 px-3 pb-2">
+          <AiDeleteResultCard
+            successLabel={
+              deleteResult.freedBytes
+                ? t('delete.doneWithSize', {
+                    count: deleteResult.deletedCount,
+                    size: formatSize(deleteResult.freedBytes),
+                  })
+                : t('delete.doneCount', { count: deleteResult.deletedCount })
+            }
+            failedLabel={
+              deleteResult.failures.length > 0
+                ? t('delete.failedCount', { count: deleteResult.failures.length })
+                : undefined
+            }
+            failures={deleteResult.failures}
+            detailsLabel={t('delete.details')}
+            rebootNotice={deleteResult.needsReboot ? t('delete.needsReboot') : undefined}
+          />
+        </div>
+      ) : null}
 
       {errorMessage ? (
         <div className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-2 text-[11px] text-[var(--color-danger)]">

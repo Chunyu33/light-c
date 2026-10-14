@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { useTranslation } from 'react-i18next';
-import { Sparkles } from 'lucide-react';
+import { AiMarkIcon } from './AiMarkIcon';
 import { requestAiAsk } from './aiAsk';
 
 interface AiAskButtonProps {
@@ -32,7 +32,7 @@ export function AiAskButton({ question, className = '' }: AiAskButtonProps) {
       aria-label={t('askHint')}
       className={`rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] ${className}`}
     >
-      <Sparkles className="h-3.5 w-3.5" />
+      <AiMarkIcon className="h-3.5 w-3.5" />
     </button>
   );
 }

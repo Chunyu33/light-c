@@ -208,6 +208,43 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         toggleCategorySelection(category.display_name, category.files, true);
       }
     },
+    // P3b：AI 提案 + 用户确认之后才会走到这里。
+    // **复用 handleDelete**（不另写删除逻辑），并显式把目标路径传进去 ——
+    // 刚写进 state 的勾选在同一个 tick 里读不到。
+    onDelete: async (ids) => {
+      const result = deepScanResult ?? scanResult;
+      if (!result) {
+        return { deletedCount: 0, failures: [{ name: '', reason: '当前没有扫描结果' }] };
+      }
+
+      const paths: string[] = [];
+      for (const id of ids) {
+        const category = result.categories.find((item) => item.category === id);
+        if (!category) continue;
+        category.files.forEach((file) => paths.push(file.path));
+      }
+      if (paths.length === 0) {
+        return { deletedCount: 0, failures: [{ name: '', reason: '目标已不存在，请重新扫描' }] };
+      }
+
+      const outcome = await handleDelete(paths, ids);
+      if (!outcome) {
+        return { deletedCount: 0, failures: [{ name: '', reason: '删除未执行或失败，详情见界面提示' }] };
+      }
+      return {
+        deletedCount: outcome.success_count,
+        freedBytes: outcome.freed_physical_size,
+        needsReboot: outcome.reboot_pending_count > 0,
+        // 失败明细只取前若干条：卡片是可展开列表，几百条没必要全塞
+        failures: outcome.file_results
+          .filter((file) => !file.success)
+          .slice(0, 20)
+          .map((file) => ({
+            name: file.path,
+            reason: file.failure_reason ? JSON.stringify(file.failure_reason) : '未知原因',
+          })),
+      };
+    },
   });
   const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);
   const scanningRef = useRef(false);
@@ -399,9 +436,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     }
   }, [oneClickScanTrigger, handleScan]);
 
-  // 执行删除
-  const handleDelete = useCallback(async () => {
-    if (selectedPaths.size === 0 && selectedCategoryNames.size === 0) return;
+  // 执行删除。
+  // overridePaths / overrideCategoryNames 是给「AI 助手代删」用的：
+  // 它刚把勾选写进 state，同一 tick 里读不到新值，所以显式把目标传进来。
+  // 不传时行为与以前完全一致。
+  const handleDelete = useCallback(async (overridePaths?: string[], overrideCategoryNames?: string[]) => {
+    const targetPaths = overridePaths ?? Array.from(selectedPaths);
+    const targetCategoryNames = overrideCategoryNames ?? Array.from(selectedCategoryNames);
+    if (targetPaths.length === 0 && targetCategoryNames.length === 0) return;
 
     // 与 handleScan 共用同一个"忙"标记：删除期间点「重新扫描」或切「深度发现」都会
     // 清空 scanResult，把正在进行中的删除的界面上下文拆掉（handleScan 那里的注释也提到了这点）。
@@ -421,11 +463,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     });
     setIsDeleting(true);
     try {
-      const paths = Array.from(selectedPaths);
+      const paths = targetPaths;
       const result = scanMode === 'deep'
         ? await deleteDeepJunkFiles(paths, {
           scanId: deepScanResult?.scan_id,
-          categoryNames: fullySelectedDeepCategoryNames,
+          // 正常路径用"整类被勾选的分类"；AI 代删时用显式传进来的目标分类
+          categoryNames: overrideCategoryNames ?? fullySelectedDeepCategoryNames,
           excludedPaths: excludedDeepPaths,
         })
         : await enhancedDeleteFiles(paths);
@@ -462,6 +505,10 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       updateModuleState('junk', { status: 'done', fileCount: 0, totalSize: 0, error: null });
       triggerHealthRefresh();
 
+      // 把结果返回出去：AI 代删时要用它生成"删了多少、失败几项"的结果卡片 ——
+      // 这些数字必须来自后端返回，不能由模型转述。
+      return result;
+
       if (result.success_count > 0) {
         // 后端 summary_message 固定为中文，因此使用结构化结果在前端生成当前语言的摘要。
         const releasedText = result.freed_physical_size > 0
@@ -493,11 +540,13 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         }
       } else if (result.failed_count > 0 || result.reboot_pending_count > 0) {
         const firstFailure = result.file_results.find((f) => !f.success && !f.marked_for_reboot);
+        // 先取路径再看有没有：直接写 firstFailure.path 在联合类型下会被判为可能 undefined
+        const blockedPath = firstFailure?.path;
         showToast({
           type: 'warning',
           title: t('toast.cleanBlocked'),
-          description: firstFailure
-            ? t('toast.cleanBlockedDesc', { path: firstFailure.path })
+          description: blockedPath
+            ? t('toast.cleanBlockedDesc', { path: blockedPath })
             : t('toast.cleanBlockedReboot'),
         });
       } else {

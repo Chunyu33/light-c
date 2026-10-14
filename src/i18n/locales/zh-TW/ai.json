@@ -13,5 +13,18 @@
   "tool": {
     "selectNotFound": "找不到你說的這些項目，資料可能已經變動，請重新掃描後再試。",
     "selected": "已依你的要求勾選 {{count}} 項：{{names}}。確認無誤後可以在介面上執行刪除。"
+  },
+  "delete": {
+    "title": "AI 請求刪除以下內容",
+    "total": "共 {{count}} 個分類",
+    "warning": "刪除前會自動備份；標示為不可復原的項目清空後無法找回。",
+    "irreversible": "不可復原",
+    "confirm": "確認刪除",
+    "cancel": "取消",
+    "doneWithSize": "已刪除 {{count}} 項，釋放 {{size}}",
+    "doneCount": "已刪除 {{count}} 項",
+    "failedCount": "{{count}} 項失敗",
+    "details": "查看詳情",
+    "needsReboot": "部分內容需要重啟資源管理器後才會生效。"
   }
 }

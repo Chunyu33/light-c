@@ -13,5 +13,18 @@
   "tool": {
     "selectNotFound": "没有找到你说的这些项，数据可能已经变化，请重新扫描后再试。",
     "selected": "已按你的要求勾选 {{count}} 项：{{names}}。确认无误后可以在界面上执行删除。"
+  },
+  "delete": {
+    "title": "AI 请求删除以下内容",
+    "total": "共 {{count}} 个分类",
+    "warning": "删除前会自动备份；标注为不可恢复的项清空后无法找回。",
+    "irreversible": "不可恢复",
+    "confirm": "确认删除",
+    "cancel": "取消",
+    "doneWithSize": "已删除 {{count}} 项，释放 {{size}}",
+    "doneCount": "已删除 {{count}} 项",
+    "failedCount": "{{count}} 项失败",
+    "details": "查看详情",
+    "needsReboot": "部分内容需要重启资源管理器后才会生效。"
   }
 }
