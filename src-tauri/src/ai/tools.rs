@@ -36,7 +36,9 @@ pub const TOOL_PROPOSE_DELETE: &str = "propose_delete";
 fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
     match name {
         TOOL_SELECT_ITEMS => Some((
-            "把指定的项加入勾选。只改变勾选状态，不会删除任何东西；删除仍由用户在界面上确认。",
+            "把指定的项加入勾选。只改变勾选状态，不会删除任何东西；删除仍由用户在界面上确认。\
+             ⚠️ 只在用户**明确要求**勾选（例如\"帮我勾上可安全删除的\"）时调用；\
+             用户只是在问\"这是什么、能不能删\"时**不要调用**，先回答他的问题。",
             serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -50,7 +52,10 @@ fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
             }),
         )),
         TOOL_PROPOSE_DELETE => Some((
-            "申请删除指定的项。这不会立即删除：界面会弹出确认，由用户决定是否执行。",
+            "申请删除指定的项。这不会立即删除：界面会弹出确认，由用户决定是否执行。\
+             ⚠️ 只在用户**明确要求删除**（例如\"帮我删掉回收站\"）时调用。\
+             用户问\"这是什么、有什么用、能不能删\"属于**询问**，不是删除指令 —— \
+             那种情况只回答，不要调用本工具。",
             serde_json::json!({
                 "type": "object",
                 "properties": {
