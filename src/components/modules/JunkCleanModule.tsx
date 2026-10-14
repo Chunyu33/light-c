@@ -49,6 +49,7 @@ import type {
   ScanResult,
 } from '../../types';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import { useModuleDataSummary } from '../ai/moduleDataRegistry';
 
 const DEEP_SCAN_STORAGE_KEY = 'lightc.junkClean.deepScan';
 
@@ -159,6 +160,25 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [deepScanResult, setDeepScanResult] = useState<DeepJunkScanResult | null>(null);
   const [scanProgress, setScanProgress] = useState<DeepJunkScanProgress | null>(null);
   const [scanMode, setScanMode] = useState<'quick' | 'deep' | null>(null);
+
+  // 给 AI 助手提供"当前模块在展示什么"的摘要。
+  // 只给统计与分类，**不给文件级明细** —— 一次扫描能有几千个文件，全量塞进 prompt 会直接撑爆上下文。
+  useModuleDataSummary('junk-clean', () => {
+    const result = deepScanResult ?? scanResult;
+    if (!result) return null;
+    const lines = [
+      `扫描结果：共 ${result.total_file_count} 个文件，合计 ${formatSize(result.total_size)}。`,
+      `用户已勾选 ${selectedCategoryNames.size} 个分类、${selectedPaths.size} 个文件。`,
+      '分类明细（名称：大小 / 文件数 / 勾选状态 / 这类文件的含义）：',
+    ];
+    for (const category of result.categories) {
+      const selected = selectedCategoryNames.has(category.display_name) ? '已勾选' : '未勾选';
+      lines.push(
+        `- ${category.display_name}：${formatSize(category.total_size)} / ${category.file_count} 个文件 / ${selected} / ${category.description}`,
+      );
+    }
+    return lines.join('\n');
+  });
   const [loadingDeepCategory, setLoadingDeepCategory] = useState<string | null>(null);
   const scanningRef = useRef(false);
   const cancelRequestedRef = useRef(false);

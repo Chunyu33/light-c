@@ -7,13 +7,14 @@
 // 会话状态（消息、发送中、错误）都在这一层，面板只负责展示与输入。
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles } from 'lucide-react';
 import { aiChat } from '../../api/ai';
 import type { AiChatMessage } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
-import { buildInitialMessages, getModuleDisplayName, withRefreshedSystemPrompt } from './aiContext';
+import { buildRequestMessages, getModuleDisplayName } from './aiContext';
+import { getModuleDataSummary } from './moduleDataRegistry';
 
 /** 只保留最近若干轮对话：更早的内容交给后续版本的滚动摘要处理。 */
 const MAX_HISTORY_MESSAGES = 16;
@@ -26,7 +27,9 @@ interface AiAssistantProps {
 export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const { t } = useTranslation('ai');
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<AiChatMessage[]>(() => buildInitialMessages(activeModuleId));
+  // 历史里**只放 user/assistant**：system 提示依赖"当前模块 + 当前数据"，
+  // 每次发送现取（见 handleSend），存进历史必然过期。
+  const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -34,14 +37,6 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const sendingRef = useRef(false);
 
   const moduleName = useMemo(() => getModuleDisplayName(activeModuleId), [activeModuleId]);
-
-  /**
-   * 切换模块时只刷新 system 消息、保留历史 ——
-   * 用户在同一轮对话里换模块不该丢掉上下文，但助手要知道当前位置变了。
-   */
-  useEffect(() => {
-    setMessages((previous) => withRefreshedSystemPrompt(previous, activeModuleId));
-  }, [activeModuleId]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -54,9 +49,11 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       setMessages(nextMessages);
 
       try {
-        // 请求体只带"要说什么"，模型、密钥、地址全部由后端从配置里取 ——
-        // 前端拿不到密钥，也就无从泄露。
-        const reply = await aiChat({ messages: trimHistory(nextMessages) });
+        // 每次发送现取"当前模块的数据摘要"，和请求一起交给后端 ——
+        // 用户可能刚扫完或刚勾选，缓存一秒都会让助手答错。
+        const dataSummary = getModuleDataSummary(activeModuleId);
+        const request = buildRequestMessages(nextMessages, activeModuleId, dataSummary);
+        const reply = await aiChat({ messages: trimHistory(request) });
         setMessages((previous) => [...previous, { role: 'assistant', content: reply.content }]);
       } catch (error) {
         // 失败时保留用户输入在历史里，方便直接重试；错误单独展示，不混进对话正文。
@@ -66,13 +63,13 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         setIsSending(false);
       }
     },
-    [messages],
+    [messages, activeModuleId],
   );
 
   const handleClear = useCallback(() => {
-    setMessages(buildInitialMessages(activeModuleId));
+    setMessages([]);
     setErrorMessage('');
-  }, [activeModuleId]);
+  }, []);
 
   const handleToggle = useCallback(() => {
     setIsOpen((previous) => !previous);

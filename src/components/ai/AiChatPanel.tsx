@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, Eraser, Loader2, Minus, Send, Sparkles } from 'lucide-react';
+import { AlertCircle, Eraser, Loader2, Minus, Send, Sparkles, User } from 'lucide-react';
 import type { AiChatMessage } from '../../types/ai';
 
 interface AiChatPanelProps {
@@ -51,7 +51,10 @@ export function AiChatPanel({
   const visibleMessages = messages.filter((message) => message.role !== 'system');
 
   return (
-    <div className="ai-panel fixed right-5 bottom-5 z-40 flex w-[24em] max-w-[calc(100vw-2.5em)] max-h-[min(32em,calc(100vh-8em))] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg">
+    /* 尺寸全部用 em + vw/vh 计算，不写死像素：
+       - em 跟随全局字号设置一起缩放；
+       - 上限再被视口夹住，窗口变小会自动收窄，不会顶出屏幕。 */
+    <div className="ai-panel fixed right-5 bottom-5 z-40 flex w-[28em] max-w-[calc(100vw-2.5em)] max-h-[min(38em,calc(100vh-8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg">
       <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]">
@@ -82,22 +85,31 @@ export function AiChatPanel({
         {visibleMessages.length === 0 ? (
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('emptyHint')}</p>
         ) : (
-          visibleMessages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
-                  message.role === 'user'
-                    ? 'bg-[var(--brand-green)] text-white'
-                    : 'bg-[var(--bg-card)] text-[var(--text-primary)]'
-                }`}
-              >
-                {message.content}
+          visibleMessages.map((message, index) => {
+            const isUser = message.role === 'user';
+            return (
+              <div key={index} className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
+                {/* 默认头像：用户用中性小人、助手用品牌色星标 —— 一眼分清谁在说话。
+                    用户侧镜像排布，气泡贴近右侧。 */}
+                <div
+                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                    isUser
+                      ? 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
+                      : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
+                  }`}
+                >
+                  {isUser ? <User className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                </div>
+                <div
+                  className={`max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
+                    isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                  }`}
+                >
+                  {message.content}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
 
         {isSending ? (

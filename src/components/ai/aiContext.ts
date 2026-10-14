@@ -32,8 +32,13 @@ const MODULE_INFO: Record<string, { name: string; role: string }> = {
   'shell-icons': { name: '外壳入口管理', role: '管理系统「此电脑」等位置的第三方入口。' },
 };
 
-/** 组装系统提示：应用身份 + 当前模块角色 + 行为约束。 */
-export function buildSystemPrompt(moduleId: string | null): string {
+/**
+ * 组装系统提示：应用身份 + 当前模块角色 + **实时数据摘要** + 行为约束。
+ *
+ * 摘要由模块在每次发送时现取（见 moduleDataRegistry），这里不做缓存 ——
+ * 用户可能刚扫完、刚勾选，缓存一秒都会让助手答错。
+ */
+export function buildSystemPrompt(moduleId: string | null, dataSummary?: string | null): string {
   const info = moduleId ? MODULE_INFO[moduleId] : undefined;
 
   const lines = [
@@ -42,31 +47,50 @@ export function buildSystemPrompt(moduleId: string | null): string {
     info
       ? `当前用户正停留在「${info.name}」模块：${info.role}`
       : '当前没有打开具体的功能模块。',
+  ];
+
+  // 有真实数据时注入；没有就明说没有，绝不让它凭印象描述（那正是"编造"的来源）
+  if (dataSummary && dataSummary.trim()) {
+    lines.push(
+      '',
+      '以下是当前模块的实时数据摘要，就是用户此刻在界面上看到的内容，回答时以此为准：',
+      dataSummary.trim(),
+      '',
+      '注意：你拿到的是摘要，没有文件级明细。需要具体到某个文件时，如实告诉用户"需要查看完整明细"，不要凭空编造文件名或路径。',
+    );
+  } else {
+    lines.push(
+      '',
+      '当前没有取到该模块的数据（用户可能还没有扫描）。不要凭猜测描述里面的内容，直接说明"还没有扫描数据"。',
+    );
+  }
+
+  lines.push(
     '',
     '行为约束：',
-    '1. 只依据对话中提供的信息回答；没有把握时明确说"我不确定"，不要编造文件路径、大小或结论。',
+    '1. 只依据上面提供的信息回答；没有把握时明确说"我不确定"，不要编造文件路径、大小或结论。',
     '2. 涉及删除操作时，永远只给出建议和风险提示 —— 不要声称你已经执行了删除，实际执行必须由用户在界面上确认。',
     '3. 回答简洁，优先给结论，其次给理由；不要长篇复述背景。',
     '4. 用用户正在使用的语言回答。',
-  ];
+  );
   return lines.join('\n');
 }
 
-/** 会话开场的消息序列（只有一条 system，用户消息后续追加）。 */
-export function buildInitialMessages(moduleId: string | null): AiChatMessage[] {
-  return [{ role: 'system', content: buildSystemPrompt(moduleId) }];
-}
-
 /**
- * 切换模块时刷新 system 消息，其余历史保留 ——
- * 这样"在垃圾清理里问过的问题"换个模块还能接着聊，但助手知道你现在在哪。
+ * 组装本次请求的完整消息：**现取的 system 提示** + 历史。
+ *
+ * system 刻意不进历史 —— 它依赖"当前模块"和"当前数据"，存下来必然过期。
+ * 历史里只保留 user/assistant，于是切模块、重新扫描都不需要清理旧消息。
  */
-export function withRefreshedSystemPrompt(
+export function buildRequestMessages(
   history: AiChatMessage[],
   moduleId: string | null,
+  dataSummary: string | null,
 ): AiChatMessage[] {
-  const rest = history.filter((message) => message.role !== 'system');
-  return [buildInitialMessages(moduleId)[0], ...rest];
+  return [
+    { role: 'system', content: buildSystemPrompt(moduleId, dataSummary) },
+    ...history.filter((message) => message.role !== 'system'),
+  ];
 }
 
 /** 取模块显示名。未知模块返回空串，界面据此不显示"· xxx"尾巴。 */

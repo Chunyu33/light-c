@@ -26,6 +26,7 @@ import {
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import { openSearchUrl } from '../../utils/searchEngine';
 import { formatSize } from '../../utils/format';
+import { useModuleDataSummary } from '../ai/moduleDataRegistry';
 
 function findScrollParent(element: HTMLElement): HTMLElement | null {
   let parent = element.parentElement;
@@ -197,6 +198,28 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
   // 以前一股脑全列出来，有用户反馈整屏都是「信息不完整」，看了也不知道该不该删。
   // 全部驱动没被删掉，只是移到开关后面。
   const [showAllDrivers, setShowAllDrivers] = useState(false);
+
+  // 给 AI 助手当前模块的数据摘要：只给汇总 + 可处理的驱动包，不给完整文件清单。
+  useModuleDataSummary('driver-cleanup', () => {
+    if (!scanResult) return null;
+    const actionable = scanResult.packages.filter((item) => item.actionable);
+    const lines = [
+      `共 ${scanResult.total_count} 个驱动包：可处理 ${scanResult.candidate_count} 个，其中高置信旧驱动 ${scanResult.high_confidence_count} 个；当前${scanResult.is_admin ? '有' : '没有'}管理员权限。`,
+      `用户已勾选 ${selectedNames.size} 个。`,
+    ];
+    if (actionable.length === 0) {
+      lines.push('当前没有可安全处理的驱动包。');
+    } else {
+      lines.push('可处理的驱动包（名称 / 厂商 / 判定原因）：');
+      for (const item of actionable.slice(0, 12)) {
+        lines.push(
+          `- ${item.original_name || item.published_name} / ${item.provider_name || '未知厂商'} / ${item.reason}`,
+        );
+      }
+      if (actionable.length > 12) lines.push(`（另有 ${actionable.length - 12} 个未列出）`);
+    }
+    return lines.join('\n');
+  });
 
   const visiblePackages = useMemo(
     () =>
