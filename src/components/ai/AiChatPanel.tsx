@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { AlertCircle, Check, Copy, Eraser, Loader2, Minus, RefreshCw, Send, Settings, User } from 'lucide-react';
+import { AlertCircle, Check, Copy, Eraser, Loader2, Minus, RefreshCw, Send, User } from 'lucide-react';
 import { Select } from '../ui/Select';
 import type { AiChatMessage } from '../../types/ai';
 import { AiDeleteRequestCard, type AiDeleteRequestItem } from './AiDeleteRequestCard';
@@ -295,33 +295,9 @@ export function AiChatPanel({
         </div>
       ) : null}
 
-      {/* 没配置密钥时：把"为什么不能打字"直接说清楚，并给出去哪配的指引 */}
-      {!canChat ? (
-        <div className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 text-[11px] text-[var(--text-muted)]">
-          <Settings className="mt-0.5 h-3 w-3 shrink-0" />
-          <span className="min-w-0">{t('needConfig')}</span>
-        </div>
-      ) : null}
-
-      {/* 输入框上方一行：当前模型可就地切换。
-          对话中途发现答得不对，换模型不该还要跳去设置页。 */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-[var(--border-color)] px-2.5 pt-2">
-        {modelOptions.length > 0 ? (
-          <Select<string>
-            value={activeModel}
-            options={modelOptions.map((id) => ({ value: id, label: id }))}
-            onChange={onSwitchModel}
-            size="sm"
-            widthClass="w-44"
-          />
-        ) : (
-          <span className="truncate text-[11px] text-[var(--text-muted)]">
-            {activeModel || t('noModel')}
-          </span>
-        )}
-      </div>
-
-      <footer className="flex shrink-0 items-end gap-2 border-t-0 p-2.5">
+      {/* 输入区：**整体一个容器**，文字在上、底部一行放模型与发送 —— 与 ds harness 一致。
+          模型放在右下角，因为它属于"这条消息用什么发"，和输入内容是一体的。 */}
+      <div className="mx-2.5 mb-2.5 flex shrink-0 flex-col gap-1.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 transition-colors focus-within:border-[var(--brand-green)]">
         <textarea
           value={draft}
           disabled={!canChat}
@@ -335,19 +311,40 @@ export function AiChatPanel({
           }}
           rows={2}
           placeholder={canChat ? t('inputPlaceholder') : t('needConfigPlaceholder')}
-          className="min-h-[2.6em] min-w-0 flex-1 resize-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--brand-green)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-[3em] w-full resize-none bg-transparent px-0.5 text-xs leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         />
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canChat || isSending || !draft.trim()}
-          title={t('send')}
-          aria-label={t('send')}
-          className="shrink-0 rounded-xl bg-[var(--brand-green)] p-2 text-white transition-colors hover:bg-[var(--brand-green-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Send className="h-3.5 w-3.5" />
-        </button>
-      </footer>
+        <div className="flex items-center justify-between gap-2">
+          {/* 左侧：没配置时在这里给指引；配好了就是空的，保持安静 */}
+          <span className="min-w-0 truncate text-[10px] text-[var(--text-muted)]">
+            {canChat ? '' : t('needConfig')}
+          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {modelOptions.length > 0 ? (
+              <Select<string>
+                value={activeModel}
+                options={modelOptions.map((id) => ({ value: id, label: id }))}
+                onChange={onSwitchModel}
+                size="sm"
+                widthClass="w-44"
+              />
+            ) : (
+              <span className="truncate text-[11px] text-[var(--text-muted)]">
+                {activeModel || t('noModel')}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canChat || isSending || !draft.trim()}
+              title={t('send')}
+              aria-label={t('send')}
+              className="shrink-0 rounded-xl bg-[var(--brand-green)] p-2 text-white transition-colors hover:bg-[var(--brand-green-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }

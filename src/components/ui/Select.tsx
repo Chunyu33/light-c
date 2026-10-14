@@ -39,7 +39,26 @@ export function Select<T extends string = string>({
   disabled = false,
 }: SelectProps<T>) {
   const [open, setOpen] = useState(false);
+  /**
+   * 下拉向上弹出。
+   *
+   * **自动判断**而不是让调用方传参数：贴在窗口底部的控件（例如 AI 助手面板的输入区）
+   * 向下展开会被裁掉或顶出屏幕，而调用方很难自己判断"我离底部还有多少"。
+   * 打开时量一次，下方空间不够、上方更宽裕就翻上去。
+   */
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  /** 下拉大致需要的高度；低于这个值就认为"下方放不下"。 */
+  const MENU_MIN_SPACE = 180;
+
+  const updateDirection = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const below = window.innerHeight - rect.bottom;
+    const above = rect.top;
+    setOpenUpward(below < MENU_MIN_SPACE && above > below);
+  }, []);
 
   // 点击外部关闭
   const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -75,7 +94,11 @@ export function Select<T extends string = string>({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          // 打开前先量一次方向：贴在窗口底部的控件要向上弹
+          if (!open) updateDirection();
+          setOpen(!open);
+        }}
         className={`w-full flex items-center justify-between gap-2 ${triggerSizeClass}
           bg-[var(--bg-card)] border border-[var(--border-color)]
           text-[var(--text-primary)] font-medium
@@ -98,10 +121,11 @@ export function Select<T extends string = string>({
       {/* 下拉列表 */}
       {open && (
         <div
-          className={`glass-overlay absolute top-full left-0 mt-1.5 w-full py-1 rounded-xl
+          className={`glass-overlay absolute left-0 w-full py-1 rounded-xl
+            ${openUpward ? 'bottom-full mb-1.5 slide-in-from-bottom-1' : 'top-full mt-1.5 slide-in-from-top-1'}
             bg-[var(--bg-card)] border border-[var(--border-color)]
             shadow-lg shadow-black/5 z-50 overflow-y-auto ${menuMaxHeightClass}
-            animate-in fade-in slide-in-from-top-1 duration-150`}
+            animate-in fade-in duration-150`}
         >
           {/* 筛选项可能来自平台/模型类型，数量不可控；截断与滚动能避免下拉层挤压结果区。 */}
           {options.map((option) => {
