@@ -29,6 +29,7 @@ import { getModuleDataSummary } from './moduleDataRegistry';
 import { getModuleActions } from './moduleActionRegistry';
 import type { AiDeleteOutcome, AiDeleteTargetSummary } from './moduleActionRegistry';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
+import type { AttachedImage } from './imageAttach';
 
 /** 只保留最近若干轮对话：更早的内容交给后续版本的滚动摘要处理。 */
 const MAX_HISTORY_MESSAGES = 16;
@@ -252,7 +253,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   );
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, images: AttachedImage[] = []) => {
       if (sendingRef.current) return;
       sendingRef.current = true;
 
@@ -264,16 +265,29 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       setErrorMessage('');
       setStreamingText('');
 
-      const userMessage: AiChatMessage = { role: 'user', content: text };
-      pushMessage(moduleId, userMessage);
-      // 落盘失败只记日志：会话记录是附属能力，不该让对话本身失败
+      // 落盘与会话历史里**只记文字与占位符**：图片 base64 动辄几百 KB，
+      // 写进 jsonl 会让文件迅速膨胀，重新加载时也毫无用处。
+      const persistedText =
+        images.length > 0 ? `${text}\n[已附加 ${images.length} 张图片]`.trim() : text;
+      pushMessage(moduleId, { role: 'user', content: persistedText });
       void appendAiSessionMessage(moduleId, localDateKey(), {
         role: 'user',
-        content: text,
+        content: persistedText,
         at: Date.now(),
       }).catch((error) => console.error('写入 AI 会话历史失败:', error));
 
-      const nextMessages: AiChatMessage[] = [...history, userMessage];
+      // 发给模型的这一条**带上图片**（图片只活在这一轮请求里，不进历史状态）
+      const nextMessages: AiChatMessage[] = [
+        ...history,
+        {
+          role: 'user',
+          content: text,
+          images:
+            images.length > 0
+              ? images.map((image) => ({ mediaType: image.mediaType, dataBase64: image.base64 }))
+              : undefined,
+        },
+      ];
       // 每次请求一个独立的流标识：事件是全局广播的，靠它过滤掉别人的增量。
       const streamId = `s${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let unlisten: (() => void) | null = null;
@@ -397,7 +411,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           activeModel={activeProfile?.model ?? ''}
           canChat={canChat}
           onSwitchModel={handleSwitchModel}
-          onSend={(text) => void handleSend(text)}
+          onSend={(text, attached) => void handleSend(text, attached)}
           onCollapse={handleToggle}
           onClear={handleClear}
         />

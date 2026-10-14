@@ -28,6 +28,63 @@ const ANTHROPIC_MAX_TOKENS: u32 = 2048;
 pub struct AiChatMessage {
     pub role: String,
     pub content: String,
+    /// 图片附件。为空时按纯文本发送 —— **与加入此功能之前的请求完全一致**。
+    ///
+    /// 为什么不把 base64 直接塞进 content：两种协议都要求图文**分开作为分片**，
+    /// 而且前端还要显示缩略图、落盘时替换成占位符，分开处理反而更简单。
+    #[serde(default)]
+    pub images: Vec<AiImage>,
+}
+
+/// 一条消息里的图片附件。前端负责**先压缩再传** ——
+/// 原图 base64 会让每一轮请求都膨胀好几 MB（历史每轮都要重发）。
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiImage {
+    /// 例如 image/jpeg
+    pub media_type: String,
+    /// 不带 `data:` 前缀的纯 base64
+    pub data_base64: String,
+}
+
+/// OpenAI 兼容协议的内容分片：纯文本时直接用字符串，带图时用 `image_url` 分片。
+fn build_openai_content(message: &AiChatMessage) -> serde_json::Value {
+    if message.images.is_empty() {
+        return serde_json::json!(message.content);
+    }
+    let mut parts: Vec<serde_json::Value> = Vec::new();
+    if !message.content.trim().is_empty() {
+        parts.push(serde_json::json!({ "type": "text", "text": message.content }));
+    }
+    for image in &message.images {
+        parts.push(serde_json::json!({
+            "type": "image_url",
+            "image_url": { "url": format!("data:{};base64,{}", image.media_type, image.data_base64) },
+        }));
+    }
+    serde_json::json!(parts)
+}
+
+/// Anthropic 协议的内容分片：图片用 `source.base64`，不是 data URI。
+fn build_anthropic_content(message: &AiChatMessage) -> serde_json::Value {
+    if message.images.is_empty() {
+        return serde_json::json!(message.content);
+    }
+    let mut parts: Vec<serde_json::Value> = Vec::new();
+    if !message.content.trim().is_empty() {
+        parts.push(serde_json::json!({ "type": "text", "text": message.content }));
+    }
+    for image in &message.images {
+        parts.push(serde_json::json!({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": image.media_type,
+                "data": image.data_base64,
+            },
+        }));
+    }
+    serde_json::json!(parts)
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -116,7 +173,7 @@ fn build_openai_body(request: &AiChatRequest, model: &str) -> serde_json::Value 
         .map(|message| {
             serde_json::json!({
                 "role": message.role,
-                "content": message.content,
+                "content": build_openai_content(message),
             })
         })
         .collect();
@@ -145,7 +202,7 @@ fn build_anthropic_body(request: &AiChatRequest, model: &str) -> serde_json::Val
         }
         messages.push(serde_json::json!({
             "role": message.role,
-            "content": message.content,
+            "content": build_anthropic_content(message),
         }));
     }
 
@@ -455,10 +512,12 @@ mod tests {
                 AiChatMessage {
                     role: "system".to_string(),
                     content: "你是助手".to_string(),
+                    images: Vec::new(),
                 },
                 AiChatMessage {
                     role: "user".to_string(),
                     content: "你好".to_string(),
+                    images: Vec::new(),
                 },
             ],
             model: None,
@@ -489,6 +548,55 @@ mod tests {
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0]["role"], "system");
         assert!((body["temperature"].as_f64().unwrap() - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn images_become_parts_for_both_protocols() {
+        // 带图时内容必须从字符串变成分片数组，而且两家形状不同：
+        // OpenAI 用 data URI，Anthropic 用 source.base64 —— 混了就直接被服务端拒绝。
+        let request = AiChatRequest {
+            messages: vec![AiChatMessage {
+                role: "user".to_string(),
+                content: "这是什么".to_string(),
+                images: vec![AiImage {
+                    media_type: "image/jpeg".to_string(),
+                    data_base64: "AAAA".to_string(),
+                }],
+            }],
+            model: None,
+            temperature: None,
+            tools: Vec::new(),
+        };
+
+        let openai = build_openai_body(&request, "m");
+        let parts = openai["messages"][0]["content"].as_array().expect("应为分片数组");
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0]["type"], "text");
+        assert_eq!(parts[1]["type"], "image_url");
+        assert_eq!(parts[1]["image_url"]["url"], "data:image/jpeg;base64,AAAA");
+
+        let anthropic = build_anthropic_body(&request, "m");
+        let parts = anthropic["messages"][0]["content"].as_array().expect("应为分片数组");
+        assert_eq!(parts[1]["type"], "image");
+        assert_eq!(parts[1]["source"]["media_type"], "image/jpeg");
+        assert_eq!(parts[1]["source"]["data"], "AAAA");
+    }
+
+    #[test]
+    fn plain_text_messages_still_send_a_plain_string() {
+        // 没图时必须保持原来的字符串形态：不改变既有请求，也少一条服务端分支
+        let request = AiChatRequest {
+            messages: vec![AiChatMessage {
+                role: "user".to_string(),
+                content: "你好".to_string(),
+                images: Vec::new(),
+            }],
+            model: None,
+            temperature: None,
+            tools: Vec::new(),
+        };
+        assert_eq!(build_openai_body(&request, "m")["messages"][0]["content"], "你好");
+        assert_eq!(build_anthropic_body(&request, "m")["messages"][0]["content"], "你好");
     }
 
     #[test]

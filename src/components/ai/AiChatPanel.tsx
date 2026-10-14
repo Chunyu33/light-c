@@ -9,13 +9,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { AlertCircle, Check, Copy, Eraser, Loader2, Minus, RefreshCw, Send, User } from 'lucide-react';
+import { AlertCircle, Check, Copy, Eraser, ImagePlus, Loader2, Minus, RefreshCw, Send, User, X } from 'lucide-react';
 import { Select } from '../ui/Select';
 import type { AiChatMessage } from '../../types/ai';
 import { AiDeleteRequestCard, type AiDeleteRequestItem } from './AiDeleteRequestCard';
 import { AiDeleteResultCard } from './AiDeleteResultCard';
 import { AiMarkIcon } from './AiMarkIcon';
 import type { AiDeleteOutcome } from './moduleActionRegistry';
+import { collectImageFiles, compressImage, type AttachedImage } from './imageAttach';
 import { renderMarkdown } from './renderMarkdown';
 import { usePanelSize } from './usePanelSize';
 import { formatSize } from '../../utils/format';
@@ -46,7 +47,8 @@ interface AiChatPanelProps {
   onSwitchModel: (model: string) => void;
   /** 是否已配置密钥。没配置时不允许输入，也不允许发送 —— 否则用户白打一串再吃一个报错 */
   canChat: boolean;
-  onSend: (text: string) => void;
+  /** images 为空时就是纯文字发送 */
+  onSend: (text: string, images: AttachedImage[]) => void;
   onCollapse: () => void;
   onClear: () => void;
 }
@@ -75,6 +77,39 @@ export function AiChatPanel({
   const { t } = useTranslation('ai');
   const [draft, setDraft] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  /** 待发送的图片（已压缩）。发出去即清空 —— 图片不进会话历史。 */
+  const [attachments, setAttachments] = useState<AttachedImage[]>([]);
+  /** 附件相关的提示（压缩失败、超出张数等），显示在输入区左下角 */
+  const [attachError, setAttachError] = useState('');
+
+  /** 单条消息最多带几张：再多对模型没有帮助，只会让每轮请求越来越重。 */
+  const MAX_ATTACHMENTS = 4;
+
+  const handleAddImages = async (files: File[]) => {
+    if (files.length === 0) return;
+    const room = MAX_ATTACHMENTS - attachments.length;
+    if (room <= 0) {
+      setAttachError(t('attachTooMany', { count: MAX_ATTACHMENTS }));
+      return;
+    }
+    const accepted = files.slice(0, room);
+    if (files.length > room) setAttachError(t('attachTooMany', { count: MAX_ATTACHMENTS }));
+
+    const compressed: AttachedImage[] = [];
+    for (const file of accepted) {
+      try {
+        compressed.push(await compressImage(file));
+      } catch (error) {
+        // 逐张处理：一张失败不该把其余几张也丢掉
+        setAttachError(error instanceof Error ? error.message : String(error));
+      }
+    }
+    if (compressed.length > 0) {
+      setAttachments((previous) => [...previous, ...compressed]);
+      if (files.length <= room) setAttachError('');
+    }
+  };
   /** 刚复制成功的那条消息序号：图标短暂变成对勾，给"确实复制了"一个反馈 */
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -99,9 +134,12 @@ export function AiChatPanel({
 
   const handleSubmit = () => {
     const text = draft.trim();
-    if (!text || isSending) return;
-    onSend(text);
+    // 只有图片没有文字也允许发送：用户常常是截个图问"这些能删吗"
+    if ((!text && attachments.length === 0) || isSending || !canChat) return;
+    onSend(text, attachments);
     setDraft('');
+    setAttachments([]);
+    setAttachError('');
   };
 
   const visibleMessages = messages.filter((message) => message.role !== 'system');
@@ -298,10 +336,42 @@ export function AiChatPanel({
       {/* 输入区：**整体一个容器**，文字在上、底部一行放模型与发送 —— 与 ds harness 一致。
           模型放在右下角，因为它属于"这条消息用什么发"，和输入内容是一体的。 */}
       <div className="mx-2.5 mb-2.5 flex shrink-0 flex-col gap-1.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 transition-colors focus-within:border-[var(--brand-green)]">
+        {/* 已附加的图片：缩略图 + 移除。放在输入框上方，一眼能看到自己带了什么 */}
+        {attachments.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {attachments.map((image, index) => (
+              <div key={index} className="group relative">
+                <img
+                  src={image.previewUrl}
+                  alt=""
+                  className="h-14 w-14 rounded-lg border border-[var(--border-color)] object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAttachments((previous) => previous.filter((_, i) => i !== index))}
+                  title={t('attachRemove')}
+                  aria-label={t('attachRemove')}
+                  className="absolute -right-1 -top-1 rounded-full bg-[var(--bg-elevated)] p-0.5 text-[var(--text-muted)] shadow ring-1 ring-[var(--border-color)] transition-colors hover:text-[var(--color-danger)]"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <textarea
           value={draft}
           disabled={!canChat}
           onChange={(event) => setDraft(event.target.value)}
+          onPaste={(event) => {
+            // 粘贴截图是最顺手的入口：用户刚截完图直接 Ctrl+V
+            const files = collectImageFiles(event.clipboardData?.files);
+            if (files.length > 0) {
+              event.preventDefault();
+              void handleAddImages(files);
+            }
+          }}
           onKeyDown={(event) => {
             // Enter 发送、Shift+Enter 换行：长问题可以分行写
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -314,11 +384,34 @@ export function AiChatPanel({
           className="min-h-[3em] w-full resize-none bg-transparent px-0.5 text-xs leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <div className="flex items-center justify-between gap-2">
-          {/* 左侧：没配置时在这里给指引；配好了就是空的，保持安静 */}
+          {/* 左侧：附件出错优先显示（刚发生的事），否则是未配置指引，都为空时保持安静 */}
           <span className="min-w-0 truncate text-[10px] text-[var(--text-muted)]">
-            {canChat ? '' : t('needConfig')}
+            {attachError || (canChat ? '' : t('needConfig'))}
           </span>
           <div className="flex shrink-0 items-center gap-1.5">
+            {/* 选图入口。放在左下角，与 ds harness 的位置一致 */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                void handleAddImages(collectImageFiles(event.target.files));
+                // 清空 value：否则连续选同一张图不会触发 change
+                event.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!canChat}
+              title={t('attachImage')}
+              aria-label={t('attachImage')}
+              className="rounded-xl border border-[var(--border-color)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ImagePlus className="h-3.5 w-3.5" />
+            </button>
             {modelOptions.length > 0 ? (
               <Select<string>
                 value={activeModel}
@@ -335,7 +428,7 @@ export function AiChatPanel({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!canChat || isSending || !draft.trim()}
+              disabled={!canChat || isSending || (!draft.trim() && attachments.length === 0)}
               title={t('send')}
               aria-label={t('send')}
               className="shrink-0 rounded-xl bg-[var(--brand-green)] p-2 text-white transition-colors hover:bg-[var(--brand-green-hover)] disabled:cursor-not-allowed disabled:opacity-50"

@@ -60,9 +60,22 @@ export interface AiProfileInput {
 }
 
 /** 对话消息。role 用 OpenAI 的写法（system / user / assistant），Anthropic 由后端转译。 */
+/**
+ * 图片附件（已压缩，见 components/ai/imageAttach.ts）。
+ * 只在**发送**时携带：历史与显示仍以 content 为准。
+ */
+export interface AiChatImage {
+  /** 例如 image/jpeg */
+  mediaType: string;
+  /** 不带 data: 前缀的纯 base64 */
+  dataBase64: string;
+}
+
 export interface AiChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** 图片附件；为空时按纯文本发送，与加入此功能之前的请求完全一致 */
+  images?: AiChatImage[];
 }
 
 /** 模型请求调用某个工具。 */

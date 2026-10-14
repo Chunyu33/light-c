@@ -31,5 +31,8 @@
   "retry": "Ask again",
   "needConfig": "No AI provider is configured yet. Add one with its API key under Settings - AI assistant, then you can ask questions here.",
   "needConfigPlaceholder": "Configure a provider first",
-  "noModel": "No model selected"
+  "noModel": "No model selected",
+  "attachImage": "Add an image (or paste a screenshot)",
+  "attachRemove": "Remove this image",
+  "attachTooMany": "Up to {{count}} images at a time"
 }

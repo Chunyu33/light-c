@@ -31,5 +31,8 @@
   "retry": "重試這則提問",
   "needConfig": "還沒有設定 AI 服務商。請到「設定 - AI 助手」新增一個並填入 API Key，之後就能在這裡提問。",
   "needConfigPlaceholder": "請先設定 AI 服務商",
-  "noModel": "未選擇模型"
+  "noModel": "未選擇模型",
+  "attachImage": "新增圖片（也可直接貼上截圖）",
+  "attachRemove": "移除這張圖",
+  "attachTooMany": "最多一次帶 {{count}} 張圖片"
 }
