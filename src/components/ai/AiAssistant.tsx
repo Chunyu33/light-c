@@ -16,7 +16,6 @@ import {
   clearAiSession,
   getAiConfig,
   listenAiStream,
-  listAiProviders,
   loadAiSession,
   localDateKey,
   readAiAttachment,
@@ -85,16 +84,10 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
    * 有没有配置密钥、有哪些模型可选、当前选的是哪个 —— 没配置时要禁用输入与发送。
    */
   const [aiConfig, setAiConfig] = useState<AiPublicConfig | null>(null);
-  /** 服务商 id → 显示名，用于面板顶部那行"模型 · 服务商" */
-  const [providerNames, setProviderNames] = useState<Record<string, string>>({});
 
   const reloadAiConfig = useCallback(async () => {
     try {
-      const [config, providers] = await Promise.all([getAiConfig(), listAiProviders()]);
-      setAiConfig(config);
-      setProviderNames(
-        Object.fromEntries(providers.map((item) => [item.id, item.name])) as Record<string, string>,
-      );
+      setAiConfig(await getAiConfig());
     } catch (error) {
       console.error('读取当前 AI 配置失败:', error);
     }
@@ -117,12 +110,6 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
   /** 能不能对话：**必须有密钥**。没配置时不让人白打一长串字再报错。 */
   const canChat = Boolean(activeProfile?.hasApiKey);
-
-  const activeModelLabel = activeProfile
-    ? [activeProfile.model || t('noModel'), providerNames[activeProfile.providerId] || activeProfile.providerId]
-        .filter(Boolean)
-        .join(' · ')
-    : '';
 
   /** 就地切换模型：写回当前档案，下一句话即生效。 */
   const handleSwitchModel = useCallback(
@@ -557,7 +544,6 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           errorMessage={errorMessage}
           onRetryLast={handleRetryLast}
           moduleName={moduleName}
-          modelLabel={activeModelLabel}
           modelOptions={activeProfile?.models ?? []}
           activeModel={activeProfile?.model ?? ''}
           canChat={canChat}

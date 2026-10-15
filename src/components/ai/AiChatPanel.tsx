@@ -41,8 +41,6 @@ interface AiChatPanelProps {
   errorMessage: string;
   /** 当前模块显示名，只用于标题，让用户知道在跟"哪个模块的助手"说话 */
   moduleName: string;
-  /** 当前使用的模型 · 服务商，显示在标题栏下方 —— 用户必须知道自己正在用的是什么 */
-  modelLabel: string;
   /** 当前档案可选的模型，用于输入框旁的就地切换 */
   modelOptions: string[];
   activeModel: string;
@@ -68,7 +66,6 @@ export function AiChatPanel({
   errorMessage,
   onRetryLast,
   moduleName,
-  modelLabel,
   modelOptions,
   activeModel,
   onSwitchModel,
@@ -190,13 +187,19 @@ export function AiChatPanel({
         onPointerDown={startResize}
         onDoubleClick={resetSize}
         title={hasCustomSize ? t('resizeHintCustom') : t('resizeHint')}
-        className="absolute left-0 top-0 z-10 h-5 w-5 cursor-nwse-resize"
+        className="group absolute left-0 top-0 z-10 h-5 w-5 cursor-nwse-resize"
       >
-        {/* 极简的缩放标记：两道短斜线，不抢视觉但能让人知道这里可以拖 */}
-        <div className="pointer-events-none absolute left-1 top-1 h-2.5 w-2.5 border-l border-t border-[var(--text-muted)] opacity-50" />
+        {/* 极简的缩放标记：一个角括号，不抢视觉但能让人知道这里可以拖。
+            颜色走品牌绿而不是 --text-muted —— 后者是深灰，在浅色面板上看着像一块黑斑，
+            跟整个面板的绿色调也不搭。悬停时加深，暗示"这里能拖"。
+            （侧边栏那个拖拽手柄同样用品牌绿，保持一致。） */}
+        <div className="pointer-events-none absolute left-1 top-1 h-2.5 w-2.5 border-l border-t border-[var(--brand-green)] opacity-40 transition-opacity group-hover:opacity-90" />
       </div>
 
-      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
+      {/* glass-block 是项目既有的语义钩子：「去边框去底色，交给留白分层」。
+          非玻璃态下它不匹配，这条 border-b 原样保留；玻璃态下由 App.css 抹掉，
+          于是面板里剩下的分隔线就只有输入框那一圈 —— 不在组件里判断主题。 */}
+      <header className="glass-block flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
         <AiMarkIcon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]">
           {t('panelTitle')}
@@ -221,14 +224,6 @@ export function AiChatPanel({
           <Minus className="h-3.5 w-3.5" />
         </button>
       </header>
-
-      {/* 当前配置：模型 · 服务商。放在对话区上方而不是标题栏里，
-          因为它会随设置变化，需要能被一眼看到。 */}
-      {modelLabel ? (
-        <div className="shrink-0 border-b border-[var(--border-color)] px-3 pb-1.5 text-[10px] text-[var(--text-muted)]">
-          {modelLabel}
-        </div>
-      ) : null}
 
       <div ref={listRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         {visibleMessages.length === 0 ? (
