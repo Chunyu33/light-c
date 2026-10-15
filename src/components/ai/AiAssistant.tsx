@@ -604,7 +604,11 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
               <span className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[3px] rotate-45 border-b border-r border-[var(--brand-green-20)] bg-[var(--bg-elevated)]" />
             </motion.span>
           </motion.span>
-          <AiMarkIcon className="h-5 w-5" />
+          {/* 图标要比别处大一号：这个 SVG 的 viewBox 是 24 格，但图形本身只占
+              中间一带（左右各让出 4 格、底部让出 6 格），所以 h-5 渲染出来
+              可见的机器人还不到 14px，放在 44px 的圆里显得很空。
+              提到 h-7 之后实际大小才和相邻的其他图标相当。 */}
+          <AiMarkIcon className="h-7 w-7" />
         </motion.button>
       )}
     </AnimatePresence>

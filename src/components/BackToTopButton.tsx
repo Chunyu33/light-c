@@ -44,11 +44,20 @@ export function BackToTopButton({ scrollContainerRef, threshold = 360 }: BackToT
     // top-1/2
     <AnimatePresence>
       {visible && (
+        /* ⚠️ 层级 z-30：**故意低于** AI 助手面板（z-40）。
+           这个按钮在右下角，而助手面板展开时正好覆盖那块区域；
+           原来写 z-50 会让它从面板上面"穿出来"，既挡内容、又容易误点。
+           它仍高于模块内容与模块操作栏（z-20），该露脸时照常露脸。
+
+           ⚠️ 注释位置有讲究：这里处于 {visible && ( … )} 的 JS 表达式位置，
+           只能写这种形式；换成花括号包起来的 JSX 注释写法会被当成对象字面量，
+           直接编不过。反过来，在 JSX 子节点位置则必须用花括号那种写法，
+           否则注释会被当文本渲染到界面上。 */
         <motion.button
           type="button"
           onClick={handleBackToTop}
           className="
-            glass-overlay fixed right-8 bottom-10 z-50 flex h-8 w-8 items-center justify-center rounded-lg
+            glass-overlay fixed right-8 bottom-10 z-30 flex h-8 w-8 items-center justify-center rounded-lg
             border border-[var(--brand-green-20)] bg-[var(--bg-card)]/95 text-[var(--brand-green)]
             shadow-lg shadow-black/10 backdrop-blur-md transition-colors
             hover:border-[var(--brand-green)] hover:bg-[var(--brand-green)] hover:text-white

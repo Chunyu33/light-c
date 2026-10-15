@@ -113,6 +113,15 @@ export function useModuleActions(moduleId: string, moduleActions: ModuleActions)
           }
           return implementation(ids);
         },
+        // ⚠️ 只读能力**必须**和上面几个一样走 ref。
+        //
+        // 直接写 `readItems: moduleActions.readItems` 会捕获**注册那一刻**的闭包，
+        // 而注册只在 moduleId 变化时做一次 —— 于是模块里的 scanResult 永远是初始的
+        // null，read_items 对**所有模块**都返回空，渐进式读取等于没实现。
+        // （这就是"代码写了但一直测不出效果"的原因。）
+        readItems: (targetId, offset, limit) =>
+          actionsRef.current.readItems?.(targetId, offset, limit) ?? null,
+        readItemDetail: (itemId) => actionsRef.current.readItemDetail?.(itemId) ?? null,
       }),
     [moduleId],
   );
