@@ -39,5 +39,6 @@
   "attachImage": "画像を追加（スクリーンショットの貼り付けも可）",
   "attachRemove": "この画像を外す",
   "attachTooMany": "一度に最大 {{count}} 枚まで",
-  "previewImage": "クリックで拡大"
+  "previewImage": "クリックで拡大",
+  "streamTimeout": "長い間応答がないため、このリクエストを中断しました。再試行するか、モデル／プロバイダーを変えてみてください。"
 }

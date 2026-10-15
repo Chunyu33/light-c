@@ -12,14 +12,19 @@ use super::stream::StreamDecoder;
 use super::tools::{anthropic_tools, openai_tools, parse_tool_calls, AiToolCall};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-
 /// 对话超时：LLM 首字延迟可能较久，给宽松一些。
 const CHAT_TIMEOUT_SECS: u64 = 60;
 /// 拉模型列表是轻量请求，超时收紧，避免设置页"测试连接"卡太久。
 const MODELS_TIMEOUT_SECS: u64 = 20;
-/// 流式对话的整段超时。reqwest 的 timeout 覆盖"直到响应体读完"，
+/// 流式对话的整段超时（兜底上限）。reqwest 的 timeout 覆盖"直到响应体读完"，
 /// 用对话那 60 秒会把长回答从中间切断，所以流式单独放宽。
-const STREAM_TIMEOUT_SECS: u64 = 300;
+/// ⚠️ 真正判断"卡住"的是下面的**空闲超时**，这里只是防止连接永不结束。
+const STREAM_TIMEOUT_SECS: u64 = 600;
+/// 流式的**空闲超时**：这么久没有收到任何新数据就判定卡住并断开。
+/// 30 秒足够覆盖服务商的首字延迟（推理模型偶尔要十几秒），又不会让用户干等。
+const STREAM_IDLE_TIMEOUT_SECS: u64 = 30;
+/// 上面那个值的 Duration 形式（循环里每次都要用，不必反复转）
+const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS);
 /// Anthropic 要求显式给 max_tokens，这里给一个够用的默认值。
 const ANTHROPIC_MAX_TOKENS: u32 = 2048;
 
@@ -465,11 +470,22 @@ where
     // 边收边发：用户能立刻看到字出来，而不是等整段返回
     let mut decoder = StreamDecoder::new(protocol);
     let mut full = String::new();
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|error| format!("读取流式响应失败: {}", error))?
-    {
+    loop {
+        // **空闲超时**，不是整段超时。
+        // 整段超时是错的：正常的长回答会被从中间砍断，而"服务商不响应"却要干等满 5 分钟。
+        // 真正该判断的是"多久没有新数据了" —— 长回答慢慢吐没关系，一个字节都不来就得断。
+        let next = match tokio::time::timeout(STREAM_IDLE_TIMEOUT, response.chunk()).await {
+            Ok(result) => result.map_err(|error| format!("读取流式响应失败: {}", error))?,
+            Err(_) => {
+                return Err(format!(
+                    "已经 {} 秒没有收到任何数据，连接已中断。可能是网络不稳定，或该服务商暂时没有响应。",
+                    STREAM_IDLE_TIMEOUT_SECS
+                ))
+            }
+        };
+        // 流正常结束
+        let Some(chunk) = next else { break };
+
         let text = String::from_utf8_lossy(&chunk);
         for delta in decoder.push(&text) {
             full.push_str(&delta);

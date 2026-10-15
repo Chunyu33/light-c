@@ -34,8 +34,18 @@ import { formatReadPage } from './useAiModuleBridge';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
 import type { AttachedImage } from './imageAttach';
 
-/** 只保留最近若干轮对话：更早的内容交给后续版本的滚动摘要处理。 */
+/** 只保留最近若干轮对话：更早的内容交给滚动摘要处理。 */
 const MAX_HISTORY_MESSAGES = 16;
+
+/**
+ * 前端看门狗：这么久没有收到任何增量就判定卡住。
+ *
+ * 比后端的空闲超时（30 秒）**稍长一点**，让后端先报错 ——
+ * 后端能给出具体原因，前端只能给一句通用提示。
+ * 前端这一层存在的意义是"后端也失效时"的兜底：事件没送达、进程被挂起、
+ * 或者哪天后端逻辑被改坏了。**没有它，按钮会永远停在"正在思考"，用户只能重启。**
+ */
+const STREAM_IDLE_MS = 45_000;
 
 interface AiAssistantProps {
   /** 当前模块 id（App 里的 visibleModuleId）；用于让助手知道"用户现在在哪" */
@@ -382,11 +392,15 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       // 每次请求一个独立的流标识：事件是全局广播的，靠它过滤掉别人的增量。
       const streamId = `s${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let unlisten: (() => void) | null = null;
+      // 看门狗句柄与重置函数：每次收到增量就重新计时，所以放在 try 外面好清理
+      let watchdogHandle: number | undefined;
+      let resetWatchdog: () => void = () => {};
 
       try {
         // 先挂监听再发请求，否则首批增量可能在挂上之前就到了
         unlisten = await listenAiStream((delta) => {
           if (delta.streamId !== streamId) return;
+          resetWatchdog(); // 有增量就说明还活着，重新计时
           setStreamingText((previous) => previous + delta.text);
         });
 
@@ -415,7 +429,23 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         // 一律走流式。工具调用以前会因此丢掉，所以当时只能"带工具就不流式"——
         // 代价是垃圾清理这类模块**永远看不到边生成边显示**，得不偿失。
         // 现在解码器会把分片的工具参数按索引拼回来（见 stream.rs），两者兼得。
-        const reply = await aiChatStream({ messages: trimHistory(request), tools }, streamId);
+        // 与看门狗赛跑：卡住时后者先 reject，把这一轮结束掉并把按钮放开
+        const reply = await Promise.race([
+          aiChatStream({ messages: trimHistory(request), tools }, streamId),
+          new Promise<never>((_, reject) => {
+            const arm = () => {
+              watchdogHandle = window.setTimeout(
+                () => reject(new Error(t('streamTimeout'))),
+                STREAM_IDLE_MS,
+              );
+            };
+            resetWatchdog = () => {
+              window.clearTimeout(watchdogHandle);
+              arm();
+            };
+            arm();
+          }),
+        ]);
 
         // 模型没回话、而是要求执行动作
         if ((reply.toolCalls?.length ?? 0) > 0) {
@@ -434,6 +464,9 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         // 失败时保留用户输入在历史里，方便直接重试；错误单独展示，不混进对话正文。
         setErrorMessage(String(error));
       } finally {
+        // 清理看门狗：不清理虽然无害（已结束的 Promise 再 reject 是空操作），
+        // 但会留一个无意义的定时器
+        window.clearTimeout(watchdogHandle);
         // 必须取消监听：否则一次对话留下一个永久监听器，下次的增量会被累加两遍
         unlisten?.();
         setStreamingText('');
