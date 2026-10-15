@@ -40,5 +40,6 @@
   "attachRemove": "Remove this image",
   "attachTooMany": "Up to {{count}} images at a time",
   "previewImage": "Click to enlarge",
-  "streamTimeout": "No response for a long time, so this request was stopped. Try again, or switch model or provider."
+  "streamTimeout": "No response for a long time, so this request was stopped. Try again, or switch model or provider.",
+  "ballBadge": "AI"
 }

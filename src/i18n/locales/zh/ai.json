@@ -40,5 +40,6 @@
   "attachRemove": "移除这张图",
   "attachTooMany": "最多一次带 {{count}} 张图片",
   "previewImage": "点击放大查看",
-  "streamTimeout": "长时间没有收到回应，已中止这一次请求。可以重试，或换个模型 / 服务商试试。"
+  "streamTimeout": "长时间没有收到回应，已中止这一次请求。可以重试，或换个模型 / 服务商试试。",
+  "ballBadge": "AI"
 }

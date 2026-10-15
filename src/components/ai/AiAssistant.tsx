@@ -580,9 +580,44 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           onClick={handleToggle}
           title={t('ballTitle')}
           aria-label={t('ballTitle')}
-          /* 位置刻意压在「回到顶部」按钮上方：两者都在右下角，不这样会叠在一起。 */
-          className="glass-item fixed right-5 bottom-[4.75rem] z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--brand-green)] shadow-lg"
+          /* 贴右边缘、**垂直居中**。
+             原来压在右下角（回到顶部按钮上方），那儿正好压着各行的右侧操作图标：
+             既挡视线，又不好点 —— 列表整列图标都在那个位置。
+             竖直居中之后，右侧这一带始终没有内容。
+
+             ⚠️ 居中刻意**不用 transform**（既不是 Tailwind 的 -translate-y-1/2，
+             也不是 framer-motion 的 style={{ y }}）：
+             这个元素同时还在用 framer-motion 做 scale 动画，而它会往同一个元素写
+             inline transform —— 两处都要写 transform 必然打架，谁赢取决于执行顺序。
+             改成「上下都贴 0 + margin auto」这种纯盒模型居中，跟 transform 完全无关，
+             不管外面怎么写动画都不会错位。 */
+          className="glass-item fixed right-5 top-0 bottom-0 my-auto z-40 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-elevated)] text-[var(--brand-green)] shadow-lg"
         >
+          {/* 上方的小气泡：光一个图标，新用户不知道这是干什么的。
+              动画拆成两层 —— 外层负责"冒出来"（只跑一次），内层负责缓慢浮动（循环）。
+              合成一层写会有个坑：关键帧循环时会跳回起始位移，看起来像在抽搐。
+
+              居中同样**不用 transform**：外层是 motion 元素（要做 scale/y 动画），
+              跟球的理由一样，交给「左右都贴 0 + margin auto + w-fit」更稳。 */}
+          <motion.span
+            aria-hidden="true"
+            initial={{ opacity: 0, scale: 0.7, y: 6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.25, type: 'spring', stiffness: 320, damping: 20 }}
+            className="pointer-events-none absolute bottom-full left-0 right-0 mx-auto mb-2 w-fit"
+          >
+            <motion.span
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+              className="relative block rounded-lg border border-[var(--brand-green-20)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-medium leading-4 text-[var(--brand-green)] shadow-sm"
+            >
+              {t('ballBadge')}
+              {/* 指向小球的小尖角：一个旋转 45° 的方块，只留底边与右边，
+                  正好拼出朝下的三角，而且边框颜色与气泡一致（两层三角那种写法太啰嗦）。
+                  这一层不是 motion 元素，所以这里用 translate 居中不会被覆盖。 */}
+              <span className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[3px] rotate-45 border-b border-r border-[var(--brand-green-20)] bg-[var(--bg-elevated)]" />
+            </motion.span>
+          </motion.span>
           <AiMarkIcon className="h-5 w-5" />
         </motion.button>
       )}
