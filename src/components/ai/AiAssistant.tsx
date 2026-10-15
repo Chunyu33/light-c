@@ -272,20 +272,43 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         // 只读读取：**先把结果落进对话**，模型下一轮就能引用这些内容。
         // 这两个工具不改任何东西，所以不受"必须用户明确要求"的限制。
         if (call.name === 'read_items') {
+          // ⚠️ 失败原因**分开报**。这三种情况的排查方向完全不同：
+          // 没登记 / 没实现 / 数据为空。合成一句"没有读到内容"，
+          // 会让问题看起来像"功能没做"，排查时白绕很多圈。
+          if (!actions) {
+            pushAndPersist(moduleId, t('tool.moduleNotReady', { module: moduleId }));
+            continue;
+          }
+          if (!actions.readItems) {
+            pushAndPersist(moduleId, t('tool.readNotProvided', { module: moduleId }));
+            continue;
+          }
           const args = call.arguments as { target_id?: unknown; offset?: unknown; limit?: unknown };
           const targetId = typeof args.target_id === 'string' ? args.target_id : '';
           const offset = Math.max(0, Number(args.offset) || 0);
           // 上限 100：再大就把上下文吃光了，而"看得多"并不等于"答得准"
           const limit = Math.min(100, Math.max(1, Number(args.limit) || 30));
-          const page = actions?.readItems?.(targetId, offset, limit) ?? null;
-          pushAndPersist(moduleId, page ? formatReadPage(page, offset) : t('tool.readEmpty'));
+          const page = actions.readItems(targetId, offset, limit);
+          if (!page || page.lines.length === 0) {
+            pushAndPersist(moduleId, t('tool.readEmpty'));
+            continue;
+          }
+          pushAndPersist(moduleId, formatReadPage(page, offset));
           continue;
         }
 
         if (call.name === 'read_item_detail') {
+          if (!actions) {
+            pushAndPersist(moduleId, t('tool.moduleNotReady', { module: moduleId }));
+            continue;
+          }
+          if (!actions.readItemDetail) {
+            pushAndPersist(moduleId, t('tool.detailNotProvided', { module: moduleId }));
+            continue;
+          }
           const args = call.arguments as { item_id?: unknown };
           const itemId = typeof args.item_id === 'string' ? args.item_id : '';
-          const detail = actions?.readItemDetail?.(itemId) ?? null;
+          const detail = actions.readItemDetail(itemId);
           pushAndPersist(moduleId, detail || t('tool.readEmpty'));
           continue;
         }

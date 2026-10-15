@@ -13,7 +13,10 @@
   "tool": {
     "selectNotFound": "没有找到你说的这些项，数据可能已经变化，请重新扫描后再试。",
     "selected": "已按你的要求勾选 {{count}} 项：{{names}}。确认无误后可以在界面上执行删除。",
-    "readEmpty": "没有读到内容：这一项可能已经不存在，或者当前还没有扫描数据。"
+    "readEmpty": "没有读到内容：这一项可能已经不存在，或者当前还没有扫描数据。",
+    "moduleNotReady": "模块「{{module}}」当前没有接入 AI 助手，或者已经卸载了。切到该模块再试一次。",
+    "readNotProvided": "模块「{{module}}」没有提供\"读取明细\"的能力，所以看不到文件级内容。",
+    "detailNotProvided": "模块「{{module}}」没有提供\"单条详情\"的能力。"
   },
   "delete": {
     "title": "AI 请求删除以下内容",

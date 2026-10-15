@@ -13,7 +13,10 @@
   "tool": {
     "selectNotFound": "Those items are no longer there. The data may have changed; please scan again.",
     "selected": "Selected {{count}} for you: {{names}}. Delete them from the page when you are ready.",
-    "readEmpty": "Nothing to read: that item may no longer exist, or there is no scan data yet."
+    "readEmpty": "Nothing to read: that item may no longer exist, or there is no scan data yet.",
+    "moduleNotReady": "The module \"{{module}}\" is not connected to the assistant right now, or has been unmounted. Open that module and try again.",
+    "readNotProvided": "The module \"{{module}}\" does not provide detail reading, so file level content is not available.",
+    "detailNotProvided": "The module \"{{module}}\" does not provide per item detail."
   },
   "delete": {
     "title": "The assistant asks to delete:",
