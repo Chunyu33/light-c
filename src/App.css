@@ -602,6 +602,11 @@
   --bg-main: #F5F5F5;               /* 主背景：柔和灰白 */
   --bg-card: #FFFFFF;               /* 卡片背景：纯白 */
   --bg-elevated: #FFFFFF;           /* 悬浮元素：纯白 */
+  /* AI 助手回复气泡的底色。
+     ⚠️ 不能用 --bg-card：浅色主题里它和面板的 --bg-elevated 都是纯白，
+        白气泡铺在白面板上等于没有边界；玻璃态下两者又都是 45% 白，同样分不开。
+     所以这里给一个**带色调**的淡墨洗：在纯白/半透白的面板上都读得出边界。 */
+  --ai-bubble-bg: rgba(15, 23, 42, 0.055);
   --bg-hover: #FAFAFA;              /* 悬停状态 */
   --bg-active: #F0F0F0;             /* 激活状态 */
   --bg-input: #FFFFFF;              /* 输入框背景 */
@@ -679,6 +684,8 @@
   --bg-main: #111111;               /* 主背景：深灰 */
   --bg-card: #191919;               /* 卡片背景：稍浅深灰 */
   --bg-elevated: #1F1F1F;           /* 悬浮元素 */
+  /* 深色下反过来：往白里提一点，让气泡比面板亮一档（见浅色处的说明） */
+  --ai-bubble-bg: rgba(255, 255, 255, 0.06);
   --bg-hover: #252525;              /* 悬停状态 */
   --bg-active: #2F2F2F;             /* 激活状态 */
   --bg-input: #1F1F1F;              /* 输入框背景 */
@@ -810,6 +817,11 @@ html.glass:not(.dark) {
      模块卡与顶栏也走这里，避免同一组颜色散落在多处。 */
   --glass-surface-bg: rgba(255, 255, 255, 0.3);
   --glass-chrome-bg: rgba(255, 255, 255, 0.4);
+  /* AI 面板是**悬浮在内容之上**的，比顶栏/侧栏需要更多遮蔽、比吸顶操作栏可以更透。
+     用 --glass-toolbar-bg（0.78）会白得像一块板子，用 --glass-chrome-bg（0.4）
+     又太透 —— 所以单独给一档，配合 blur 才是"液态玻璃"该有的样子。 */
+  --glass-panel-bg: rgba(255, 255, 255, 0.62);
+  --glass-panel-border: rgba(255, 255, 255, 0.72);
 }
 
 /* 深色玻璃：透明度要低于浅色，否则背景提亮后文字对比度不足。
@@ -847,6 +859,12 @@ html.dark.glass {
   /* 深色下表面是"在极光上叠一层白"，量级与 --bg-card 一致 */
   --glass-surface-bg: rgba(255, 255, 255, 0.07);
   --glass-chrome-bg: rgba(255, 255, 255, 0.07);
+  /* 深色浮层用实色深底（与 --glass-overlay-bg 同一思路），叠白会变成白板 */
+  --glass-panel-bg: rgba(38, 38, 38, 0.66);
+  /* ⚠️ 深色下描边不能用 --glass-toolbar-border（rgba(255,255,255,0.18)）——
+      深底上那圈白会在面板边缘形成明显的亮边，看着像一圈浅色阴影。
+      取与 --glass-edge 同量级的值。 */
+  --glass-panel-border: rgba(255, 255, 255, 0.14);
 }
 
 /* ===== 背景层：极光色雾 =====
@@ -1073,9 +1091,11 @@ html.glass .driver-toolbar {
    而不是用普通卡片表面（玻璃态下只有 0.45 不透明，正文会透上来）。
    刻意不叠加 glass-item 钩子：自带全套配方，避免两条规则抢同一个属性。 */
 html.glass .ai-panel {
-  background-color: var(--glass-toolbar-bg, var(--bg-elevated));
-  border-color: var(--glass-toolbar-border, var(--border-color));
+  background-color: var(--glass-panel-bg, var(--bg-elevated));
+  border-color: var(--glass-panel-border, var(--border-color));
+  /* 玻璃三味：白边（上面那条 border-color）+ 内高光 + 浮起柔投影。少一味都会显得像半成品。 */
   box-shadow: var(--glass-shadow), var(--glass-inner);
+  /* 前缀写在标准属性前面（原因见 .driver-toolbar 的注释） */
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(20px) saturate(160%);
 }

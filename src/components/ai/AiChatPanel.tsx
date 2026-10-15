@@ -253,7 +253,7 @@ export function AiChatPanel({
                   </div>
                   <div
                     className={`max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
-                      isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                      isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--ai-bubble-bg)] text-[var(--text-primary)]'
                     }`}
                   >
                     {/* 用户发的图片：缩略图在上、文字在下，点击放大。
@@ -322,7 +322,9 @@ export function AiChatPanel({
             <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--brand-green-10)] text-[var(--brand-green)]">
               <AiMarkIcon className="h-3.5 w-3.5" />
             </div>
-            <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--bg-card)] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--text-primary)]">
+            {/* 流式过程中的气泡必须与落定后的**同一个底色**：
+                否则回答结束的一瞬间气泡会变一次色，很跳。 */}
+            <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--ai-bubble-bg)] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--text-primary)]">
               {renderMarkdown(streamingText)}
               {/* 光标：暗示还在继续输出 */}
               <span className="ml-0.5 inline-block h-3 w-1 translate-y-0.5 animate-pulse bg-[var(--brand-green)]" />
