@@ -107,6 +107,9 @@ pub struct AiPublicConfig {
     pub active_profile_id: String,
     pub profiles: Vec<AiPublicProfile>,
     pub data_dir: String,
+    /// **解析后的真实目录**（配置为空时就是默认位置）。
+    /// 界面要显示"到底存在哪"并支持一键打开，靠前端自己拼是拼不出来的。
+    pub resolved_data_dir: String,
 }
 
 /// 解析后的 AI 数据根目录：配置为空时回落到「数据目录/ai」。
@@ -328,7 +331,8 @@ pub fn read_public_config() -> AiPublicConfig {
                 reasoning_effort: profile.reasoning_effort.clone(),
             })
             .collect(),
-        data_dir: stored.data_dir,
+        data_dir: stored.data_dir.clone(),
+        resolved_data_dir: resolve_data_dir().to_string_lossy().to_string(),
     }
 }
 

@@ -69,7 +69,8 @@
     "profileReady": "Key configured",
     "profileNoKey": "No key yet",
     "profileEdit": "Edit",
-    "profileCancel": "Cancel"
+    "profileCancel": "Cancel",
+    "dataDirOpen": "Open folder"
   },
   "tabs": {
     "ai": "AI assistant",

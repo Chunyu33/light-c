@@ -124,6 +124,17 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
   const [scanResult, setScanResult] = useState<SocialScanResult | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('social-clean', {
+    // 只读读取：分类列表（截图里也是"有哪些聊天软件"这种问法）
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.categories ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.name}  ${formatSize(item.total_size)}  （${item.file_count} 个文件，其中可清理 ${item.deletable_count} 个）`,
+        ),
+      };
+    },
     summary: () => {
       if (!scanResult) return null;
       const apps = scanResult.detected_apps.slice(0, 8).join('、');

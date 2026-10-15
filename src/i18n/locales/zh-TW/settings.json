@@ -69,7 +69,8 @@
     "profileReady": "已設定金鑰",
     "profileNoKey": "還沒有填寫金鑰",
     "profileEdit": "編輯",
-    "profileCancel": "取消"
+    "profileCancel": "取消",
+    "dataDirOpen": "開啟目錄"
   },
   "tabs": {
     "ai": "AI 助手",

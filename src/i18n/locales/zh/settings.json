@@ -69,7 +69,8 @@
     "profileReady": "已配置密钥",
     "profileNoKey": "还没有填写密钥",
     "profileEdit": "编辑",
-    "profileCancel": "取消"
+    "profileCancel": "取消",
+    "dataDirOpen": "打开目录"
   },
   "tabs": {
     "ai": "AI 助手",

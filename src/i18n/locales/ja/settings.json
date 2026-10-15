@@ -69,7 +69,8 @@
     "profileReady": "キー設定済み",
     "profileNoKey": "キー未設定",
     "profileEdit": "編集",
-    "profileCancel": "キャンセル"
+    "profileCancel": "キャンセル",
+    "dataDirOpen": "フォルダーを開く"
   },
   "tabs": {
     "ai": "AI アシスタント",

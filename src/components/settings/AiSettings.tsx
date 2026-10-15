@@ -19,7 +19,7 @@ import {
   setAiDataDir,
   testAiConnection,
 } from '../../api/ai';
-import { pickFolderDialog } from '../../api/commands';
+import { openInFolder, pickFolderDialog } from '../../api/commands';
 import type { AiProviderPreset, AiPublicConfig } from '../../types/ai';
 
 /** 统一的设置行：左侧标题与描述，右侧控件。 */
@@ -251,15 +251,21 @@ export function AiSettings() {
     [activeId, applyConfig],
   );
 
-  /** 新增：直接建一份空档案并切过去，用户接着填密钥即可。 */
-  const handleAddProfile = useCallback(async () => {
-    try {
-      applyConfig(await saveAiProfile({ id: '', name: '', providerId: 'deepseek', baseUrl: '', model: '', apiKey: '' }));
-      setIsEditing(true); // 新增后直接展开，用户接着填密钥即可
-    } catch (error) {
-      setErrorMessage(String(error));
-    }
-  }, [applyConfig]);
+  /**
+   * 新增：**先不建档**，只展开一张空白表单。
+   * 保存成功后才真正创建并出现在列表里 —— 否则列表里会先多出一条半成品配置，
+   * 用户取消掉还留着一条空壳（Evan 反馈过）。
+   */
+  const handleAddProfile = useCallback(() => {
+    setActiveId('');
+    setProviderId('deepseek');
+    setBaseUrl('');
+    setModel('');
+    setModelOptions([]);
+    setApiKey('');
+    setErrorMessage('');
+    setIsEditing(true);
+  }, []);
 
   const handleDeleteProfile = useCallback(
     async (profileId: string) => {
@@ -298,6 +304,17 @@ export function AiSettings() {
     if (saved) applyConfig(saved);
     setIsEditing(false);
   }, [saved, applyConfig]);
+
+  /** 打开 AI 数据目录（用系统文件管理器）。目录不存在时提示一下，不要静默失败。 */
+  const handleOpenDataDir = useCallback(async () => {
+    const target = saved?.resolvedDataDir;
+    if (!target) return;
+    try {
+      await openInFolder(target);
+    } catch (error) {
+      setErrorMessage(String(error));
+    }
+  }, [saved]);
 
   /**
    * 选择 AI 数据目录。reset = 恢复默认位置（跟随主数据目录）。
@@ -454,40 +471,6 @@ export function AiSettings() {
 
           </>) : null}
 
-          <div className="border-t border-[var(--border-color)] pt-5">
-            <SettingRow
-              title={t('aiAssistant.dataDir')}
-              description={t('aiAssistant.dataDirDesc')}
-            >
-              {/* 用"选文件夹"而不是手输：这是给普通用户用的设置，
-                  手打路径既容易打错，也没法确认那个目录到底能不能写。
-                  AI 数据目录是**全局**设置，不属于任何一份服务商档案。 */}
-              <div className="flex items-center gap-2">
-                <span
-                  className="max-w-[18em] truncate text-xs text-[var(--text-muted)]"
-                  title={dataDir || t('aiAssistant.dataDirDefault')}
-                >
-                  {dataDir || t('aiAssistant.dataDirDefault')}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void handlePickDataDir(false)}
-                  className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
-                >
-                  {t('aiAssistant.dataDirPick')}
-                </button>
-                {dataDir ? (
-                  <button
-                    type="button"
-                    onClick={() => void handlePickDataDir(true)}
-                    className="shrink-0 rounded-xl px-2 py-2 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
-                  >
-                    {t('aiAssistant.dataDirReset')}
-                  </button>
-                ) : null}
-              </div>
-            </SettingRow>
-          </div>
 
           {/* 动作行也只在编辑态出现：不编辑时看到「保存」会让人以为有未保存的改动 */}
           {isEditing ? (
@@ -543,6 +526,46 @@ export function AiSettings() {
             <p className="text-xs text-[var(--text-muted)]">{t('aiAssistant.loading')}</p>
           ) : null}
         </div>
+      </div>
+
+      {/* AI 数据目录：**全局设置**，不属于任何一份厂商档案，所以单独一张卡片。
+          厂商卡片回答"用哪家模型"，这张回答"东西存在哪"，是两件事。 */}
+      <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5">
+        <SettingRow title={t('aiAssistant.dataDir')} description={t('aiAssistant.dataDirDesc')}>
+          <div className="flex items-center gap-2">
+            {/* 直接显示解析后的**真实路径**：用户问的就是"到底存在哪"，
+                只写一句"数据目录下的 ai 文件夹"等于没回答。 */}
+            <span
+              className="max-w-[20em] truncate text-xs text-[var(--text-muted)]"
+              title={saved?.resolvedDataDir || ''}
+            >
+              {saved?.resolvedDataDir || t('aiAssistant.dataDirDefault')}
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleOpenDataDir()}
+              className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+            >
+              {t('aiAssistant.dataDirOpen')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handlePickDataDir(false)}
+              className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+            >
+              {t('aiAssistant.dataDirPick')}
+            </button>
+            {dataDir ? (
+              <button
+                type="button"
+                onClick={() => void handlePickDataDir(true)}
+                className="shrink-0 rounded-xl px-2 py-2 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
+              >
+                {t('aiAssistant.dataDirReset')}
+              </button>
+            ) : null}
+          </div>
+        </SettingRow>
       </div>
 
       <p className="text-xs text-[var(--text-muted)] leading-relaxed">{t('aiAssistant.privacyNote')}</p>

@@ -88,6 +88,18 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [scanResult, setScanResult] = useState<AiModelScanResult | null>(null);
   // 接入 AI 助手（**只读**：这里只统计占用，不提供删除动作）。
   useAiModuleBridge('ai-models', {
+    // 只读读取：模型列表。之前判成"看总量"的模块不需要下钻，是判错了 ——
+    // 这个模块界面上本来就是一列模型，用户当然会问"具体是哪几个"。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.sources ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) => `${item.path}  ${formatSize(item.total_size)}  （${item.model_count} 个模型）`,
+        ),
+      };
+    },
     summary: () => {
       if (!scanResult) return null;
       return [

@@ -43,6 +43,8 @@ export interface AiPublicConfig {
   profiles: AiPublicProfile[];
   /** 自定义 AI 数据目录；为空表示跟随主数据目录（全局设置，不属于某份档案） */
   dataDir: string;
+  /** 解析后的真实目录，界面直接显示并支持一键打开 */
+  resolvedDataDir: string;
 }
 
 /**
