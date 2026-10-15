@@ -78,6 +78,25 @@ export function AiChatPanel({
   const [draft, setDraft] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /** 输入框节点：高度要跟着内容长，所以需要拿到它量 scrollHeight */
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * 输入框随内容长高。
+   *
+   * 顺序有讲究：**先归零再按 scrollHeight 设高** —— 直接设 scrollHeight 的话，
+   * 删字时高度只会增不会减（scrollHeight 不会自己变小）。
+   *
+   * 上下限交给 CSS 的 min-h / max-h，这里只给"自然高度"：
+   * 将来调边界不用改这段逻辑。⚠️ max-h 里额外叠了 30vh ——
+   * 窗口很矮时不能让它把上面的消息列表整个挤没（与弹窗尺寸同一套写法）。
+   */
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+  }, [draft]);
   /** 待发送的图片（已压缩）。发出去即清空 —— 图片不进会话历史。 */
   const [attachments, setAttachments] = useState<AttachedImage[]>([]);
   /** 附件相关的提示（压缩失败、超出张数等），显示在输入区左下角 */
@@ -419,7 +438,11 @@ export function AiChatPanel({
           </div>
         ) : null}
 
+        {/* ⚠️ 注释不能写在属性之间（rows={1} 那一带是属性位置，只能放属性）。
+            rows 只是初始值：真实高度由上面的 effect 按内容算。
+            真正定边界的是 min-h / max-h —— 少了 max-h，长提示词会一直长到把消息区挤没。 */}
         <textarea
+          ref={textareaRef}
           value={draft}
           disabled={!canChat}
           onChange={(event) => setDraft(event.target.value)}
@@ -438,9 +461,9 @@ export function AiChatPanel({
               handleSubmit();
             }
           }}
-          rows={2}
+          rows={1}
           placeholder={canChat ? t('inputPlaceholder') : t('needConfigPlaceholder')}
-          className="min-h-[3em] w-full resize-none bg-transparent px-0.5 text-xs leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-[3em] max-h-[min(13em,30vh)] w-full resize-none overflow-y-auto bg-transparent px-0.5 text-xs leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <div className="flex items-center justify-between gap-2">
           {/* 左侧：附件出错优先显示（刚发生的事），否则是未配置指引，都为空时保持安静 */}
