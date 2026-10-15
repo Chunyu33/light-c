@@ -81,6 +81,18 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [files, setFiles] = useState<LargeFileEntry[]>([]);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('big-files', {
+    // 只读：单条详情。itemId 是 read_items 行首的完整路径。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      const file = files.find((item) => item.path === wanted || wanted.startsWith(item.path));
+      if (!file) return null;
+      return [
+        `路径：${file.path}`,
+        `大小：${formatSize(file.size)}`,
+        `来源：${file.source_label || '未知来源'}`,
+        `风险等级：${file.risk_level}`,
+      ].join('\n');
+    },
     // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
     readItems: (_targetId, offset, limit) => {
       if (files.length === 0) return null;

@@ -251,6 +251,24 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           .map((file) => `${file.path}  ${formatSize(file.size)}`),
       };
     },
+    // 只读：单条详情。itemId 就是 read_items 里行首那个完整路径 ——
+    // 用 startsWith 兜一下，模型偶尔会把后面的说明文字一起带上。
+    readItemDetail: (itemId) => {
+      const result = deepScanResult ?? scanResult;
+      const wanted = itemId.trim();
+      if (!result || !wanted) return null;
+      for (const category of result.categories) {
+        const file = category.files.find((item) => item.path === wanted || wanted.startsWith(item.path));
+        if (!file) continue;
+        return [
+          `路径：${file.path}`,
+          `大小：${formatSize(file.size)}`,
+          `所属分类：${category.display_name}（${category.description}）`,
+          `分类风险等级：${category.risk_level}`,
+        ].join('\n');
+      }
+      return null;
+    },
     // P3b：AI 提案 + 用户确认之后才会走到这里。
     // **复用 handleDelete**（不另写删除逻辑），并显式把目标路径传进去 ——
     // 刚写进 state 的勾选在同一个 tick 里读不到。

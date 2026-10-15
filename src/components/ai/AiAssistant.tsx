@@ -399,11 +399,18 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         // 模型连"提议删除"的入口都看不到，也就无从提议。
         const actions = getModuleActions(moduleId);
         const tools: string[] = [];
-        if (actions?.selectItems) tools.push('select_items');
-        if (actions?.deleteItems) tools.push('propose_delete');
-        // 只读工具：登记了读取能力才声明。没实现的模块，模型压根不知道自己能往下看。
+
+        // 只读工具：登记了读取能力就声明 —— 它们不改任何东西，
+        // 用户问「这里有什么」正是该直接读的时候。
         if (actions?.readItems) tools.push('read_items');
         if (actions?.readItemDetail) tools.push('read_item_detail');
+
+        // 会改数据的工具：**只在这次看起来是在要求动手时**才声明。
+        // 这是请求层的兜底：提示词只能劝住模型，不给工具才是真正的约束。
+        if (looksLikeActionRequest(nextMessages)) {
+          if (actions?.selectItems) tools.push('select_items');
+          if (actions?.deleteItems) tools.push('propose_delete');
+        }
 
         // 一律走流式。工具调用以前会因此丢掉，所以当时只能"带工具就不流式"——
         // 代价是垃圾清理这类模块**永远看不到边生成边显示**，得不偿失。
@@ -537,10 +544,57 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
  * 裁剪历史：始终保留 system 消息，其余按"最近 N 条"截断。
  * 目的是先把上下文成本压住 —— 更聪明的滚动摘要属于后续版本。
  */
+/**
+ * 看起来像"在要求动手"的表达。
+ *
+ * 命中才把**会改数据**的工具声明给模型 —— 这是请求层的硬约束，
+ * 比在提示词里反复叮嘱可靠得多：提示词只能"劝"，不给工具是"不能"。
+ *
+ * ⚠️ 刻意做得**保守**：宁可漏判（该动时没动，助手会反问一句），
+ * 也不要误判（不该动时动了，弹出一张删除卡片）。
+ */
+const ACTION_HINTS = ['删', '清理', '清掉', '清空', '勾选', '勾上', '选中', 'delete', 'remove'];
+
+/** 最近两条消息里出现动手类词就算"在要求操作"。看两条是为了兼容"助手反问、用户回答『对』"这一步。 */
+function looksLikeActionRequest(messages: AiChatMessage[]): boolean {
+  const recent = messages
+    .filter((message) => message.role !== 'system')
+    .slice(-2)
+    .map((message) => message.content.toLowerCase());
+  return recent.some((text) => ACTION_HINTS.some((hint) => text.includes(hint)));
+}
+
+/**
+ * 被裁掉的那部分历史压成一段摘要。
+ *
+ * **在本地做，不额外调模型** —— 多一次请求既慢又要花钱，而这些内容本来也不复杂：
+ * 有价值的只是"问过什么、执行过什么"。保留这两样，早期的上下文就不会彻底消失。
+ */
+function summarizeDropped(dropped: AiChatMessage[]): string {
+  const asked = dropped
+    .filter((message) => message.role === 'user')
+    .map((message) => message.content.split('\n')[0].slice(0, 40))
+    .filter(Boolean);
+  // 工具执行结果也是 assistant 消息，但内容以结论句开头，单独收一行更有用
+  const acted = dropped
+    .filter((message) => message.role === 'assistant' && message.content.startsWith('已'))
+    .map((message) => message.content.slice(0, 60));
+
+  const parts: string[] = [];
+  if (asked.length > 0) parts.push(`用户此前问过：${asked.join('；')}`);
+  if (acted.length > 0) parts.push(`期间执行过：${acted.join('；')}`);
+  if (parts.length === 0) return '';
+  return `【更早的对话摘要（原始消息已从上下文移除）】${parts.join('。')}。需要细节时请让用户重新说明，不要凭这段摘要编造具体数字。`;
+}
+
 function trimHistory(messages: AiChatMessage[]): AiChatMessage[] {
   const systems = messages.filter((message) => message.role === 'system');
   const rest = messages.filter((message) => message.role !== 'system');
-  const kept = rest.slice(Math.max(0, rest.length - MAX_HISTORY_MESSAGES));
+  const cutIndex = Math.max(0, rest.length - MAX_HISTORY_MESSAGES);
+  const kept = rest.slice(cutIndex);
+  // 被裁掉的部分不直接丢：压成一段摘要，作为额外的 system 内容带上。
+  // （两个协议的构造都会把 system 消息提出去，所以放这里是对的。）
+  const droppedSummary = cutIndex > 0 ? summarizeDropped(rest.slice(0, cutIndex)) : '';
 
   // **只保留最近一条消息里的图片**。
   // 图片是 base64 进请求的，而对话无状态、整个历史每轮重发 ——
@@ -556,5 +610,8 @@ function trimHistory(messages: AiChatMessage[]): AiChatMessage[] {
     return { ...message, images: undefined };
   });
 
-  return [...systems, ...trimmed.reverse()];
+  const summaryMessage: AiChatMessage[] = droppedSummary
+    ? [{ role: 'system', content: droppedSummary }]
+    : [];
+  return [...systems, ...summaryMessage, ...trimmed.reverse()];
 }

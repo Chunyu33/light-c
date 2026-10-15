@@ -65,6 +65,20 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   const [scanResult, setScanResult] = useState<LeftoverScanResult | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('leftovers', {
+    // 只读：单条详情。itemId 是 read_items 行首的完整路径。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      const item = (scanResult?.leftovers ?? []).find(
+        (entry) => entry.path === wanted || wanted.startsWith(entry.path),
+      );
+      if (!item) return null;
+      return [
+        `路径：${item.path}`,
+        `关联应用：${item.app_name}`,
+        `大小：${formatSize(item.size)}（${item.file_count} 个文件）`,
+        `来源：${item.source}`,
+      ].join('\n');
+    },
     // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
     readItems: (_targetId, offset, limit) => {
       const list = scanResult?.leftovers ?? [];
