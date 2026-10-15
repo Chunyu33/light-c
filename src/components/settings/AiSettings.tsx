@@ -92,6 +92,9 @@ export function AiSettings() {
   const [dataDir, setDataDir] = useState('');
   // 当前正在编辑的档案 id。表单里的字段都属于它。
   const [activeId, setActiveId] = useState('');
+  // 思考强度。**默认空 = 不发这个参数** —— 无法自动探测模型是否支持，
+  // 发了不支持的模型可能直接报错，所以默认保持安静。
+  const [reasoningEffort, setReasoningEffort] = useState('');
   /**
    * 是否展开了编辑区。
    * 列表默认是**只读**的：字段只在点「编辑」或「新增」时展开，
@@ -116,6 +119,7 @@ export function AiSettings() {
         setModel(active?.model || '');
         // 模型下拉直接读档案里缓存的列表：重启后也还在，不用每次进来重新拉
         setModelOptions(active?.models ?? []);
+        setReasoningEffort(active?.reasoningEffort ?? '');
         setDataDir(config.dataDir || '');
 
         // 模型列表为空时自动拉一次：用户不该为了"看见有哪些模型"先去点一次测试连接。
@@ -171,7 +175,15 @@ export function AiSettings() {
   const persist = useCallback(async () => {
     // 密钥留空 = 后端沿用已保存的（前端只拿得到掩码，回传不了明文）
     // name 原样带回：档案名由用户维护，这里不该覆盖掉
-    const next = await saveAiProfile({ id: activeId, name: activeProfile?.name ?? '', providerId, baseUrl, model, apiKey });
+    const next = await saveAiProfile({
+      id: activeId,
+      name: activeProfile?.name ?? '',
+      providerId,
+      baseUrl,
+      model,
+      apiKey,
+      reasoningEffort,
+    });
     // 数据目录是全局的，单独保存；它不属于任何一份档案
     const withDir = await setAiDataDir(dataDir);
     setSaved(withDir);
@@ -181,7 +193,7 @@ export function AiSettings() {
     if (active) setActiveId(active.id);
     setApiKey(''); // 保存成功后清空输入框，回到"掩码显示"状态
     return next;
-  }, [activeId, providerId, baseUrl, model, apiKey, dataDir]);
+  }, [activeId, providerId, baseUrl, model, apiKey, reasoningEffort, dataDir]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -233,6 +245,7 @@ export function AiSettings() {
       setBaseUrl(active?.baseUrl || preset?.baseUrl || '');
       setModel(active?.model || '');
       setModelOptions(active?.models ?? []);
+      setReasoningEffort(active?.reasoningEffort ?? '');
       setApiKey('');
       setErrorMessage('');
     },
@@ -465,6 +478,28 @@ export function AiSettings() {
                   widthClass="w-64"
                 />
               )}
+            </SettingRow>
+          </div>
+
+          {/* 思考强度：只在用户主动选择时才发送。
+              ⚠️ 无法自动探测模型支持与否（模型列表不返回能力信息），
+              所以默认留空不发送 —— 这比替用户猜要不要发更可靠。 */}
+          <div className="border-t border-[var(--border-color)] pt-5">
+            <SettingRow
+              title={t('aiAssistant.reasoningEffort')}
+              description={t('aiAssistant.reasoningEffortDesc')}
+            >
+              <Select<string>
+                value={reasoningEffort}
+                options={[
+                  { value: '', label: t('aiAssistant.reasoningDefault') },
+                  { value: 'low', label: 'low' },
+                  { value: 'medium', label: 'medium' },
+                  { value: 'high', label: 'high' },
+                ]}
+                onChange={setReasoningEffort}
+                widthClass="w-64"
+              />
             </SettingRow>
           </div>
 

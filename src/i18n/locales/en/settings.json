@@ -70,7 +70,10 @@
     "profileNoKey": "No key yet",
     "profileEdit": "Edit",
     "profileCancel": "Cancel",
-    "dataDirOpen": "Open folder"
+    "dataDirOpen": "Open folder",
+    "reasoningEffort": "Reasoning effort",
+    "reasoningDefault": "Default (do not send)",
+    "reasoningEffortDesc": "Only some models support this. Leave it at default if unsure; if the API reports an error, set it back."
   },
   "tabs": {
     "ai": "AI assistant",

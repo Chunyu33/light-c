@@ -70,7 +70,10 @@
     "profileNoKey": "キー未設定",
     "profileEdit": "編集",
     "profileCancel": "キャンセル",
-    "dataDirOpen": "フォルダーを開く"
+    "dataDirOpen": "フォルダーを開く",
+    "reasoningEffort": "思考の強度",
+    "reasoningDefault": "既定（このパラメーターを送らない）",
+    "reasoningEffortDesc": "一部のモデルのみ対応しています。不明な場合は既定のままにしてください。"
   },
   "tabs": {
     "ai": "AI アシスタント",

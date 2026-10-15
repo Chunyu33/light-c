@@ -70,7 +70,10 @@
     "profileNoKey": "還沒有填寫金鑰",
     "profileEdit": "編輯",
     "profileCancel": "取消",
-    "dataDirOpen": "開啟目錄"
+    "dataDirOpen": "開啟目錄",
+    "reasoningEffort": "思考強度",
+    "reasoningDefault": "預設（不送出這個參數）",
+    "reasoningEffortDesc": "只有部分模型支援。不確定就保持預設；設定後若介面報錯，改回預設即可。"
   },
   "tabs": {
     "ai": "AI 助手",

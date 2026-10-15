@@ -70,7 +70,10 @@
     "profileNoKey": "还没有填写密钥",
     "profileEdit": "编辑",
     "profileCancel": "取消",
-    "dataDirOpen": "打开目录"
+    "dataDirOpen": "打开目录",
+    "reasoningEffort": "思考强度",
+    "reasoningDefault": "默认（不发送这个参数）",
+    "reasoningEffortDesc": "只有部分模型支持。拿不准就保持默认；设置后若接口报错，改回默认即可。"
   },
   "tabs": {
     "ai": "AI 助手",

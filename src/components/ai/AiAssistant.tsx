@@ -136,6 +136,8 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           baseUrl: activeProfile.baseUrl,
           model,
           apiKey: '', // 留空 = 不改动已保存的密钥
+          // 原样带回：这一项用户在设置里配过，切换模型不该把它清掉
+          reasoningEffort: activeProfile.reasoningEffort,
         });
         setAiConfig(next);
       } catch (error) {
@@ -209,6 +211,8 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   useEffect(() => {
     setPendingDelete(null);
     setDeleteResult(null);
+    // 错误提示同样是"上一个模块的"：不清就会串到别的模块对话框里
+    setErrorMessage('');
   }, [activeModuleId]);
 
   /** 用户点了「确认删除」：这时才真正调用模块的删除入口。 */

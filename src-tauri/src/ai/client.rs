@@ -9,7 +9,9 @@
 use super::config::read_config;
 use super::presets::{find_preset, AiProtocol};
 use super::stream::StreamDecoder;
-use super::tools::{anthropic_tools, openai_tools, parse_tool_calls, AiToolCall};
+use super::tools::{
+    anthropic_tools, extract_inline_tool_calls, openai_tools, parse_tool_calls, AiToolCall,
+};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 /// 对话超时：LLM 首字延迟可能较久，给宽松一些。
@@ -135,6 +137,30 @@ fn http_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
 
 /// 取"当前生效"的连接信息：预设里的协议 + 配置里的地址/密钥/模型。
 /// 地址留空时回落到预设默认值，用户只填密钥也能用。
+/// 把档案里配置的"思考强度"挂到请求体上。
+///
+/// ⚠️ **无法自动探测哪些模型支持**：`/models` 只返回模型名，不含能力信息。
+/// 所以做法是"用户设了才发"，并且只走 OpenAI 兼容协议 —— 那是国内多数服务商
+/// 采用的字段名；Anthropic 的思考是 `thinking` 对象、形状完全不同，不在这里猜测。
+///
+/// 不支持的模型收到这个字段：有的直接忽略，有的会报错。后者会在界面上看到原文，
+/// 用户把这一项改回"默认"即可 —— 这比替他猜要不要发要可靠。
+fn attach_reasoning_effort(body: &mut serde_json::Value, protocol: AiProtocol) {
+    if protocol != AiProtocol::OpenAi {
+        return;
+    }
+    let Some(effort) = read_config()
+        .active_profile()
+        .map(|profile| profile.reasoning_effort.trim().to_string())
+    else {
+        return;
+    };
+    if effort.is_empty() {
+        return;
+    }
+    body["reasoning_effort"] = serde_json::json!(effort);
+}
+
 fn resolve_connection() -> Result<(AiProtocol, String, String, String), String> {
     let stored = read_config();
     // 一切以"当前档案"为准：用户切了服务商，下一次调用就该换一套
@@ -310,6 +336,7 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
             body["tools"] = serde_json::json!(declarations);
         }
     }
+    attach_reasoning_effort(&mut body, protocol);
 
     let response = match protocol {
         AiProtocol::OpenAi => {
@@ -347,7 +374,19 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
         AiProtocol::OpenAi => parse_openai_reply(&value),
         AiProtocol::Anthropic => parse_anthropic_reply(&value),
     };
-    let tool_calls = parse_tool_calls(protocol, &value);
+    let mut tool_calls = parse_tool_calls(protocol, &value);
+    let mut content = content;
+
+    // 与流式同样的兜底：模型把调用写成正文文本时，标准解析拿不到
+    if tool_calls.is_empty() {
+        if let Some(text) = content.clone() {
+            let (inline_calls, cleaned) = extract_inline_tool_calls(&text);
+            if !inline_calls.is_empty() {
+                tool_calls = inline_calls;
+                content = Some(cleaned);
+            }
+        }
+    }
 
     // 有工具调用时 content 通常是空的 —— 那是动作意图，不是失败；
     // 两者都没有才算真的没解析出东西。
@@ -439,6 +478,7 @@ where
             body["tools"] = serde_json::json!(declarations);
         }
     }
+    attach_reasoning_effort(&mut body, protocol);
 
     let send = match protocol {
         AiProtocol::OpenAi => {
@@ -500,7 +540,17 @@ where
         on_delta(&delta);
     }
 
-    let tool_calls = decoder.take_tool_calls();
+    let mut tool_calls = decoder.take_tool_calls();
+    // 有些模型（实测轻量档）不走标准 function calling，而是把调用当文本吐在正文里。
+    // 只在标准解析一无所获时兜底 —— 否则会把正文里正常的说明文字也当成调用。
+    if tool_calls.is_empty() {
+        let (inline_calls, cleaned) = extract_inline_tool_calls(&full);
+        if !inline_calls.is_empty() {
+            tool_calls = inline_calls;
+            full = cleaned;
+        }
+    }
+
     // 只有正文空**且**没有工具调用才算真的没内容：
     // 模型决定调工具时正文本来就可能为空，那不是错误。
     if full.trim().is_empty() && tool_calls.is_empty() {

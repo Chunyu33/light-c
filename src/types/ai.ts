@@ -53,6 +53,8 @@ export interface AiPublicConfig {
  * （前端只拿得到掩码，回传不了明文，留空是唯一的"不改"表达方式）。
  */
 export interface AiProfileInput {
+  /** 思考强度；空字符串 = 不发送该参数（默认）。并非所有模型都支持 */
+  reasoningEffort: string;
   id: string;
   name: string;
   providerId: string;

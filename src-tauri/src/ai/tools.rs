@@ -282,6 +282,50 @@ mod tests {
     }
 
     #[test]
+    fn inline_xml_tool_call_is_recognized_and_stripped_from_text() {
+        // 实测：deepseek 轻量档会把调用写成这样的文本，既不会变成 tool_calls，
+        // 还会原样显示给用户。这里必须能认出来，并从正文里剔除。
+        let raw = "I'll read the item list.\n<invoke name=\"read_items\">\n<parameter name=\"module\">AI 模型空间</parameter>\n</invoke>";
+        let (calls, cleaned) = extract_inline_tool_calls(raw);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "read_items");
+        // module 是模型自己起的参数名，要映射回 target_id
+        assert_eq!(
+            calls[0].arguments.get("target_id").and_then(|v| v.as_str()),
+            Some("AI 模型空间")
+        );
+        // 正文里不能再留着那段 XML，否则用户会看到"模型在表演调工具"
+        assert!(!cleaned.contains("<invoke"));
+        assert!(cleaned.contains("I'll read the item list"));
+    }
+
+    #[test]
+    fn inline_list_parameter_splits_on_commas() {
+        let raw = "<invoke name=\"propose_delete\"><parameter name=\"ids\">RecycleBin, WindowsTemp</parameter></invoke>";
+        let (calls, _) = extract_inline_tool_calls(raw);
+        assert_eq!(calls.len(), 1);
+        let ids = calls[0].arguments.get("ids").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(ids.len(), 2);
+    }
+
+    #[test]
+    fn inline_unknown_tool_is_dropped_entirely() {
+        // 没声明过的工具：既不执行，也不该把这段留在正文里
+        let raw = "看看这个 <invoke name=\"run_shell\"><parameter name=\"cmd\">rm -rf /</parameter></invoke>";
+        let (calls, cleaned) = extract_inline_tool_calls(raw);
+        assert!(calls.is_empty());
+        assert!(!cleaned.contains("run_shell"));
+    }
+
+    #[test]
+    fn plain_text_is_left_untouched() {
+        let raw = "这是一个普通回答，里面没有任何工具调用。";
+        let (calls, cleaned) = extract_inline_tool_calls(raw);
+        assert!(calls.is_empty());
+        assert_eq!(cleaned, raw);
+    }
+
+    #[test]
     fn unknown_tools_are_ignored_in_declarations() {
         let names = vec!["select_items".to_string(), "run_shell".to_string()];
         assert_eq!(openai_tools(&names).len(), 1);
@@ -297,4 +341,158 @@ mod tests {
         assert!(anthropic[0].get("input_schema").is_some(), "Anthropic 用 input_schema");
         assert!(anthropic[0].get("function").is_none());
     }
+}
+
+// ---------------------------------------------------------------------------
+// 文本兜底：不是所有模型都老老实实走 function calling
+//
+// 实测（deepseek 的轻量档）会把工具调用**当普通文本吐出来**：
+//
+//   I'll read the item list.
+//   <invoke name="read_items">
+//   <parameter name="module">AI 模型空间</parameter>
+//   </invoke>
+//
+// 后果有三重，而且都很隐蔽：
+//   1. tool_calls 是空的 → 工具不会被执行；
+//   2. 这段文本会**原样显示给用户**，看起来像模型在"表演调工具"；
+//   3. 模型随后还会给自己找台阶（"系统没给我查询接口"）。
+//
+// 所以这里做一层兜底：认出这种写法、还原成标准工具调用，并把它从正文里剔除。
+// ⚠️ 只认我们声明过的工具，参数名也做有限别名映射 —— 宁可漏认，不要乱认。
+// ---------------------------------------------------------------------------
+
+/// 参数别名 → 标准参数名。模型写的是"它觉得应该叫什么"，不是我们的 schema。
+fn canonical_argument(tool: &str, raw_name: &str) -> Option<&'static str> {
+    let name = raw_name.trim().to_ascii_lowercase();
+    match tool {
+        TOOL_READ_ITEMS => {
+            if matches!(name.as_str(), "target_id" | "targetid" | "id" | "module" | "category") {
+                Some("target_id")
+            } else if matches!(name.as_str(), "offset" | "start") {
+                Some("offset")
+            } else if matches!(name.as_str(), "limit" | "count" | "size") {
+                Some("limit")
+            } else {
+                None
+            }
+        }
+        TOOL_READ_ITEM_DETAIL => {
+            if matches!(name.as_str(), "item_id" | "itemid" | "id" | "path" | "item" | "file") {
+                Some("item_id")
+            } else {
+                None
+            }
+        }
+        TOOL_SELECT_ITEMS | TOOL_PROPOSE_DELETE => {
+            if matches!(name.as_str(), "ids" | "id" | "items" | "targets") {
+                Some("ids")
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// 把一段 `<parameter>` 的取值整理成参数值。
+/// ids 这类列表允许模型写成逗号或换行分隔的多个值。
+fn argument_value(canonical: &str, raw: &str) -> Value {
+    let trimmed = raw.trim();
+    if canonical == "ids" {
+        let ids: Vec<Value> = trimmed
+            .split(['\n', ',', '，'])
+            .map(|item| item.trim().trim_matches('"').trim_matches('\'').to_string())
+            .filter(|item| !item.is_empty())
+            .map(Value::String)
+            .collect();
+        return serde_json::json!(ids);
+    }
+    if canonical == "offset" || canonical == "limit" {
+        if let Ok(number) = trimmed.parse::<i64>() {
+            return serde_json::json!(number);
+        }
+    }
+    serde_json::json!(trimmed)
+}
+
+/// 从正文里认出内联的工具调用，返回 (调用列表, 清理过的正文)。
+pub fn extract_inline_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
+    let mut calls: Vec<AiToolCall> = Vec::new();
+    let mut remaining = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+
+    while let Some(open) = content[cursor..].find("<invoke") {
+        let open_at = cursor + open;
+        // 开始标签的结尾
+        let Some(tag_end_rel) = content[open_at..].find('>') else { break };
+        let tag_end = open_at + tag_end_rel;
+        let open_tag = &content[open_at..tag_end];
+        let Some(name) = attribute(open_tag, "name") else {
+            remaining.push_str(&content[cursor..=tag_end]);
+            cursor = tag_end + 1;
+            continue;
+        };
+        // 结束标签；找不到就当这段不是调用，原样保留
+        let Some(close_rel) = content[tag_end..].find("</invoke>") else {
+            cursor = tag_end + 1;
+            continue;
+        };
+        let body_end = tag_end + close_rel;
+        let body = &content[tag_end + 1..body_end];
+        let block_end = body_end + "</invoke>".len();
+
+        // 只认声明过的工具；不认识的整段丢弃（它既不该执行，也不该显示）
+        if matches!(
+            name.as_str(),
+            TOOL_SELECT_ITEMS | TOOL_PROPOSE_DELETE | TOOL_READ_ITEMS | TOOL_READ_ITEM_DETAIL
+        ) {
+            let mut arguments = serde_json::Map::new();
+            let mut rest = body;
+            while let Some(param_open) = rest.find("<parameter") {
+                let Some(param_tag_end_rel) = rest[param_open..].find('>') else { break };
+                let param_tag_end = param_open + param_tag_end_rel;
+                let param_tag = &rest[param_open..param_tag_end];
+                let Some(param_name) = attribute(param_tag, "name") else { break };
+                let Some(param_close_rel) = rest[param_tag_end..].find("</parameter>") else { break };
+                let param_value = &rest[param_tag_end + 1..param_tag_end + param_close_rel];
+                rest = &rest[param_tag_end + param_close_rel + "</parameter>".len()..];
+                if let Some(canonical) = canonical_argument(&name, &param_name) {
+                    arguments.insert(canonical.to_string(), argument_value(canonical, param_value));
+                }
+            }
+            calls.push(AiToolCall {
+                call_id: String::new(),
+                name,
+                arguments: Value::Object(arguments),
+            });
+        }
+
+        // 正文里保留前面已确定的部分，跳过整段调用（含前面那行提示语之外的内容自己处理）
+        remaining.push_str(&content[cursor..open_at]);
+        cursor = block_end;
+    }
+    remaining.push_str(&content[cursor..]);
+
+    // 去掉因剔除调用而留下的连续空行
+    let cleaned = remaining
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    (calls, cleaned.trim().to_string())
+}
+
+/// 从标签里取属性值，支持双引号与单引号。
+fn attribute(tag: &str, key: &str) -> Option<String> {
+    let needle = format!("{}=", key);
+    let start = tag.find(&needle)? + needle.len();
+    let rest = tag[start..].trim_start();
+    let quote = rest.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let inner = &rest[1..];
+    let end = inner.find(quote)?;
+    Some(inner[..end].trim().to_string())
 }
