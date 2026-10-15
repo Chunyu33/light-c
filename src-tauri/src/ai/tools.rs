@@ -95,7 +95,7 @@ fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
             }),
         )),
         TOOL_READ_ITEM_DETAIL => Some((
-            "读取单个条目的完整信息（完整路径、大小、时间等）。\n             ⚠️ 只读操作。item_id 必须是摘要或 read_items 结果里出现过的项。",
+            "读取单个条目的完整信息（完整路径、大小、时间等）。\n             ⚠️ 只读操作，任何时候都可以调用。\n             item_id 用完整路径即可：可以来自摘要、read_items 的结果，**也可以是用户在自己问题里给出的那个路径**（例如行内「咨询 AI 助手」按钮带过来的路径）—— 不确定就先用 read_items 找一下。",
             serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -341,6 +341,72 @@ mod tests {
         assert!(anthropic[0].get("input_schema").is_some(), "Anthropic 用 input_schema");
         assert!(anthropic[0].get("function").is_none());
     }
+
+    // ---- 手写解析器的边界：这几条都是曾经出过问题、或者一改就容易踩的地方 ----
+
+    #[test]
+    fn attributes_are_matched_on_whole_names_only() {
+        // `username=` 里也含 "name=" —— 必须按属性名边界匹配，
+        // 否则会把 "admin" 当成 name，真正的 name 反而取不到。
+        let tag = "<invoke username=\"admin\" name=\"read_items\"";
+        assert_eq!(attribute(tag, "name").as_deref(), Some("read_items"));
+        assert_eq!(
+            attribute("<invoke name=\"read_items\"", "name").as_deref(),
+            Some("read_items")
+        );
+    }
+
+    #[test]
+    fn a_well_formed_inline_call_is_extracted_and_removed_from_the_body() {
+        let content = "先说明一下。\n<invoke name=\"read_items\"><parameter name=\"offset\">0</parameter></invoke>\n后面还有话。";
+        let (calls, cleaned) = extract_inline_tool_calls(content);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "read_items");
+        assert_eq!(
+            calls[0].arguments.get("offset").and_then(|value| value.as_i64()),
+            Some(0)
+        );
+        assert!(cleaned.contains("先说明一下。"), "实际: {}", cleaned);
+        assert!(cleaned.contains("后面还有话。"), "实际: {}", cleaned);
+        assert!(!cleaned.contains("<invoke"), "调用块应被剔除，实际: {}", cleaned);
+    }
+
+    #[test]
+    fn an_unclosed_invoke_tag_keeps_the_text_before_it() {
+        // 模型吐了半个标签时，开标签之前的正文**不能丢** ——
+        // 早先那里只推进 cursor、不把正文补回来，整段会被吞掉（而正文是要显示也要入库的）。
+        let content = "这一段必须留下来。\n<invoke name=\"read_items\">";
+        let (calls, cleaned) = extract_inline_tool_calls(content);
+        assert!(calls.is_empty(), "残缺的调用不该被执行");
+        assert!(
+            cleaned.contains("这一段必须留下来。"),
+            "正文被吞了，实际: {}",
+            cleaned
+        );
+    }
+
+    #[test]
+    fn paragraph_breaks_in_the_body_are_preserved() {
+        // 剔掉调用块之后只能压多余空行；正文自己的空行是 Markdown 的段落分隔，要留着。
+        let content = "第一段\n\n第二段\n\n<invoke name=\"read_items\"></invoke>";
+        let (calls, cleaned) = extract_inline_tool_calls(content);
+        assert_eq!(calls.len(), 1);
+        assert!(
+            cleaned.contains("第一段\n\n第二段"),
+            "段落分隔被压掉了，实际: {:?}",
+            cleaned
+        );
+    }
+
+    #[test]
+    fn an_unclosed_invoke_tag_does_not_swallow_the_tail() {
+        // 连 '>' 都没有的碎片：整段都得原样留下，不能因为"找不到开标签结尾"就丢内容
+        let content = "前面的正文。\n<invoke name=\"read_items\"";
+        let (calls, cleaned) = extract_inline_tool_calls(content);
+        assert!(calls.is_empty());
+        assert!(cleaned.contains("前面的正文。"), "实际: {}", cleaned);
+        assert!(cleaned.contains("read_items"), "残片本身也该留在正文里: {}", cleaned);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -424,17 +490,16 @@ pub fn extract_inline_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
 
     while let Some(open) = content[cursor..].find("<invoke") {
         let open_at = cursor + open;
-        // 开始标签的结尾
-        let Some(tag_end_rel) = content[open_at..].find('>') else { break };
-        let tag_end = open_at + tag_end_rel;
-        let open_tag = &content[open_at..tag_end];
-        let Some(name) = attribute(open_tag, "name") else {
-            remaining.push_str(&content[cursor..=tag_end]);
-            cursor = tag_end + 1;
-            continue;
+        // 开标签连 '>' 都没有：后面不可能再出现完整调用，剩下的正文交给循环外收尾
+        let Some(tag_end) = content[open_at..].find('>').map(|relative| open_at + relative) else {
+            break;
         };
-        // 结束标签；找不到就当这段不是调用，原样保留
-        let Some(close_rel) = content[tag_end..].find("</invoke>") else {
+        let name = attribute(&content[open_at..tag_end], "name");
+        // 结束标签同样必须在 —— 缺 name 或缺结束标签，都说明这段不构成调用。
+        // ⚠️ 这时**必须把开标签之前的正文原样补回去**：早先这里只推进 cursor 不补正文，
+        // 模型吐了半个标签的时候，它前面那整段正文会被静默丢掉（而这段是要显示、也要入库的）。
+        let (Some(name), Some(close_rel)) = (name, content[tag_end..].find("</invoke>")) else {
+            remaining.push_str(&content[cursor..=tag_end]);
             cursor = tag_end + 1;
             continue;
         };
@@ -474,19 +539,49 @@ pub fn extract_inline_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
     }
     remaining.push_str(&content[cursor..]);
 
-    // 去掉因剔除调用而留下的连续空行
-    let cleaned = remaining
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
-    (calls, cleaned.trim().to_string())
+    // 只压掉"剔除调用块"留下的多余空行。**不能一路 filter 掉所有空行** ——
+    // 那会把正文自己本来就有的空行也删掉，Markdown 的段落分隔就没了。
+    (calls, collapse_blank_lines(&remaining).trim().to_string())
+}
+
+/// 把连续空行压成一个：剔除调用块之后容易留下成片空白。
+fn collapse_blank_lines(text: &str) -> String {
+    let mut lines: Vec<&str> = Vec::new();
+    let mut consecutive_blank = 0usize;
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            consecutive_blank += 1;
+            // 最多留一个空行，多出来的直接不要
+            if consecutive_blank > 1 {
+                continue;
+            }
+        } else {
+            consecutive_blank = 0;
+        }
+        lines.push(line);
+    }
+    lines.join("\n")
 }
 
 /// 从标签里取属性值，支持双引号与单引号。
+///
+/// ⚠️ 必须按**属性名边界**查找：直接 `find("name=")` 会被 `username=`、`data-name=`
+/// 这类属性命中，把它们的值当成 name。
 fn attribute(tag: &str, key: &str) -> Option<String> {
     let needle = format!("{}=", key);
-    let start = tag.find(&needle)? + needle.len();
+    // 从前往后逐个候选位置试，只接受"前面是空白、或者就在标签开头"的那个
+    let mut search_from = 0usize;
+    let start = loop {
+        let found = tag[search_from..].find(&needle)? + search_from;
+        let preceded_by_boundary = match tag[..found].chars().next_back() {
+            None => true,
+            Some(character) => character.is_whitespace(),
+        };
+        if preceded_by_boundary {
+            break found + needle.len();
+        }
+        search_from = found + needle.len();
+    };
     let rest = tag[start..].trim_start();
     let quote = rest.chars().next()?;
     if quote != '"' && quote != '\'' {

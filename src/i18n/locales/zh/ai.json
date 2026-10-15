@@ -8,6 +8,11 @@
   "send": "发送",
   "thinking": "正在思考…",
   "askHint": "咨询 AI 助手",
+  "askQuestion": {
+    "file": "文件「{{target}}」是什么？有什么作用？可以删除吗，删除后可能有什么影响？",
+    "folder": "文件夹「{{target}}」是做什么用的？可以删除吗，删除后可能有什么影响？",
+    "model": "AI 模型「{{target}}」是什么？占用这么大正常吗？可以删除吗，删除后可能有什么影响？"
+  },
   "resizeHint": "拖动调整大小，双击恢复默认",
   "resizeHintCustom": "拖动调整大小，双击恢复默认",
   "tool": {
@@ -44,5 +49,6 @@
   "attachTooMany": "最多一次带 {{count}} 张图片",
   "previewImage": "点击放大查看",
   "streamTimeout": "长时间没有收到回应，已中止这一次请求。可以重试，或换个模型 / 服务商试试。",
+  "switchModelFailed": "切换模型没有成功：{{message}}",
   "ballBadge": "AI"
 }

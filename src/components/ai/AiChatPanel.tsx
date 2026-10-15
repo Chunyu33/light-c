@@ -133,12 +133,18 @@ export function AiChatPanel({
   };
   /** 刚复制成功的那条消息序号：图标短暂变成对勾，给"确实复制了"一个反馈 */
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  /** 复制反馈的定时器句柄：卸载时要清掉，否则面板收起后回调还会跑，连点还会叠出好几个 */
+  const copyResetHandleRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(copyResetHandleRef.current), []);
 
   const handleCopy = async (content: string, index: number) => {
     try {
       await navigator.clipboard.writeText(content);
       setCopiedIndex(index);
-      setTimeout(
+      // 先清掉上一个：连点两次不该留下两个回调
+      window.clearTimeout(copyResetHandleRef.current);
+      copyResetHandleRef.current = window.setTimeout(
         () => setCopiedIndex((previous) => (previous === index ? null : previous)),
         1500,
       );
@@ -147,16 +153,47 @@ export function AiChatPanel({
     }
   };
 
-  // 新消息进来时滚到底部；用 scrollTop 而不是 scrollIntoView，避免连带滚动整个页面。
+  /**
+   * 是否跟随到底部。
+   *
+   * 为什么需要这个开关：流式输出时**每个增量都会触发跟随** —— 无条件拉到底的话，
+   * 用户想往回读上半段会被每一帧拽回来，等于没法回看。所以只在"他本来就贴着底部"
+   * 时跟随；往上滚就停止跟随，自己滚回底部（或重新发消息）才恢复。
+   */
+  const stickToBottomRef = useRef(true);
+
+  /** 距底部多少像素以内算"还贴着底"。字号缩放与浮点累积都可能差几像素。 */
+  const FOLLOW_BOTTOM_THRESHOLD_PX = 24;
+
+  const handleListScroll = () => {
+    const node = listRef.current;
+    if (!node) return;
+    // scrollHeight - clientHeight - scrollTop 就是"离底部还有多远"
+    const overflow = node.scrollHeight - node.clientHeight;
+    // 内容不足一屏时不存在"贴不贴底"，直接恢复跟随 ——
+    // 否则清空会话之后会一直卡在"不跟随"，新回答不再自动滚动。
+    stickToBottomRef.current =
+      overflow <= FOLLOW_BOTTOM_THRESHOLD_PX ||
+      overflow - node.scrollTop <= FOLLOW_BOTTOM_THRESHOLD_PX;
+  };
+
+  // 消息、流式增量、发送状态变化时跟随到底部；用 scrollTop 而不是 scrollIntoView，
+  // 避免连带滚动整个页面。
+  //
+  // ⚠️ 依赖里必须有 streamingText：正文是一段段追加的，而 messages 在整轮结束前
+  // 不会变 —— 少了它，流式输出期间就完全不会滚动，只有回答落定那一下才跳到底部。
   useEffect(() => {
     const node = listRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [messages, isSending]);
+    if (!node || !stickToBottomRef.current) return;
+    node.scrollTop = node.scrollHeight;
+  }, [messages, streamingText, isSending]);
 
   const handleSubmit = () => {
     const text = draft.trim();
     // 只有图片没有文字也允许发送：用户常常是截个图问"这些能删吗"
     if ((!text && attachments.length === 0) || isSending || !canChat) return;
+    // 用户主动发了消息：无论刚才翻到哪儿都回到跟随状态，否则自己的消息会落在视口外
+    stickToBottomRef.current = true;
     onSend(text, attachments);
     setDraft('');
     setAttachments([]);
@@ -244,7 +281,7 @@ export function AiChatPanel({
         </button>
       </header>
 
-      <div ref={listRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
+      <div ref={listRef} onScroll={handleListScroll} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
         {visibleMessages.length === 0 ? (
           <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('emptyHint')}</p>
         ) : (

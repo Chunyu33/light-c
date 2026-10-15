@@ -1,7 +1,7 @@
 {
   "name": "light-c",
   "private": true,
-  "version": "2.16.16",
+  "version": "2.17.0",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": {

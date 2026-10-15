@@ -8,6 +8,11 @@
   "send": "Send",
   "thinking": "Thinking…",
   "askHint": "Ask the AI assistant",
+  "askQuestion": {
+    "file": "What is the file \"{{target}}\"? What is it for? Is it safe to delete, and what could happen if I do?",
+    "folder": "What is the folder \"{{target}}\" used for? Is it safe to delete, and what could happen if I do?",
+    "model": "What is the AI model \"{{target}}\"? Is it normal for it to take up this much space? Is it safe to delete, and what could happen if I do?"
+  },
   "resizeHint": "Drag to resize, double-click to reset",
   "resizeHintCustom": "Drag to resize, double-click to reset",
   "tool": {
@@ -44,5 +49,6 @@
   "attachTooMany": "Up to {{count}} images at a time",
   "previewImage": "Click to enlarge",
   "streamTimeout": "No response for a long time, so this request was stopped. Try again, or switch model or provider.",
+  "switchModelFailed": "Could not switch to that model: {{message}}",
   "ballBadge": "AI"
 }

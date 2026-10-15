@@ -32,6 +32,25 @@ pub struct AiSessionMessage {
     pub images: Vec<String>,
     /// Unix 毫秒时间戳，便于按时间排序与展示
     pub at: i64,
+    /// 思考模式下这一轮的思维链。
+    ///
+    /// **落盘是必须的**：服务端要求请求带 tools 时把 assistant 的 reasoning_content
+    /// 原样回传（不回传 400），而重启后从磁盘恢复的历史同样要带着它发出去。
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
+    /// 这条 assistant 消息是**本地生成的**（工具查询结果），不是模型说的话。
+    ///
+    /// 发请求时要按用户侧内容对待 —— 一旦当成 assistant，就会变成
+    /// "一条没有 reasoning_content 的 assistant"，带 tools 的请求会被服务端 400 拒掉。
+    #[serde(default)]
+    pub local_tool_output: bool,
+    /// 产出这条回复的**档案 id**。
+    ///
+    /// 思维链只对产出它的那家服务商有意义：换一家（尤其严格的第三方网关）就变成未知字段，
+    /// 可能被 400 拒掉。所以发请求时只回传"当前档案自己产出的"那些 ——
+    /// 这个字段就是判断依据，必须落盘，否则重启后就认不出来了。
+    #[serde(default)]
+    pub produced_by_profile: Option<String>,
 }
 
 /// 会话根目录：{AI 数据目录}/sessions

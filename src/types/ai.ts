@@ -80,6 +80,23 @@ export interface AiChatMessage {
   content: string;
   /** 图片附件；为空时按纯文本发送，与加入此功能之前的请求完全一致 */
   images?: AiChatImage[];
+  /**
+   * 思考模式下这一轮的思维链。**必须原样回传**给服务端 ——
+   * 请求带 tools 时，中间那轮 assistant 的 reasoning_content 不回传就直接 400。
+   * 它不显示、也不参与正文，只是跟着消息走。
+   */
+  reasoningContent?: string;
+  /**
+   * 产出这条回复的**档案 id**。思维链只对产出它的那家服务商有意义 ——
+   * 换一家（尤其严格的第三方网关）就变成未知字段，可能被 400 拒掉，
+   * 所以发请求时只回传"当前档案自己产出的"那些。
+   */
+  producedByProfile?: string;
+  /**
+   * 这条 assistant 消息是**本地生成的**（工具查询结果），不是模型说的话。
+   * 发请求时会按用户侧内容处理 —— 否则会变成"一条没有 reasoning_content 的 assistant"。
+   */
+  localToolOutput?: boolean;
 }
 
 /** 模型请求调用某个工具。 */
@@ -106,6 +123,8 @@ export interface AiChatRequest {
 export interface AiChatReply {
   content: string;
   model: string;
+  /** 思考模式下这一轮的思维链（不显示）；前端要把它存到下一条 assistant 消息上并回传 */
+  reasoningContent?: string;
   /** 有值时表示模型想做某个动作而不是回话 */
   toolCalls?: AiToolCall[];
 }

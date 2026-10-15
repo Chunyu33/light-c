@@ -1,7 +1,7 @@
 // ============================================================================
 // AI 服务商预设
 //
-// 现状：国内外主流服务商（DeepSeek / 通义 / Kimi / 智谱 / 豆包 / 硅基流动）
+// 现状：国内外主流服务商（DeepSeek / 通义 / Kimi / 智谱 / 豆包 ）
 // 以及本地推理（Ollama / LM Studio / vLLM）**都已经统一到 OpenAI 兼容协议**，
 // 所以这里只需要两种协议实现：OpenAi 与 Anthropic。
 //
@@ -70,7 +70,7 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
     },
     AiProviderPreset {
         id: "dashscope",
-        name: "通义千问（阿里云百炼）",
+        name: "通义千问（Qwen）",
         protocol: AiProtocol::OpenAi,
         // 百炼的 OpenAI 兼容模式专用路径，与原生 DashScope 接口不同
         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -82,14 +82,6 @@ pub const PROVIDER_PRESETS: &[AiProviderPreset] = &[
         name: "智谱 GLM",
         protocol: AiProtocol::OpenAi,
         base_url: "https://open.bigmodel.cn/api/paas/v4",
-        default_model: "",
-        local: false,
-    },
-    AiProviderPreset {
-        id: "siliconflow",
-        name: "硅基流动",
-        protocol: AiProtocol::OpenAi,
-        base_url: "https://api.siliconflow.cn/v1",
         default_model: "",
         local: false,
     },

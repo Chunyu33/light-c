@@ -28,7 +28,7 @@ pub use attachment::{read_attachment, save_attachment};
 pub use client::{chat_once, chat_stream, fetch_models, AiChatReply, AiChatRequest};
 pub use config::{
     cache_fetched_models, delete_profile, read_public_config, set_active_profile, set_data_dir,
-    upsert_profile, AiProfile, AiPublicConfig, AiPublicProfile,
+    upsert_profile, AiProfile, AiPublicConfig,
 };
 pub use presets::{list_providers, AiProviderPreset};
 pub use session::{append_message, clear_session, load_session, sessions_root, AiSessionMessage};

@@ -198,8 +198,18 @@ fn migrate_legacy(value: &serde_json::Value) -> Option<AiStoredConfig> {
 /// 读配置。文件不存在、内容损坏都回退到默认值 —— 配置读不出来不该让界面打不开。
 pub fn read_config() -> AiStoredConfig {
     let path = config_path();
-    let Ok(text) = fs::read_to_string(&path) else {
-        return AiStoredConfig::default();
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        // "还没配置过"是正常状态，不打日志
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return AiStoredConfig::default();
+        }
+        Err(error) => {
+            // ⚠️ 文件在、但读不出来（被占用 / 权限 / 坏盘）**不能当成"没有配置"静默过去**：
+            // 用户看到的现象是"我的密钥全没了"，而查不到任何线索。
+            log::warn!("读取 AI 配置失败，已回退默认值 {}: {}", path.display(), error);
+            return AiStoredConfig::default();
+        }
     };
 
     // 先当通用 JSON 读：这样才能判断是旧结构（需要迁移）还是新结构
@@ -229,7 +239,12 @@ pub fn read_config() -> AiStoredConfig {
     }
 }
 
-/// 写配置。只写一个小 JSON，直接落盘即可；目录不存在时先建。
+/// 写配置。
+///
+/// **必须原子写**：直接 `fs::write` 是先截断再写，中途崩溃或被结束进程就会留下半个
+/// JSON —— 下次读回来解析失败 → 回退默认值 → 用户所有密钥与档案静默消失。
+/// 改成"写临时文件 → rename 覆盖"：同一卷上 rename 是原子的，
+/// 要么是旧的完整文件、要么是新的完整文件，没有中间态。
 pub fn save_config(config: AiStoredConfig) -> Result<(), String> {
     let directory = config_dir();
     fs::create_dir_all(&directory)
@@ -237,14 +252,39 @@ pub fn save_config(config: AiStoredConfig) -> Result<(), String> {
 
     let text = serde_json::to_string_pretty(&config)
         .map_err(|error| format!("序列化 AI 配置失败: {}", error))?;
+
     let path = config_path();
-    fs::write(&path, text)
-        .map_err(|error| format!("写入 AI 配置失败 {}: {}", path.display(), error))?;
+    // 临时名带上进程号：避免和另一个实例/另一个正在写的临时文件撞名
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    fs::write(&temporary, text)
+        .map_err(|error| format!("写入 AI 配置失败 {}: {}", temporary.display(), error))?;
+    fs::rename(&temporary, &path).map_err(|error| {
+        // 换名都失败了，临时文件没有留下的意义，顺手清掉，别在配置目录里留垃圾
+        let _ = fs::remove_file(&temporary);
+        format!("替换 AI 配置失败 {}: {}", path.display(), error)
+    })?;
     Ok(())
+}
+
+/// 配置"读 → 改 → 写"的串行闸。
+///
+/// Tauri 命令是可以并发进来的，而下面每个改配置的函数都是 read_config → 改 → save_config：
+/// 两个交叉执行就会丢更新（典型场景：测试连接在写模型缓存的同时，用户点了保存档案）。
+/// 用 std 的 Mutex 就够 —— 这些操作只是读写一个很小的本地文件。
+/// ⚠️ 不要在持闸函数内部再调另一个持闸函数：std 的 Mutex 不可重入，会死锁。
+/// （`read_config` / `save_config` 自己不持闸，所以它们互相调用是安全的。）
+static CONFIG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// 取配置闸。锁中毒（持锁线程 panic 过）时照常放行 —— 这道闸只防并发交叉，不保护任何不变量。
+fn lock_config() -> std::sync::MutexGuard<'static, ()> {
+    CONFIG_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// 新增或更新一份档案（按 id 匹配）。返回更新后的整体配置。
 pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
+    let _guard = lock_config();
     let mut config = read_config();
     match config.profiles.iter_mut().find(|item| item.id == profile.id) {
         Some(existing) => {
@@ -274,6 +314,7 @@ pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
 
 /// 删除一份档案。删掉的正好是当前档案时，自动切到剩下的第一份。
 pub fn delete_profile(profile_id: &str) -> Result<AiStoredConfig, String> {
+    let _guard = lock_config();
     let mut config = read_config();
     config.profiles.retain(|profile| profile.id != profile_id);
     if config.active_profile_id == profile_id {
@@ -289,6 +330,7 @@ pub fn delete_profile(profile_id: &str) -> Result<AiStoredConfig, String> {
 
 /// 切换当前档案。
 pub fn set_active_profile(profile_id: &str) -> Result<AiStoredConfig, String> {
+    let _guard = lock_config();
     let mut config = read_config();
     if !config.profiles.iter().any(|profile| profile.id == profile_id) {
         return Err(format!("要切换的服务商配置不存在: {}", profile_id));
@@ -301,6 +343,7 @@ pub fn set_active_profile(profile_id: &str) -> Result<AiStoredConfig, String> {
 /// 缓存模型列表到**当前档案**：拉取成功后调用。
 /// 只改这两个字段，其余配置原样保留 —— 这个函数不该有别的副作用。
 pub fn cache_fetched_models(models: Vec<String>) -> Result<(), String> {
+    let _guard = lock_config();
     let mut config = read_config();
     let Some(profile) = config.active_profile_mut() else {
         return Ok(());
@@ -360,6 +403,7 @@ pub fn mask_api_key(key: &str) -> String {
 
 /// 全局数据目录设置（不属于任何档案）。
 pub fn set_data_dir(data_dir: String) -> Result<AiStoredConfig, String> {
+    let _guard = lock_config();
     let mut config = read_config();
     config.data_dir = data_dir;
     save_config(config.clone())?;

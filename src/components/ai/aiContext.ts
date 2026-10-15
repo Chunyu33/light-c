@@ -56,7 +56,11 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
       '以下是当前模块的实时数据摘要，就是用户此刻在界面上看到的内容，回答时以此为准：',
       dataSummary.trim(),
       '',
-      '注意：你拿到的是摘要，没有文件级明细。需要具体到某个文件时，如实告诉用户"需要查看完整明细"，不要凭空编造文件名或路径。',
+      // ⚠️ 这句以前写的是"需要文件级明细就如实告诉用户看不到" —— 那是**只读工具还没有**的时候写的，
+      // 后来加了 read_items / read_item_detail 却没同步改。于是它和第 4 条直接打架：
+      // 模型照着这句回答"我看不到明细/只能看摘要"，就成了只会复述摘要的复读机。
+      '注意：你拿到的是摘要，没有文件级明细。需要具体到某个文件或目录时，',
+      '**用第 4 条里的只读工具去查**，不要凭空编造文件名或路径。',
     );
   } else {
     lines.push(
@@ -71,8 +75,8 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
     '1. **用你自己的知识回答**。用户问"这个文件/驱动/项目是什么、有什么用、能不能删"时，',
     '   这正是期望你做的 —— 你了解 Windows 系统与常见软件，请直接讲清楚。',
     '   （不要因为"摘要里没写它的用途"就拒答，那样助手就没有价值了。）',
-    '2. 但**具体数字、路径、文件名**必须以摘要为准：摘要里没有的不要编造，',
-    '   直接说"这里看不到明细"。编造细节比不回答更糟。',
+    '2. 但**具体数字、路径、文件名**不能靠猜：摘要里没有的，先用只读工具去查（见第 4 条），',
+    '   查不到再如实说"看不到"。编造细节比不回答更糟。',
     '3. 回答简洁，优先给结论，其次给理由；用用户正在使用的语言回答。',
     '',
     '—— 最后一条最重要，工具分两类，规则不同 ——',
@@ -91,10 +95,11 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
     '   看不清意图就先问一句"你是想了解，还是想让我勾上它们？"，不要猜。',
     '   **当前模块能不能清理，与用户现在想做什么，是两件事。**',
     '',
-    '   照着这几个例子判断：',
-    '   - "这个文件夹里是什么？" → 直接回答，不调工具',
-    '   - "回收站能删吗？删了有什么影响？" → 直接回答（说清风险），**不调工具**',
-    '   - "这一堆缓存是干嘛的？" → 直接回答，不调工具',
+    '   照着这几个例子判断（**「不调工具」只针对会改数据的工具，只读工具照常调**）：',
+    '   - "这个文件夹里是什么？" → 先用你自己的知识讲用途；要"里面具体有哪些文件"就调 read_items',
+    '   - "文件夹「某路径」是做什么用的？可以删除吗？" → 同上（这正是行内「咨询 AI 助手」按钮发出的问句）',
+    '   - "回收站能删吗？删了有什么影响？" → 直接回答（说清风险），**不要调用会改数据的工具**',
+    '   - "这一堆缓存是干嘛的？" → 先讲用途；要看具体是哪些文件就调 read_items',
     '   - "帮我把回收站删了" → 调用 propose_delete',
     '   - "把可以安全删的都勾上" → 调用 select_items',
   );
@@ -102,19 +107,81 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
 }
 
 /**
+ * 把连续的同角色消息合并成一条。
+ *
+ * 为什么需要：一次只读查询会产出**多条** assistant 消息（每个工具调用一条），
+ * 于是历史里会连着出现好几条 assistant。OpenAI 兼容协议能容忍，
+ * **Anthropic 会直接报 "roles must alternate" 拒掉整个请求** ——
+ * 而只要用户用过一次「咨询 AI 助手」（必然触发只读工具），之后每次提问都会撞上。
+ */
+function mergeConsecutiveRoles(messages: AiChatMessage[]): AiChatMessage[] {
+  const merged: AiChatMessage[] = [];
+  for (const message of messages) {
+    const previous = merged[merged.length - 1];
+    // system 不参与合并：它必须是独立的第一条
+    if (previous && previous.role === message.role && message.role !== 'system') {
+      merged[merged.length - 1] = {
+        role: previous.role,
+        content: `${previous.content}\n\n${message.content}`,
+        // 图片要一起带上：同一角色连发两条时它们各自可能带图
+        images:
+          previous.images || message.images
+            ? [...(previous.images ?? []), ...(message.images ?? [])]
+            : undefined,
+      };
+      continue;
+    }
+    merged.push(message);
+  }
+  return merged;
+}
+
+/** 本地工具结果发给模型时的前缀：说清"这是你要的数据"，而不是让模型以为这话是它自己说的。 */
+const TOOL_OUTPUT_PREFIX = '【以下是你刚才要求查询的数据】\n';
+
+/**
+ * 把历史消息整理成可发送的形态。
+ *
+ * 唯一的转换是**本地工具结果**：它在界面上是一条 assistant 气泡，但发出去必须算用户侧内容 ——
+ * 服务端要求"带 tools 的请求里，assistant 消息必须带上它的 reasoning_content"，
+ * 而这条是本地拼出来的、没有思维链，当成 assistant 发出去会被直接 400 拒掉
+ *（实测报错：The reasoning_content in the thinking mode must be passed back to the API）。
+ */
+function toRequestMessage(message: AiChatMessage, activeProfileId: string): AiChatMessage {
+  if (message.role === 'assistant' && message.localToolOutput) {
+    return { role: 'user', content: `${TOOL_OUTPUT_PREFIX}${message.content}` };
+  }
+  // 思维链只回传给**产出它的那份档案**：用户在会话中途换了服务商之后，
+  // 它对新服务商就是个陌生字段 —— 而 OpenAI 的 messages 只认
+  // role / content / name / tool_calls / tool_call_id / refusal，
+  // 严格的网关会因此拒掉整个请求。宁可少回传，也不能让整个请求失败。
+  if (message.reasoningContent && message.producedByProfile !== activeProfileId) {
+    return { ...message, reasoningContent: undefined };
+  }
+  return message;
+}
+
+/**
  * 组装本次请求的完整消息：**现取的 system 提示** + 历史。
  *
  * system 刻意不进历史 —— 它依赖"当前模块"和"当前数据"，存下来必然过期。
  * 历史里只保留 user/assistant，于是切模块、重新扫描都不需要清理旧消息。
+ *
+ * `activeProfileId` 用来判断每条消息的思维链还该不该回传（见 toRequestMessage）。
  */
 export function buildRequestMessages(
   history: AiChatMessage[],
   moduleId: string | null,
   dataSummary: string | null,
+  activeProfileId: string,
 ): AiChatMessage[] {
   return [
     { role: 'system', content: buildSystemPrompt(moduleId, dataSummary) },
-    ...history.filter((message) => message.role !== 'system'),
+    ...mergeConsecutiveRoles(
+      history
+        .filter((message) => message.role !== 'system')
+        .map((message) => toRequestMessage(message, activeProfileId)),
+    ),
   ];
 }
 

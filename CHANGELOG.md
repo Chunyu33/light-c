@@ -2,7 +2,7 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.17.0
 
 - New AI assistant: open it from the floating button in the lower right, ask what the files on screen are and whether they can be removed, then turn the answer into a selection or a deletion
 - Configure several AI providers and keep them saved side by side, switching provider or model at any time; screenshots can be attached to a question

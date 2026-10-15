@@ -172,6 +172,63 @@ function getParentTypeColor(type: string): string {
   }
 }
 
+/**
+ * 在热区结果里按路径找条目（递归整棵树，含子目录）。
+ *
+ * 中文说明：read_items 只列出顶级条目，但模型常会顺着上一条详情里的子目录路径继续追问，
+ * 而子目录数据本来就在内存里（后端对超大目录做了智能下钻），所以必须递归找。
+ * 命中判据取"路径前缀最长"的那一条：它同时覆盖精确相等，也能兜住模型把行尾的大小、
+ * 文件数说明一起当成路径带过来的情况；取最长是为了避免认成更上层的祖先目录。
+ */
+function findHotspotEntry(entries: HotspotEntry[], wanted: string): HotspotEntry | null {
+  let best: HotspotEntry | null = null;
+  for (const entry of entries) {
+    if (wanted.startsWith(entry.path) && (!best || entry.path.length > best.path.length)) {
+      best = entry;
+    }
+    const matched = findHotspotEntry(entry.children ?? [], wanted);
+    if (matched && (!best || matched.path.length > best.path.length)) best = matched;
+  }
+  return best;
+}
+
+/**
+ * 把一条热区目录渲染成给模型看的详情文本。
+ *
+ * 中文说明：只吐内存里已有的字段 —— 这些数字界面上本来就展示，模型照着念不会和用户
+ * 看到的不一致。子目录一条不落地列出：后端只对超大目录做智能下钻，每层本来就只给
+ * 几个，再截断就把"哪个子目录最占地方"这个用户最常问的答案切掉了。
+ */
+function buildHotspotEntryDetail(entry: HotspotEntry): string {
+  const flags = [
+    entry.is_cache ? '缓存目录' : '',
+    entry.is_program ? '程序目录' : '',
+    entry.is_protected ? '系统保护目录' : '',
+  ].filter(Boolean);
+
+  const lines = [
+    `路径：${entry.path}`,
+    `大小：${formatSize(entry.total_size)}（${entry.file_count} 个文件）`,
+    `最后修改：${formatDateTime(entry.last_modified)}`,
+    `所在位置类型：${entry.parent_type}`,
+    `属性：${flags.length > 0 ? flags.join('、') : '无特殊属性'}`,
+    `是否可安全清理：${entry.is_safe_to_clean ? '是' : '否'}`,
+  ];
+
+  const children = [...(entry.children ?? [])].sort((left, right) => right.total_size - left.total_size);
+  if (children.length > 0) {
+    lines.push(
+      '',
+      '其中占用最大的子目录：',
+      ...children.map(
+        (child) => `- ${child.path}  ${formatSize(child.total_size)}（${child.file_count} 个文件）`,
+      ),
+    );
+  }
+
+  return lines.join('\n');
+}
+
 // ============================================================================
 // 大目录分析条目组件
 // ============================================================================
@@ -513,6 +570,14 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
           (item) => `${item.path}  ${formatSize(item.total_size)}  （${item.file_count} 个文件）`,
         ),
       };
+    },
+    // 只读：单条详情。itemId 就是 read_items 里行首那个完整路径 ——
+    // 找不到时返回 null，让公共层统一说明"没有读到内容"，不在这里编理由。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const entry = findHotspotEntry(scanResult?.entries ?? [], wanted);
+      return entry ? buildHotspotEntryDetail(entry) : null;
     },
     summary: () => {
       if (!scanResult) return null;

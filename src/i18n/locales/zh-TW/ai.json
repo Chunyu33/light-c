@@ -8,6 +8,11 @@
   "send": "傳送",
   "thinking": "正在思考…",
   "askHint": "諮詢 AI 助手",
+  "askQuestion": {
+    "file": "檔案「{{target}}」是什麼？有什麼作用？可以刪除嗎，刪除後可能有什麼影響？",
+    "folder": "資料夾「{{target}}」是做什麼用的？可以刪除嗎，刪除後可能有什麼影響？",
+    "model": "AI 模型「{{target}}」是什麼？佔用這麼大正常嗎？可以刪除嗎，刪除後可能有什麼影響？"
+  },
   "resizeHint": "拖曳調整大小，雙擊恢復預設",
   "resizeHintCustom": "拖曳調整大小，雙擊恢復預設",
   "tool": {
@@ -44,5 +49,6 @@
   "attachTooMany": "最多一次帶 {{count}} 張圖片",
   "previewImage": "點擊放大檢視",
   "streamTimeout": "長時間沒有收到回應，已中止這一次請求。可以重試，或換個模型／服務商試試。",
+  "switchModelFailed": "切換模型沒有成功：{{message}}",
   "ballBadge": "AI"
 }

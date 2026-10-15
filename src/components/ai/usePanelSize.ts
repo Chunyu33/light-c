@@ -101,15 +101,22 @@ export function usePanelSize(): UsePanelSizeResult {
       setSize(latest);
     };
     const handleUp = () => {
-      handle.releasePointerCapture(event.pointerId);
+      // 指针被系统收走时（pointercancel）捕获可能已经没了，直接 release 会抛
+      if (handle.hasPointerCapture(event.pointerId)) {
+        handle.releasePointerCapture(event.pointerId);
+      }
       handle.removeEventListener('pointermove', handleMove);
       handle.removeEventListener('pointerup', handleUp);
+      handle.removeEventListener('pointercancel', handleUp);
       // 松手时才落盘：拖拽过程中反复写 localStorage 是没必要的 IO
       localStorage.setItem(STORAGE_KEY, JSON.stringify(latest));
     };
 
     handle.addEventListener('pointermove', handleMove);
     handle.addEventListener('pointerup', handleUp);
+    // 指针被系统抢走（触屏手势、失焦、被弹窗打断）时只会来 pointercancel：
+    // 不接它，move 监听就会留在手柄上，下次拖拽会叠一份旧的。
+    handle.addEventListener('pointercancel', handleUp);
   }, []);
 
   const resetSize = useCallback(() => {

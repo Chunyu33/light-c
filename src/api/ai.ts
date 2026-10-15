@@ -96,6 +96,15 @@ export interface AiSessionMessage {
   images?: string[];
   /** Unix 毫秒时间戳 */
   at: number;
+  /**
+   * 思考模式的思维链。**必须落盘** —— 不回传给服务端会 400，
+   * 而重启后从磁盘恢复的历史同样要带着它一起发出去。
+   */
+  reasoningContent?: string;
+  /** 这条 assistant 消息是本地生成的（工具查询结果），发请求时按用户侧内容处理 */
+  localToolOutput?: boolean;
+  /** 产出这条回复的档案 id：思维链只回传给产出它的那份档案 */
+  producedByProfile?: string;
 }
 
 /**

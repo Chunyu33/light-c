@@ -28,7 +28,11 @@ const STREAM_IDLE_TIMEOUT_SECS: u64 = 30;
 /// 上面那个值的 Duration 形式（循环里每次都要用，不必反复转）
 const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS);
 /// Anthropic 要求显式给 max_tokens，这里给一个够用的默认值。
-const ANTHROPIC_MAX_TOKENS: u32 = 2048;
+///
+/// ⚠️ 不能给太大：超过模型自己的输出上限会被直接拒（不同 Claude 型号上限不同，
+/// 小模型只到 4096）。取 4096 是所有在役 Claude 型号都接受的值 ——
+/// 原来的 2048 太紧，助手一次回答带上一页明细就会被截断。
+const ANTHROPIC_MAX_TOKENS: u32 = 4096;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +45,14 @@ pub struct AiChatMessage {
     /// 而且前端还要显示缩略图、落盘时替换成占位符，分开处理反而更简单。
     #[serde(default)]
     pub images: Vec<AiImage>,
+    /// 思考模式下的思维链。**必须原样回传**给 OpenAI 兼容服务端。
+    ///
+    /// DeepSeek 规定：请求带 `tools` 时，中间那轮 assistant 的 reasoning_content
+    /// 要在后续所有请求里完整回传，不回传直接 400
+    ///（"The reasoning_content in the thinking mode must be passed back to the API"）。
+    /// 只对 assistant 消息有意义 —— 前端从 `AiChatReply` 拿到后原样带回来。
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
 }
 
 /// 一条消息里的图片附件。前端负责**先压缩再传** ——
@@ -116,6 +128,10 @@ pub struct AiChatRequest {
 pub struct AiChatReply {
     pub content: String,
     pub model: String,
+    /// 这一轮的思维链（思考模式下才有）。前端要把它存到下一条 assistant 消息上，
+    /// 后续请求必须原样回传 —— 否则服务端 400。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
     /// 模型请求调用的工具。有值时 content 通常为空 —— 它不是"回复"，而是一个动作意图。
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<AiToolCall>,
@@ -202,10 +218,21 @@ fn build_openai_body(request: &AiChatRequest, model: &str) -> serde_json::Value 
         .messages
         .iter()
         .map(|message| {
-            serde_json::json!({
+            let mut value = serde_json::json!({
                 "role": message.role,
                 "content": build_openai_content(message),
-            })
+            });
+            // 思考模式：带 tools 的请求必须把中间那轮 assistant 的 reasoning_content
+            // 一起回传，不回传服务端直接 400（见 AiChatMessage.reasoning_content 的说明）。
+            // 只往 assistant 上加 —— 塞到 user/system 上没有意义，也可能被服务端拒。
+            if message.role == "assistant" {
+                if let Some(reasoning) = message.reasoning_content.as_deref() {
+                    if !reasoning.trim().is_empty() {
+                        value["reasoning_content"] = serde_json::json!(reasoning);
+                    }
+                }
+            }
+            value
         })
         .collect();
 
@@ -262,6 +289,17 @@ fn parse_openai_reply(value: &serde_json::Value) -> Option<String> {
         .get(0)?
         .get("message")?
         .get("content")?
+        .as_str()
+        .map(|text| text.to_string())
+}
+
+/// 非流式响应里的思维链。与流式那份（stream.rs）是同一个约束：必须回传，否则 400。
+fn parse_openai_reasoning(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("choices")?
+        .get(0)?
+        .get("message")?
+        .get("reasoning_content")?
         .as_str()
         .map(|text| text.to_string())
 }
@@ -360,6 +398,214 @@ fn extract_error_message(body: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// 流式与非流式共用的步骤
+//
+// 两条路径除了"怎么收响应"以外完全一样：构造请求体、发请求、收尾解析。
+// 这三步以前各抄了一份 —— 后果是实打实的：加了"只交回本次声明过的工具"之后，
+// 它只生效在流式那一份上。抄一份就多一处会忘记同步的地方。
+// ---------------------------------------------------------------------------
+
+/// 构造请求体：按协议选形状 + 挂上本次声明的工具 + 采样参数。
+/// `streaming` 只影响 `stream` 字段，其余完全一致。
+fn build_request_body(
+    request: &AiChatRequest,
+    protocol: AiProtocol,
+    model: &str,
+    streaming: bool,
+) -> serde_json::Value {
+    let mut body = match protocol {
+        AiProtocol::OpenAi => build_openai_body(request, model),
+        AiProtocol::Anthropic => build_anthropic_body(request, model),
+    };
+    if streaming {
+        body["stream"] = serde_json::json!(true);
+    }
+
+    // 工具声明与"要不要流式"是两件独立的事：流式下工具参数会分片到达，
+    // 由 stream.rs 按索引拼回去，所以照样声明，不必为了工具放弃流式。
+    if !request.tools.is_empty() {
+        let declarations = match protocol {
+            AiProtocol::OpenAi => openai_tools(&request.tools),
+            AiProtocol::Anthropic => anthropic_tools(&request.tools),
+        };
+        if !declarations.is_empty() {
+            body["tools"] = serde_json::json!(declarations);
+        }
+    }
+
+    attach_reasoning_effort(&mut body, protocol);
+    body
+}
+
+/// 按协议发对话请求：两种协议只有路径与鉴权头不同。
+async fn send_chat_request(
+    client: &reqwest::Client,
+    protocol: AiProtocol,
+    base_url: &str,
+    api_key: &str,
+    body: &serde_json::Value,
+) -> Result<reqwest::Response, String> {
+    let sent = match protocol {
+        AiProtocol::OpenAi => {
+            client
+                .post(join_url(base_url, "/chat/completions"))
+                .bearer_auth(api_key)
+                .json(body)
+                .send()
+                .await
+        }
+        AiProtocol::Anthropic => {
+            client
+                .post(join_url(base_url, "/v1/messages"))
+                .header("x-api-key", api_key)
+                .header("anthropic-version", "2023-06-01")
+                .json(body)
+                .send()
+                .await
+        }
+    };
+    sent.map_err(|error| format!("网络请求失败: {}", error))
+}
+
+/// 错误信息里是否点名了 `reasoning_effort`。
+///
+/// 只在**点名**时才去掉它重试 —— 否则会把别的 400（模型名写错、余额不足）也重试一遍，
+/// 白花一次请求，还把真正的错误盖住。
+fn error_blames_reasoning_effort(error_text: &str) -> bool {
+    error_text.to_ascii_lowercase().contains("reasoning_effort")
+}
+
+/// 发请求；如果服务端明确表示不认 `reasoning_effort`，去掉它再试一次。
+///
+/// 为什么值得单独做：思考强度是**用户自己填的**，而支持它的模型有限。
+/// 让用户吃一个 400 再回设置页猜"该清哪一栏"，是很糟的体验。
+/// 另外：非 2xx 一律在这里变成 Err —— 流式与非流式共用同一套状态处理，不再各写一份。
+async fn send_with_reasoning_fallback(
+    client: &reqwest::Client,
+    protocol: AiProtocol,
+    base_url: &str,
+    api_key: &str,
+    body: &serde_json::Value,
+) -> Result<reqwest::Response, String> {
+    let response = send_chat_request(client, protocol, base_url, api_key, body).await?;
+    let status = response.status().as_u16();
+    if (200..300).contains(&status) {
+        return Ok(response);
+    }
+
+    let text = response.text().await.unwrap_or_default();
+    if body.get("reasoning_effort").is_none() || !error_blames_reasoning_effort(&text) {
+        return Err(describe_http_error(status, &text));
+    }
+
+    log::info!("服务端不认 reasoning_effort，去掉该参数重试一次");
+    let mut retry_body = body.clone();
+    if let Some(object) = retry_body.as_object_mut() {
+        object.remove("reasoning_effort");
+    }
+
+    let retry = send_chat_request(client, protocol, base_url, api_key, &retry_body).await?;
+    let retry_status = retry.status().as_u16();
+    if (200..300).contains(&retry_status) {
+        return Ok(retry);
+    }
+    let retry_text = retry.text().await.unwrap_or_default();
+    Err(describe_http_error(retry_status, &retry_text))
+}
+
+/// 收尾：正文兜底解析 + 只保留本次声明过的工具。
+fn finalize_reply(
+    mut content: String,
+    mut tool_calls: Vec<AiToolCall>,
+    allowed_tools: &[String],
+) -> (String, Vec<AiToolCall>) {
+    // 有些模型（实测轻量档）不走标准 function calling，而是把调用当文本吐在正文里。
+    // 只在标准解析一无所获时兜底 —— 否则会把正文里正常的说明文字也当成调用。
+    if tool_calls.is_empty() {
+        let (inline_calls, cleaned) = extract_inline_tool_calls(&content);
+        if !inline_calls.is_empty() {
+            tool_calls = inline_calls;
+            content = cleaned;
+        }
+    }
+
+    // 只交回**本次声明过**的工具：模型可能在正文里写出一个根本没声明过的调用
+    //（上面那段兜底就会把它解析出来）。前端执行前还会再挡一次，两层都要有。
+    tool_calls.retain(|call| allowed_tools.iter().any(|name| name == &call.name));
+    (content, tool_calls)
+}
+
+/// 收完一个流之后的产物。
+struct StreamOutcome {
+    content: String,
+    tool_calls: Vec<AiToolCall>,
+    /// 思维链（只有思考模式的模型会给）。**必须原样回传**给服务端，
+    /// 见 `AiChatMessage.reasoning_content` 的说明。
+    reasoning: Option<String>,
+}
+
+/// 收完整个流：增量逐个交给 `on_delta`，返回累积正文、工具调用与思维链。
+///
+/// 超时是**空闲超时**而不是整段超时：长回答慢慢吐是正常的，"一个字节都不来"才该断。
+async fn consume_stream<F>(
+    response: &mut reqwest::Response,
+    protocol: AiProtocol,
+    on_delta: &mut F,
+) -> Result<StreamOutcome, String>
+where
+    F: FnMut(&str),
+{
+    let mut decoder = StreamDecoder::new(protocol);
+    let mut full = String::new();
+
+    loop {
+        let next = match tokio::time::timeout(STREAM_IDLE_TIMEOUT, response.chunk()).await {
+            Ok(result) => result.map_err(|error| format!("读取流式响应失败: {}", error))?,
+            Err(_) => {
+                return Err(format!(
+                    "已经 {} 秒没有收到任何数据，连接已中断。可能是网络不稳定，或该服务商暂时没有响应。",
+                    STREAM_IDLE_TIMEOUT_SECS
+                ))
+            }
+        };
+        // 流正常结束
+        let Some(chunk) = next else { break };
+
+        // 直接把字节喂给解码器：**不能在这里按分片解码** ——
+        // 网络分片边界可能落在一个多字节字符中间，那样一个汉字会被解成两个替换字符，
+        // 而这段文本既要实时显示、也要写进会话记录。解码在解码器里按"完整行"做。
+        for delta in decoder.push_bytes(&chunk) {
+            full.push_str(&delta);
+            on_delta(&delta);
+        }
+        if decoder.finished {
+            break;
+        }
+    }
+
+    // 服务端一直吐不含换行的数据时解码器会放弃缓冲，这里明确报错，而不是静默截断
+    if decoder.overflowed {
+        return Err("服务端返回的数据格式异常（长时间没有换行），连接已中断。".to_string());
+    }
+    for delta in decoder.finish() {
+        full.push_str(&delta);
+        on_delta(&delta);
+    }
+
+    // 思维链要单独取走再判断：空串表示这个模型这一轮没有思考内容
+    let reasoning = decoder.take_reasoning();
+    Ok(StreamOutcome {
+        content: full,
+        tool_calls: decoder.take_tool_calls(),
+        reasoning: if reasoning.trim().is_empty() {
+            None
+        } else {
+            Some(reasoning)
+        },
+    })
+}
+
+// ---------------------------------------------------------------------------
 // 对外能力
 // ---------------------------------------------------------------------------
 
@@ -372,85 +618,49 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
     }
 
     let client = http_client(CHAT_TIMEOUT_SECS)?;
-    // 先按协议构造请求体，再按需挂上工具声明。
-    // 两种协议的工具形状不同，但"要不要带工具"对上层是同一件事。
-    let mut body = match protocol {
-        AiProtocol::OpenAi => build_openai_body(&request, &model),
-        AiProtocol::Anthropic => build_anthropic_body(&request, &model),
-    };
-    if !request.tools.is_empty() {
-        let declarations = match protocol {
-            AiProtocol::OpenAi => openai_tools(&request.tools),
-            AiProtocol::Anthropic => anthropic_tools(&request.tools),
-        };
-        if !declarations.is_empty() {
-            body["tools"] = serde_json::json!(declarations);
-        }
-    }
-    attach_reasoning_effort(&mut body, protocol);
+    let body = build_request_body(&request, protocol, &model, false);
+    // 发送与非 2xx 处理都在这里面（含"不认 reasoning_effort 就去掉重试一次"）
+    let response = send_with_reasoning_fallback(&client, protocol, &base_url, &api_key, &body).await?;
 
-    let response = match protocol {
-        AiProtocol::OpenAi => {
-            client
-                .post(join_url(&base_url, "/chat/completions"))
-                .bearer_auth(&api_key)
-                .json(&body)
-                .send()
-                .await
-        }
-        AiProtocol::Anthropic => {
-            client
-                .post(join_url(&base_url, "/v1/messages"))
-                .header("x-api-key", &api_key)
-                .header("anthropic-version", "2023-06-01")
-                .json(&body)
-                .send()
-                .await
-        }
-    }
-    .map_err(|error| format!("网络请求失败: {}", error))?;
-
-    let status = response.status().as_u16();
     let text = response
         .text()
         .await
         .map_err(|error| format!("读取响应内容失败: {}", error))?;
-    if !(200..300).contains(&status) {
-        return Err(describe_http_error(status, &text));
-    }
 
     let value: serde_json::Value =
         serde_json::from_str(&text).map_err(|error| format!("响应不是合法 JSON: {}", error))?;
-    let content = match protocol {
+    let parsed_content = match protocol {
         AiProtocol::OpenAi => parse_openai_reply(&value),
         AiProtocol::Anthropic => parse_anthropic_reply(&value),
     };
-    let mut tool_calls = parse_tool_calls(protocol, &value);
-    let mut content = content;
+    // 先记下"当初解析出正文没有"：下面判断"是不是完全没解析出东西"用的是这个事实，
+    // 而不是兜底清洗之后的结果（清洗只会删内容，不该把"有正文"变成"没正文"）。
+    let had_content = parsed_content.is_some();
+    let (content, tool_calls) = finalize_reply(
+        parsed_content.unwrap_or_default(),
+        parse_tool_calls(protocol, &value),
+        &request.tools,
+    );
 
-    // 与流式同样的兜底：模型把调用写成正文文本时，标准解析拿不到
-    if tool_calls.is_empty() {
-        if let Some(text) = content.clone() {
-            let (inline_calls, cleaned) = extract_inline_tool_calls(&text);
-            if !inline_calls.is_empty() {
-                tool_calls = inline_calls;
-                content = Some(cleaned);
-            }
-        }
-    }
-
-    // 有工具调用时 content 通常是空的 —— 那是动作意图，不是失败；
+    // 有工具调用时正文通常是空的 —— 那是动作意图，不是失败；
     // 两者都没有才算真的没解析出东西。
-    if content.is_none() && tool_calls.is_empty() {
+    if !had_content && tool_calls.is_empty() {
         return Err(format!(
             "响应里没有找到回复正文，可能模型不支持该调用方式。原始响应片段: {}",
             text.chars().take(300).collect::<String>()
         ));
     }
 
+    // 思考模式的思维链（只有 OpenAI 兼容协议有；我们的 Anthropic 路径不开启思考）
+    let reasoning_content = match protocol {
+        AiProtocol::OpenAi => parse_openai_reasoning(&value),
+        AiProtocol::Anthropic => None,
+    };
+
     Ok(AiChatReply {
-        content: content.unwrap_or_default(),
+        content,
         model,
+        reasoning_content,
         tool_calls,
     })
 }
@@ -511,105 +721,24 @@ where
     }
 
     let client = http_client(STREAM_TIMEOUT_SECS)?;
-    // 复用非流式的请求构造，只把 stream 打开：两种协议的请求体本来就只有这一处差异，
-    // 没必要为了流式再抄一份构造函数（抄一份就多一处会忘记同步的地方）。
-    let mut body = match protocol {
-        AiProtocol::OpenAi => build_openai_body(&request, &model),
-        AiProtocol::Anthropic => build_anthropic_body(&request, &model),
-    };
-    body["stream"] = serde_json::json!(true);
-    // 工具声明与"要不要流式"是两件独立的事：流式下工具参数会分片到达，
-    // 由 stream.rs 按索引拼回去，所以这里照样声明，不必为了工具放弃流式。
-    if !request.tools.is_empty() {
-        let declarations = match protocol {
-            AiProtocol::OpenAi => openai_tools(&request.tools),
-            AiProtocol::Anthropic => anthropic_tools(&request.tools),
-        };
-        if !declarations.is_empty() {
-            body["tools"] = serde_json::json!(declarations);
-        }
-    }
-    attach_reasoning_effort(&mut body, protocol);
-
-    let send = match protocol {
-        AiProtocol::OpenAi => {
-            client
-                .post(join_url(&base_url, "/chat/completions"))
-                .bearer_auth(&api_key)
-                .json(&body)
-                .send()
-                .await
-        }
-        AiProtocol::Anthropic => {
-            client
-                .post(join_url(&base_url, "/v1/messages"))
-                .header("x-api-key", &api_key)
-                .header("anthropic-version", "2023-06-01")
-                .json(&body)
-                .send()
-                .await
-        }
-    };
-    let mut response = send.map_err(|error| format!("网络请求失败: {}", error))?;
-
-    let status = response.status().as_u16();
-    if !(200..300).contains(&status) {
-        let text = response.text().await.unwrap_or_default();
-        return Err(describe_http_error(status, &text));
-    }
+    let body = build_request_body(&request, protocol, &model, true);
+    // 发送、重试与非 2xx 处理都在这里面（见 send_with_reasoning_fallback）
+    let mut response =
+        send_with_reasoning_fallback(&client, protocol, &base_url, &api_key, &body).await?;
 
     // 边收边发：用户能立刻看到字出来，而不是等整段返回
-    let mut decoder = StreamDecoder::new(protocol);
-    let mut full = String::new();
-    loop {
-        // **空闲超时**，不是整段超时。
-        // 整段超时是错的：正常的长回答会被从中间砍断，而"服务商不响应"却要干等满 5 分钟。
-        // 真正该判断的是"多久没有新数据了" —— 长回答慢慢吐没关系，一个字节都不来就得断。
-        let next = match tokio::time::timeout(STREAM_IDLE_TIMEOUT, response.chunk()).await {
-            Ok(result) => result.map_err(|error| format!("读取流式响应失败: {}", error))?,
-            Err(_) => {
-                return Err(format!(
-                    "已经 {} 秒没有收到任何数据，连接已中断。可能是网络不稳定，或该服务商暂时没有响应。",
-                    STREAM_IDLE_TIMEOUT_SECS
-                ))
-            }
-        };
-        // 流正常结束
-        let Some(chunk) = next else { break };
-
-        let text = String::from_utf8_lossy(&chunk);
-        for delta in decoder.push(&text) {
-            full.push_str(&delta);
-            on_delta(&delta);
-        }
-        if decoder.finished {
-            break;
-        }
-    }
-    for delta in decoder.finish() {
-        full.push_str(&delta);
-        on_delta(&delta);
-    }
-
-    let mut tool_calls = decoder.take_tool_calls();
-    // 有些模型（实测轻量档）不走标准 function calling，而是把调用当文本吐在正文里。
-    // 只在标准解析一无所获时兜底 —— 否则会把正文里正常的说明文字也当成调用。
-    if tool_calls.is_empty() {
-        let (inline_calls, cleaned) = extract_inline_tool_calls(&full);
-        if !inline_calls.is_empty() {
-            tool_calls = inline_calls;
-            full = cleaned;
-        }
-    }
+    let outcome = consume_stream(&mut response, protocol, &mut on_delta).await?;
+    let (content, tool_calls) = finalize_reply(outcome.content, outcome.tool_calls, &request.tools);
 
     // 只有正文空**且**没有工具调用才算真的没内容：
     // 模型决定调工具时正文本来就可能为空，那不是错误。
-    if full.trim().is_empty() && tool_calls.is_empty() {
+    if content.trim().is_empty() && tool_calls.is_empty() {
         return Err("服务端没有返回任何内容，请确认所选模型支持流式输出。".to_string());
     }
     Ok(AiChatReply {
-        content: full,
+        content,
         model,
+        reasoning_content: outcome.reasoning,
         tool_calls,
     })
 }
@@ -630,11 +759,13 @@ mod tests {
                     role: "system".to_string(),
                     content: "你是助手".to_string(),
                     images: Vec::new(),
+                    reasoning_content: None,
                 },
                 AiChatMessage {
                     role: "user".to_string(),
                     content: "你好".to_string(),
                     images: Vec::new(),
+                    reasoning_content: None,
                 },
             ],
             model: None,
@@ -679,6 +810,7 @@ mod tests {
                     media_type: "image/jpeg".to_string(),
                     data_base64: "AAAA".to_string(),
                 }],
+                reasoning_content: None,
             }],
             model: None,
             temperature: None,
@@ -707,6 +839,7 @@ mod tests {
                 role: "user".to_string(),
                 content: "你好".to_string(),
                 images: Vec::new(),
+                reasoning_content: None,
             }],
             model: None,
             temperature: None,
@@ -778,5 +911,51 @@ mod tests {
             "data": [{ "id": "b-model" }, { "id": "a-model" }, { "object": "x" }]
         });
         assert_eq!(parse_model_ids(&value), vec!["b-model", "a-model"]);
+    }
+
+    #[test]
+    fn only_a_named_reasoning_effort_error_triggers_the_retry() {
+        // 只有点名 reasoning_effort 才该去掉它重试 —— 别的 400 重试只会白花一次请求、
+        // 还把真正的错误盖住。
+        assert!(error_blames_reasoning_effort(
+            "{\"error\":{\"message\":\"Unrecognized request argument supplied: reasoning_effort\"}}"
+        ));
+        assert!(error_blames_reasoning_effort("unknown parameter: REASONING_EFFORT"));
+        assert!(!error_blames_reasoning_effort(
+            "{\"error\":{\"message\":\"Model Not Exist\"}}"
+        ));
+        assert!(!error_blames_reasoning_effort("Insufficient Balance"));
+    }
+
+    #[test]
+    fn reasoning_content_is_attached_only_to_assistant_messages() {
+        // 思考模式：只有 assistant 消息该带 reasoning_content。
+        // 塞到 user/system 上没有意义，严格的网关还可能因此拒掉整个请求。
+        let request = AiChatRequest {
+            messages: vec![
+                AiChatMessage {
+                    role: "system".to_string(),
+                    content: "你是助手".to_string(),
+                    images: Vec::new(),
+                    reasoning_content: Some("不该被带上".to_string()),
+                },
+                AiChatMessage {
+                    role: "assistant".to_string(),
+                    content: "之前的回答".to_string(),
+                    images: Vec::new(),
+                    reasoning_content: Some("当时的思考".to_string()),
+                },
+            ],
+            model: None,
+            temperature: None,
+            tools: Vec::new(),
+        };
+        let body = build_openai_body(&request, "test-model");
+        let messages = body["messages"].as_array().expect("messages 应是数组");
+        assert!(messages[0].get("reasoning_content").is_none(), "system 不该带");
+        assert_eq!(
+            messages[1].get("reasoning_content").and_then(|value| value.as_str()),
+            Some("当时的思考")
+        );
     }
 }

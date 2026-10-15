@@ -32,14 +32,33 @@ struct PartialToolCall {
     arguments: String,
 }
 
+/// 未成行的残留数据上限。正常的一行就是一个 SSE 数据块（几十 KB 量级）；
+/// 顶到 4MB 说明服务端在持续吐不含换行的数据 —— 那是异常，必须断，不能让它一直涨内存。
+const MAX_BUFFER_BYTES: usize = 4 * 1024 * 1024;
+
 /// SSE 数据块的增量解析器。
-/// 用法：每收到一块网络数据就 `push`，取出返回的增量文本；流结束时调用 `finish`。
+/// 用法：每收到一块网络数据就 `push_bytes`，取出返回的增量文本；流结束时调用 `finish`。
 pub struct StreamDecoder {
     protocol: AiProtocol,
-    /// 尚未构成完整行的残留数据
-    buffer: String,
+    /// 尚未构成完整行的残留数据。
+    ///
+    /// ⚠️ 这里存**字节**而不是字符串：网络分片与 UTF-8 字符边界毫无关系，
+    /// 一个汉字完全可能被切成"前 2 字节 + 后 1 字节"两块。如果在喂进来之前
+    /// 就按分片解码，半个字会变成乱码 —— 而且这段文本是要入库的，错字会永久留在会话记录里。
+    /// 所以先在字节层按 `\n` 切出完整行，再对整行解码。
+    buffer: Vec<u8>,
     /// 服务端已宣告结束（data: [DONE] 之类）
     pub finished: bool,
+    /// 缓冲区超过上限（服务端一直不吐换行）。调用方看到它应当直接报错中断。
+    pub overflowed: bool,
+    /// 思考模式下的思维链（reasoning_content）。
+    ///
+    /// ⚠️ **必须原样回传给 API**：DeepSeek 明确规定，请求带 `tools` 时，
+    /// 中间那轮 assistant 的 reasoning_content 要在后续所有请求里完整回传，
+    /// 哪怕那一轮没有真的调工具 —— 不回传就 400
+    /// （"The reasoning_content in the thinking mode must be passed back to the API"）。
+    /// 它**不进正文**：界面显示和落盘内容都只用 content。
+    reasoning: String,
     /// 累积中的工具调用，按分片索引排序保证顺序稳定
     partial_tools: BTreeMap<usize, PartialToolCall>,
 }
@@ -48,23 +67,43 @@ impl StreamDecoder {
     pub fn new(protocol: AiProtocol) -> Self {
         Self {
             protocol,
-            buffer: String::new(),
+            buffer: Vec::new(),
             finished: false,
+            overflowed: false,
+            reasoning: String::new(),
             partial_tools: BTreeMap::new(),
         }
     }
 
-    /// 喂入一段原始文本，返回本次能解析出的全部增量文本片段。
+    /// 取走这一轮累积的思维链。为空表示这个模型/这一轮没有思考内容。
+    pub fn take_reasoning(&mut self) -> String {
+        std::mem::take(&mut self.reasoning)
+    }
+
+    /// 喂入一段原始文本；内部就是字节版本，单测与文本来源走这里。
     pub fn push(&mut self, chunk: &str) -> Vec<String> {
-        self.buffer.push_str(chunk);
+        self.push_bytes(chunk.as_bytes())
+    }
+
+    /// 喂入一块原始字节，返回本次能解析出的全部增量文本片段。
+    pub fn push_bytes(&mut self, chunk: &[u8]) -> Vec<String> {
+        self.buffer.extend_from_slice(chunk);
+        if self.buffer.len() > MAX_BUFFER_BYTES {
+            // 清掉缓冲并立标记：调用方据此中断，而不是一边涨内存一边装作正常
+            self.buffer.clear();
+            self.overflowed = true;
+            return Vec::new();
+        }
+
         let mut deltas = Vec::new();
 
-        // 只处理完整的行；最后一段（可能只有半行）留在 buffer 里等下一块
-        while let Some(index) = self.buffer.find('\n') {
-            let line = self.buffer[..index].trim_end_matches('\r').to_string();
-            self.buffer.drain(..=index);
+        // 只处理完整的行；最后一段（可能只有半行）留在缓冲区里等下一块
+        while let Some(index) = self.buffer.iter().position(|byte| *byte == b'\n') {
+            // 这一行已经收到完整了，此时解码不会切断任何多字节字符
+            let line: Vec<u8> = self.buffer.drain(..=index).collect();
+            let text = String::from_utf8_lossy(&line).to_string();
 
-            if let Some(delta) = self.parse_line(&line) {
+            if let Some(delta) = self.parse_line(&text) {
                 deltas.push(delta);
             }
         }
@@ -73,13 +112,12 @@ impl StreamDecoder {
 
     /// 流结束：把缓冲区里可能残留的最后一行也处理掉。
     pub fn finish(&mut self) -> Vec<String> {
-        if self.buffer.trim().is_empty() {
+        if self.buffer.iter().all(|byte| byte.is_ascii_whitespace()) {
             return Vec::new();
         }
-        let line = std::mem::take(&mut self.buffer);
-        self.parse_line(line.trim_end_matches('\r'))
-            .into_iter()
-            .collect()
+        let remainder = std::mem::take(&mut self.buffer);
+        let text = String::from_utf8_lossy(&remainder).to_string();
+        self.parse_line(&text).into_iter().collect()
     }
 
     /// 把这一片里的工具增量累积下来（如果有）。必须在取正文之前调用。
@@ -186,6 +224,11 @@ impl StreamDecoder {
         // 先把这一片里的工具增量累积下来，再取正文 —— 两者可能同时出现
         self.record_tool_fragments(&value);
 
+        // 思考模式的思维链单独收下，**不进正文**（回传规则见 reasoning 字段的说明）
+        if let Some(fragment) = extract_reasoning_fragment(&value, self.protocol) {
+            self.reasoning.push_str(&fragment);
+        }
+
         match self.protocol {
             AiProtocol::OpenAi => parse_openai_delta(&value),
             AiProtocol::Anthropic => parse_anthropic_delta(&value),
@@ -210,6 +253,24 @@ fn parse_anthropic_delta(value: &serde_json::Value) -> Option<String> {
         None
     } else {
         Some(text.to_string())
+    }
+}
+
+/// 取这一片里的思考内容。
+///
+/// OpenAI 兼容协议（DeepSeek 等）把思维链放在 `choices[0].delta.reasoning_content`，
+/// 与 `content` **同级**；正文那边只读 `content`，所以这里必须单独收一遍。
+/// Anthropic 的思考是独立的 content block，而我们的 Anthropic 路径不开启思考，这里不处理。
+fn extract_reasoning_fragment(value: &serde_json::Value, protocol: AiProtocol) -> Option<String> {
+    match protocol {
+        AiProtocol::OpenAi => value
+            .get("choices")?
+            .get(0)?
+            .get("delta")?
+            .get("reasoning_content")?
+            .as_str()
+            .map(|text| text.to_string()),
+        AiProtocol::Anthropic => None,
     }
 }
 
@@ -319,5 +380,46 @@ mod tests {
         let mut decoder = StreamDecoder::new(AiProtocol::OpenAi);
         assert!(decoder.push("data: {\"choices\":[{\"delta\":{\"content\":\"尾\"}}]}").is_empty());
         assert_eq!(decoder.finish(), vec!["尾".to_string()]);
+    }
+
+    #[test]
+    fn a_character_split_across_two_chunks_is_not_corrupted() {
+        // 真实网络按字节分片，分片边界和 UTF-8 字符边界毫无关系。
+        // 这里故意把 "好"（E5 A5 BD）从中间切开喂进去：解码必须等整行完整才做，
+        // 否则会解出替换字符 —— 而这段文本同时用于实时显示与入库，错字是永久的。
+        let line = "data: {\"choices\":[{\"delta\":{\"content\":\"好\"}}]}\n";
+        let bytes = line.as_bytes();
+        let split = bytes
+            .iter()
+            .position(|byte| *byte == 0xE5)
+            .expect("这一行里应当有汉字的首字节")
+            + 1;
+
+        let mut decoder = StreamDecoder::new(AiProtocol::OpenAi);
+        assert!(decoder.push_bytes(&bytes[..split]).is_empty(), "半行不该产出增量");
+        assert_eq!(decoder.push_bytes(&bytes[split..]), vec!["好".to_string()]);
+    }
+
+    #[test]
+    fn a_flood_without_newlines_is_rejected_instead_of_growing_forever() {
+        let mut decoder = StreamDecoder::new(AiProtocol::OpenAi);
+        let flood = vec![b'a'; MAX_BUFFER_BYTES + 1];
+        assert!(decoder.push_bytes(&flood).is_empty());
+        assert!(decoder.overflowed, "顶到上限必须立标记，交给调用方报错中断");
+    }
+
+    #[test]
+    fn reasoning_content_is_collected_without_leaking_into_the_text() {
+        // 思考模式下 reasoning_content 与 content 同级：正文只取 content，
+        // 思维链要单独攒起来 —— 它**必须回传给 API**（不回传就 400），但不该显示给用户。
+        let mut decoder = StreamDecoder::new(AiProtocol::OpenAi);
+        let deltas = decoder.push(
+            "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"先看路径\"}}]}\n\
+             data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"再判断用途\"}}]}\n\
+             data: {\"choices\":[{\"delta\":{\"content\":\"这是缓存目录。\"}}]}\n",
+        );
+        assert_eq!(deltas, vec!["这是缓存目录。".to_string()], "思维链不该混进正文");
+        assert_eq!(decoder.take_reasoning(), "先看路径再判断用途");
+        assert_eq!(decoder.take_reasoning(), "", "取过一次就空了");
     }
 }
