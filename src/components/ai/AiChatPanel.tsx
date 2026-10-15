@@ -35,6 +35,8 @@ interface AiChatPanelProps {
   onCancelDelete: () => void;
   /** 重试某条用户消息（网络或接口出错时用）：组件只上报序号，截断与重发由上层决定 */
   onRetry: (index: number) => void;
+  /** 重试最近一次提问 —— 错误提示旁边那个按钮用，用户不用去上面找 */
+  onRetryLast: () => void;
   isSending: boolean;
   errorMessage: string;
   /** 当前模块显示名，只用于标题，让用户知道在跟"哪个模块的助手"说话 */
@@ -64,6 +66,7 @@ export function AiChatPanel({
   onRetry,
   isSending,
   errorMessage,
+  onRetryLast,
   moduleName,
   modelLabel,
   modelOptions,
@@ -378,7 +381,17 @@ export function AiChatPanel({
       {errorMessage ? (
         <div className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-2 text-[11px] text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-          <span className="min-w-0 break-all">{errorMessage}</span>
+          {/* break-all 会把服务商返回的英文长句切得很难读，用 normal 断词 + 允许换行 */}
+          <span className="min-w-0 whitespace-pre-wrap break-words select-text">{errorMessage}</span>
+          {/* 出错时最可能想做的就是"再试一次"。让用户去上面悬停找重试按钮，
+              等于把最有用的动作藏起来了。 */}
+          <button
+            type="button"
+            onClick={onRetryLast}
+            className="ml-auto shrink-0 rounded-lg border border-[var(--color-danger)]/40 px-2 py-0.5 transition-colors hover:bg-[var(--color-danger)]/10"
+          >
+            {t('retry')}
+          </button>
         </div>
       ) : null}
 

@@ -500,6 +500,18 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     [activeModuleId, historyByModule, handleSend],
   );
 
+  /** 重试最近一次提问：从后往前找最后一条用户消息，走与单条重试同一条路径。 */
+  const handleRetryLast = useCallback(() => {
+    const moduleId = activeModuleId ?? '';
+    const history = historyByModule[moduleId] ?? [];
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      if (history[index].role === 'user') {
+        handleRetry(index);
+        return;
+      }
+    }
+  }, [activeModuleId, historyByModule, handleRetry]);
+
   /** 清空当前模块的对话：**内存与磁盘一起清**，否则重开面板历史会"复活"。 */
   const handleClear = useCallback(() => {
     const moduleId = activeModuleId ?? '';
@@ -543,6 +555,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           onRetry={handleRetry}
           isSending={isSending}
           errorMessage={errorMessage}
+          onRetryLast={handleRetryLast}
           moduleName={moduleName}
           modelLabel={activeModelLabel}
           modelOptions={activeProfile?.models ?? []}

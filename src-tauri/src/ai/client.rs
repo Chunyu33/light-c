@@ -299,13 +299,64 @@ fn parse_model_ids(value: &serde_json::Value) -> Vec<String> {
 
 /// 把服务端返回的错误体摘成人话，避免直接把一大坨 JSON 甩给用户。
 fn describe_http_error(status: u16, body: &str) -> String {
-    let brief: String = body.chars().take(300).collect();
+    // 服务商返回的是一坨 JSON，直接把整段甩给用户等于没说。
+    // 先把里面的 message 抠出来 —— 那句话通常才是真正有用的信息。
+    let detail = extract_error_message(body);
     match status {
-        401 | 403 => format!("鉴权失败（{}），请检查 API Key 是否正确、是否已开通该模型。{}", status, brief),
-        404 => format!("接口地址不对（404），请检查「接口地址」是否填成了正确的服务商地址。{}", brief),
-        429 => format!("请求太频繁或额度不足（429）。{}", brief),
-        _ => format!("请求失败（{}）：{}", status, brief),
+        401 | 403 => format!("鉴权失败（{}），请检查 API Key 是否正确、是否已开通该模型。{}", status, detail),
+        404 => format!("接口地址不对（404），请检查「接口地址」是否填成了正确的服务商地址。{}", detail),
+        429 => format!("请求太频繁或额度不足（429）。{}", detail),
+        // 5xx 是**服务商那边**的问题，不是本机也不是配置错了。
+        // 说清楚这一点，用户才不会去反复改设置（实测 503 时错误原文就建议"换个服务商"）。
+        500..=599 => format!(
+            "服务商暂时不可用（{}），稍后重试通常就好；持续不行的话可以换一个服务商。{}",
+            status, detail
+        ),
+        _ => format!("请求失败（{}）：{}", status, detail),
     }
+}
+
+/// 从错误响应里取出一句人能看懂的话。
+///
+/// 见到的形状不止一种：OpenAI 兼容是 `{"error":{"message":"..."}}`，
+/// Anthropic 是 `{"error":{"type":"...","message":"..."}}`，
+/// 也有直接 `{"message":"..."}` 的。取不到就退回原文（截断），**绝不返回空串** ——
+/// 宁可给原始内容，也不能让用户只看到一句"请求失败"。
+fn extract_error_message(body: &str) -> String {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
+        let error = value.get("error");
+        // 形状一：{"error": {"message": "..."}}（OpenAI 兼容、Anthropic 都是这个）
+        if let Some(text) = error
+            .and_then(|item| item.get("message"))
+            .and_then(|item| item.as_str())
+        {
+            if !text.trim().is_empty() {
+                return text.trim().to_string();
+            }
+        }
+        // 形状二：{"error": "..."}（少数服务商直接给字符串）
+        if let Some(text) = error.and_then(|item| item.as_str()) {
+            if !text.trim().is_empty() {
+                return text.trim().to_string();
+            }
+        }
+        // 形状三：{"message": "..."} / {"detail": "..."}
+        for key in ["message", "detail"] {
+            if let Some(text) = value.get(key).and_then(|item| item.as_str()) {
+                if !text.trim().is_empty() {
+                    return text.trim().to_string();
+                }
+            }
+        }
+        // 连 message 都没有（有些服务商只给 code），把 code 报出来便于排查
+        if let Some(code) = error
+            .and_then(|item| item.get("code"))
+            .and_then(|item| item.as_str())
+        {
+            return format!("错误代码：{}", code);
+        }
+    }
+    body.chars().take(200).collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +714,31 @@ mod tests {
         };
         assert_eq!(build_openai_body(&request, "m")["messages"][0]["content"], "你好");
         assert_eq!(build_anthropic_body(&request, "m")["messages"][0]["content"], "你好");
+    }
+
+    #[test]
+    fn provider_error_json_is_reduced_to_its_message() {
+        // 服务商返回一坨 JSON，直接甩给用户等于没说。
+        // 实测 503 就是这样：真正有用的只有 message 那一句。
+        let body = r#"{"error":{"message":"Service is too busy. We advise users to temporarily switch to alternative LLM API service providers.","type":"service_unavailable_error","code":"service_unavailable_error"}}"#;
+        let text = describe_http_error(503, body);
+        assert!(text.contains("Service is too busy"), "应保留服务商的原文：{}", text);
+        assert!(!text.contains("request_id"), "不该把整坨 JSON 带出来：{}", text);
+        // 5xx 必须说清"是服务商那边的问题"，否则用户会去反复改设置
+        assert!(text.contains("服务商暂时不可用"), "{}", text);
+    }
+
+    #[test]
+    fn error_extraction_falls_back_gracefully() {
+        // 不是 JSON：退回原文，绝不能返回空串
+        assert_eq!(extract_error_message("plain gateway error"), "plain gateway error");
+        // 只有 code 没有 message
+        assert_eq!(
+            extract_error_message(r#"{"error":{"code":"rate_limited"}}"#),
+            "错误代码：rate_limited"
+        );
+        // 顶层 message
+        assert_eq!(extract_error_message(r#"{"message":"bad request"}"#), "bad request");
     }
 
     #[test]
