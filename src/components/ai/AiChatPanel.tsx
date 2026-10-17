@@ -9,8 +9,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { AlertCircle, Check, Copy, Eraser, ImagePlus, Loader2, Minus, RefreshCw, Send, User, X } from 'lucide-react';
+import { AlertCircle, Check, Copy, Eraser, History, ImagePlus, Loader2, Minus, RefreshCw, Send, User, X } from 'lucide-react';
 import { Select } from '../ui/Select';
+import { ConfirmDialog } from '../ConfirmDialog';
+import i18n from '../../i18n';
 import type { AiChatMessage } from '../../types/ai';
 import { AiDeleteRequestCard, type AiDeleteRequestItem } from './AiDeleteRequestCard';
 import { AiDeleteResultCard } from './AiDeleteResultCard';
@@ -20,6 +22,24 @@ import { collectImageFiles, compressImage, type AttachedImage } from './imageAtt
 import { renderMarkdown } from './renderMarkdown';
 import { usePanelSize } from './usePanelSize';
 import { formatSize } from '../../utils/format';
+
+/**
+ * 消息所属日期的显示文案（跨天加载后的日期分隔线用）。
+ *
+ * 用 `Intl.DateTimeFormat` 跟界面语言走，不自己拼"月/日"（各语言写法不同）。
+ * 没有时间戳的旧数据返回空串 —— 那就干脆不插分隔线，比插错一条好。
+ */
+function formatDayLabel(at: number | undefined): string {
+  if (typeof at !== 'number' || !Number.isFinite(at) || at <= 0) return '';
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return '';
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return new Intl.DateTimeFormat(i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  }).format(date);
+}
 
 interface AiChatPanelProps {
   messages: AiChatMessage[];
@@ -50,7 +70,16 @@ interface AiChatPanelProps {
   /** images 为空时就是纯文字发送 */
   onSend: (text: string, images: AttachedImage[]) => void;
   onCollapse: () => void;
+  /** 点「清空」：只负责**弹出二次确认**，不直接清 */
   onClear: () => void;
+  /** 是否还有更早的历史没加载（顶部「加载更早」按钮） */
+  hasEarlier: boolean;
+  isLoadingEarlier: boolean;
+  onLoadEarlier: () => void;
+  /** 「清空对话」二次确认的开关与回调（清空的是**所有日期**，必须确认） */
+  isClearConfirmOpen: boolean;
+  onConfirmClear: () => void;
+  onCancelClear: () => void;
 }
 
 export function AiChatPanel({
@@ -73,6 +102,12 @@ export function AiChatPanel({
   onSend,
   onCollapse,
   onClear,
+  hasEarlier,
+  isLoadingEarlier,
+  onLoadEarlier,
+  isClearConfirmOpen,
+  onConfirmClear,
+  onCancelClear,
 }: AiChatPanelProps) {
   const { t } = useTranslation('ai');
   const [draft, setDraft] = useState('');
@@ -282,16 +317,42 @@ export function AiChatPanel({
       </header>
 
       <div ref={listRef} onScroll={handleListScroll} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
+        {/* 加载更早：历史是跨天读取的，到底或到内存上限时按钮就消失 */}
+        {hasEarlier && visibleMessages.length > 0 ? (
+          <button
+            type="button"
+            onClick={onLoadEarlier}
+            disabled={isLoadingEarlier}
+            className="mx-auto flex items-center gap-1 rounded-full border border-[var(--border-color)] px-2.5 py-1 text-[0.79rem] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:opacity-60"
+          >
+            {isLoadingEarlier ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <History className="h-3 w-3" />
+            )}
+            {isLoadingEarlier ? t('history.loadingEarlier') : t('history.loadEarlier')}
+          </button>
+        ) : null}
         {visibleMessages.length === 0 ? (
-          <p className="text-xs leading-relaxed text-[var(--text-muted)]">{t('emptyHint')}</p>
+          <p className="text-sm leading-relaxed text-[var(--text-muted)]">{t('emptyHint')}</p>
         ) : (
           visibleMessages.map((message, index) => {
             const isUser = message.role === 'user';
+            // 跨天加载后插一条日期分隔线：不然看不出这段是昨天还是今天
+            const dayLabel = formatDayLabel(message.at);
+            const previousDayLabel = index > 0 ? formatDayLabel(visibleMessages[index - 1]?.at) : '';
             return (
               <div
                 key={index}
                 className={`group flex flex-col gap-0.5 ${isUser ? 'items-end' : 'items-start'}`}
               >
+                {dayLabel && dayLabel !== previousDayLabel ? (
+                  <div className="flex w-full items-center gap-2 py-1 text-[0.72rem] text-[var(--text-faint)]">
+                    <span className="h-px flex-1 bg-[var(--border-color)]" />
+                    <span className="shrink-0">{dayLabel}</span>
+                    <span className="h-px flex-1 bg-[var(--border-color)]" />
+                  </div>
+                ) : null}
                 <div style={{ userSelect: 'all' }} className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                   <div
                     className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
@@ -303,7 +364,7 @@ export function AiChatPanel({
                     {isUser ? <User className="h-3.5 w-3.5" /> : <AiMarkIcon className="h-3.5 w-3.5" />}
                   </div>
                   <div
-                    className={`max-w-[80%] select-text whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
+                    className={`max-w-[80%] select-text whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed ${
                       isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--ai-bubble-bg)] text-[var(--text-primary)]'
                     }`}
                   >
@@ -375,7 +436,7 @@ export function AiChatPanel({
             </div>
             {/* 流式过程中的气泡必须与落定后的**同一个底色**：
                 否则回答结束的一瞬间气泡会变一次色，很跳。 */}
-            <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--ai-bubble-bg)] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--text-primary)]">
+            <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--ai-bubble-bg)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--text-primary)]">
               {renderMarkdown(streamingText)}
               {/* 光标：暗示还在继续输出 */}
               <span className="ml-0.5 inline-block h-3 w-1 translate-y-0.5 animate-pulse bg-[var(--brand-green)]" />
@@ -432,7 +493,7 @@ export function AiChatPanel({
       ) : null}
 
       {errorMessage ? (
-        <div className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-2 text-[11px] text-[var(--color-danger)]">
+        <div className="mx-3 mb-2 flex shrink-0 items-start gap-2 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-2 text-[0.79rem] text-[var(--color-danger)]">
           <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
           {/* break-all 会把服务商返回的英文长句切得很难读，用 normal 断词 + 允许换行 */}
           <span className="min-w-0 whitespace-pre-wrap break-words select-text">{errorMessage}</span>
@@ -500,11 +561,11 @@ export function AiChatPanel({
           }}
           rows={1}
           placeholder={canChat ? t('inputPlaceholder') : t('needConfigPlaceholder')}
-          className="min-h-[3em] max-h-[min(13em,30vh)] w-full resize-none overflow-y-auto bg-transparent px-0.5 text-xs leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-[3em] max-h-[min(13em,30vh)] w-full resize-none overflow-y-auto bg-transparent px-0.5 text-sm leading-relaxed text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <div className="flex items-center justify-between gap-2">
           {/* 左侧：附件出错优先显示（刚发生的事），否则是未配置指引，都为空时保持安静 */}
-          <span className="min-w-0 truncate text-[10px] text-[var(--text-muted)]">
+          <span className="min-w-0 truncate text-[0.72rem] text-[var(--text-muted)]">
             {attachError || (canChat ? '' : t('needConfig'))}
           </span>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -540,7 +601,7 @@ export function AiChatPanel({
                 widthClass="w-44"
               />
             ) : (
-              <span className="truncate text-[11px] text-[var(--text-muted)]">
+              <span className="truncate text-[0.79rem] text-[var(--text-muted)]">
                 {activeModel || t('noModel')}
               </span>
             )}
@@ -558,6 +619,16 @@ export function AiChatPanel({
         </div>
       </div>
     </motion.div>
+      {/* 清空对话的二次确认：清空的是该模块**所有日期**的历史，不能点一下就执行 */}
+      <ConfirmDialog
+        isOpen={isClearConfirmOpen}
+        title={t('clearTitle')}
+        description={t('clearBody')}
+        confirmText={t('clearConfirm')}
+        isDanger
+        onConfirm={onConfirmClear}
+        onCancel={onCancelClear}
+      />
     </>
   );
 }

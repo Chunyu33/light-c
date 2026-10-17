@@ -3,6 +3,13 @@
   "panelTitle": "AI 助手",
   "collapse": "收合",
   "clear": "清空對話",
+  "clearTitle": "清空目前對話？",
+  "clearBody": "會刪除這個模組所有日期的對話記錄（不只是今天），刪除後無法復原。",
+  "clearConfirm": "清空",
+  "history": {
+    "loadEarlier": "載入更早的訊息",
+    "loadingEarlier": "正在載入更早的訊息…"
+  },
   "emptyHint": "可以問我目前模組裡的資料是什麼、某個資料夾能不能刪。助手只依據對話裡的資訊回答，不會自己動手刪除任何東西。",
   "inputPlaceholder": "問點什麼…（Enter 送出，Shift+Enter 換行）",
   "send": "傳送",

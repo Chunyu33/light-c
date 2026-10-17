@@ -97,6 +97,11 @@ export interface AiChatMessage {
    * 发请求时会按用户侧内容处理 —— 否则会变成"一条没有 reasoning_content 的 assistant"。
    */
   localToolOutput?: boolean;
+  /**
+   * Unix 毫秒时间戳（**只在界面用**：跨天加载后靠它插日期分隔线）。
+   * 请求构造不会带它 —— `toRequestMessage` 只挑 role/content 这类协议字段。
+   */
+  at?: number;
 }
 
 /** 模型请求调用某个工具。 */

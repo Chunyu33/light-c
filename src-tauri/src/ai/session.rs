@@ -146,6 +146,105 @@ pub fn clear_session(module_id: &str, date: &str) -> Result<(), String> {
     fs::remove_file(&path).map_err(|error| format!("删除会话文件失败 {}: {}", path.display(), error))
 }
 
+/// 一次按范围读取的结果。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSessionPage {
+    /// **按时间正序**（旧 → 新），前端拼到消息列表顶部即可
+    pub messages: Vec<AiSessionMessage>,
+    /// 还有更早的没读（界面据此显示「加载更早」）
+    pub has_more: bool,
+}
+
+/// 单次最多读多少条：前端传什么都夹在这个范围内，**从源头防止一次读爆**。
+const MAX_RANGE_MESSAGES: usize = 200;
+
+/// 从候选文件名里挑出要读的日期：只留合法且**不晚于** `end_date` 的，按时间倒序。
+///
+/// 单独抽出来是为了能单测 —— 它决定"读哪几天"，出错的后果是"历史少了"或"读到未来"。
+fn candidate_dates(names: Vec<String>, end_date: &str) -> Vec<String> {
+    let mut dates: Vec<String> = names
+        .into_iter()
+        .filter_map(|name| name.strip_suffix(".jsonl").map(str::to_string))
+        // `YYYY-MM-DD` 直接按字典序比较就是时间序，不需要引入日期库
+        .filter(|date| is_safe_date(date) && date.as_str() <= end_date)
+        .collect();
+    dates.sort_unstable();
+    dates.reverse();
+    dates
+}
+
+/// 从 `end_date` 往前读，攒够 `max_messages` 条就停。
+///
+/// 会话是**每天一个文件**，所以"加载更早"天然就是"再往前读几天"：
+/// 按日期倒序逐天读，够数就返回，不做日期运算。
+pub fn load_session_range(
+    module_id: &str,
+    end_date: &str,
+    max_messages: usize,
+) -> Result<AiSessionPage, String> {
+    if !is_safe_segment(module_id) {
+        return Err(format!("非法的模块标识: {}", module_id));
+    }
+    if !is_safe_date(end_date) {
+        return Err(format!("非法的日期格式（应为 YYYY-MM-DD）: {}", end_date));
+    }
+    let limit = max_messages.clamp(1, MAX_RANGE_MESSAGES);
+
+    let directory = sessions_root().join(module_id);
+    if !directory.is_dir() {
+        return Ok(AiSessionPage { messages: Vec::new(), has_more: false });
+    }
+
+    let names = fs::read_dir(&directory)
+        .map_err(|error| format!("读取会话目录失败 {}: {}", directory.display(), error))?
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .collect::<Vec<String>>();
+    let dates = candidate_dates(names, end_date);
+
+    let mut collected: Vec<AiSessionMessage> = Vec::new();
+    let mut consumed = 0usize;
+    for date in &dates {
+        // 逐天从新往旧读：新的一天拼在**前面**，读完后整体就是正序
+        let mut merged = load_session(module_id, date)?;
+        merged.append(&mut collected);
+        collected = merged;
+        consumed += 1;
+        if collected.len() >= limit {
+            break;
+        }
+    }
+
+    // ⚠️ **按整日返回**，不在一天中间截断：
+    // 「加载更早」用的是"当前最早那条所在日期的前一天"作边界 —— 如果这里切在某天中间，
+    // 那半天就永远读不到了（用户看到的历史会缺一截）。
+    // 只有**单日就超过两倍上限**这种极端情况才截断：宁可留个缺口，也不一次读爆。
+    let mut has_more = dates.len() > consumed;
+    if collected.len() > limit.saturating_mul(2) {
+        collected.drain(0..collected.len() - limit);
+        has_more = true;
+    }
+
+    Ok(AiSessionPage { messages: collected, has_more })
+}
+
+/// 清空某模块**所有日期**的会话（界面的「清空对话」）。
+///
+/// 只删当天那一个文件是不够的：历史是按天加载的，删了今天、昨天的还会被加载回来 ——
+/// 用户看到的就是"清空了又冒出来"。所以清空 = 把这个模块的整个目录删掉。
+pub fn clear_all_sessions(module_id: &str) -> Result<(), String> {
+    if !is_safe_segment(module_id) {
+        return Err(format!("非法的模块标识: {}", module_id));
+    }
+    let directory = sessions_root().join(module_id);
+    if !directory.is_dir() {
+        return Ok(());
+    }
+    fs::remove_dir_all(&directory)
+        .map_err(|error| format!("清空会话目录失败 {}: {}", directory.display(), error))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +273,30 @@ mod tests {
         let path = session_file("junk-clean", "2026-10-14").expect("合法输入应通过");
         let text = path.to_string_lossy().replace('\\', "/");
         assert!(text.ends_with("ai/sessions/junk-clean/2026-10-14.jsonl"), "实际得到 {}", text);
+    }
+
+    #[test]
+    fn candidate_dates_keep_valid_past_dates_newest_first() {
+        // 只读合法日期、且**不晚于** end_date；顺序必须是最新在前（加载顺序依赖它）
+        let names = vec![
+            "2026-10-14.jsonl".to_string(),
+            "2026-10-16.jsonl".to_string(),
+            "2026-10-15.jsonl".to_string(),
+            "2026-10-17.jsonl".to_string(),
+            "not-a-date.jsonl".to_string(),
+            "2026-10-1.jsonl".to_string(),
+            "README.txt".to_string(),
+        ];
+        let dates = candidate_dates(names, "2026-10-16");
+        assert_eq!(
+            dates.iter().map(String::as_str).collect::<Vec<_>>(),
+            vec!["2026-10-16", "2026-10-15", "2026-10-14"]
+        );
+    }
+
+    #[test]
+    fn candidate_dates_are_empty_when_nothing_is_old_enough() {
+        let names = vec!["2026-10-18.jsonl".to_string()];
+        assert!(candidate_dates(names, "2026-10-16").is_empty());
     }
 }

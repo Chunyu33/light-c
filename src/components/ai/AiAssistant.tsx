@@ -13,15 +13,17 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   aiChatStream,
   appendAiSessionMessage,
-  clearAiSession,
+  clearAiModuleSession,
   getAiConfig,
   listenAiStream,
-  loadAiSession,
+  loadAiSessionRange,
   localDateKey,
   readAiAttachment,
   saveAiAttachment,
   saveAiProfile,
+  shiftDateKey,
 } from '../../api/ai';
+import type { AiSessionMessage } from '../../api/ai';
 import type { AiChatMessage, AiChatReply, AiPublicConfig, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { AiMarkIcon } from './AiMarkIcon';
@@ -35,6 +37,23 @@ import type { AttachedImage } from './imageAttach';
 
 /** 只保留最近若干轮对话：更早的内容交给滚动摘要处理。 */
 const MAX_HISTORY_MESSAGES = 16;
+
+/** 一次从磁盘加载多少条历史（打开面板时），「加载更早」每次也加这么多。 */
+const HISTORY_PAGE_SIZE = 40;
+
+/**
+ * 内存里最多保留多少条历史。
+ *
+ * 加载多少只影响**界面**和滚动摘要的输入 —— 真正进上下文的仍只有最近 16 条。
+ * 但无限往里塞没意义、长列表也会变卡，所以到顶就停。
+ */
+const MAX_LOADED_HISTORY = 200;
+
+/** 摘要最多纳入多少条被裁掉的消息（加载更早之后可能裁掉几百条，不能全塞进去）。 */
+const SUMMARY_MAX_MESSAGES = 40;
+
+/** 摘要的硬上限字数，兜底防止上下文被摘要吃满。 */
+const SUMMARY_MAX_CHARS = 1200;
 
 /**
  * 一次提问最多跑几轮请求。
@@ -69,6 +88,11 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
    * 不会出现在旧驱动的面板里（Evan 反馈过这个串台）。
    */
   const [historyByModule, setHistoryByModule] = useState<Record<string, AiChatMessage[]>>({});
+  /** 某个模块是否还有更早的历史没加载（界面据此显示「加载更早」） */
+  const [hasEarlierByModule, setHasEarlierByModule] = useState<Record<string, boolean>>({});
+  const [isLoadingEarlier, setIsLoadingEarlier] = useState(false);
+  /** 「清空对话」的二次确认（清空是**所有日期**，不能只靠点一下） */
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   // 流式增量拼起来的"正在生成的回答"。它不进历史 —— 只有命令返回的完整正文才入库，
@@ -145,11 +169,12 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   );
   const currentHistory = historyByModule[activeModuleId ?? ''] ?? [];
 
-  /** 写一条消息到该模块的历史（内存） */
+  /** 写一条消息到该模块的历史（内存）。顺手补 `at`：跨天加载后靠它插日期分隔线。 */
   const pushMessage = useCallback((moduleId: string, message: AiChatMessage) => {
+    const stamped = message.at === undefined ? { ...message, at: Date.now() } : message;
     setHistoryByModule((previous) => ({
       ...previous,
-      [moduleId]: [...(previous[moduleId] ?? []), message],
+      [moduleId]: [...(previous[moduleId] ?? []), stamped],
     }));
   }, []);
 
@@ -164,35 +189,10 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
     void (async () => {
       try {
-        const stored = await loadAiSession(moduleId, localDateKey());
-        if (stored.length === 0) return;
-        // 把附件文件名读回成 data URL：这样重开面板也能看到当时发的图，
-        // 而且这些图会一并进入后续请求的上下文（与编辑器的行为一致）。
-        const restored = await Promise.all(
-          stored.map(async (item) => {
-            // 思维链、"本地工具结果"标记、以及"是哪份档案产出的"都要一起恢复：
-            // 前者不回传会被服务端 400；第二个决定这条算 assistant 还是用户侧内容；
-            // 第三个决定换服务商之后它还要不要带出去。
-            const carried = {
-              reasoningContent: item.reasoningContent,
-              localToolOutput: item.localToolOutput,
-              producedByProfile: item.producedByProfile,
-            };
-            const names = item.images ?? [];
-            if (names.length === 0) {
-              return { role: item.role, content: item.content, ...carried };
-            }
-            const dataUrls = await Promise.all(names.map((name) => readAiAttachment(name)));
-            return {
-              role: item.role,
-              content: item.content,
-              images: dataUrls
-                .filter((url) => url.length > 0)
-                .map((url) => ({ mediaType: 'image/jpeg', dataBase64: url.split(',')[1] ?? '' })),
-              ...carried,
-            };
-          }),
-        );
+        const page = await loadAiSessionRange(moduleId, localDateKey(), HISTORY_PAGE_SIZE);
+        setHasEarlierByModule((previous) => ({ ...previous, [moduleId]: page.hasMore }));
+        if (page.messages.length === 0) return;
+        const restored = await restoreMessages(page.messages);
         setHistoryByModule((previous) => ({ ...previous, [moduleId]: restored }));
       } catch (error) {
         console.error('读取 AI 会话历史失败:', error);
@@ -667,12 +667,59 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     }
   }, [activeModuleId, historyByModule, handleRetry]);
 
-  /** 清空当前模块的对话：**内存与磁盘一起清**，否则重开面板历史会"复活"。 */
-  const handleClear = useCallback(() => {
+  /**
+   * 加载更早的消息。
+   *
+   * 只影响**界面**和滚动摘要的输入 —— 真正进上下文的仍只有最近 16 条（+ 封顶后的摘要），
+   * 所以加载多少都不会挤爆上下文。到 `MAX_LOADED_HISTORY` 就停，按钮随之消失。
+   */
+  const handleLoadEarlier = useCallback(async () => {
     const moduleId = activeModuleId ?? '';
+    if (!moduleId || isLoadingEarlier) return;
+    const current = historyByModule[moduleId] ?? [];
+    if (current.length >= MAX_LOADED_HISTORY) {
+      setHasEarlierByModule((previous) => ({ ...previous, [moduleId]: false }));
+      return;
+    }
+
+    setIsLoadingEarlier(true);
+    try {
+      // 边界取"当前最早那条"所在日期的**前一天**：同一天里更早的不会重复读一遍
+      const oldestAt = current.find((message) => typeof message.at === 'number')?.at;
+      const boundary = oldestAt ? localDateKey(new Date(oldestAt)) : localDateKey();
+      const page = await loadAiSessionRange(moduleId, shiftDateKey(boundary, -1), HISTORY_PAGE_SIZE);
+      const restored = await restoreMessages(page.messages);
+      setHistoryByModule((previous) => {
+        const merged = [...restored, ...(previous[moduleId] ?? [])];
+        // 超出内存上限就丢掉最早的（剩下的会随滚动摘要进 prompt）
+        return { ...previous, [moduleId]: merged.slice(-MAX_LOADED_HISTORY) };
+      });
+      setHasEarlierByModule((previous) => ({ ...previous, [moduleId]: page.hasMore }));
+    } catch (error) {
+      console.error('加载更早的对话失败:', error);
+    } finally {
+      setIsLoadingEarlier(false);
+    }
+  }, [activeModuleId, historyByModule, isLoadingEarlier]);
+
+  /** 点「清空」只负责弹确认 —— 清空是**所有日期**，不能点一下就执行。 */
+  const handleClearRequest = useCallback(() => {
+    setShowClearConfirm(true);
+  }, []);
+
+  /**
+   * 确认后真正清空：**内存与磁盘一起清，而且是该模块的所有日期**。
+   *
+   * 只删当天那个文件是不够的（历史现在跨天加载）——
+   * 否则会出现"清空了、重开面板昨天的又回来了"。
+   */
+  const handleClearConfirmed = useCallback(() => {
+    const moduleId = activeModuleId ?? '';
+    setShowClearConfirm(false);
     setHistoryByModule((previous) => ({ ...previous, [moduleId]: [] }));
+    setHasEarlierByModule((previous) => ({ ...previous, [moduleId]: false }));
     setErrorMessage('');
-    void clearAiSession(moduleId, localDateKey()).catch((error) =>
+    void clearAiModuleSession(moduleId).catch((error) =>
       console.error('清空 AI 会话历史失败:', error),
     );
   }, [activeModuleId]);
@@ -725,7 +772,13 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           onSwitchModel={handleSwitchModel}
           onSend={(text, attached) => void handleSend(text, attached)}
           onCollapse={handleToggle}
-          onClear={handleClear}
+          onClear={handleClearRequest}
+          hasEarlier={(hasEarlierByModule[activeModuleId ?? ''] ?? false) && currentHistory.length > 0}
+          isLoadingEarlier={isLoadingEarlier}
+          onLoadEarlier={() => void handleLoadEarlier()}
+          isClearConfirmOpen={showClearConfirm}
+          onConfirmClear={handleClearConfirmed}
+          onCancelClear={() => setShowClearConfirm(false)}
         />
       ) : (
         <motion.button
@@ -770,7 +823,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
             <motion.span
               animate={{ y: [0, -3, 0] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-              className="relative block rounded-lg border border-[var(--brand-green-20)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[10px] font-medium leading-4 text-[var(--brand-green)] shadow-sm"
+              className="relative block rounded-lg border border-[var(--brand-green-20)] bg-[var(--bg-elevated)] px-2 py-0.5 text-[0.72rem] font-medium leading-4 text-[var(--brand-green)] shadow-sm"
             >
               {t('ballBadge')}
               {/* 指向小球的小尖角：一个旋转 45° 的方块，只留底边与右边，
@@ -893,8 +946,7 @@ async function persistUserTurn(
   moduleId: string,
   content: string,
   images: AttachedImage[],
-): Promise<void> {
-  try {
+): Promise<void> {  try {
     const names = await Promise.all(
       images.map((image) => saveAiAttachment(image.base64, image.mediaType)),
     );
@@ -1013,12 +1065,17 @@ function looksLikeActionRequest(messages: AiChatMessage[]): boolean {
  * 有价值的只是"问过什么、执行过什么"。保留这两样，早期的上下文就不会彻底消失。
  */
 function summarizeDropped(dropped: AiChatMessage[]): string {
-  const asked = dropped
+  // ⚠️ 只取**最近**的这么多条：加载更早之后被裁掉的可能有几百条，
+  // 全塞进摘要等于把上下文重新吃满 —— 摘要的作用是"别忘光"，不是"全记住"。
+  const recent = dropped.length > SUMMARY_MAX_MESSAGES ? dropped.slice(-SUMMARY_MAX_MESSAGES) : dropped;
+  const omitted = dropped.length - recent.length;
+
+  const asked = recent
     .filter((message) => message.role === 'user')
     .map((message) => message.content.split('\n')[0].slice(0, 40))
     .filter(Boolean);
   // 工具执行结果也是 assistant 消息，但内容以结论句开头，单独收一行更有用
-  const acted = dropped
+  const acted = recent
     .filter((message) => message.role === 'assistant' && message.content.startsWith('已'))
     .map((message) => message.content.slice(0, 60));
 
@@ -1026,7 +1083,13 @@ function summarizeDropped(dropped: AiChatMessage[]): string {
   if (asked.length > 0) parts.push(`用户此前问过：${asked.join('；')}`);
   if (acted.length > 0) parts.push(`期间执行过：${acted.join('；')}`);
   if (parts.length === 0) return '';
-  return `【更早的对话摘要（原始消息已从上下文移除）】${parts.join('。')}。需要细节时请让用户重新说明，不要凭这段摘要编造具体数字。`;
+  const head =
+    omitted > 0
+      ? `【更早的对话摘要（另有 ${omitted} 条更早的未纳入）】`
+      : '【更早的对话摘要（原始消息已从上下文移除）】';
+  const text = `${head}${parts.join('。')}。需要细节时请让用户重新说明，不要凭这段摘要编造具体数字。`;
+  // 硬上限兜底：无论裁剪策略以后怎么改，进 prompt 的摘要都不会超过这个长度
+  return text.length > SUMMARY_MAX_CHARS ? `${text.slice(0, SUMMARY_MAX_CHARS)}…（摘要已截断）` : text;
 }
 
 /**
@@ -1061,4 +1124,39 @@ function trimHistory(messages: AiChatMessage[]): AiChatMessage[] {
     ? [{ role: 'system', content: droppedSummary }]
     : [];
   return [...systems, ...summaryMessage, ...trimmed.reverse()];
+}
+
+/**
+ * 把磁盘上的会话记录还原成界面用的消息（打开面板、以及「加载更早」都走它）。
+ *
+ * 附件要读回成 data URL：这样重开面板也能看到当时发的图。
+ * 思维链、「本地工具结果」标记、「是哪份档案产出的」三个字段也必须一起恢复 ——
+ * 前者不回传会被服务端 400，第二个决定这条算 assistant 还是用户侧内容，
+ * 第三个决定换服务商之后它还要不要带出去。
+ * `at` 只给界面用（插日期分隔线），请求构造不会带它。
+ */
+async function restoreMessages(stored: AiSessionMessage[]): Promise<AiChatMessage[]> {
+  return Promise.all(
+    stored.map(async (item) => {
+      const carried = {
+        at: item.at,
+        reasoningContent: item.reasoningContent,
+        localToolOutput: item.localToolOutput,
+        producedByProfile: item.producedByProfile,
+      };
+      const names = item.images ?? [];
+      if (names.length === 0) {
+        return { role: item.role, content: item.content, ...carried };
+      }
+      const dataUrls = await Promise.all(names.map((name) => readAiAttachment(name)));
+      return {
+        role: item.role,
+        content: item.content,
+        images: dataUrls
+          .filter((url) => url.length > 0)
+          .map((url) => ({ mediaType: 'image/jpeg', dataBase64: url.split(',')[1] ?? '' })),
+        ...carried,
+      };
+    }),
+  );
 }

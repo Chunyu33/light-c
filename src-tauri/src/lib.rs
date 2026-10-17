@@ -178,6 +178,8 @@ pub fn run() {
             read_ai_attachment,
             append_ai_session_message,
             load_ai_session,
+            load_ai_session_range,
+            clear_ai_module_session,
             clear_ai_session,
         ])
         .run(context)

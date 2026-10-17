@@ -116,6 +116,28 @@ pub fn load_ai_session(module_id: String, date: String) -> Result<Vec<AiSessionM
     crate::ai::load_session(&module_id, &date)
 }
 
+/// 按范围读取历史：从 `end_date` 往前读，攒够 `max_messages` 条就停。
+///
+/// 界面打开时用它加载"最近 N 条"（跨天），「加载更早」也走它 ——
+/// 单次条数在 `ai::session` 里夹了上限，**从源头防止一次读爆**。
+#[tauri::command]
+pub fn load_ai_session_range(
+    module_id: String,
+    end_date: String,
+    max_messages: usize,
+) -> Result<crate::ai::AiSessionPage, String> {
+    crate::ai::load_session_range(&module_id, &end_date, max_messages)
+}
+
+/// 清空某模块**所有日期**的会话（界面的「清空对话」，前端已做二次确认）。
+///
+/// 与上面的 `clear_ai_session`（只删一天）的区别：历史现在是跨天加载的，
+/// 只删当天会出现"清空了、昨天的又回来了"，所以「清空对话」走这一个。
+#[tauri::command]
+pub fn clear_ai_module_session(module_id: String) -> Result<(), String> {
+    crate::ai::clear_all_sessions(&module_id)
+}
+
 /// 流式对话：增量通过事件推送，命令最终返回完整正文。
 ///
 /// 为什么用事件而不是"返回值就是流"：Tauri 命令只能返回一次性结果，

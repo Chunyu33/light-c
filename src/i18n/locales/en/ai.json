@@ -3,6 +3,13 @@
   "panelTitle": "AI assistant",
   "collapse": "Collapse",
   "clear": "Clear chat",
+  "clearTitle": "Clear this conversation?",
+  "clearBody": "This deletes this module's conversation from all dates (not just today) and cannot be undone.",
+  "clearConfirm": "Clear",
+  "history": {
+    "loadEarlier": "Load earlier messages",
+    "loadingEarlier": "Loading earlier messages…"
+  },
   "emptyHint": "Ask about the data in the current module, or whether a folder is safe to remove. The assistant answers from what it is told and never deletes anything on its own.",
   "inputPlaceholder": "Ask something… (Enter to send, Shift+Enter for a new line)",
   "send": "Send",

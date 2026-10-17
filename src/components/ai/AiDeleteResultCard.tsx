@@ -62,7 +62,7 @@ export function AiDeleteResultCard({
           {expanded ? (
             <ul className="mt-1.5 space-y-1 pl-6">
               {failures?.map((failure, index) => (
-                <li key={`${failure.name}-${index}`} className="text-[11px] leading-relaxed">
+                <li key={`${failure.name}-${index}`} className="text-[0.79rem] leading-relaxed">
                   <span className="break-all text-[var(--text-primary)]">{failure.name}</span>
                   <span className="ml-1 break-all text-[var(--text-muted)]">{failure.reason}</span>
                 </li>
@@ -73,7 +73,7 @@ export function AiDeleteResultCard({
       ) : null}
 
       {rebootNotice ? (
-        <div className="flex items-start gap-1.5 border-t border-[var(--border-color)] px-3 py-2 text-[11px] text-[var(--text-muted)]">
+        <div className="flex items-start gap-1.5 border-t border-[var(--border-color)] px-3 py-2 text-[0.79rem] text-[var(--text-muted)]">
           <RotateCw className="mt-0.5 h-3 w-3 shrink-0" />
           <span className="min-w-0">{rebootNotice}</span>
         </div>

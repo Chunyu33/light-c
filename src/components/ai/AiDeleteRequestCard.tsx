@@ -77,7 +77,7 @@ export function AiDeleteRequestCard({
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-[var(--text-primary)]">{item.label}</span>
               {item.irreversible && irreversibleLabel ? (
-                <span className="shrink-0 rounded px-1 py-0.5 text-[10px] text-[var(--color-danger)] ring-1 ring-inset ring-[var(--color-danger)]/40">
+                <span className="shrink-0 rounded px-1 py-0.5 text-[0.72rem] text-[var(--color-danger)] ring-1 ring-inset ring-[var(--color-danger)]/40">
                   {irreversibleLabel}
                 </span>
               ) : null}
@@ -92,13 +92,13 @@ export function AiDeleteRequestCard({
       <div className="border-t border-[var(--border-color)] px-3 py-2">
         <p className="text-xs font-medium text-[var(--text-primary)]">{totalLabel}</p>
         {warning ? (
-          <p className="mt-1 flex items-start gap-1.5 text-[11px] text-[var(--color-warning)]">
+          <p className="mt-1 flex items-start gap-1.5 text-[0.79rem] text-[var(--color-warning)]">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
             <span className="min-w-0">{warning}</span>
           </p>
         ) : null}
         {disabledReason ? (
-          <p className="mt-1 text-[11px] text-[var(--text-muted)]">{disabledReason}</p>
+          <p className="mt-1 text-[0.79rem] text-[var(--text-muted)]">{disabledReason}</p>
         ) : null}
       </div>
 

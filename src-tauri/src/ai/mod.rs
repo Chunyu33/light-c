@@ -31,4 +31,7 @@ pub use config::{
     upsert_profile, AiProfile, AiPublicConfig,
 };
 pub use presets::{list_providers, AiProviderPreset};
-pub use session::{append_message, clear_session, load_session, sessions_root, AiSessionMessage};
+pub use session::{
+    append_message, clear_all_sessions, clear_session, load_session, load_session_range,
+    sessions_root, AiSessionMessage, AiSessionPage,
+};

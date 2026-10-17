@@ -3,6 +3,13 @@
   "panelTitle": "AI アシスタント",
   "collapse": "折りたたむ",
   "clear": "会話を消去",
+  "clearTitle": "この会話を消去しますか？",
+  "clearBody": "このモジュールの全日付の会話記録（今日だけでなく）を削除します。元に戻せません。",
+  "clearConfirm": "消去",
+  "history": {
+    "loadEarlier": "以前のメッセージを読み込む",
+    "loadingEarlier": "以前のメッセージを読み込み中…"
+  },
   "emptyHint": "現在のモジュールのデータや、フォルダを削除してよいか質問できます。アシスタントは会話で与えられた情報だけを根拠に答え、自分で削除は行いません。",
   "inputPlaceholder": "質問を入力…（Enter で送信、Shift+Enter で改行）",
   "send": "送信",

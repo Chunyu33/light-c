@@ -108,6 +108,19 @@ export interface AiSessionMessage {
 }
 
 /**
+ * 一次按范围读取历史的结果（后端 `load_ai_session_range`）。
+ *
+ * `messages` 是**按时间正序**的，前端直接拼到消息列表顶部即可。
+ * 定义在这里而不是 `types/ai.ts`：它依赖 `AiSessionMessage`，而那也在本文件里
+ * （放到 types 里会形成 types ↔ api 的循环引用）。
+ */
+export interface AiSessionPage {
+  messages: AiSessionMessage[];
+  /** 还有更早的没读（界面据此显示「加载更早」） */
+  hasMore: boolean;
+}
+
+/**
  * 本地日期键（YYYY-MM-DD）。
  * 用本地时间手工拼，**不能用 toISOString** —— 那是 UTC，
  * 东八区晚上 8 点之后会算成"明天"，会话就会跨日错位。
@@ -147,4 +160,34 @@ export async function clearAiSession(moduleId: string, date: string): Promise<vo
 /** 读取某模块某天的会话历史；没有历史时返回空数组。 */
 export async function loadAiSession(moduleId: string, date: string): Promise<AiSessionMessage[]> {
   return invoke<AiSessionMessage[]>('load_ai_session', { moduleId, date });
+}
+
+/**
+ * 按范围读取历史：从 `endDate` 往前读，攒够 `maxMessages` 条就停。
+ *
+ * 会话按天分文件，所以"加载更早"天然就是"再往前读几天" —— 不需要日期运算。
+ * 单次条数在后端夹了上限（200），前端传什么都不会真的读爆。
+ */
+export async function loadAiSessionRange(
+  moduleId: string,
+  endDate: string,
+  maxMessages: number,
+): Promise<AiSessionPage> {
+  return invoke<AiSessionPage>('load_ai_session_range', { moduleId, endDate, maxMessages });
+}
+
+/**
+ * 清空某模块**所有日期**的会话（界面的「清空对话」，前端已做二次确认）。
+ *
+ * 与 `clearAiSession`（只删一天）的区别：历史现在跨天加载，
+ * 只删当天会出现"清空了、昨天的又回来了"。
+ */
+export async function clearAiModuleSession(moduleId: string): Promise<void> {
+  return invoke<void>('clear_ai_module_session', { moduleId });
+}
+
+/** `YYYY-MM-DD` 偏移 N 天。用本地时间算，与 `localDateKey` 保持同一口径。 */
+export function shiftDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return localDateKey(new Date(year, (month || 1) - 1, (day || 1) + days));
 }
