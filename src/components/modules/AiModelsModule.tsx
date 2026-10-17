@@ -88,17 +88,78 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
   const [scanResult, setScanResult] = useState<AiModelScanResult | null>(null);
   // 接入 AI 助手（**只读**：这里只统计占用，不提供删除动作）。
   useAiModuleBridge('ai-models', {
-    // 只读读取：模型列表。之前判成"看总量"的模块不需要下钻，是判错了 ——
-    // 这个模块界面上本来就是一列模型，用户当然会问"具体是哪几个"。
-    readItems: (_targetId, offset, limit) => {
-      const list = scanResult?.sources ?? [];
-      if (list.length === 0) return null;
+    // 只读读取：**模型文件列表**（与界面上那一列一致），不是"来源"列表。
+    //
+    // ⚠️ 这里踩过一次：原来返回的是 `scanResult.sources`（目录级），于是用户问
+    // "某个 .safetensors 是干什么的、占这么大正常吗"，模型只拿到
+    // 「D:\…\models 58.75 GB（8 个模型）」这种目录级信息，**只能凭文件名猜** ✗
+    // 而界面上本来就是"一列模型文件" —— 接口和界面对不上，模型当然答不准。
+    readItems: (targetId, offset, limit) => {
+      const all = flattenModels(scanResult);
+      // targetId 可以是来源名，也可以是来源路径：模型看到的摘要里写的是路径，
+      // 它据此写回来的大概率也是路径。
+      const wanted = targetId.trim();
+      const models = wanted
+        ? all.filter((model) => model.sourceName === wanted || model.path.startsWith(wanted))
+        : all;
+      if (models.length === 0) {
+        // ⚠️ 这里**不要**返回 null：公共层只会说一句"没有读到内容"，
+        // 而"还没扫描"和"没匹配到"是两件完全不同的排查方向。
+        // 返回一条说明，模型就能把原因直接讲给用户，而不是自己猜一个理由。
+        return {
+          total: 0,
+          lines: [
+            all.length === 0
+              ? '（当前还没有扫描结果 —— 请先点一次「开始扫描」，再问这个问题）'
+              : `（没有匹配「${wanted}」的模型；本次扫描共 ${all.length} 个模型，不带参数即可读全部）`,
+          ],
+        };
+      }
       return {
-        total: list.length,
-        lines: list.slice(offset, offset + limit).map(
-          (item) => `${item.path}  ${formatSize(item.total_size)}  （${item.model_count} 个模型）`,
-        ),
+        total: models.length,
+        lines: models
+          .slice(offset, offset + limit)
+          .map((model) => `${model.path}  ${formatSize(model.size)}  （来源：${model.sourceName}）`),
       };
+    },
+    // 只读：单条详情。itemId 通常是上面每行行首那段完整路径，
+    // 但模型手上也可能只有**文件名**（用户问句里就是文件名，甚至被界面截断过）——
+    // 所以匹配要宽容，否则它会拿到一句"没读到"然后只能靠名字猜（实测踩过）。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      // `\\?\` 这类前缀在不同来源里有的带有的不带，比对前先抹掉
+      const normalize = (value: string) => value.trim().replace(/^\\\\\?\\/, '');
+      // 只取文件名再去掉扩展名：界面上的标题是**截短过的**（没有 .safetensors），
+      // 快捷提问带过来的就是那个短名字，只按完整路径/文件名比会全部落空。
+      const stem = (value: string) => {
+        const base = normalize(value).split(/[\\/]/).pop() ?? '';
+        return base.replace(/\.[^.]+$/, '');
+      };
+      const target = normalize(wanted);
+      const models = flattenModels(scanResult);
+      const index = models.findIndex((model) => {
+        const modelPath = normalize(model.path);
+        return (
+          modelPath === target ||
+          model.name === wanted ||
+          modelPath.endsWith(`\\${wanted}`) ||
+          modelPath.endsWith(`/${wanted}`) ||
+          (target.length > 3 && stem(model.path) === stem(target))
+        );
+      });
+      if (index < 0) return null;
+      const model = models[index];
+      const source = scanResult?.sources.find((item) => item.name === model.sourceName);
+      return [
+        `名称：${model.name}`,
+        `路径：${model.path}`,
+        `大小：${formatSize(model.size)}`,
+        `来源：${model.sourceName}` +
+          (source ? `（该来源共 ${source.model_count} 个模型、合计 ${formatSize(source.total_size)}）` : ''),
+        `类型判断：${getModelType(model)}`,
+        `在本次扫描的 ${models.length} 个模型里，按大小排第 ${index + 1} 位`,
+      ].join('\n');
     },
     summary: () => {
       if (!scanResult) return null;
@@ -874,9 +935,12 @@ function ModelTable({
               <div className="flex shrink-0 items-center gap-1">
                 <IconButton title={moduleT('aiModels.openFolder')} onClick={() => onOpenPath(model.path)} icon={<FolderOpen className="w-4 h-4" />} />
                 <IconButton title={moduleT('aiModels.searchModel')} onClick={() => onSearchModel(model.name)} icon={<Search className="w-4 h-4" />} />
-                {/* 快捷提问：模型文件单独一套问法，用户真正关心的是"占这么大正常吗" */}
+                {/* 快捷提问：模型文件单独一套问法，用户真正关心的是"占这么大正常吗"。
+                    ⚠️ 传**路径**而不是界面上那个被截短的显示名 —— 问句里的目标要能被
+                    `read_items` / `read_item_detail` 逐字对上，否则模型照抄回来只会得到"没读到"。
+                    其余三个带快捷提问的模块（大文件 / 磁盘变化 / 大目录）传的都是路径，这里对齐。 */}
                 <AiAskButton
-                  question={buildItemQuestion(model.name, 'model')}
+                  question={buildItemQuestion(model.path, 'model')}
                   className="inline-flex h-7 w-7 items-center justify-center"
                 />
                 <IconButton

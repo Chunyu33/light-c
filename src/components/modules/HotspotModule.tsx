@@ -224,6 +224,14 @@ function buildHotspotEntryDetail(entry: HotspotEntry): string {
         (child) => `- ${child.path}  ${formatSize(child.total_size)}（${child.file_count} 个文件）`,
       ),
     );
+  } else {
+    // ⚠️ "没有子目录"必须**说出来**。不说的话模型会以为"还没读到"，
+    // 于是反复调用 read_items 去要同一份数据，直到轮次用尽、一句结论都没有（实测踩过）。
+    lines.push(
+      '',
+      '子目录：无（这一层已经到底了）。',
+      '说明：后端只对超大目录做智能下钻；要看到这个目录里**具体是哪些文件**，需要在界面上点开它。',
+    );
   }
 
   return lines.join('\n');
@@ -450,7 +458,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                   e.stopPropagation();
                   onDrillDown(entry.path);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
                 title={moduleT('drillDown.expand')}
               >
                 <ChevronRight className="w-4 h-4" />
@@ -464,7 +472,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                   e.stopPropagation();
                   onCleanup(entry);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
+                className="p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
                 title={moduleT('drillDown.cleanup')}
               >
                 <Trash2 className="w-4 h-4" />
@@ -477,7 +485,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                 e.stopPropagation();
                 onSearch(entry.path);
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
               title={moduleT('drillDown.search')}
             >
               <Search className="w-4 h-4" />
@@ -494,7 +502,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                 e.stopPropagation();
                 onOpenFolder(entry.path);
               }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
               title={moduleT('drillDown.open')}
             >
               <FolderOpen className="w-4 h-4" />
@@ -561,9 +569,24 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   // 接入 AI 助手（**只读**：大目录分析只做分析，不提供删除动作）。
   useAiModuleBridge('hotspot', {
     // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
-    readItems: (_targetId, offset, limit) => {
-      const list = scanResult?.entries ?? [];
-      if (list.length === 0) return null;
+    readItems: (targetId, offset, limit) => {
+      const all = scanResult?.entries ?? [];
+      // ⚠️ **必须认 targetId**：用户问的是"这个文件夹里有什么"，
+      // 只回顶层列表等于没回答，模型会反复调用去要同一份东西，直到轮次用尽、
+      // 一句结论都没有（实测踩过）。给了 targetId 就读那一条的**子目录**。
+      const wanted = targetId.trim();
+      const list = wanted ? (findHotspotEntry(all, wanted)?.children ?? []) : all;
+      if (list.length === 0) {
+        if (!wanted) return null;
+        // 说清"这儿没有下一层"，否则模型会一直要
+        return {
+          total: 0,
+          lines: [
+            `（「${wanted}」下没有可继续下钻的子目录）`,
+            '后端只对超大目录做智能下钻；要看这个目录里具体是哪些文件，需要在界面上点开它。',
+          ],
+        };
+      }
       return {
         total: list.length,
         lines: list.slice(offset, offset + limit).map(

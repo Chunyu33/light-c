@@ -17,6 +17,15 @@ export interface AiAskRequest {
   /** 自增序号：相同文本连点两次也要能触发第二次 */
   id: number;
   text: string;
+  /**
+   * 这一问**不需要去查数据**。
+   *
+   * 用在"用户自己从界面上展开看到的那一行"（例如磁盘变化分析的「变化明细」弹窗）：
+   * 问句里带的就是那一行本身，而这些**文件级**明细并不在模块的读取能力里 ——
+   * 让模型去查只会白试一次，还会先冒出一句"没有读到内容"再作答。
+   * 置位后：本轮不声明任何工具，并在系统提示里说明"数据就在问题里，直接用你自己的知识回答"。
+   */
+  skipLookup: boolean;
 }
 
 let sequence = 0;
@@ -30,11 +39,11 @@ function subscribe(listener: () => void): () => void {
 }
 
 /** 模块侧调用：请求助手打开并发送这个问题。 */
-export function requestAiAsk(text: string): void {
+export function requestAiAsk(text: string, options?: { skipLookup?: boolean }): void {
   const trimmed = text.trim();
   if (!trimmed) return;
   sequence += 1;
-  pending = { id: sequence, text: trimmed };
+  pending = { id: sequence, text: trimmed, skipLookup: options?.skipLookup === true };
   listeners.forEach((listener) => listener());
 }
 

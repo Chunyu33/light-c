@@ -235,6 +235,59 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         `当前${scanResult.is_admin ? '有' : '没有'}管理员权限，用户已勾选 ${selectedNames.size} 个。`,
       ].join('');
     },
+    // 只读读取：驱动包列表。**与界面同源**，但给"全部"而不是默认筛选后的那些 ——
+    // 界面上有「显示全部驱动」开关，用户问到任何一行都得答得上。
+    // 每条带上状态判定，模型才不可能把"正在使用"的驱动也说成能删。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.packages ?? [];
+      if (list.length === 0) {
+        // 空结果的两种原因要分开说，否则排查方向完全是两回事
+        return {
+          total: 0,
+          lines: [
+            scanResult
+              ? '（已经扫描过，但没有读到任何驱动包）'
+              : '（当前还没有扫描结果 —— 请先点一次「开始扫描」，再问这个问题）',
+          ],
+        };
+      }
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map((item) => {
+          const name = item.original_name || item.published_name;
+          const size = item.total_size > 0 ? formatSize(item.total_size) : '占用未知';
+          const judge = item.actionable ? '可安全处理' : '不建议处理';
+          return `${name}  ${item.provider_name || '未知厂商'}  ${item.driver_version}  ${size}  （${getReasonLabel(item, moduleT)}，${judge}）`;
+        }),
+      };
+    },
+    // 只读：单条详情。id 用 published_name（与 targets 一致）；
+    // 用户问的那句话里通常只有"原名 + 厂商 + 版本"，所以再按原名兜一次。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const list = scanResult?.packages ?? [];
+      const item =
+        list.find((entry) => entry.published_name === wanted) ??
+        list.find((entry) => (entry.original_name || '').trim() === wanted);
+      if (!item) return null;
+      return [
+        `名称：${item.original_name || item.published_name}`,
+        `发布名：${item.published_name}`,
+        `厂商：${item.provider_name || '未知'}`,
+        `类别：${item.class_name || '未知'}`,
+        `版本：${item.driver_version}`,
+        `签名者：${item.signer_name || '未知'}`,
+        `所在位置：${item.driver_store_path || '未知'}`,
+        `占用：${item.total_size > 0 ? formatSize(item.total_size) : '无法读取'}（${item.file_count} 个文件）`,
+        `关联设备：共 ${item.device_count} 个（在用 ${item.active_device_count}、已安装 ${item.installed_device_count}、被更高版本替代 ${item.outranked_device_count}）`,
+        `判定依据：${getReasonLabel(item, moduleT)} —— ${item.reason}`,
+        // 结论由**本地事实**给出，不交给模型自己判断能不能删
+        item.actionable
+          ? '结论：按上面的判定，这个驱动包可以做安全清理（删除前程序会自动备份，可以回退）。'
+          : '结论：**不建议清理这个驱动包** —— 按上面的判定理由，删除可能影响设备或无法回退。',
+      ].join('\n');
+    },
     targets: () =>
       (scanResult?.packages ?? [])
         .filter((item) => item.actionable)

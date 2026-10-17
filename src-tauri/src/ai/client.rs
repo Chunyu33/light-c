@@ -11,6 +11,7 @@ use super::presets::{find_preset, AiProtocol};
 use super::stream::StreamDecoder;
 use super::tools::{
     anthropic_tools, extract_inline_tool_calls, openai_tools, parse_tool_calls, AiToolCall,
+    TOOL_READ_ITEM_DETAIL, TOOL_READ_ITEMS,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -464,7 +465,7 @@ async fn send_chat_request(
                 .await
         }
     };
-    sent.map_err(|error| format!("网络请求失败: {}", error))
+    sent.map_err(describe_request_error)
 }
 
 /// 错误信息里是否点名了 `reasoning_effort`。
@@ -473,6 +474,41 @@ async fn send_chat_request(
 /// 白花一次请求，还把真正的错误盖住。
 fn error_blames_reasoning_effort(error_text: &str) -> bool {
     error_text.to_ascii_lowercase().contains("reasoning_effort")
+}
+
+/// 把 reqwest 的错误连**底层原因**一起说出来。
+///
+/// ⚠️ reqwest 的 `Display` 只给一句 `error sending request for url (…)`，
+/// 真正的原因（连接被重置 / 握手失败 / DNS / 超时）在 `source()` 链里 ——
+/// 只打第一层，用户和排查的人都只能对着这句话猜（实测踩过）。
+fn describe_request_error(error: reqwest::Error) -> String {
+    let mut parts = vec![error.to_string()];
+    let mut cause = std::error::Error::source(&error);
+    while let Some(current) = cause {
+        parts.push(current.to_string());
+        cause = current.source();
+    }
+    format!("网络请求失败: {}", parts.join(" → "))
+}
+
+/// 发一次请求；**发送阶段的失败重试一次**。
+///
+/// 单次网络抖动（连接被重置、握手失败）不该让用户把问题重打一遍。
+/// 发送失败时请求根本没到服务端，所以重试是安全的 —— 不会重复计费。
+async fn send_chat_request_with_retry(
+    client: &reqwest::Client,
+    protocol: AiProtocol,
+    base_url: &str,
+    api_key: &str,
+    body: &serde_json::Value,
+) -> Result<reqwest::Response, String> {
+    match send_chat_request(client, protocol, base_url, api_key, body).await {
+        Ok(response) => Ok(response),
+        Err(first_error) => {
+            log::info!("首次发送失败，重试一次：{}", first_error);
+            send_chat_request(client, protocol, base_url, api_key, body).await
+        }
+    }
 }
 
 /// 发请求；如果服务端明确表示不认 `reasoning_effort`，去掉它再试一次。
@@ -487,7 +523,7 @@ async fn send_with_reasoning_fallback(
     api_key: &str,
     body: &serde_json::Value,
 ) -> Result<reqwest::Response, String> {
-    let response = send_chat_request(client, protocol, base_url, api_key, body).await?;
+    let response = send_chat_request_with_retry(client, protocol, base_url, api_key, body).await?;
     let status = response.status().as_u16();
     if (200..300).contains(&status) {
         return Ok(response);
@@ -504,7 +540,7 @@ async fn send_with_reasoning_fallback(
         object.remove("reasoning_effort");
     }
 
-    let retry = send_chat_request(client, protocol, base_url, api_key, &retry_body).await?;
+    let retry = send_chat_request_with_retry(client, protocol, base_url, api_key, &retry_body).await?;
     let retry_status = retry.status().as_u16();
     if (200..300).contains(&retry_status) {
         return Ok(retry);
@@ -513,7 +549,17 @@ async fn send_with_reasoning_fallback(
     Err(describe_http_error(retry_status, &retry_text))
 }
 
-/// 收尾：正文兜底解析 + 只保留本次声明过的工具。
+/// 只读工具名：**任何时候都放行**，不需要"本轮声明过"这个前提。
+///
+/// 理由：它们的共同前提是"不改任何数据"，本来就答应过用户随时可用；
+/// 而这条放行是**必须**的 —— 后续轮次为了绕开思考模式的 `reasoning_content` 回传要求
+/// 不声明任何工具，模型于是改用文本 / DSML 标记表达读取意图。
+/// 一刀切挡住的话，那条回复就变成"正文空 + 无工具" → 前端报
+/// 「服务端没有返回任何内容」（实测踩过）。
+/// ⚠️ **会改数据的工具仍然必须在本轮声明里**，这条底线不动。
+const READ_ONLY_TOOL_NAMES: [&str; 2] = [TOOL_READ_ITEMS, TOOL_READ_ITEM_DETAIL];
+
+/// 收尾：正文兜底解析 + 只保留本次声明过的工具（只读工具恒放行）。
 fn finalize_reply(
     mut content: String,
     mut tool_calls: Vec<AiToolCall>,
@@ -529,9 +575,13 @@ fn finalize_reply(
         }
     }
 
-    // 只交回**本次声明过**的工具：模型可能在正文里写出一个根本没声明过的调用
-    //（上面那段兜底就会把它解析出来）。前端执行前还会再挡一次，两层都要有。
-    tool_calls.retain(|call| allowed_tools.iter().any(|name| name == &call.name));
+    // 只交回**本次声明过**的工具（只读工具除外，见上面常量的说明）：
+    // 模型可能在正文里写出一个根本没声明过的调用（上面那段兜底就会把它解析出来）。
+    // 前端执行前还会再挡一次，两层都要有。
+    tool_calls.retain(|call| {
+        allowed_tools.iter().any(|name| name == &call.name)
+            || READ_ONLY_TOOL_NAMES.contains(&call.name.as_str())
+    });
     (content, tool_calls)
 }
 
@@ -683,10 +733,7 @@ pub async fn fetch_models() -> Result<Vec<String>, String> {
             .header("anthropic-version", "2023-06-01"),
     };
 
-    let response = request
-        .send()
-        .await
-        .map_err(|error| format!("网络请求失败: {}", error))?;
+    let response = request.send().await.map_err(describe_request_error)?;
     let status = response.status().as_u16();
     let text = response
         .text()
@@ -957,5 +1004,29 @@ mod tests {
             messages[1].get("reasoning_content").and_then(|value| value.as_str()),
             Some("当时的思考")
         );
+    }
+
+    #[test]
+    fn read_only_tool_calls_survive_an_undeclared_round() {
+        // 后续轮次为了绕开思考模式的 reasoning_content 回传要求，`tools` 是空的；
+        // 模型于是改用文本 / DSML 标记表达读取意图。一刀切挡住的话，
+        // 这一轮会变成"正文空 + 无工具" → 前端报「服务端没有返回任何内容」（实测踩过）。
+        let content =
+            "<invoke name=\"read_items\"><parameter name=\"path\">D:\\models</parameter></invoke>";
+        let (cleaned, calls) = finalize_reply(content.to_string(), Vec::new(), &[]);
+        assert_eq!(calls.len(), 1, "只读工具不该被挡掉");
+        assert_eq!(calls[0].name, "read_items");
+        assert!(cleaned.trim().is_empty(), "调用块应当从正文里剔除");
+
+        // ⚠️ 但**会改数据的工具**在没声明的轮次里必须挡住 —— 这条底线不动
+        let write_content =
+            "<invoke name=\"select_items\"><parameter name=\"ids\">[\"a\"]</parameter></invoke>";
+        let (_, write_calls) = finalize_reply(write_content.to_string(), Vec::new(), &[]);
+        assert!(write_calls.is_empty(), "未声明的写工具必须被挡掉");
+
+        // 声明过的时候照旧放行（不能把口子收得太紧）
+        let declared = vec!["select_items".to_string()];
+        let (_, declared_calls) = finalize_reply(write_content.to_string(), Vec::new(), &declared);
+        assert_eq!(declared_calls.len(), 1);
     }
 }

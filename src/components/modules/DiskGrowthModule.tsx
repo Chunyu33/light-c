@@ -438,7 +438,9 @@ function ChangeRow({
         {growth && <ChevronRight className="hint-nudge h-3 w-3 shrink-0" aria-hidden="true" />}
       </button>
 
-      <div className="flex w-16 shrink-0 justify-end gap-0.5 opacity-0 transition group-hover:opacity-100">
+      {/* 操作按钮：**常驻显示**（原来 hover 才出现，用户根本不知道这里有按钮），
+          并与左边"变化量 + 箭头"留出呼吸位 —— 两者贴在一起显得很挤。 */}
+      <div className="flex shrink-0 items-center justify-end gap-1 pl-2">
         <button
           onClick={() => onSearchPath(entry.path)}
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition"
@@ -686,7 +688,7 @@ function DiskGrowthDetailsModal({
                 <span className="flex-1">{moduleT('diskGrowth.subdirectories')}</span>
                 <span className="w-20 text-right">{moduleT('diskGrowth.currentSize')}</span>
                 <span className="w-24 text-right">{moduleT('diskGrowth.difference')}</span>
-                <span className="w-16" />
+                <span className="w-24" />
               </div>
               <div ref={directoryScrollRef} className="flex-1 min-h-0 overflow-auto">
                 {directoryError ? (
@@ -709,7 +711,15 @@ function DiskGrowthDetailsModal({
                           </div>
                           <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(detail.new_size)}</span>
                           <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${detailStyle.color}`}>{formatDiff(detail.diff)}</span>
-                          <div className="w-16 flex justify-end gap-0.5">
+                          <div className="w-24 flex items-center justify-end gap-0.5">
+                            {/* 快捷提问：这一行是**用户自己展开看到的**，问句里带的路径就是它本身，
+                                `skipLookup` → 不让助手去查（这层文件级明细本来就不在它的读取能力里，
+                                查只会白试一次）。 */}
+                            <AiAskButton
+                              question={buildItemQuestion(detail.path, 'folder')}
+                              skipLookup
+                              className="inline-flex h-7 w-7 items-center justify-center"
+                            />
                             <button onClick={() => onOpenFolder(detail.path)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title={moduleT('diskGrowth.openFolder')}>
                               <FolderOpen className="w-4 h-4" />
                             </button>
@@ -749,7 +759,7 @@ function DiskGrowthDetailsModal({
                 <span className="flex-1">{moduleT('diskGrowth.files')}</span>
                 <span className="w-20 text-right">{moduleT('diskGrowth.currentSize')}</span>
                 <span className="w-24 text-right">{moduleT('diskGrowth.difference')}</span>
-                <span className="w-10" />
+                <span className="w-16" />
               </div>
               <div ref={fileScrollRef} className="flex-1 min-h-0 overflow-auto">
                 {fileError ? (
@@ -775,9 +785,18 @@ function DiskGrowthDetailsModal({
                           </div>
                           <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(file.new_size)}</span>
                           <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${fileStyle.color}`}>{formatDiff(file.diff)}</span>
-                          <button onClick={() => onOpenFolder(file.path)} className="w-10 flex justify-end p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title={moduleT('diskGrowth.openLocation')}>
-                            <FolderOpen className="w-4 h-4" />
-                          </button>
+                          <div className="w-16 flex items-center justify-end gap-0.5">
+                            {/* 快捷提问：这一行是**具体文件**（用户展开明细才看到的），
+                                `skipLookup` → 不让助手去查，直接用模型自己的知识答"这是什么、能不能删" */}
+                            <AiAskButton
+                              question={buildItemQuestion(file.path, 'file')}
+                              skipLookup
+                              className="inline-flex h-7 w-7 items-center justify-center"
+                            />
+                            <button onClick={() => onOpenFolder(file.path)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] transition" title={moduleT('diskGrowth.openLocation')}>
+                              <FolderOpen className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -839,6 +858,39 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
           ? `已有一份历史快照（${scanSummary.previous_scan_time}），可以对比出这段时间里哪些目录长大了。`
           : '这是首次快照，还没有可对比的历史数据；下次扫描之后就能看出增减来自哪里。',
       ].join('');
+    },
+    // 只读读取：变化目录列表（界面上那一列）。给**全部**并带上变化量 ——
+    // 界面默认只显示显著的几条，但用户可能问到任何一条。
+    readItems: (_targetId, offset, limit) => {
+      const list = growthReport?.entries ?? [];
+      if (list.length === 0) return null;
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map((item) => {
+          const sign = item.diff >= 0 ? '+' : '-';
+          const percent = `${item.diff_percent >= 0 ? '+' : ''}${item.diff_percent.toFixed(1)}%`;
+          return `${item.path}  ${formatSize(item.new_size)}  （变化 ${sign}${formatSize(Math.abs(item.diff))}，${percent}）`;
+        }),
+      };
+    },
+    // 只读：单条详情。itemId 用行首那个目录路径。
+    // 只报这一条自己的事实 —— 具体是哪个文件顶上去的属于界面上那层下钻，这里不编。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const item = (growthReport?.entries ?? []).find((entry) => entry.path.trim() === wanted);
+      if (!item) return null;
+      const modified =
+        item.modified > 0 ? new Date(item.modified * 1000).toLocaleString() : '（快照里没有记录）';
+      return [
+        `目录：${item.path}`,
+        `本次快照：${formatSize(item.new_size)}`,
+        `上次快照：${item.old_size > 0 ? formatSize(item.old_size) : '（上次快照里没有，属于新出现）'}`,
+        `变化量：${item.diff >= 0 ? '+' : '-'}${formatSize(Math.abs(item.diff))}`
+          + `（${item.diff_percent >= 0 ? '+' : ''}${item.diff_percent.toFixed(1)}%）`,
+        `子树内最新文件修改时间：${modified}`,
+        '说明：这里只有目录级的增减；具体是哪些文件造成的，要看界面上的下钻结果。',
+      ].join('\n');
     },
   });
 

@@ -167,6 +167,51 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
           : '当前没有管理员权限，需要权限的项目只能给出说明、无法直接处理。',
       ].join('');
     },
+    // 只读读取：瘦身项列表（就是界面上那一列）。
+    // 每条带上后端给的 status_text 与"能不能处理"，模型才不可能凭名字猜。
+    readItems: (_targetId, offset, limit) => {
+      const items = status?.items ?? [];
+      if (items.length === 0) {
+        // 空结果的两种原因分开说：排查方向完全不同
+        return {
+          total: 0,
+          lines: [
+            status
+              ? '（已经检查过，但没有读到任何可处理的项目）'
+              : '（当前还没有检查结果 —— 请先在模块里点一次扫描，再问这个问题）',
+          ],
+        };
+      }
+      return {
+        total: items.length,
+        lines: items.slice(offset, offset + limit).map((item) => {
+          const size = item.size > 0 ? formatSize(item.size) : '未统计';
+          return `${item.name}  ${size}  （${item.status_text}${item.actionable ? '，可处理' : '，当前不可处理'}）`;
+        }),
+      };
+    },
+    // 只读：单条详情。itemId 先用 items 里的 id，找不到再按名称兜一次。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const items = status?.items ?? [];
+      const item =
+        items.find((entry) => entry.id === wanted) ??
+        items.find((entry) => entry.name.trim() === wanted);
+      if (!item) return null;
+      return [
+        `名称：${item.name}`,
+        `说明：${item.description}`,
+        `可释放：${item.size > 0 ? formatSize(item.size) : '未统计'}`,
+        `当前状态：${item.status_text}`,
+        item.warning ? `⚠️ 风险提示：${item.warning}` : '',
+        item.actionable
+          ? `可执行的操作：${item.action_text}`
+          : '当前状态下不能直接处理（通常是缺管理员权限，或该状态不允许操作）',
+      ]
+        .filter(Boolean)
+        .join('\n');
+    },
   });
 
   const [loading, setLoading] = useState(false);

@@ -293,6 +293,33 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         ),
       };
     },
+    // 只读：单条详情。itemId 用 read_items 行首那个显示名 —— 该模块每行开头就是它，
+    // 模型照着抄回来的自然也是它；名字对不上再按键名兜一次。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const list = scanResult?.entries ?? [];
+      const item =
+        list.find((entry) => entry.display_name.trim() === wanted) ??
+        list.find((entry) => entry.key_name.trim() === wanted);
+      if (!item) return null;
+      // 只给事实："能不能删"由模块自己的判定（系统保护 / 目标程序是否存在）说话，
+      // 不让模型凭菜单名字猜。
+      const target = item.exe_path
+        ? `${item.exe_path}（${item.exe_exists ? '文件存在' : '**文件已不存在** —— 这个入口很可能已经失效'}）`
+        : '（命令里没有绝对路径，无法判断）';
+      return [
+        `名称：${item.display_name}`,
+        `注册表位置：${item.registry_path}`,
+        `作用范围：${item.scope || '未标注'}`,
+        `命令：${item.command || '（未读取到）'}`,
+        `目标程序：${target}`,
+        `图标来源：${item.icon_path || '（未设置）'}`,
+        item.is_system_protected
+          ? '结论：这是**系统保护项**，界面上不允许选中删除。'
+          : `结论：可以清理${item.needs_admin ? '，但需要管理员权限' : ''}（删除前程序会自动备份注册表）。`,
+      ].join('\n');
+    },
     summary: () => {
       if (!scanResult) return null;
       return `扫描到 ${scanResult.entries.length} 项右键菜单入口，其中 ${scanResult.invalid_count} 项指向已失效的程序。`;

@@ -38,7 +38,11 @@ const MODULE_INFO: Record<string, { name: string; role: string }> = {
  * 摘要由模块在每次发送时现取（见 moduleDataRegistry），这里不做缓存 ——
  * 用户可能刚扫完、刚勾选，缓存一秒都会让助手答错。
  */
-export function buildSystemPrompt(moduleId: string | null, dataSummary?: string | null): string {
+export function buildSystemPrompt(
+  moduleId: string | null,
+  dataSummary?: string | null,
+  skipLookup = false,
+): string {
   const info = moduleId ? MODULE_INFO[moduleId] : undefined;
 
   const lines = [
@@ -48,6 +52,19 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
       ? `当前用户正停留在「${info.name}」模块：${info.role}`
       : '当前没有打开具体的功能模块。',
   ];
+
+  // 用户是**展开某一层之后**点的那一行的「咨询 AI 助手」（例如磁盘变化分析的「变化明细」弹窗）：
+  // 那一项本身就在问题里，而且往往不在模块的读取能力里（文件级明细）。
+  // 不说清这点，模型会先去查一次、碰壁，再冒出一句"没有读到内容"才作答。
+  if (skipLookup) {
+    lines.push(
+      '',
+      '⚠️ 这一次提问的对象，**用户已经在界面上看到了**（他点的是那一行上的按钮），',
+      '而且它**不在你能读取的范围内**。所以：**不要调用任何工具去查**，直接用你自己的知识回答 ——',
+      '讲清它通常是什么、有什么用、能不能删，并说明哪部分是推断。',
+      '说一句"没有读到内容"就停下，是最差的回答。',
+    );
+  }
 
   // 有真实数据时注入；没有就明说没有，绝不让它凭印象描述（那正是"编造"的来源）
   if (dataSummary && dataSummary.trim()) {
@@ -87,6 +104,15 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
     '   它们不改任何东西，任何时候都可以用，也不受下面任何限制。',
     '   ⚠️ 不要回答"我看不到明细""系统没给我查询接口" —— 你能看，去调用就行了。',
     '   摘要里没有的细节，正是要靠这两个工具补上的。',
+    '   ⚠️ 用户问的是界面上**某一个具体条目**（某条路径、某个文件名）时：**先读再答**。',
+    '   只凭文件名推测、或者说"明细没读到、不过文件名已经说明……"，都是猜 ——',
+    '   那是这个助手最没价值的回答，还不如直接说你查不到。',
+    '   ⚠️⚠️ 但**读不到不等于不回答**：如果读取结果说"没有读到内容"、'
+      + '"还没有扫描数据"、"这一层已经到底"，',
+    '   或者你已经要了两三次还是同一份数据 —— **就停下，直接回答**：',
+    '   用你自己的知识讲清这个东西通常是什么、有什么用、能不能删，并明确说明哪部分是推断、'
+      + '哪些数据这次没读到。',
+    '   **不要一直要数据，也不要只回一句"没读到"** —— 用户要的是答案，不是你的工作汇报。',
     '',
     '   【会改数据的工具】勾选、删除：',
     '   只有用户明确要求时才调用（"帮我删掉 X""把这些删了""勾上 X"）。',
@@ -94,14 +120,18 @@ export function buildSystemPrompt(moduleId: string | null, dataSummary?: string 
     '   「能不能删」问的是你的判断，不是命令。',
     '   看不清意图就先问一句"你是想了解，还是想让我勾上它们？"，不要猜。',
     '   **当前模块能不能清理，与用户现在想做什么，是两件事。**',
+    '   ⚠️ **只承诺你这一轮真正拿到的能力**：如果你没拿到勾选/删除工具（有些模块只支持查看），',
+    '   就直说"这个模块里我不能替你勾选或删除，你可以自己勾选后点删除" ——',
+    '   不要写成"你说一声我就去删"这种你做不到的承诺（用户当真照做，只会白跑一轮）。',
     '',
     '   照着这几个例子判断（**「不调工具」只针对会改数据的工具，只读工具照常调**）：',
     '   - "这个文件夹里是什么？" → 先用你自己的知识讲用途；要"里面具体有哪些文件"就调 read_items',
     '   - "文件夹「某路径」是做什么用的？可以删除吗？" → 同上（这正是行内「咨询 AI 助手」按钮发出的问句）',
     '   - "回收站能删吗？删了有什么影响？" → 直接回答（说清风险），**不要调用会改数据的工具**',
     '   - "这一堆缓存是干嘛的？" → 先讲用途；要看具体是哪些文件就调 read_items',
-    '   - "帮我把回收站删了" → 调用 propose_delete',
-    '   - "把可以安全删的都勾上" → 调用 select_items',
+    '   - "帮我把回收站删了" → **拿到了** propose_delete 就调用它',
+    '   - "把可以安全删的都勾上" → **拿到了** select_items 就调用它',
+    '   （**没拿到**这两类工具时，就是上面那句"这个模块里我不能替你勾选或删除" —— 别有别的写法）',
   );
   return lines.join('\n');
 }
@@ -174,9 +204,10 @@ export function buildRequestMessages(
   moduleId: string | null,
   dataSummary: string | null,
   activeProfileId: string,
+  skipLookup = false,
 ): AiChatMessage[] {
   return [
-    { role: 'system', content: buildSystemPrompt(moduleId, dataSummary) },
+    { role: 'system', content: buildSystemPrompt(moduleId, dataSummary, skipLookup) },
     ...mergeConsecutiveRoles(
       history
         .filter((message) => message.role !== 'system')

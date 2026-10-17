@@ -407,6 +407,39 @@ mod tests {
         assert!(cleaned.contains("前面的正文。"), "实际: {}", cleaned);
         assert!(cleaned.contains("read_items"), "残片本身也该留在正文里: {}", cleaned);
     }
+
+    #[test]
+    fn dsml_markup_is_recognized_and_removed_from_the_body() {
+        // 实测（deepseek-flash 思考模式 + 没声明工具时）它用自己的 DSML 标记表达工具调用。
+        // 原样贴过来的形态 —— 必须能认出来，而且**不能显示给用户**。
+        let content = "我来查一下。\n\
+             <｜｜DSML｜｜ calls>\n\
+             <｜｜DSML｜｜ invoke name=\"read_items\">\n\
+             <｜｜DSML｜｜ parameter name=\"path\" string=\"true\">C:\\Users\\chunyu\\AppData\\Roaming\\devin</｜｜DSML｜｜ parameter>\n\
+             </｜｜DSML｜｜ invoke>\n\
+             </｜｜DSML｜｜ calls>";
+        let (calls, cleaned) = extract_inline_tool_calls(content);
+        assert_eq!(calls.len(), 1, "DSML 标记应当被认成一次调用，实际: {}", cleaned);
+        assert_eq!(calls[0].name, "read_items");
+        // `path` 是实测会被写出来的别名，不认它参数就丢了
+        assert_eq!(
+            calls[0].arguments.get("target_id").and_then(|value| value.as_str()),
+            Some("C:\\Users\\chunyu\\AppData\\Roaming\\devin")
+        );
+        assert!(!cleaned.contains("DSML"), "标记不该留在正文里: {}", cleaned);
+        assert!(!cleaned.contains("invoke"), "标记不该留在正文里: {}", cleaned);
+        assert!(cleaned.contains("我来查一下。"), "正文要留下: {}", cleaned);
+    }
+
+    #[test]
+    fn dsml_wrapper_alone_leaves_no_leftovers() {
+        // 只有外层包装、没有真正的调用：不该产出调用，也不该把 `<calls>` 留在正文里
+        let content = "说明文字\n<｜｜DSML｜｜ calls>\n</｜｜DSML｜｜ calls>";
+        let (calls, cleaned) = extract_inline_tool_calls(content);
+        assert!(calls.is_empty());
+        assert!(!cleaned.contains("calls"), "包装标签不该留在正文里: {}", cleaned);
+        assert!(cleaned.contains("说明文字"));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +466,12 @@ fn canonical_argument(tool: &str, raw_name: &str) -> Option<&'static str> {
     let name = raw_name.trim().to_ascii_lowercase();
     match tool {
         TOOL_READ_ITEMS => {
-            if matches!(name.as_str(), "target_id" | "targetid" | "id" | "module" | "category") {
+            // `path` / `folder` 是实测会写出来的别名：模型想"读这个文件夹里面有什么"，
+            // 就会把路径写成 path（DSML 那段就是这么写的）。不认它，参数会被直接丢掉。
+            if matches!(
+                name.as_str(),
+                "target_id" | "targetid" | "id" | "module" | "category" | "path" | "folder" | "dir"
+            ) {
                 Some("target_id")
             } else if matches!(name.as_str(), "offset" | "start") {
                 Some("offset")
@@ -482,8 +520,43 @@ fn argument_value(canonical: &str, raw: &str) -> Value {
     serde_json::json!(trimmed)
 }
 
+/// 把 DeepSeek 的 **DSML** 标记归一化成标准 `<invoke>` / `<parameter>` 形状。
+///
+/// 思考模式下**没有声明工具**时，它不会（也没有工具可）走 function calling，
+/// 而是用自己的标记表达同一件事：
+///
+/// ```text
+/// <｜｜DSML｜｜ calls>
+/// <｜｜DSML｜｜ invoke name="read_items">
+/// <｜｜DSML｜｜ parameter name="path" string="true">C:\…\devin</｜｜DSML｜｜ parameter>
+/// </｜｜DSML｜｜ invoke>
+/// </｜｜DSML｜｜ calls>
+/// ```
+///
+/// ⚠️ 不认它有两个后果，都很糟：**工具不执行**、**这段标记原样显示给用户**。
+/// 归一化之后复用同一套解析器 —— 刻意不写第二套解析器。
+fn normalize_dsml(content: &str) -> String {
+    if !content.contains("DSML") {
+        return content.to_string();
+    }
+    content
+        // ⚠️ 顺序很关键：DSML 前缀后面**带一个空格**（`<｜｜DSML｜｜ invoke`），
+        // 所以带空格的写法必须先替换 —— 先替换不带空格的，剩下的 `< invoke` 就再也匹配不上了。
+        .replace("</｜｜DSML｜｜ ", "</")
+        .replace("</｜｜DSML｜｜", "</")
+        .replace("<｜｜DSML｜｜ ", "<")
+        .replace("<｜｜DSML｜｜", "<")
+        // 外层 `<calls>` 只是包装（解析器只认 `<invoke>`），去掉免得残留在正文里
+        .replace("<calls>", "")
+        .replace("</calls>", "")
+}
+
 /// 从正文里认出内联的工具调用，返回 (调用列表, 清理过的正文)。
 pub fn extract_inline_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
+    // 先把 DeepSeek 的 DSML 标记归一化成标准形状，后面就只需要一套解析器
+    let normalized = normalize_dsml(content);
+    let content = normalized.as_str();
+
     let mut calls: Vec<AiToolCall> = Vec::new();
     let mut remaining = String::with_capacity(content.len());
     let mut cursor = 0usize;

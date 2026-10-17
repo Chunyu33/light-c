@@ -15,11 +15,16 @@ import { requestAiAsk } from './aiAsk';
 interface AiAskButtonProps {
   /** 要问 AI 的问题；空字符串时按钮不渲染，避免出现点了没反应的入口 */
   question: string;
+  /**
+   * 这一问不需要去查数据（用户已经在界面上把这行展开看到了，问句里带的路径就是那行本身）。
+   * 置位后助手不声明任何工具，直接用模型自己的知识作答 —— 否则它会白试一次读取。
+   */
+  skipLookup?: boolean;
   /** 允许调用方补充定位类（例如模块自己的 hover 态） */
   className?: string;
 }
 
-export function AiAskButton({ question, className = '' }: AiAskButtonProps) {
+export function AiAskButton({ question, skipLookup = false, className = '' }: AiAskButtonProps) {
   const { t } = useTranslation('ai');
 
   if (!question.trim()) return null;
@@ -27,7 +32,7 @@ export function AiAskButton({ question, className = '' }: AiAskButtonProps) {
   return (
     <button
       type="button"
-      onClick={() => requestAiAsk(question)}
+      onClick={() => requestAiAsk(question, { skipLookup })}
       title={t('askHint')}
       aria-label={t('askHint')}
       className={`rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-green-10)] hover:text-[var(--brand-green)] ${className}`}

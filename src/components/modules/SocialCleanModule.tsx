@@ -135,6 +135,28 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         ),
       };
     },
+    // 只读：单条详情。itemId 用 read_items 行首那个分类名 —— 该模块每行开头就是它，
+    // 名字对不上再用分类 id 兜一次。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const list = scanResult?.categories ?? [];
+      const item =
+        list.find((entry) => entry.name.trim() === wanted) ??
+        list.find((entry) => entry.id.trim() === wanted);
+      if (!item) return null;
+      // 「能删不能删」是这里最容易说错的地方：可清理数与总数是两件事，
+      // 所以两个数都给出来，别让模型只看到总量就说"都能删"。
+      const keepCount = Math.max(0, item.file_count - item.deletable_count);
+      return [
+        `分类：${item.name}`,
+        `说明：${item.description || '（未提供说明）'}`,
+        `占用：${formatSize(item.total_size)}（共 ${item.file_count} 个文件）`,
+        `其中可清理：${item.deletable_count} 个`,
+        `不建议清理：${keepCount} 个（通常是聊天记录、账号数据等，删了会丢内容）`,
+        '结论：只有"可清理"那部分是缓存；用户确认后由模块原有的清理流程处理。',
+      ].join('\n');
+    },
     summary: () => {
       if (!scanResult) return null;
       const apps = scanResult.detected_apps.slice(0, 8).join('、');

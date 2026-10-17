@@ -292,7 +292,7 @@ export function AiChatPanel({
                 key={index}
                 className={`group flex flex-col gap-0.5 ${isUser ? 'items-end' : 'items-start'}`}
               >
-                <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
+                <div style={{ userSelect: 'all' }} className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                   <div
                     className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                       isUser
@@ -303,7 +303,7 @@ export function AiChatPanel({
                     {isUser ? <User className="h-3.5 w-3.5" /> : <AiMarkIcon className="h-3.5 w-3.5" />}
                   </div>
                   <div
-                    className={`max-w-[80%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
+                    className={`max-w-[80%] select-text whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-xs leading-relaxed ${
                       isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--ai-bubble-bg)] text-[var(--text-primary)]'
                     }`}
                   >

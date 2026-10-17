@@ -39,9 +39,9 @@ const MAX_HISTORY_MESSAGES = 16;
 /**
  * 一次提问最多跑几轮请求。
  *
- * 一轮 = 一次请求。模型要求调只读工具时，把工具结果带上**再问一轮**，它才能据此作答 ——
- * 也就是"查资料"与"给结论"是两轮。留 3 轮是给"先 read_items 定位条目、再 read_item_detail
- * 看细节"这类两步查询留余量；**最后一轮不再给工具**，所以它必然收敛，不会一直查下去。
+ * 一轮 = 一次请求，而且**只有第一轮声明工具** —— 原因见 `handleSend` 里的详细说明
+ *（带 `tools` 的后续请求会被思考模式要求回传那一轮的思维链，而我们拿不出来）。
+ * 所以实际形态就是"查一次 → 据此作答"两轮；留 3 是给兜底重试留余量。
  */
 const MAX_TOOL_ROUNDS = 3;
 
@@ -373,7 +373,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           const limit = Math.min(100, Math.max(1, Number(args.limit) || 30));
           const page = actions.readItems(targetId, offset, limit);
           if (!page || page.lines.length === 0) {
-            report(t('tool.readEmpty'));
+            report(t(emptyReadMessageKey(moduleId), { module: moduleId }));
             continue;
           }
           report(formatReadPage(page, offset));
@@ -392,7 +392,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           const args = call.arguments as { item_id?: unknown };
           const itemId = typeof args.item_id === 'string' ? args.item_id : '';
           const detail = actions.readItemDetail(itemId);
-          report(detail || t('tool.readEmpty'));
+          report(detail || t(emptyReadMessageKey(moduleId), { module: moduleId }));
           continue;
         }
 
@@ -401,11 +401,19 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         const resolved = actions?.resolveTargets?.(ids) ?? [];
 
         if (call.name === 'select_items') {
+          // ⚠️ 模块没登记"勾选"动作时**必须挡在这里**：`?.()` 是静默 no-op，
+          // 而下面会照报"已按你的要求勾选 N 项" —— 那就成了**谎报已执行**（项目最忌讳的）。
+          // 正常路径到不了这里（没登记就不声明、执行层白名单也会挡），这是最后一道兜底，
+          // 用来保证"说了已勾选就一定真的勾了"。
+          if (!actions?.selectItems) {
+            report(t('tool.selectNotProvided', { module: moduleId }));
+            continue;
+          }
           if (resolved.length === 0) {
             report(t('tool.selectNotFound'));
             continue;
           }
-          actions?.selectItems?.(resolved.map((target) => target.id));
+          actions.selectItems(resolved.map((target) => target.id));
           changedData = true;
           report(
             t('tool.selected', {
@@ -417,6 +425,12 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         }
 
         if (call.name === 'propose_delete') {
+          // 同理：模块没有"删除"能力时**不要弹卡片** —— 弹了也执行不了，
+          // 用户点确认只会拿到一句"当前模块未提供删除能力"（那个报错应该在确认前就说清）。
+          if (!actions?.deleteItems) {
+            report(t('tool.deleteNotProvided', { module: moduleId }));
+            continue;
+          }
           if (resolved.length === 0) {
             report(t('tool.selectNotFound'));
             continue;
@@ -438,9 +452,17 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   );
 
   const handleSend = useCallback(
-    async (text: string, images: AttachedImage[] = [], historyOverride?: AiChatMessage[]) => {
+    async (
+      text: string,
+      images: AttachedImage[] = [],
+      historyOverride?: AiChatMessage[],
+      // 从"用户自己展开看到的那一行"发起的提问：数据就在问句里，本轮不查数据（见 aiAsk.ts）
+      skipLookup = false,
+    ) => {
       if (sendingRef.current) return;
       sendingRef.current = true;
+      // 记住这一轮"要不要查数据"：重试同一问时要沿用（见 handleRetry）
+      lastSkipLookupRef.current = skipLookup;
 
       // 抓一份"发送时"的模块与历史：用户可能在生成过程中切模块，
       // 这一轮的结果必须落回发起时那个模块，而不是"当前"模块（否则又串台了）。
@@ -467,33 +489,72 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
       // 每次请求一个独立的流标识：事件是全局广播的，靠它过滤掉别人的增量。
       const streamId = `s${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const request = buildTurnMessages(history, text, images, moduleId, activeProfile?.id ?? '');
+      const request = buildTurnMessages(
+        history,
+        text,
+        images,
+        moduleId,
+        activeProfile?.id ?? '',
+        skipLookup,
+      );
       // 工具声明、请求、看门狗、收尾各自成函数（见文件末的"发送流程里的几个步骤"）
-      const tools = buildAllowedTools(getModuleActions(moduleId), request);
+      const tools = buildAllowedTools(getModuleActions(moduleId), request, skipLookup);
 
       try {
         // 一轮 = 一次请求。模型要求调只读工具时，把结果带上**再问一轮**，它才能据此作答。
         // 少了这一轮，用户看到的就是一堆原始数据、没有结论（"查了但不说话"）。
         let turnMessages = request;
+        // 上一轮工具结果的指纹：模型可能反复要**同一份数据**（实测：一直要同一份顶层列表），
+        // 第二轮起就能认出来，别把轮次烧在这种原地打转上。
+        let previousToolFingerprint = '';
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-          // 最后一轮不再给工具：逼它用已经查到的数据作答，避免一直查下去烧额度
           const isLastRound = round === MAX_TOOL_ROUNDS - 1;
-          const toolsForRound = isLastRound ? [] : tools;
 
-          const reply = await requestStreamReply({
-            // 每轮一个独立的流标识：上一轮的迟到增量不该被算进这一轮
-            streamId: `${streamId}-r${round}`,
-            messages: turnMessages,
-            tools: toolsForRound,
-            timeoutMessage: t('streamTimeout'),
+          // ⚠️ **只有第一轮声明工具。**
+          // DeepSeek 规定：请求带 `tools` 时，发起工具调用那一轮 assistant 的 `reasoning_content`
+          // 必须在后续所有请求里完整回传 —— 而我们没走标准 tool_calls 协议（工具结果是自己拼的
+          // 文本），**根本拿不出那一轮的思维链**，所以后续请求只要还带 `tools` 就必然 400。
+          // 那条规则只对"带 tools 的请求"生效，不带就完全不受它约束。
+          // 何况第二轮的任务本来就是"用刚查到的数据作答"，不该再调工具。
+          let roundTools = round === 0 ? tools : [];
+
+          // 最后一轮：不再给工具，并且**明确要求"就现在作答"** ——
+          // 数据没读到就用你自己的知识回答，不要空手而归（提示词里本来就允许，这里点明时机）。
+          if (isLastRound) {
+            turnMessages = [
+              ...turnMessages,
+              { role: 'user' as const, content: t('tool.answerFromKnowledge') },
+            ];
+          }
+
+          const onDelta = (delta: string) => {
             // 用户已经切走了就别再往面板上贴字：这一轮的完整正文最后仍会落进
             // 发起时那个模块的历史，切回去看得到。
-            onDelta: (delta) => {
-              if (activeModuleIdRef.current !== moduleId) return;
-              setStreamingText((previous) => previous + delta);
-            },
-          });
+            if (activeModuleIdRef.current !== moduleId) return;
+            setStreamingText((previous) => previous + delta);
+          };
+          // 每轮一个独立的流标识：上一轮的迟到增量不该被算进这一轮
+          const callModel = (attemptTools: string[]) =>
+            requestStreamReply({
+              streamId: `${streamId}-r${round}-${attemptTools.length}`,
+              messages: turnMessages,
+              tools: attemptTools,
+              timeoutMessage: t('streamTimeout'),
+              onDelta,
+            });
+
+          let reply: AiChatReply;
+          try {
+            reply = await callModel(roundTools);
+          } catch (error) {
+            // 兜底：万一还是撞上"必须回传 reasoning_content"的 400，就摘掉工具再试一次
+            //（不带 tools 的请求不受那条规则约束）。只重试一次，不套娃。
+            if (roundTools.length === 0 || !/reasoning_content/i.test(String(error))) throw error;
+            console.warn('服务端要求回传思维链，本轮改为不带工具重试:', error);
+            roundTools = [];
+            reply = await callModel(roundTools);
+          }
 
           const calls = reply.toolCalls ?? [];
           if (calls.length === 0) {
@@ -506,24 +567,41 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
             return;
           }
 
-          // 把**本次声明过的工具**一并传下去：执行层要按它再过滤一次（见 runToolCalls）
-          const { texts, changedData } = runToolCalls(moduleId, calls, toolsForRound);
+          // 执行前按「本轮可执行白名单」再过滤一次：
+          // 只读工具任何时候都算，会改数据的工具必须在本轮声明里（见 executableTools）
+          const { texts, changedData } = runToolCalls(moduleId, calls, executableTools(roundTools));
 
           // 会改数据的动作到此为止：勾选已经改了、删除提案在等用户确认，
           // 再自动发一轮只会让模型对着"已勾选"再复述一遍，没有意义。
           if (changedData) return;
-          // 最后一轮既然没给工具，就没有下一轮可喂了：有正文就用正文收尾
+          // 已经到轮次上限：没有下一轮可喂了，有正文就用正文收尾
           if (isLastRound) {
+            // 正文空 = 模型一直在查、到最后也没给结论。**必须说一句**，
+            // 否则用户对着几条原始数据发愣，不知道是坏了还是没查完。
             if (reply.content.trim()) {
               pushAndPersist(moduleId, reply.content, {
                 reasoningContent: reply.reasoningContent,
                 producedByProfile: activeProfile?.id,
               });
+            } else {
+              pushAndPersist(moduleId, t('tool.noConclusion'));
             }
             return;
           }
-          // 工具全部越界或被挡下来（没登记/没实现），没什么可喂回去的
-          if (texts.length === 0) return;
+          // 没进展了（工具什么也没给 / 同一份结果连着来两次）：
+          // **不要再喂数据，也不要就此作废** —— 明确让它用自己已有的知识作答。
+          // 提示词里本来就允许这么做，这里只是把"该收了"这个时机说给它听。
+          const fingerprint = texts.join('\n');
+          const madeNoProgress =
+            texts.length === 0 || (fingerprint.length > 0 && fingerprint === previousToolFingerprint);
+          if (madeNoProgress) {
+            turnMessages = [
+              ...turnMessages,
+              { role: 'user' as const, content: t('tool.answerFromKnowledge') },
+            ];
+            continue;
+          }
+          previousToolFingerprint = fingerprint;
 
           // 只读工具的结果作为 assistant 消息带进上下文 —— 这正是原来"下一轮"缺的那一步。
           // ⚠️ 必须**合成一条**，不是一条一个：Anthropic 要求 user/assistant 交替出现，
@@ -570,7 +648,9 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       setHistoryByModule((previous) => ({ ...previous, [moduleId]: truncated }));
       // 显式把截断后的数组传进去：否则 handleSend 读到的仍是旧的整段历史，
       // 被重试的那条提问会连着它后面的旧回复一起再发一次（界面已截断、请求没截断）。
-      void handleSend(target.content, [], truncated);
+      // 重试**最后一条**时沿用"不用查数据"的规则（见 lastSkipLookupRef）。
+      const skipLookup = index === history.length - 1 && lastSkipLookupRef.current;
+      void handleSend(target.content, [], truncated, skipLookup);
     },
     [activeModuleId, historyByModule, handleSend],
   );
@@ -605,11 +685,18 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   // 用 id 去重：同一个问题连点两次也要能触发两次，但又不能被重建的 handleSend 重复触发。
   const askRequest = useAiAskRequest();
   const lastAskIdRef = useRef(0);
+  /**
+   * 上一次发送是不是"不用查数据"（从弹窗明细那一行发起的提问）。
+   *
+   * 重试时要沿用同一条规则，否则同一问重试会变成另一种行为（先去查、碰壁，再作答）。
+   * 只记最近一条：重试更早的历史消息不带这个标记 —— 那种情况很少见，最坏也只是多查一次。
+   */
+  const lastSkipLookupRef = useRef(false);
   useEffect(() => {
     if (!askRequest || askRequest.id === lastAskIdRef.current) return;
     lastAskIdRef.current = askRequest.id;
     setIsOpen(true);
-    void handleSend(askRequest.text);
+    void handleSend(askRequest.text, [], undefined, askRequest.skipLookup);
     clearAiAsk();
   }, [askRequest, handleSend]);
 
@@ -720,6 +807,7 @@ function buildTurnMessages(
   images: AttachedImage[],
   moduleId: string,
   activeProfileId: string,
+  skipLookup = false,
 ): AiChatMessage[] {
   return buildRequestMessages(
     [
@@ -736,7 +824,39 @@ function buildTurnMessages(
     moduleId,
     getModuleDataSummary(moduleId),
     activeProfileId,
+    skipLookup,
   );
+}
+
+/** 只读工具名。它们不改任何东西，所以**任何时候都允许执行**（见 executableTools）。 */
+const READ_ONLY_TOOLS = ['read_items', 'read_item_detail'];
+
+/** 这个模块当前有没有扫描数据（摘要为空 = 还没有）。用于把"空结果"的原因说清。 */
+function moduleHasData(moduleId: string): boolean {
+  return Boolean(getModuleDataSummary(moduleId)?.trim());
+}
+
+/**
+ * 只读工具拿到空结果时，到底该说哪句话。
+ *
+ * ⚠️ 这两件事的下一步**完全不同**：模块还没扫描 → 让用户去扫描；没匹配到 → 换个条目问。
+ * 混成一句"没有读到内容：这一项可能已经不存在，或者当前还没有扫描数据"，
+ * 用户不知道该做什么，排查的人还得反过来猜 —— 这个坑实际踩了两次
+ *（AI 模型空间的模型文件、旧驱动的驱动包，两次都不是"这一项不存在"）。
+ */
+function emptyReadMessageKey(moduleId: string): 'tool.readEmpty' | 'tool.moduleNoData' {
+  return moduleHasData(moduleId) ? 'tool.readEmpty' : 'tool.moduleNoData';
+}
+
+/**
+ * 本轮的「可执行白名单」。
+ *
+ * - **只读工具任何时候都算**：后续轮次没有声明工具，但模型仍可能用自己的标记（DSML）
+ *   要求读取 —— 实测就是这样。不认它，这一轮就变成"什么都没发生"的静默空转。
+ * - **会改数据的工具必须在本轮声明里**，否则一律不执行 —— 这条底线不动。
+ */
+function executableTools(declared: string[]): string[] {
+  return [...new Set([...declared, ...READ_ONLY_TOOLS])];
 }
 
 /**
@@ -746,7 +866,15 @@ function buildTurnMessages(
  * 会改数据的工具：**只在这次看起来是在要求动手时**才给。这是请求层的硬约束，
  * 比在提示词里反复叮嘱可靠得多：提示词只能"劝"，不给工具是"不能"。
  */
-function buildAllowedTools(actions: ModuleActions | null, messages: AiChatMessage[]): string[] {
+function buildAllowedTools(
+  actions: ModuleActions | null,
+  messages: AiChatMessage[],
+  skipLookup = false,
+): string[] {
+  // 用户是**展开某一层之后**点的那一行（数据就在问句里、且不在模块的读取能力内）：
+  // 一个工具都不声明 —— 否则模型会先去查、碰壁，再冒出一句"没有读到内容"才作答。
+  if (skipLookup) return [];
+
   const tools: string[] = [];
   if (actions?.readItems) tools.push('read_items');
   if (actions?.readItemDetail) tools.push('read_item_detail');

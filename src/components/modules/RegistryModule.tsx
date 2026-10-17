@@ -53,6 +53,24 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         ),
       };
     },
+    // 只读：单条详情。itemId 用 read_items 行首那个注册表路径（该行开头就是它）。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const list = scanResult?.entries ?? [];
+      const item =
+        list.find((entry) => entry.path.trim() === wanted) ??
+        list.find((entry) => entry.name.trim() === wanted);
+      if (!item) return null;
+      return [
+        `名称：${item.name}`,
+        `注册表路径：${item.path}`,
+        `引用的程序路径：${item.associated_path || '（未记录）'}`,
+        `判定问题：${item.issue || '（未记录）'}`,
+        '结论：这类残留指向的程序已经不在，清理只影响"右键打开方式/应用列表"里的失效条目；'
+          + '删除前程序会自动备份注册表，可回退。',
+      ].join('\n');
+    },
     summary: () => {
       if (!scanResult) return null;
       return `扫描到 ${scanResult.entries.length} 项可疑的注册表残留，其中 ${scanResult.total_count} 项被判定为可安全清理。`;

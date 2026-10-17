@@ -167,6 +167,32 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         ),
       };
     },
+    // 只读：单条详情。itemId 用 read_items 行首那个入口名，找不到再用 CLSID 兜一次。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const list = entries ?? [];
+      const item =
+        list.find((entry) => entry.name.trim() === wanted) ??
+        list.find((entry) => entry.clsid.trim() === wanted);
+      if (!item) return null;
+      // 挂载位置与风险判定都由后端给出，这里只做转述，不自己下结论。
+      return [
+        `名称：${item.name}`,
+        `关联应用：${item.applicationName || '（无法识别，可能是第三方或已卸载的程序）'}`,
+        `CLSID：${item.clsid}`,
+        `挂载位置：${item.entryKind === 'navigationPane' ? '资源管理器左侧导航窗格' : '「此电脑」'}`
+          + `（${item.hive}${item.registryView && item.registryView !== 'default' ? ` / ${item.registryView} 位视图` : ''}）`,
+        `注册表路径：${item.regPath}`,
+        `程序路径：${item.sourcePath || '（未记录）'}`,
+        `风险判定：${item.riskReason || item.riskLevel}`,
+        item.isSystemProtected
+          ? '结论：系统保护项，界面上不允许处理。'
+          : item.isLocked
+            ? '结论：当前处于锁定状态（已由 LightC 移除/锁定），需要先解锁才能再操作。'
+            : '结论：可以移除（移除前会自动备份，可恢复）。',
+      ].join('\n');
+    },
     summary: () => {
       if (!entries || entries.length === 0) return null;
       const names = entries.slice(0, 8).map((entry) => entry.name).filter(Boolean).join('、');

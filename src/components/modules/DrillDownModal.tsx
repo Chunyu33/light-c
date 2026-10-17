@@ -269,7 +269,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             {/* 下钻 */}
             <button
               onClick={(e) => { e.stopPropagation(); onDrillDown(entry.path); }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
+              className="p-1.5 rounded-lg hover:bg-[var(--brand-green-10)] text-[var(--brand-green)] transition-all"
               title={moduleT('drillDown.expand')}
             >
               <ChevronRight className="w-4 h-4" />
@@ -278,7 +278,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             {canCleanup && (
               <button
                 onClick={(e) => { e.stopPropagation(); onCleanup(entry); }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
+                className="p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
                 title={moduleT('drillDown.cleanup')}
               >
                 <Trash2 className="w-4 h-4" />
@@ -287,7 +287,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             {/* 搜索 全路径用.path，文件夹名称用.name */}
             <button
               onClick={(e) => { e.stopPropagation(); onSearch(entry.path); }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-blue-500 transition-all"
               title={moduleT('drillDown.search')}
             >
               <Search className="w-4 h-4" />
@@ -295,7 +295,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             {/* 打开文件夹 */}
             <button
               onClick={(e) => { e.stopPropagation(); onOpenFolder(entry.path); }}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all"
               title={moduleT('drillDown.open')}
             >
               <FolderOpen className="w-4 h-4" />

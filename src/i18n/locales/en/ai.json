@@ -18,7 +18,12 @@
   "tool": {
     "selectNotFound": "Those items are no longer there. The data may have changed; please scan again.",
     "selected": "Selected {{count}} for you: {{names}}. Delete them from the page when you are ready.",
-    "readEmpty": "Nothing to read: that item may no longer exist, or there is no scan data yet.",
+    "readEmpty": "Nothing to read: that item may no longer exist, or it does not match the summary.",
+    "moduleNoData": "The \"{{module}}\" module has no scan data yet — run a scan there first, then ask again.",
+    "selectNotProvided": "The \"{{module}}\" module does not support selecting items — pick them yourself in the UI, then use its own delete button.",
+    "deleteNotProvided": "The \"{{module}}\" module does not support deletion — it is view-only, so remove things yourself in the UI.",
+    "noConclusion": "The data was fetched (see the messages above), but the model did not give a conclusion. Ask again to continue, or rephrase the question.",
+    "answerFromKnowledge": "(That is as far as the lookups go. If you still don't have the data you need, answer the user's question from your own knowledge and say which parts are inference — stop asking for more data.)",
     "moduleNotReady": "The module \"{{module}}\" is not connected to the assistant right now, or has been unmounted. Open that module and try again.",
     "readNotProvided": "The module \"{{module}}\" does not provide detail reading, so file level content is not available.",
     "detailNotProvided": "The module \"{{module}}\" does not provide per item detail."
