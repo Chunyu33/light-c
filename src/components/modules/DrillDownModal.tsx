@@ -19,6 +19,8 @@ import {
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
+import { AiAskButton } from '../ai/AiAskButton';
+import { buildItemQuestion } from '../ai/aiQuestions';
 
 // ============================================================================
 // 工具函数（与 HotspotModule 共享逻辑）
@@ -40,16 +42,16 @@ function formatDateTime(timestamp: number): string {
 
 function getParentTypeColor(type: string): string {
   switch (type) {
-    case 'Local':      return 'text-blue-500 bg-blue-50 dark:bg-blue-900/20';
-    case 'Roaming':    return 'text-purple-500 bg-purple-50 dark:bg-purple-900/20';
-    case 'LocalLow':   return 'text-orange-500 bg-orange-50 dark:bg-orange-900/20';
-    case 'Windows':    return 'text-red-500 bg-red-50 dark:bg-red-900/20';
+    case 'Local':      return 'status-chip text-blue-500';
+    case 'Roaming':    return 'status-chip text-purple-500';
+    case 'LocalLow':   return 'status-chip text-orange-500';
+    case 'Windows':    return 'status-chip text-red-500';
     case 'Program Files':
     case 'Program Files (x86)':
-      return 'text-amber-500 bg-amber-50 dark:bg-amber-900/20';
-    case 'Users':      return 'text-cyan-500 bg-cyan-50 dark:bg-cyan-900/20';
-    case 'System':     return 'text-rose-500 bg-rose-50 dark:bg-rose-900/20';
-    default:           return 'text-gray-500 bg-gray-50 dark:bg-gray-900/20';
+      return 'status-chip text-amber-500';
+    case 'Users':      return 'status-chip text-cyan-500';
+    case 'System':     return 'status-chip text-rose-500';
+    default:           return 'status-chip text-gray-500';
   }
 }
 
@@ -210,13 +212,14 @@ const ModalEntryItem = memo(function ModalEntryItem({
   return (
     <div
       className={`group relative rounded-xl p-3 hover:bg-[var(--bg-hover)] transition-colors cursor-default ${
-        entry.is_protected ? 'border border-red-200 dark:border-red-800/30' : ''
+        entry.is_protected ? 'border border-[var(--hotspot-danger-border)]' : ''
       }`}
     >
-      {/* 占比背景条 */}
+      {/* 占比背景条。危险目录用主题变量（同 HotspotModule 主列表）——
+          不要用 `bg-red-100 dark:…`：本项目没启用 dark 变体，深色下会命中浅色的红 ✗ */}
       <div
         className={`absolute inset-0 rounded-xl opacity-40 transition-all ${
-          entry.is_protected ? 'bg-red-100 dark:bg-red-900/10' : 'bg-[var(--brand-green-10)]'
+          entry.is_protected ? 'bg-[var(--hotspot-danger-fill)]' : 'bg-[var(--brand-green-10)]'
         }`}
         style={{ width: `${percentage}%` }}
       />
@@ -234,13 +237,13 @@ const ModalEntryItem = memo(function ModalEntryItem({
               {entry.parent_type}
             </span>
             {entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-red-500">
                 <Shield className="w-3 h-3" />
                 {moduleT('hotspot.systemProtected')}
               </span>
             )}
             {entry.is_cache && !entry.is_program && !entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-orange-500">
                 <Trash2 className="w-3 h-3" />
                 {moduleT('hotspot.temporaryCache')}
               </span>
@@ -278,7 +281,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             {canCleanup && (
               <button
                 onClick={(e) => { e.stopPropagation(); onCleanup(entry); }}
-                className="p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--hotspot-danger-fill)] text-[var(--color-warning)] transition-all"
                 title={moduleT('drillDown.cleanup')}
               >
                 <Trash2 className="w-4 h-4" />
@@ -300,6 +303,13 @@ const ModalEntryItem = memo(function ModalEntryItem({
             >
               <FolderOpen className="w-4 h-4" />
             </button>
+            {/* 快捷提问：这一行是**用户自己下钻看到的**，数据就在问句里 ——
+                用 skipLookup，不让助手先去查（这层文件级明细本来也不在它的读取能力里） */}
+            <AiAskButton
+              question={buildItemQuestion(entry.path, 'folder')}
+              skipLookup
+              className="inline-flex h-7 w-7 items-center justify-center"
+            />
           </div>
         </div>
       </div>

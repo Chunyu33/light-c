@@ -155,7 +155,7 @@ export function SupportAuthor() {
 
                 {/* 底部切换 */}
                 <div className="flex justify-center mt-4">
-                  <div className="inline-flex bg-gray-100 rounded-xl p-1">
+                  <div className="inline-flex bg-[var(--bg-hover)] rounded-xl p-1">
                     {PAYMENT_OPTIONS.map((option) => (
                       <button
                         key={option.type}

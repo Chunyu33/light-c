@@ -45,11 +45,11 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
  */
 function getScopeStyle(scope: string, translate: (key: string) => string): { label: string; className: string } {
   switch (scope) {
-    case '任意文件': return { label: translate('contextMenu.scope.file'), className: 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' };
-    case '文件夹': return { label: translate('contextMenu.scope.folder'), className: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-500' };
-    case '桌面背景': return { label: translate('contextMenu.scope.desktop'), className: 'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400' };
-    case '磁盘驱动器': return { label: translate('contextMenu.scope.drive'), className: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400' };
-    case '库文件夹': return { label: translate('contextMenu.scope.library'), className: 'bg-teal-50 text-teal-600 dark:bg-teal-900/20 dark:text-teal-400' };
+    case '任意文件': return { label: translate('contextMenu.scope.file'), className: 'status-chip text-blue-600' };
+    case '文件夹': return { label: translate('contextMenu.scope.folder'), className: 'status-chip text-yellow-600' };
+    case '桌面背景': return { label: translate('contextMenu.scope.desktop'), className: 'status-chip text-purple-600' };
+    case '磁盘驱动器': return { label: translate('contextMenu.scope.drive'), className: 'status-chip text-orange-600' };
+    case '库文件夹': return { label: translate('contextMenu.scope.library'), className: 'status-chip text-teal-600' };
     default:
       return { label: scope, className: 'bg-[var(--bg-hover)] text-[var(--text-muted)]' };
   }

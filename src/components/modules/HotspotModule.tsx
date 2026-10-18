@@ -153,22 +153,22 @@ function HotspotDiagnostics({
 function getParentTypeColor(type: string): string {
   switch (type) {
     case 'Local':
-      return 'text-blue-500 bg-blue-50 dark:bg-blue-900/20';
+      return 'status-chip text-blue-500';
     case 'Roaming':
-      return 'text-purple-500 bg-purple-50 dark:bg-purple-900/20';
+      return 'status-chip text-purple-500';
     case 'LocalLow':
-      return 'text-orange-500 bg-orange-50 dark:bg-orange-900/20';
+      return 'status-chip text-orange-500';
     case 'Windows':
-      return 'text-red-500 bg-red-50 dark:bg-red-900/20';
+      return 'status-chip text-red-500';
     case 'Program Files':
     case 'Program Files (x86)':
-      return 'text-amber-500 bg-amber-50 dark:bg-amber-900/20';
+      return 'status-chip text-amber-500';
     case 'Users':
-      return 'text-cyan-500 bg-cyan-50 dark:bg-cyan-900/20';
+      return 'status-chip text-cyan-500';
     case 'System':
-      return 'text-rose-500 bg-rose-50 dark:bg-rose-900/20';
+      return 'status-chip text-rose-500';
     default:
-      return 'text-gray-500 bg-gray-50 dark:bg-gray-900/20';
+      return 'status-chip text-gray-500';
   }
 }
 
@@ -326,12 +326,13 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
         className={`group relative bg-[var(--bg-main)] rounded-xl p-3 hover:bg-[var(--bg-hover)] transition-colors ${
           hasNestedChildren ? 'cursor-pointer' : ''
         } ${
-        entry.is_protected ? 'border border-red-200 dark:border-red-800/30' : ''
+        entry.is_protected ? 'border border-[var(--hotspot-danger-border)]' : ''
       } ${isChild ? 'bg-opacity-50' : ''}`}>
-      {/* 占比背景条 */}
+      {/* 占比背景条。危险目录用 `--hotspot-danger-fill`（主题变量，明暗各一份）——
+          不要用 `bg-red-100 dark:…`：本项目没启用 dark 变体，深色下会命中浅色的红 ✗ */}
       <div 
         className={`absolute inset-0 rounded-xl opacity-50 transition-all ${
-          entry.is_protected ? 'bg-red-100 dark:bg-red-900/10' : 'bg-[var(--brand-green-10)]'
+          entry.is_protected ? 'bg-[var(--hotspot-danger-fill)]' : 'bg-[var(--brand-green-10)]'
         }`}
         style={{ width: `${percentage}%` }}
       />
@@ -384,7 +385,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             </span>
             {/* 下钻深度指示器 */}
             {entry.depth > 0 && (
-              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-purple-500 bg-purple-50 dark:bg-purple-900/20">
+              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded status-chip text-purple-500">
                 L{entry.depth}
               </span>
             )}
@@ -393,28 +394,28 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             </span>
             {/* 系统保护目录标签 - 深度扫描时显示 */}
             {entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-red-500">
                 <Shield className="w-3 h-3" />
                 {moduleT('hotspot.systemProtected')}
               </span>
             )}
             {/* 程序目录标签 - 红色警告，禁止删除 */}
             {entry.is_program && !entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-red-500 bg-red-50 dark:bg-red-900/20">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-red-500">
                 <ShieldAlert className="w-3 h-3" />
                 {moduleT('hotspot.systemProgram')}
               </span>
             )}
             {/* 缓存目录标签 - 建议清理（仅非深度扫描模式显示） */}
             {entry.is_cache && !entry.is_program && !entry.is_protected && !isFullScan && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-orange-500 bg-orange-50 dark:bg-orange-900/20">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-orange-500">
                 <Trash2 className="w-3 h-3" />
                 {moduleT('hotspot.temporaryCache')}
               </span>
             )}
             {/* 深度扫描只读提示 */}
             {isFullScan && !entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-blue-500 bg-blue-50 dark:bg-blue-900/20">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-blue-500">
                 <Eye className="w-3 h-3" />
                 {moduleT('hotspot.viewOnly')}
               </span>
@@ -472,7 +473,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
                   e.stopPropagation();
                   onCleanup(entry);
                 }}
-                className="p-1.5 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-500 transition-all"
+                className="p-1.5 rounded-lg hover:bg-[var(--hotspot-danger-fill)] text-[var(--color-warning)] transition-all"
                 title={moduleT('drillDown.cleanup')}
               >
                 <Trash2 className="w-4 h-4" />
@@ -979,8 +980,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
             <button
               onClick={handleStopScan}
               className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30
-                border border-red-200 dark:border-red-800/30 transition-colors"
+                soft-danger border transition-colors"
             >
               <XCircle className="w-3.5 h-3.5" />
               {moduleT('hotspot.stop')}
@@ -992,9 +992,11 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       {/* 扫描结果 */}
       {moduleState.status === 'done' && scanResult && (
         <div className="space-y-3">
-          {/* 深度扫描安全提示 */}
+          {/* 深度扫描安全提示。底色/文字走主题变量 ——
+              原来写 `bg-blue-50 dark:bg-blue-900/20`，而 dark 变体不跟应用主题，
+              深色下就是一条亮蓝色横幅 ✗ */}
           {scanResult.is_full_scan && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-600 dark:text-blue-400">
+            <div className="flex items-center gap-2 px-3 py-2 bg-[var(--notice-info-fill)] rounded-lg text-xs text-[var(--notice-info-text)]">
               <Eye className="w-4 h-4 flex-shrink-0" />
               <span>{moduleT('hotspot.deepScanReadOnly')}</span>
             </div>

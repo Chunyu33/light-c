@@ -604,7 +604,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                     }}
                     className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
                       ${isCriticalCategory 
-                        ? 'border-red-300 bg-red-100 cursor-not-allowed' 
+                        ? 'soft-danger border-2 cursor-not-allowed' 
                         : isAllSelected 
                           ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
                           : isPartialSelected 
@@ -843,7 +843,7 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
       <div 
         className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center shrink-0 transition-colors
           ${isCritical 
-            ? 'border-red-300 bg-red-100' 
+            ? 'soft-danger border-2' 
             : isSelected 
               ? 'bg-emerald-500 border-emerald-500' 
               : 'border-[var(--fg-faint)]'
@@ -1242,7 +1242,7 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       <div
         className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors
           ${isCritical
-            ? 'border-red-300 bg-red-100 cursor-not-allowed'
+            ? 'soft-danger border-2 cursor-not-allowed'
             : isSelected
               ? 'bg-emerald-500 border-emerald-500'
               : 'border-[var(--fg-faint)]'

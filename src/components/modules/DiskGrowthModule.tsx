@@ -1281,8 +1281,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
           <button
             onClick={handleStopScan}
             className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-              bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30
-              border border-red-200 dark:border-red-800/30 transition-colors"
+              soft-danger border transition-colors"
           >
             <XCircle className="w-3.5 h-3.5" />
             {moduleT('diskGrowth.stop')}

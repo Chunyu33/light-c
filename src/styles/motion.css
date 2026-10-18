@@ -1,0 +1,226 @@
+/* ============================================================================
+   动画效果
+   ============================================================================ */
+
+/* ============================================================================
+   设置弹窗左右分栏宽度拖拽
+   与主界面侧边栏保持一致：热区压在分界线上，悬停/拖拽时只显示一条 1px 绿线。
+   ============================================================================ */
+.settings-modal__nav-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 2;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.settings-modal__nav-resize-handle::after {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  content: '';
+  transition: background-color 150ms ease;
+}
+
+.settings-modal__nav-resize-handle:hover::after,
+.settings-modal__nav-resize-handle:focus-visible::after,
+.settings-modal--resizing .settings-modal__nav-resize-handle::after {
+  background: var(--brand-green);
+}
+
+/* 拖拽过程中统一指针和选区，避免鼠标越过分栏后光标抖动或选中文字。 */
+.settings-modal--resizing,
+.settings-modal--resizing * {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* ── 模态框弹入动画 ──────────────────────────────────────────────────────────
+   cubic-bezier(0.16, 1, 0.3, 1) 弹簧曲线：快速加速后回弹收敛，
+   与 Windows 11 / 微信桌面版窗口弹出质感一致 */
+@keyframes modal-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── 模态框弹出动画 ──────────────────────────────────────────────────────────
+   cubic-bezier(0.4, 0, 1, 1) 快速收缩曲线：立即加速消失，避免拖拉感 */
+@keyframes modal-content-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+  }
+}
+
+/* ── 遮罩淡入 / 淡出 ─────────────────────────────────────────────────────── */
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── 工具类 ─────────────────────────────────────────────────────────────────
+   animation-fill-mode: both 确保：
+   - 动画开始前元素保持 from 关键帧状态（避免闪现最终态）
+   - 动画结束后元素保持 to  关键帧状态（避免复位闪烁） */
+.modal-overlay-in  { animation: modal-overlay-in  220ms ease both; }
+.modal-overlay-out { animation: modal-overlay-out 185ms ease both; }
+.modal-content-in  { animation: modal-content-in  280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.modal-content-out { animation: modal-content-out 185ms cubic-bezier(0.4, 0, 1, 1) both; }
+
+/* 流光动画 - 用于进度条 */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
+}
+
+/* 脉冲发光动画 - 用于按钮 */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.2);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* 渐变流动动画 - 用于按钮背景 */
+@keyframes gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-flow 3s ease infinite;
+}
+
+/* ============================================================================
+   页面过渡动画 - 桌面应用风格（淡入淡出 + 轻微缩放）
+   ============================================================================ */
+
+/* 淡出（退出页面） */
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.animate-slide-out-left,
+.animate-slide-out-right {
+  animation: fade-out 0.15s ease-out forwards;
+}
+
+/* 淡入（进入页面） */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-in-right,
+.animate-slide-in-left {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+/* 页面模式入场动画只作用于当前页容器，避免 Framer Motion 重新协调所有常驻模块树。 */
+@keyframes page-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 两个等价 class 交替使用，让同一个模块实例在不卸载的情况下也能稳定重播动画。 */
+.page-content-enter-even,
+.page-content-enter-odd {
+  animation: page-content-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-content-enter-even,
+  .page-content-enter-odd {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+/* 可点击提示：向右轻推 3px，**持续循环**，一轮 2.4s。
+   用途是"这一列能点开看明细"的常驻提示（磁盘变化分析的「变化量」）——
+   原先只有鼠标悬停时才出现下划线，不悬停完全看不出可点击。
+   周期刻意拉长到 2.4s：列表一次能出几十行，箭头又是同时循环，
+   周期太短会明显成"一片在闪"；2.4s + 只用 3px 位移，读起来接近呼吸而不是闪烁。 */
+@keyframes hint-nudge {
+  0%,
+  55%,
+  100% {
+    transform: translateX(0);
+  }
+  22% {
+    transform: translateX(3px);
+  }
+}
+
+.hint-nudge {
+  animation: hint-nudge 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-nudge {
+    animation: none;
+  }
+}
+

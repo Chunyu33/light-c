@@ -128,6 +128,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
         {/* 设置按钮 - Ghost 风格 */}
         <button
           data-window-control
+          data-titlebar-control
           onClick={onSettingsClick}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           title={t('windowSettings')}
@@ -141,6 +142,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
         {/* 最小化 */}
         <button
           data-window-control
+          data-titlebar-control
           onClick={handleMinimize}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           title={t('windowMinimize')}
@@ -151,6 +153,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
         {/* 最大化/还原 */}
         <button
           data-window-control
+          data-titlebar-control
           onClick={handleMaximize}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           title={isMaximized ? t('windowRestore') : t('windowMaximize')}
@@ -162,6 +165,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
         {/* 关闭 */}
         <button
           data-window-control
+          data-titlebar-control
           onClick={handleClose}
           className="h-full px-3 flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--color-danger)] hover:text-white transition-colors"
           title={commonT('close')}

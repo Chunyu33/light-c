@@ -588,7 +588,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                   }} className="inline-flex items-center justify-center gap-1 rounded-lg border border-[var(--brand-green-20)] px-2 py-1 text-xs font-medium text-[var(--brand-green)] hover:bg-[var(--brand-green-10)]">
                   <FolderOpen className="h-3.5 w-3.5" />{moduleT('driverUi.backup')}
                 </button>
-                <button title={moduleT('driverUi.restoreAll')} disabled={!scanResult.is_admin || deleting || restoring} onClick={() => setShowRestoreConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-400 bg-[var(--bg-card)] px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950">
+                <button title={moduleT('driverUi.restoreAll')} disabled={!scanResult.is_admin || deleting || restoring} onClick={() => setShowRestoreConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-400 bg-[var(--bg-card)] px-2 py-1 text-xs font-medium text-[var(--notice-info-text)] hover:bg-[var(--notice-info-fill)] disabled:cursor-not-allowed disabled:opacity-50">
                   <RotateCcw className="h-3.5 w-3.5" />{t('restore')}
                 </button>
                 <button title={deleting ? moduleT('driverUi.deleting') : moduleT('driverUi.deleteSelected', { count: selectedNames.size })} disabled={selectedNames.size === 0 || !scanResult.is_admin || deleting || restoring} onClick={() => setShowConfirm(true)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
@@ -599,7 +599,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
 
               <div className="min-w-0">
               {!scanResult.is_admin && (
-                <div className="flex items-start gap-2 rounded-xl border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                <div className="flex items-start gap-2 rounded-xl soft-warning border px-3 py-2 text-xs">
                   <ShieldAlert className="w-4 h-4 shrink-0" />
                   <span>{moduleT('driverUi.adminHint')}</span>
                 </div>

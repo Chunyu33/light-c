@@ -207,7 +207,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   key={id}
                   type="button"
                   onClick={() => setActiveTab(id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${activeTab === id
+                  /* 选中态额外挂一个语义类：玻璃主题下要换成"玻璃胶囊"，
+                     样式写在 App.css 的 html.glass 下 —— 不在 JSX 里判断外观开关，
+                     关掉玻璃时这条类名没有任何样式，原样保留。 */
+                  className={`settings-tab${activeTab === id ? ' settings-tab--active' : ''} flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${activeTab === id
                     ? 'bg-[var(--brand-green-10)] font-medium text-[var(--brand-green)]'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   }`}

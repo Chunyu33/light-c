@@ -591,7 +591,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                       <div className={`
                         w-5 h-5 rounded border-2 flex items-center justify-center
                         ${isLocked
-                          ? 'border-rose-300 bg-rose-100'
+                          ? 'soft-danger'
                           : isSelected
                             ? 'bg-[var(--brand-green)] border-[var(--brand-green)] cursor-pointer'
                             : 'border-[var(--text-faint)] cursor-pointer'

@@ -1,0 +1,232 @@
+/* ============================================================================
+   单窗口启动屏
+   只动画 transform、opacity 和 background-position，避免启动阶段持续重排。
+   ============================================================================ */
+.splash-screen {
+  --splash-base: #f4faf6;
+  --splash-gradient-start: #e5f7eb;
+  --splash-gradient-end: #edf3ff;
+  --splash-orb-one: rgba(7, 193, 96, 0.18);
+  --splash-orb-two: rgba(71, 133, 255, 0.14);
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(135deg, var(--splash-base), var(--splash-gradient-start), var(--splash-gradient-end), var(--splash-base));
+  transition: opacity 220ms ease;
+}
+
+.splash-screen--dark {
+  --splash-base: #0d1512;
+  --splash-gradient-start: #112b21;
+  --splash-gradient-end: #131d37;
+  --splash-orb-one: rgba(7, 193, 96, 0.22);
+  --splash-orb-two: rgba(73, 118, 255, 0.18);
+}
+
+.splash-screen--exiting {
+  opacity: 0;
+}
+
+.splash-screen__aurora {
+  position: absolute;
+  z-index: -1;
+  width: 38vw;
+  height: 38vw;
+  min-width: 260px;
+  min-height: 260px;
+  border-radius: 9999px;
+  pointer-events: none;
+  will-change: transform;
+  background: radial-gradient(circle, var(--splash-orb-color) 0%, transparent 70%);
+}
+
+.splash-screen__aurora--one {
+  top: -18%;
+  left: -10%;
+  --splash-orb-color: var(--splash-orb-one);
+  animation: splash-orbit-one 9s ease-in-out infinite alternate;
+}
+
+.splash-screen__aurora--two {
+  right: -12%;
+  bottom: -20%;
+  --splash-orb-color: var(--splash-orb-two);
+  animation: splash-orbit-two 11s ease-in-out infinite alternate;
+}
+
+.splash-screen__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 收紧启动屏信息层级，避免 Logo、标语和平台信息之间出现过大空白。 */
+  gap: 14px;
+  transform: translateZ(0);
+}
+
+.splash-screen__logo {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 28px rgba(7, 193, 96, 0.24));
+  animation: splash-logo-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.splash-screen__slogan {
+  /* 显式清除段落默认外边距，确保静态首屏与 React 接管后的布局一致。 */
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  /* letter-spacing: 0.06em; */
+  text-align: center;
+  animation: splash-platform-in 520ms 80ms ease-out both;
+}
+
+.splash-screen__platform {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+  animation: splash-platform-in 520ms 160ms ease-out both;
+}
+
+.splash-screen__author {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.splash-screen__channel {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+
+/* 固定在模块扫描按钮下方，滚动结果时仍保持可见且不占用内容流空间。 */
+.module-operation-toolbar {
+  position: fixed;
+  /* 固定在视口右侧，避免结果容器滚动或过渡动画影响操作区。 */
+  top: 244px;
+  right: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  width: fit-content;
+  max-width: calc(100vw - 76px);
+  margin: 0;
+  padding: 0.35em;
+  border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
+  border-radius: 0.8em;
+  /* 不透明度这块踩过两次坑，记录清楚：
+     ① 原来写死 78% —— 太透，内容透上来和按钮叠在一起。
+     ② 改成 color-mix(var(--bg-elevated) 96%) 仍然没用 ✗ ——
+        玻璃主题下 --bg-elevated 本身就是 rgba(255,255,255,0.45)，
+        对一个 45% 的颜色再取 96%，结果还是 ~43%，等于没改。
+     现在用 --glass-toolbar-bg：玻璃态是 84% + 强模糊，非玻璃态回落到 --bg-elevated。
+     悬浮层下面会滚过内容，靠「高不透明 + 强模糊」挡住，同时保住液态玻璃质感。 */
+  background: var(--glass-toolbar-bg, var(--bg-elevated));
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  /* 前缀写在标准属性前面（原因见 .driver-toolbar 的注释） */
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+
+.module-operation-toolbar__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3em;
+}
+
+/* 折叠态仅保留操作入口，尺寸跟随应用字号，避免固定按钮在不同字号下失衡。 */
+.module-operation-toolbar--collapsed {
+  padding: 0.25em;
+}
+
+.module-operation-toolbar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.1em;
+  height: 2.1em;
+  padding: 0.35em;
+  border: 1px solid var(--border-default);
+  border-radius: 0.6em;
+  color: var(--fg-muted);
+  background: var(--bg-card);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.module-operation-toolbar__toggle:hover {
+  color: var(--fg-primary);
+  background: var(--bg-hover);
+}
+
+.module-operation-toolbar__toggle:focus-visible {
+  outline: 2px solid var(--fg-secondary);
+  outline-offset: 1px;
+}
+
+.module-operation-toolbar__toggle-icon {
+  width: 1.1em;
+  height: 1.1em;
+  stroke-width: 2;
+}
+
+/* 展开态入口位于左侧并由父级垂直居中，操作按钮保持原有纵向排列。 */
+.module-operation-toolbar:not(.module-operation-toolbar--collapsed) .module-operation-toolbar__toggle {
+  align-self: center;
+}
+
+.module-operation-toolbar__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  min-height: 2.3em;
+  padding: 0.45em 0.85em;
+  border-radius: 0.65em;
+  font-size: 0.86em;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+/* 操作按钮中的功能图标也跟随按钮字号，避免自定义大字号时图标显得过小。 */
+.module-operation-toolbar__button > svg {
+  width: 1em;
+  height: 1em;
+}
+
+.module-operation-toolbar__button--muted {
+  color: var(--fg-muted);
+}
+
+.module-operation-toolbar__button--muted:hover {
+  background: color-mix(in srgb, var(--bg-hover) 78%, transparent);
+  color: var(--fg-secondary);
+}
+
+.module-operation-toolbar__button--danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
+.module-operation-toolbar__button--danger:hover {
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+}
+
+.module-operation-toolbar__button:disabled {
+  cursor: not-allowed;
+  color: var(--fg-faint);
+  background: color-mix(in srgb, var(--bg-hover) 68%, transparent);
+  opacity: 0.78;
+}
+
