@@ -33,6 +33,8 @@ import { getModuleActions } from './moduleActionRegistry';
 import type { AiDeleteOutcome, AiDeleteTargetSummary, ModuleActions } from './moduleActionRegistry';
 import { formatReadPage } from './useAiModuleBridge';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
+import { subscribeAiConfig } from './aiConfigSignal';
+import { useToast } from '../Toast';
 import type { AttachedImage } from './imageAttach';
 
 /** 只保留最近若干轮对话：更早的内容交给滚动摘要处理。 */
@@ -81,6 +83,8 @@ interface AiAssistantProps {
 
 export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const { t } = useTranslation('ai');
+  /** 快捷提问在"没配服务商"时面板不会打开，只能靠 toast 传达 */
+  const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   /**
    * **按模块隔离**的会话历史：每个模块一份，切换模块就换一套，没有就是空的。
@@ -125,6 +129,11 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       console.error('读取当前 AI 配置失败:', error);
     }
   }, []);
+
+  // 订阅「AI 配置已变更」：设置页保存 / 切换档案 / 删除档案 / 换数据目录后都会广播。
+  // 只在打开面板时刷新是不够的：刚配好服务商就直接点快捷提问，那条路径不经过面板，
+  // 判断用的还是旧值，会被误拦（Evan 反馈过）。
+  useEffect(() => subscribeAiConfig(() => void reloadAiConfig()), [reloadAiConfig]);
 
   // 打开面板时刷新：用户可能刚在设置里改过配置
   useEffect(() => {
@@ -742,10 +751,26 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   useEffect(() => {
     if (!askRequest || askRequest.id === lastAskIdRef.current) return;
     lastAskIdRef.current = askRequest.id;
+
+    // ⚠️ 没配好服务商时**什么都不做**：不弹面板、不入库、不发请求。
+    // 快捷提问是从模块里点的，弹出一个空面板再报错，用户会以为问题已经发出去了；
+    // 更糟的是那句话会被写进会话历史（面板一开就已经落盘）。
+    // 这里只给一条提示（面板不打开，所以只能用 toast 传达），并清掉这次请求 ——
+    // 否则用户配好服务商后它会自己"补发"，那是另一种意外。
+    if (!canChat) {
+      showToast({
+        type: 'warning',
+        title: t('needConfigPlaceholder'),
+        description: t('needConfigHint'),
+      });
+      clearAiAsk();
+      return;
+    }
+
     setIsOpen(true);
     void handleSend(askRequest.text, [], undefined, askRequest.skipLookup);
     clearAiAsk();
-  }, [askRequest, handleSend]);
+  }, [askRequest, handleSend, canChat, showToast, t]);
 
   return (
     /* AnimatePresence 负责"离场动画"：React 卸载节点时它会把 exit 播完再移除。

@@ -39,6 +39,14 @@ export async function deleteAiProfile(profileId: string): Promise<AiPublicConfig
   return invoke<AiPublicConfig>('delete_ai_profile', { profileId });
 }
 
+/**
+ * 清除某份档案已保存的密钥（档案本身保留）。
+ * 密钥泄露时用户必须能撤销它 —— 否则只能删掉整份档案。
+ */
+export async function clearAiProfileKey(profileId: string): Promise<AiPublicConfig> {
+  return invoke<AiPublicConfig>('clear_ai_profile_key', { profileId });
+}
+
 /** 切换当前使用的服务商档案。 */
 export async function setActiveAiProfile(profileId: string): Promise<AiPublicConfig> {
   return invoke<AiPublicConfig>('set_active_ai_profile', { profileId });

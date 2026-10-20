@@ -577,3 +577,26 @@ html.glass [data-titlebar-control] {
   margin-inline: 0.1em;
   border-radius: 999px;
 }
+
+/* ===== 设置页里的"段"与"操作控件"（液态玻璃）=====
+   两个问题（Evan 直接指出）：
+   ① **段没了**：页面里的块用的是 `bg-[var(--bg-main)]`，而玻璃主题下 --bg-main 是 transparent，
+      于是整页糊成一整片，"一块块的段落感"消失；
+   ② **操作控件**（按钮 / 输入框 / 下拉）还是"灰边 + 实底"的普通窗口样子。
+
+   处理原则：**只补一层很轻的玻璃面、把灰边换成白反光边** ——
+   不改组件结构、不动任何分隔线、不碰弹窗外壳（外壳继续保持原来的半透明）。
+*/
+html.glass .settings-content .glass-block {
+  background-color: var(--glass-surface-bg);
+  box-shadow:
+    0 0 0 1px var(--glass-item-border),
+    var(--glass-inner);
+}
+
+/* ⚠️ 这条只改「控件自己的边框颜色」：
+   - 图标按钮本来没有边框 → 天然不受影响；
+   - 行的分隔线挂在 div/span 的 border-t/b 上，不在 button/input 上 → 不会被误伤（上次的教训）。 */
+html.glass .settings-content :is(button, input, select, textarea) {
+  border-color: var(--glass-item-border);
+}

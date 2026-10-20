@@ -34,12 +34,6 @@ pub const TOOL_PROPOSE_DELETE: &str = "propose_delete";
 pub const TOOL_READ_ITEMS: &str = "read_items";
 pub const TOOL_READ_ITEM_DETAIL: &str = "read_item_detail";
 
-/// 只读工具：它们**不改任何东西**，所以不受"必须用户明确要求才调用"的限制 ——
-/// 用户问"这个分类里都有什么"时正应该调用它们。
-pub fn is_read_only_tool(name: &str) -> bool {
-    name == TOOL_READ_ITEMS || name == TOOL_READ_ITEM_DETAIL
-}
-
 /// 单个工具的描述与参数 schema（两种协议共用这段内容，只是外层包装不同）。
 fn tool_spec(name: &str) -> Option<(&'static str, Value)> {
     match name {
@@ -279,6 +273,43 @@ mod tests {
         assert_eq!(calls.len(), 1);
         // 解析失败 → 空对象 → 没有 id → 调用方不会拿它去删任何东西
         assert!(extract_ids(&calls[0].arguments).is_empty());
+    }
+
+    /// 实测：deepseek-flash 会把调用写成 `<tool_call>{"name":…}</tool_call>` 的 JSON 文本。
+    /// 不认的话，用户会在聊天里看到这段原文，而且那次调用根本不执行（Evan 截图反馈过）。
+    #[test]
+    fn json_style_tool_call_is_recognized_and_never_shown() {
+        let raw = "这个驱动包可以安全清理。\n<tool_call>\n{\"name\": \"read_item_detail\", \"arguments\": {\"id\": \"oem7.inf\"}}\n</tool_call>";
+        let (calls, cleaned) = extract_inline_tool_calls(raw);
+        assert_eq!(calls.len(), 1, "应认出一次调用");
+        assert_eq!(calls[0].name, "read_item_detail");
+        assert_eq!(
+            calls[0].arguments.get("item_id").and_then(|value| value.as_str()),
+            Some("oem7.inf")
+        );
+        assert!(!cleaned.contains("tool_call"), "调用块不能留在正文里，实际: {}", cleaned);
+        assert!(cleaned.contains("可以安全清理"), "正文必须保留，实际: {}", cleaned);
+    }
+
+    /// 认不出的工具名：不执行，但那段文本也必须消失 —— 用户不该看到工具语法。
+    #[test]
+    fn unknown_json_tool_call_is_dropped_from_text() {
+        let raw = "说明。\n<tool_call>{\"name\": \"rm_rf\", \"arguments\": {}}</tool_call>";
+        let (calls, cleaned) = extract_inline_tool_calls(raw);
+        assert!(calls.is_empty(), "未声明的工具不能执行");
+        assert_eq!(cleaned, "说明。");
+    }
+
+    /// arguments 写成 JSON 字符串（OpenAI 风格）也要能接住。
+    #[test]
+    fn json_style_tool_call_accepts_string_arguments() {
+        let raw = "<tool_call>{\"name\": \"read_items\", \"arguments\": \"{\\\"path\\\": \\\"D:/models\\\"}\"}</tool_call>";
+        let (calls, _) = extract_inline_tool_calls(raw);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0].arguments.get("target_id").and_then(|value| value.as_str()),
+            Some("D:/models")
+        );
     }
 
     #[test]
@@ -551,7 +582,78 @@ fn normalize_dsml(content: &str) -> String {
         .replace("</calls>", "")
 }
 
+/// `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`
+///
+/// 第三种内联形式：Hermes 系模板和一些 OpenAI 兼容网关会把调用写成这种**JSON 文本**。
+/// 实测 deepseek-flash 会这么干 —— 不认的话，用户会在聊天记录里看到一段 `<tool_call>` 原文，
+/// 而且那次调用**不会被执行**（问"这个驱动是什么"，答案里带个查目录的调用，看起来像坏了）。
+fn extract_json_style_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
+    const OPEN: &str = "<tool_call>";
+    const CLOSE: &str = "</tool_call>";
+
+    let mut calls: Vec<AiToolCall> = Vec::new();
+    let mut remaining = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+
+    while let Some(open_rel) = content[cursor..].find(OPEN) {
+        let open_at = cursor + open_rel;
+        let Some(close_rel) = content[open_at..].find(CLOSE) else {
+            // 没有结束标签 = 半截调用，正文原样保留（和 invoke 那套的处理保持一致）
+            break;
+        };
+        let body_end = open_at + close_rel;
+        let body = &content[open_at + OPEN.len()..body_end];
+
+        // 只认声明过的工具；认不出就不执行
+        let parsed = serde_json::from_str::<Value>(body.trim()).ok();
+        let name = parsed
+            .as_ref()
+            .and_then(|value| value.get("name"))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let declared = matches!(
+            name.as_str(),
+            TOOL_SELECT_ITEMS | TOOL_PROPOSE_DELETE | TOOL_READ_ITEMS | TOOL_READ_ITEM_DETAIL
+        );
+
+        if declared {
+            let mut arguments = serde_json::Map::new();
+            if let Some(raw) = parsed.as_ref().and_then(|value| value.get("arguments")) {
+                // arguments 既可能是对象，也可能是（OpenAI 风格的）JSON 字符串
+                let object = match raw {
+                    Value::String(text) => serde_json::from_str::<Value>(text).ok(),
+                    other => Some(other.clone()),
+                };
+                if let Some(Value::Object(map)) = object {
+                    for (key, value) in map {
+                        // 和 invoke 那套用同一份别名映射，避免两套解析器对参数名理解不一致
+                        if let Some(canonical) = canonical_argument(&name, &key) {
+                            arguments.insert(canonical.to_string(), value);
+                        }
+                    }
+                }
+            }
+            calls.push(AiToolCall {
+                call_id: String::new(),
+                name,
+                arguments: Value::Object(arguments),
+            });
+        }
+
+        // 无论认不认得，这段 `<tool_call>` 都不能留在正文里 —— 它不是给人看的内容
+        remaining.push_str(&content[cursor..open_at]);
+        cursor = body_end + CLOSE.len();
+    }
+    remaining.push_str(&content[cursor..]);
+
+    (calls, remaining)
+}
+
 /// 从正文里认出内联的工具调用，返回 (调用列表, 清理过的正文)。
+///
+/// 支持两种写法：`<invoke name="x"><parameter name="y">…</parameter></invoke>`（含 DSML 变体），
+/// 以及 `<tool_call>{"name":…, "arguments":…}</tool_call>`（Hermes 系 JSON 文本）。
 pub fn extract_inline_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
     // 先把 DeepSeek 的 DSML 标记归一化成标准形状，后面就只需要一套解析器
     let normalized = normalize_dsml(content);
@@ -611,6 +713,11 @@ pub fn extract_inline_tool_calls(content: &str) -> (Vec<AiToolCall>, String) {
         cursor = block_end;
     }
     remaining.push_str(&content[cursor..]);
+
+    // 第二遍：`<tool_call>{json}</tool_call>` 形式（Hermes 系）。放在后面是因为
+    // 它和 `<invoke>` 的块结构完全不同，各自一套扫描比混在一个循环里好读也好测。
+    let (json_calls, remaining) = extract_json_style_tool_calls(&remaining);
+    calls.extend(json_calls);
 
     // 只压掉"剔除调用块"留下的多余空行。**不能一路 filter 掉所有空行** ——
     // 那会把正文自己本来就有的空行也删掉，Markdown 的段落分隔就没了。

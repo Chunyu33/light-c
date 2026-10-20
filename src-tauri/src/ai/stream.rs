@@ -80,7 +80,9 @@ impl StreamDecoder {
         std::mem::take(&mut self.reasoning)
     }
 
-    /// 喂入一段原始文本；内部就是字节版本，单测与文本来源走这里。
+    /// 喂入一段原始文本；内部就是字节版本，**只有单测用**（生产路径都走 `push_bytes`）。
+    /// 标 `cfg(test)` 是为了让它在正式构建里不产生 dead_code 警告。
+    #[cfg(test)]
     pub fn push(&mut self, chunk: &str) -> Vec<String> {
         self.push_bytes(chunk.as_bytes())
     }

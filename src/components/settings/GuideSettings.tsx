@@ -1,6 +1,6 @@
 // 使用说明页面
 
-import { BookOpen, Cpu, Database, FileBox, HardDrive, Layers, MessageCircle, MousePointerClick, Package, Shield, ShieldCheck, Zap } from 'lucide-react';
+import { BookOpen, Bot, Cpu, Database, FileBox, HardDrive, Layers, MessageCircle, MousePointerClick, Package, Shield, ShieldCheck, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const GUIDE_ITEMS = [
@@ -17,6 +17,8 @@ const GUIDE_ITEMS = [
   { key: 'diskGrowth', icon: HardDrive },
   { key: 'shellIcons', icon: HardDrive },
   { key: 'aiModels', icon: Cpu },
+  // AI 助手单独一条：这里最容易被误解成"软件自带模型"，必须写清"要自己的 Key、不提供本地模型"
+  { key: 'aiAssistant', icon: Bot },
 ] as const;
 
 const RISK_LEVELS = [

@@ -195,8 +195,173 @@ fn migrate_legacy(value: &serde_json::Value) -> Option<AiStoredConfig> {
     })
 }
 
+/// DPAPI 加密后的密钥前缀。
+///
+/// **没有前缀的一律当明文处理** —— 升到这个版本之前存下的老配置不需要迁移代码，
+/// 读出来照样能用，下次保存时自动变成密文。
+const DPAPI_PREFIX: &str = "dpapi:";
+
+/// 二进制 → 十六进制。只是为了把密文塞进 JSON 字符串，不值得为它引 base64 依赖。
+fn to_hex(bytes: &[u8]) -> String {
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push_str(&format!("{:02x}", byte));
+    }
+    text
+}
+
+fn from_hex(text: &str) -> Option<Vec<u8>> {
+    if text.len() % 2 != 0 {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(text.len() / 2);
+    let chars: Vec<char> = text.chars().collect();
+    for pair in chars.chunks(2) {
+        let byte = u8::from_str_radix(&format!("{}{}", pair[0], pair[1]), 16).ok()?;
+        bytes.push(byte);
+    }
+    Some(bytes)
+}
+
+/// 用当前 Windows 用户的 DPAPI 加密密钥（`CryptProtectData`）。
+///
+/// **只加密 api_key 这一个字段**，不动档案的其它内容：换用户 / 换机器读不回来，
+/// 对密钥来说恰好是正确语义（解密失败就当没配，让用户重填，而不是把旧密文发给服务商）。
+/// 加密本身失败时**退回明文**并记日志 —— 宁可降级，也不能让用户存不了密钥。
+fn protect_key(plain: &str) -> String {
+    if plain.trim().is_empty() || plain.starts_with(DPAPI_PREFIX) {
+        return plain.to_string();
+    }
+    match dpapi_protect(plain.as_bytes()) {
+        Some(encrypted) => format!("{}{}", DPAPI_PREFIX, to_hex(&encrypted)),
+        None => {
+            log::warn!("DPAPI 加密 API Key 失败，本次以明文保存");
+            plain.to_string()
+        }
+    }
+}
+
+/// 解密（`CryptUnprotectData`）。没有前缀 = 老的明文配置，原样返回。
+/// 解密失败返回空串：界面会显示"未配置"，用户重填即可 —— 绝不能把密文当密钥发出去。
+fn unprotect_key(stored: &str) -> String {
+    let Some(encoded) = stored.strip_prefix(DPAPI_PREFIX) else {
+        return stored.to_string();
+    };
+    let Some(encrypted) = from_hex(encoded) else {
+        log::warn!("API Key 密文格式非法，按未配置处理");
+        return String::new();
+    };
+    match dpapi_unprotect(&encrypted) {
+        Some(plain) => String::from_utf8_lossy(&plain).to_string(),
+        None => {
+            log::warn!("DPAPI 解密 API Key 失败（可能换了用户或机器），按未配置处理");
+            String::new()
+        }
+    }
+}
+
+fn dpapi_protect(plain: &[u8]) -> Option<Vec<u8>> {
+    use winapi::shared::minwindef::LPVOID;
+    use winapi::um::dpapi::CryptProtectData;
+    use winapi::um::winbase::LocalFree;
+    use winapi::um::wincrypt::DATA_BLOB;
+
+    let mut buffer = plain.to_vec();
+    let mut input = DATA_BLOB {
+        cbData: buffer.len() as u32,
+        pbData: buffer.as_mut_ptr(),
+    };
+    let mut output = DATA_BLOB {
+        cbData: 0,
+        pbData: std::ptr::null_mut(),
+    };
+    let ok = unsafe {
+        CryptProtectData(
+            &mut input,
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+            &mut output,
+        )
+    };
+    if ok == 0 {
+        return None;
+    }
+    let encrypted = unsafe {
+        std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec()
+    };
+    unsafe {
+        LocalFree(output.pbData as LPVOID);
+    }
+    Some(encrypted)
+}
+
+fn dpapi_unprotect(encrypted: &[u8]) -> Option<Vec<u8>> {
+    use winapi::shared::minwindef::LPVOID;
+    use winapi::um::dpapi::CryptUnprotectData;
+    use winapi::um::winbase::LocalFree;
+    use winapi::um::wincrypt::DATA_BLOB;
+
+    let mut buffer = encrypted.to_vec();
+    let mut input = DATA_BLOB {
+        cbData: buffer.len() as u32,
+        pbData: buffer.as_mut_ptr(),
+    };
+    let mut output = DATA_BLOB {
+        cbData: 0,
+        pbData: std::ptr::null_mut(),
+    };
+    let ok = unsafe {
+        CryptUnprotectData(
+            &mut input,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+            &mut output,
+        )
+    };
+    if ok == 0 {
+        return None;
+    }
+    let plain = unsafe {
+        std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec()
+    };
+    unsafe {
+        LocalFree(output.pbData as LPVOID);
+    }
+    Some(plain)
+}
+
+/// 落盘前把每个档案的密钥加密（已是密文的跳过，避免二次加密）。
+fn encrypt_keys(config: &mut AiStoredConfig) {
+    for profile in &mut config.profiles {
+        profile.api_key = protect_key(&profile.api_key);
+    }
+}
+
+/// 读盘后把每个档案的密钥解密（没有前缀的明文原样保留）。
+fn decrypt_keys(config: &mut AiStoredConfig) {
+    for profile in &mut config.profiles {
+        profile.api_key = unprotect_key(&profile.api_key);
+    }
+}
+
 /// 读配置。文件不存在、内容损坏都回退到默认值 —— 配置读不出来不该让界面打不开。
 pub fn read_config() -> AiStoredConfig {
+    let mut config = read_config_raw();
+    decrypt_keys(&mut config);
+    config
+}
+
+/// 真正的读取逻辑（不含加解密）。
+///
+/// 单独拆一层是因为 `read_config` 有好几个 return 点（默认值 / 新结构 / 旧结构迁移），
+/// 解密放在外层只需要接一次 —— 以后再加分支也不会漏掉解密。
+fn read_config_raw() -> AiStoredConfig {
     let path = config_path();
     let text = match fs::read_to_string(&path) {
         Ok(text) => text,
@@ -245,7 +410,10 @@ pub fn read_config() -> AiStoredConfig {
 /// JSON —— 下次读回来解析失败 → 回退默认值 → 用户所有密钥与档案静默消失。
 /// 改成"写临时文件 → rename 覆盖"：同一卷上 rename 是原子的，
 /// 要么是旧的完整文件、要么是新的完整文件，没有中间态。
-pub fn save_config(config: AiStoredConfig) -> Result<(), String> {
+pub fn save_config(mut config: AiStoredConfig) -> Result<(), String> {
+    // 落盘前加密密钥（只加密这一个字段）。这里改的是副本 ——
+    // 调用方手里的仍是明文，返回给命令层时不必再解密。
+    encrypt_keys(&mut config);
     let directory = config_dir();
     fs::create_dir_all(&directory)
         .map_err(|error| format!("创建 AI 配置目录失败 {}: {}", directory.display(), error))?;
@@ -282,9 +450,52 @@ fn lock_config() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// 校验并规整一份档案（新增/更新都走这里）。
+///
+/// 前端表单已经校验过一次，但命令层是**对外表面**（任何调用方都能传），
+/// 这里再挡一道：坏档案一旦写进配置，表现出来就是"设置页看着填好了、提问却一直失败"。
+fn validate_profile(mut profile: AiProfile) -> Result<AiProfile, String> {
+    let preset = super::presets::list_providers()
+        .into_iter()
+        .find(|preset| preset.id == profile.provider_id);
+    let Some(preset) = preset else {
+        return Err(format!("未知的服务商: {}", profile.provider_id));
+    };
+    // 显示名留空时回落到服务商名：档案列表里不该出现空白项，否则用户分不清在用哪个
+    if profile.name.trim().is_empty() {
+        profile.name = preset.name.to_string();
+    }
+    // 地址留空是**合法**的（表示用预设默认地址），但填了就必须是 http(s)
+    let base_url = profile.base_url.trim();
+    if !base_url.is_empty() && !(base_url.starts_with("http://") || base_url.starts_with("https://")) {
+        return Err(format!("接口地址必须以 http:// 或 https:// 开头: {}", base_url));
+    }
+    Ok(profile)
+}
+
+/// 生成新档案 id：秒级时间戳 + 重名时自增后缀。
+///
+/// ⚠️ 只用 `p_{秒级时间戳}` 会在"同一秒内新建两份"时撞 id ——
+/// 撞了之后 upsert 会认到前一份（新填的密钥写进旧档案）、删除会把两份一起删。
+fn next_profile_id(config: &AiStoredConfig) -> String {
+    let base = format!("p_{}", now_seconds());
+    if !config.profiles.iter().any(|profile| profile.id == base) {
+        return base;
+    }
+    let mut suffix = 2;
+    loop {
+        let candidate = format!("{}_{}", base, suffix);
+        if !config.profiles.iter().any(|profile| profile.id == candidate) {
+            return candidate;
+        }
+        suffix += 1;
+    }
+}
+
 /// 新增或更新一份档案（按 id 匹配）。返回更新后的整体配置。
 pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
     let _guard = lock_config();
+    let profile = validate_profile(profile)?;
     let mut config = read_config();
     match config.profiles.iter_mut().find(|item| item.id == profile.id) {
         Some(existing) => {
@@ -299,7 +510,7 @@ pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
         None => {
             let mut created = profile;
             if created.id.trim().is_empty() {
-                created.id = format!("p_{}", now_seconds());
+                created.id = next_profile_id(&config);
             }
             // ⚠️ 新建的档案**必须设为当前**。
             // 否则：界面里的表单永远编辑"当前档案"，用户新建后填的密钥会被存进旧档案，
@@ -308,6 +519,25 @@ pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
             config.profiles.push(created);
         }
     }
+    save_config(config.clone())?;
+    Ok(config)
+}
+
+/// 清掉某份档案已保存的密钥（档案本身保留）。
+///
+/// 单独出一个入口，是因为"密钥留空 = 不改动"那条约定让用户**没法撤销**一份泄露的
+/// Key（只能删掉整份档案）。撤销密钥是安全操作，必须做得到。
+pub fn clear_profile_key(profile_id: &str) -> Result<AiStoredConfig, String> {
+    let _guard = lock_config();
+    let mut config = read_config();
+    let Some(profile) = config
+        .profiles
+        .iter_mut()
+        .find(|profile| profile.id == profile_id)
+    else {
+        return Err(format!("要清除密钥的服务商配置不存在: {}", profile_id));
+    };
+    profile.api_key.clear();
     save_config(config.clone())?;
     Ok(config)
 }
@@ -413,6 +643,78 @@ pub fn set_data_dir(data_dir: String) -> Result<AiStoredConfig, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 密钥加密：本机加密能解回原样；老配置的明文原样通过；无法解密的按"未配置"处理。
+    #[test]
+    fn api_key_round_trips_through_dpapi_and_legacy_plaintext_passes_through() {
+        let encrypted = protect_key("sk-abcdefghijklmn");
+        assert!(
+            encrypted.starts_with(DPAPI_PREFIX),
+            "加密后应带 dpapi: 前缀，实际 {}",
+            encrypted
+        );
+        assert_ne!(encrypted, "sk-abcdefghijklmn", "密文不该还是明文");
+        assert_eq!(unprotect_key(&encrypted), "sk-abcdefghijklmn");
+
+        // 升版本前的明文配置：原样读出来，不需要迁移代码
+        assert_eq!(unprotect_key("sk-legacy-plain-key"), "sk-legacy-plain-key");
+
+        // 空密钥不加密：否则会存下一个"加密过的空串"，看起来像配过了
+        assert_eq!(protect_key(""), "");
+
+        // 坏密文（换机器 / 手改文件）：当未配置 —— 绝不能把密文当密钥发出去
+        assert_eq!(unprotect_key("dpapi:zzzz"), "");
+    }
+
+    /// 新增档案时 id 不能撞：撞了 upsert 会认错档案、删除会删掉两份。
+    #[test]
+    fn new_profile_ids_do_not_collide_within_the_same_second() {
+        let mut config = AiStoredConfig {
+            active_profile_id: String::new(),
+            profiles: Vec::new(),
+            data_dir: String::new(),
+        };
+        let first = next_profile_id(&config);
+        config.profiles.push(AiProfile {
+            id: first.clone(),
+            ..Default::default()
+        });
+        let second = next_profile_id(&config);
+        assert_ne!(first, second, "同一秒内第二份档案拿到了相同 id");
+        assert!(second.starts_with(&first), "冲突时应带后缀，实际 {}", second);
+    }
+
+    /// 档案校验：未知服务商与非法地址要挡住；显示名留空回落到服务商名。
+    #[test]
+    fn profile_validation_rejects_broken_configs_and_fills_name() {
+        let unknown = validate_profile(AiProfile {
+            provider_id: "not-a-provider".into(),
+            ..Default::default()
+        });
+        assert!(unknown.is_err(), "未知服务商应被拒绝");
+
+        let bad_url = validate_profile(AiProfile {
+            provider_id: "deepseek".into(),
+            base_url: "api.deepseek.com".into(),
+            ..Default::default()
+        });
+        assert!(bad_url.is_err(), "缺协议头的地址应被拒绝");
+
+        let ok = validate_profile(AiProfile {
+            provider_id: "deepseek".into(),
+            base_url: "https://api.deepseek.com".into(),
+            ..Default::default()
+        })
+        .expect("合法档案应通过");
+        assert!(!ok.name.trim().is_empty(), "显示名留空时应回落到服务商名");
+
+        // 地址留空 = 用预设默认地址，必须放行
+        assert!(validate_profile(AiProfile {
+            provider_id: "deepseek".into(),
+            ..Default::default()
+        })
+        .is_ok());
+    }
 
     #[test]
     fn legacy_single_config_migrates_into_one_profile() {

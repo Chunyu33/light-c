@@ -169,6 +169,7 @@ pub fn run() {
             get_ai_config,
             save_ai_profile,
             delete_ai_profile,
+            clear_ai_profile_key,
             set_active_ai_profile,
             set_ai_data_dir,
             test_ai_connection,

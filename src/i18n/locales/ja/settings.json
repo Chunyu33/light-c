@@ -73,14 +73,19 @@
     "dataDirOpen": "フォルダーを開く",
     "reasoningEffort": "思考の強度",
     "reasoningDefault": "既定（このパラメーターを送らない）",
-    "reasoningEffortDesc": "一部のモデルのみ対応しています。不明な場合は既定のままにしてください。"
+    "reasoningEffortDesc": "一部のモデルのみ対応しています。不明な場合は既定のままにしてください。",
+    "removeKey": "キーを削除",
+    "removeKeyDone": "保存された API キーを削除しました",
+    "unsavedTitle": "未保存の変更があります",
+    "unsavedDesc": "続行すると現在の入力内容は破棄されます。よろしいですか？",
+    "unsavedDiscard": "破棄して続行"
   },
   "tabs": {
     "ai": "AI アシスタント",
     "general": "一般",
     "features": "機能設定",
     "diskInfo": "ディスク情報",
-    "guide": "使用ガイド",
+    "guide": "機能ガイド",
     "security": "セキュリティ",
     "feedback": "フィードバック",
     "about": "アプリ情報"
@@ -185,6 +190,7 @@
     "description": "問題や改善提案がある場合は、以下の方法でご連絡ください。",
     "githubDesc": "GitHub で問題を報告",
     "email": "メールで送信",
+    "wechat": "WeChat",
     "contact": "コミュニティ",
     "qqGroup": "QQ グループ：",
     "copied": "コピーしました",
@@ -425,6 +431,10 @@
       "aiModels": {
         "title": "AI モデル容量",
         "desc": "Ollama、LM Studio、ComfyUI、HuggingFace のモデル資産を分析します。必要に応じて詳細検出を有効にしてください。"
+      },
+      "aiAssistant": {
+        "title": "AI アシスタント",
+        "desc": "どのモジュールからでも AI に質問できます。そのモジュールのデータをもとに回答し、ジャンククリーナーでは選択の代行と削除の提案も行います（削除は必ず確認が必要です）。「モデルにはご自身の API キーが必要です」——「設定 → AI アシスタント」でプロバイダー（DeepSeek、OpenAI 互換、Claude など）を選び、ご自身のキーを入力してください。利用料は各プロバイダーに支払われます。「本ソフトはローカルモデルを提供せず、組み込みのキーもありません」——未設定の場合この機能は使えませんが、他の機能には影響しません。"
       }
     },
     "permissionsTitle": "権限について",

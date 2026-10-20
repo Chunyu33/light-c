@@ -31,6 +31,13 @@ pub fn save_ai_profile(profile: AiProfile) -> Result<AiPublicConfig, String> {
     Ok(crate::ai::read_public_config())
 }
 
+/// 清除某份档案已保存的密钥（档案保留）。密钥泄露时用户必须能撤销它。
+#[tauri::command]
+pub fn clear_ai_profile_key(profile_id: String) -> Result<AiPublicConfig, String> {
+    crate::ai::clear_profile_key(&profile_id)?;
+    Ok(crate::ai::read_public_config())
+}
+
 /// 删除一份服务商档案。删掉的正好是当前档案时，后端会自动切到剩下的第一份。
 #[tauri::command]
 pub fn delete_ai_profile(profile_id: String) -> Result<AiPublicConfig, String> {

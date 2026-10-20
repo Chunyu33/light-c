@@ -55,6 +55,7 @@
   "retry": "Ask again",
   "needConfig": "No AI provider is configured yet. Add one with its API key under Settings - AI assistant, then you can ask questions here.",
   "needConfigPlaceholder": "Configure a provider first",
+  "needConfigHint": "Add a provider and your own API key under Settings → AI Assistant, then ask again.",
   "noModel": "No model selected",
   "attachImage": "Add an image (or paste a screenshot)",
   "attachRemove": "Remove this image",

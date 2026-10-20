@@ -55,6 +55,7 @@
   "retry": "この質問を再送",
   "needConfig": "AI プロバイダーが未設定です。「設定 - AI アシスタント」で API キーを登録すると、ここで質問できます。",
   "needConfigPlaceholder": "先にプロバイダーを設定してください",
+  "needConfigHint": "「設定 → AI アシスタント」でプロバイダーとご自身の API キーを設定すると、すぐに質問できます。",
   "noModel": "モデル未選択",
   "attachImage": "画像を追加（スクリーンショットの貼り付けも可）",
   "attachRemove": "この画像を外す",

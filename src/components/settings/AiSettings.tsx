@@ -11,6 +11,7 @@ import { AlertCircle, CheckCircle2, Loader2, Plus, Sparkles } from 'lucide-react
 import { Select } from '../ui/Select';
 import { useToast } from '../Toast';
 import {
+  clearAiProfileKey,
   deleteAiProfile,
   getAiConfig,
   listAiProviders,
@@ -20,6 +21,8 @@ import {
   testAiConnection,
 } from '../../api/ai';
 import { openInFolder, pickFolderDialog } from '../../api/commands';
+import { notifyAiConfigChanged } from '../ai/aiConfigSignal';
+import { ConfirmDialog } from '../ConfirmDialog';
 import type { AiProviderPreset, AiPublicConfig } from '../../types/ai';
 
 /** 统一的设置行：左侧标题与描述，右侧控件。 */
@@ -184,16 +187,21 @@ export function AiSettings() {
       apiKey,
       reasoningEffort,
     });
-    // 数据目录是全局的，单独保存；它不属于任何一份档案
-    const withDir = await setAiDataDir(dataDir);
+    // 数据目录是全局的，单独保存；它不属于任何一份档案。
+    // **只有真的变了才写** —— 否则每次保存都要多写一次磁盘、多广播一次"配置已变更"。
+    const withDir =
+      dataDir === (saved?.dataDir ?? '') ? await getAiConfig() : await setAiDataDir(dataDir);
     setSaved(withDir);
     setActiveId(withDir.activeProfileId);
     // 保存后端会回填 id（新增档案时），这里同步一次，否则再保存会又插入一份
     const active = withDir.profiles.find((item) => item.id === withDir.activeProfileId);
     if (active) setActiveId(active.id);
     setApiKey(''); // 保存成功后清空输入框，回到"掩码显示"状态
+    // ⚠️ 保存**不走** applyConfig，所以这里要单独广播一次：
+    // 不广播的话助手那份配置副本还是旧的，"刚配好 Key 就点快捷提问"仍会被误拦（Evan 反馈过）。
+    notifyAiConfigChanged();
     return next;
-  }, [activeId, providerId, baseUrl, model, apiKey, reasoningEffort, dataDir]);
+  }, [activeId, providerId, baseUrl, model, apiKey, reasoningEffort, dataDir, saved]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -248,8 +256,45 @@ export function AiSettings() {
       setReasoningEffort(active?.reasoningEffort ?? '');
       setApiKey('');
       setErrorMessage('');
+      // 磁盘上的配置已经变了 —— 通知助手重新读取，否则它那份副本还是旧的，
+      // 刚配好服务商就点快捷提问会被误判成没配好
+      notifyAiConfigChanged();
     },
     [providers],
+  );
+
+  /**
+   * 表单里有没有没保存的改动。
+   *
+   * 只是用来在"切档案 / 新增 / 删除"这三个**会丢改动**的入口先问一句。
+   * 判据是"和新密钥是否填了 + 四个字段是否偏离已保存值"，不比时间戳 —— 简单且不会误报。
+   */
+  const isDirty = useMemo(() => {
+    if (apiKey.trim()) return true;
+    const current = saved?.profiles.find((item) => item.id === activeId);
+    // 新建中的草稿没有对照物，不当作"未保存改动"（用户本来就在编辑）
+    if (!current) return false;
+    return (
+      providerId !== current.providerId ||
+      baseUrl !== current.baseUrl ||
+      model !== current.model ||
+      reasoningEffort !== current.reasoningEffort
+    );
+  }, [apiKey, saved, activeId, providerId, baseUrl, model, reasoningEffort]);
+
+  /** 待确认的"丢弃改动"动作：有未保存改动时先把动作挂在这里，确认后再执行 */
+  const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
+
+  /** 执行一个会丢改动的操作：干净就直接执行，脏就先问一句 */
+  const confirmUnsaved = useCallback(
+    (action: () => void) => {
+      if (!isDirty) {
+        action();
+        return;
+      }
+      setPendingDiscard(() => action);
+    },
+    [isDirty],
   );
 
   const handleSwitchProfile = useCallback(
@@ -268,17 +313,22 @@ export function AiSettings() {
    * 新增：**先不建档**，只展开一张空白表单。
    * 保存成功后才真正创建并出现在列表里 —— 否则列表里会先多出一条半成品配置，
    * 用户取消掉还留着一条空壳（Evan 反馈过）。
+   *
+   * ⚠️ 默认服务商（DeepSeek）的**地址和默认模型也要一并带出来**：
+   * 只设 providerId 的话，下拉框显示 DeepSeek、接口地址却是空的，
+   * 用户得先切到别家再切回来才出现（Evan 反馈过）。这里复用同一份预设，和切换时一致。
    */
   const handleAddProfile = useCallback(() => {
+    const preset = providers.find((item) => item.id === 'deepseek') ?? providers[0];
     setActiveId('');
-    setProviderId('deepseek');
-    setBaseUrl('');
-    setModel('');
+    setProviderId(preset?.id ?? 'deepseek');
+    setBaseUrl(preset?.baseUrl ?? '');
+    setModel(preset?.defaultModel ?? '');
     setModelOptions([]);
     setApiKey('');
     setErrorMessage('');
     setIsEditing(true);
-  }, []);
+  }, [providers]);
 
   const handleDeleteProfile = useCallback(
     async (profileId: string) => {
@@ -290,6 +340,25 @@ export function AiSettings() {
     },
     [applyConfig],
   );
+
+  /**
+   * 移除这块档案已保存的密钥（档案保留）。
+   * 撤销一份可能泄露的 Key 是安全操作，所以要能单独做 —— 不必删掉整份档案。
+   */
+  const handleClearKey = useCallback(async () => {
+    if (!activeId) return;
+    setIsSaving(true);
+    setErrorMessage('');
+    try {
+      applyConfig(await clearAiProfileKey(activeId));
+      setApiKey('');
+      showToast({ type: 'success', title: t('aiAssistant.removeKeyDone') });
+    } catch (error) {
+      setErrorMessage(String(error));
+    } finally {
+      setIsSaving(false);
+    }
+  }, [activeId, applyConfig, showToast, t]);
 
   /**
    * 下拉选项：拉取到的模型 + **当前模型本身**。
@@ -378,7 +447,7 @@ export function AiSettings() {
                 >
                   <button
                     type="button"
-                    onClick={() => void handleSwitchProfile(profile.id)}
+                    onClick={() => confirmUnsaved(() => void handleSwitchProfile(profile.id))}
                     className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   >
                     {/* 圆点 = 是否已配置密钥，一眼看出哪条能用 */}
@@ -402,7 +471,7 @@ export function AiSettings() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleDeleteProfile(profile.id)}
+                    onClick={() => confirmUnsaved(() => void handleDeleteProfile(profile.id))}
                     className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
                   >
                     {t('aiAssistant.profileDelete')}
@@ -412,7 +481,7 @@ export function AiSettings() {
             })}
             <button
               type="button"
-              onClick={() => void handleAddProfile()}
+              onClick={() => confirmUnsaved(() => handleAddProfile())}
               className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-color)] py-2 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)]"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -446,13 +515,26 @@ export function AiSettings() {
                   : t('aiAssistant.apiKeyDesc')
               }
             >
-              <TextField
-                value={apiKey}
-                onChange={setApiKey}
-                placeholder={activeProfile?.hasApiKey ? t('aiAssistant.apiKeyKeep') : 'sk-...'}
-                widthClass="w-64"
-                password
-              />
+              <div className="flex items-center gap-2">
+                <TextField
+                  value={apiKey}
+                  onChange={setApiKey}
+                  placeholder={activeProfile?.hasApiKey ? t('aiAssistant.apiKeyKeep') : 'sk-...'}
+                  widthClass="w-64"
+                  password
+                />
+                {/* 已配置时才出现：撤销一份可能泄露的 Key 必须做得到，但不能误点到空白按钮上 */}
+                {activeProfile?.hasApiKey ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleClearKey()}
+                    disabled={isSaving}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--color-danger)] transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  >
+                    {t('aiAssistant.removeKey')}
+                  </button>
+                ) : null}
+              </div>
             </SettingRow>
           </div>
 
@@ -604,6 +686,20 @@ export function AiSettings() {
       </div>
 
       <p className="text-xs text-[var(--text-muted)] leading-relaxed">{t('aiAssistant.privacyNote')}</p>
+
+      {/* 有未保存改动时才拦一次：切档案 / 新增 / 删除都会把当前表单冲掉 */}
+      <ConfirmDialog
+        isOpen={pendingDiscard !== null}
+        title={t('aiAssistant.unsavedTitle')}
+        description={t('aiAssistant.unsavedDesc')}
+        confirmText={t('aiAssistant.unsavedDiscard')}
+        onConfirm={() => {
+          const action = pendingDiscard;
+          setPendingDiscard(null);
+          action?.();
+        }}
+        onCancel={() => setPendingDiscard(null)}
+      />
     </div>
   );
 }

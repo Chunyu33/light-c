@@ -73,14 +73,19 @@
     "dataDirOpen": "Open folder",
     "reasoningEffort": "Reasoning effort",
     "reasoningDefault": "Default (do not send)",
-    "reasoningEffortDesc": "Only some models support this. Leave it at default if unsure; if the API reports an error, set it back."
+    "reasoningEffortDesc": "Only some models support this. Leave it at default if unsure; if the API reports an error, set it back.",
+    "removeKey": "Remove key",
+    "removeKeyDone": "Saved API key removed",
+    "unsavedTitle": "Unsaved changes",
+    "unsavedDesc": "Continuing will discard the edits in this form. Continue?",
+    "unsavedDiscard": "Discard and continue"
   },
   "tabs": {
     "ai": "AI assistant",
     "general": "General",
     "features": "Features",
     "diskInfo": "Disk Info",
-    "guide": "Guide",
+    "guide": "Feature guide",
     "security": "Security",
     "feedback": "Feedback",
     "about": "About"
@@ -185,6 +190,7 @@
     "description": "If you encounter a problem or have a suggestion, contact me through one of the channels below.",
     "githubDesc": "Report an issue on GitHub",
     "email": "Email feedback",
+    "wechat": "WeChat",
     "contact": "Community",
     "qqGroup": "QQ group:",
     "copied": "Copied",
@@ -425,6 +431,10 @@
       "aiModels": {
         "title": "AI model space",
         "desc": "Analyzes model assets from Ollama, LM Studio, ComfyUI and HuggingFace; enable deep discovery when needed."
+      },
+      "aiAssistant": {
+        "title": "AI Assistant",
+        "desc": "Ask the AI from any module — it answers using that module's data, and in Junk Cleanup it can select items and propose deletions (you always confirm before anything is removed). \"You supply the API key\": choose a provider (DeepSeek, any OpenAI-compatible endpoint, or Claude) and enter your own key under Settings → AI Assistant; usage is billed by that provider. \"This app ships no local model and no built-in key\" — without one the assistant stays unavailable, and everything else keeps working."
       }
     },
     "permissionsTitle": "Permissions",

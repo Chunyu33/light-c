@@ -237,7 +237,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             />
           </aside>
 
-          <section className="flex min-w-0 flex-1 flex-col bg-[var(--bg-card)]">
+          <section className="flex min-w-0 flex-1 flex-col bg-[var(--bg-card)] settings-content">
             <div className="flex min-h-12 items-center justify-between border-b border-[var(--border-color)] px-5">
               <h3 className="text-sm font-medium text-[var(--text-primary)]">
                 {t(SETTINGS_TABS.find((tab) => tab.id === activeTab)?.label ?? 'title')}

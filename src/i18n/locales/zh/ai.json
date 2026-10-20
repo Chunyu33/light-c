@@ -55,6 +55,7 @@
   "retry": "重试这条提问",
   "needConfig": "还没有配置 AI 服务商。请到「设置 - AI 助手」里添加一个并填入 API Key，之后这里就能提问了。",
   "needConfigPlaceholder": "请先配置 AI 服务商",
+  "needConfigHint": "在「设置 · AI 助手」里添加服务商并填入你自己的 API Key，之后就能直接提问了。",
   "noModel": "未选择模型",
   "attachImage": "添加图片（也可直接粘贴截图）",
   "attachRemove": "移除这张图",

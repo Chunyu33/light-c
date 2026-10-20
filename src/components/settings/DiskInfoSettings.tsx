@@ -129,7 +129,7 @@ function DiskInfoCard({ disk, translate }: { disk: DiskHealthInfo; translate: Tr
   const subtitle = `${disk.drive_letters.length > 0 ? disk.drive_letters.join(' / ') : translate('diskInfo.unassignedDrive')} · ${formatMediaType(disk.media_type, translate)} · ${disk.bus_type || translate('diskInfo.unknownBus')}`;
 
   return (
-    <article className="glass-list min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
+    <article className="glass-list glass-block min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4">
       <div className="flex min-w-0 items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-green-10)] text-[var(--brand-green)]">
           <HardDrive className="h-4 w-4" />

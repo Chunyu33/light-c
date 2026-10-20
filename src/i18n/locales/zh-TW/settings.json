@@ -73,14 +73,19 @@
     "dataDirOpen": "開啟目錄",
     "reasoningEffort": "思考強度",
     "reasoningDefault": "預設（不送出這個參數）",
-    "reasoningEffortDesc": "只有部分模型支援。不確定就保持預設；設定後若介面報錯，改回預設即可。"
+    "reasoningEffortDesc": "只有部分模型支援。不確定就保持預設；設定後若介面報錯，改回預設即可。",
+    "removeKey": "移除金鑰",
+    "removeKeyDone": "已移除儲存的 API Key",
+    "unsavedTitle": "有未儲存的修改",
+    "unsavedDesc": "繼續會捨棄目前表單裡的修改，確定嗎？",
+    "unsavedDiscard": "捨棄並繼續"
   },
   "tabs": {
     "ai": "AI 助手",
     "general": "通用",
     "features": "功能設定",
     "diskInfo": "磁碟資訊",
-    "guide": "使用說明",
+    "guide": "功能說明",
     "security": "安全與校驗",
     "feedback": "意見反饋",
     "about": "關於"
@@ -185,6 +190,7 @@
     "description": "如果您在使用過程中遇到任何問題或有改進建議，歡迎透過以下方式聯絡我",
     "githubDesc": "在 GitHub 上提交問題",
     "email": "郵件反饋",
+    "wechat": "微信",
     "contact": "交流",
     "qqGroup": "QQ群：",
     "copied": "已複製",
@@ -425,6 +431,10 @@
       "aiModels": {
         "title": "AI 模型空間",
         "desc": "分析 Ollama、LM Studio、ComfyUI、HuggingFace 等平臺的模型資產；需要時可開啟深度發現。"
+      },
+      "aiAssistant": {
+        "title": "AI 助手",
+        "desc": "在每個模組裡都能直接問 AI：它會結合目前模組的資料回答問題，在垃圾清理裡還能依你的要求勾選、並提議刪除（刪除始終需要你確認）。「模型需要你自己提供 API Key」—— 在「設定 → AI 助手」裡選擇服務商（DeepSeek、OpenAI 相容介面或 Claude）並填入你自己的 Key，呼叫費用由對應服務商收取。「本軟體不提供本地模型，也不內建任何 Key」；未設定時該功能不可用，其餘功能不受影響。"
       }
     },
     "permissionsTitle": "許可權說明",
