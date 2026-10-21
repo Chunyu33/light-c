@@ -627,3 +627,14 @@ html.glass .ai-panel {
   transform: translateZ(0);
 }
 
+
+/* 设置页里**可点击的段块**（如「更新日志」那个整行链接）：
+   玻璃态下背景被上面那条 .settings-content .glass-block 规则接管了，
+   Tailwind 的 hover:bg-* 优先级不够，hover 会完全没反馈 ——
+   这里补一个"抬起"的反馈（边框变亮 + 投影加重），而不是换底色，和胶囊/卡片的语言一致。 */
+html.glass .settings-content a.glass-block:hover {
+  box-shadow:
+    0 0 0 1px var(--glass-edge),
+    var(--glass-shadow),
+    var(--glass-inner);
+}

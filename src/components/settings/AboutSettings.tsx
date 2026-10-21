@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react';
-import { Code2, Cpu, Download, ExternalLink, HardDrive, HelpCircle, Info, Monitor as MonitorIcon, RefreshCw, Rocket, User, Clock, ClipboardList } from 'lucide-react';
+import { ArrowUpRight, Code2, Cpu, Download, ExternalLink, HardDrive, HelpCircle, Info, Monitor as MonitorIcon, RefreshCw, Rocket, User, Clock, ClipboardList } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { getDistributionChannel, getSystemInfo, type DistributionChannel, type SystemInfo } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -245,7 +245,7 @@ export function AboutSettings() {
           href="https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-between p-4 rounded-2xl bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] transition-colors group"
+          className="glass-block flex items-center justify-between p-4 rounded-2xl bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] transition-colors group"
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center">
@@ -280,6 +280,8 @@ function MoreToolsSection() {
       icon: viapIcon,
       description: t('toolViapDesc'),
       downloadUrl: 'https://pan.quark.cn/s/4761ee4ba698',
+      // 官网详情页：介绍比弹窗里这一句话完整得多
+      detailUrl: 'https://viap.evan666.cc/',
     },
     {
       name: 'BinlockX',
@@ -287,6 +289,7 @@ function MoreToolsSection() {
       description:
         t('toolBinlockxDesc'),
       downloadUrl: 'https://pan.quark.cn/s/4243a5142b29',
+      detailUrl: 'https://binlockx.evan666.cc/',
     },
   ];
 
@@ -297,7 +300,7 @@ function MoreToolsSection() {
         {t('moreTools')}
       </h4>
       <div className="space-y-3">
-        {tools.map(({ name, icon, description, downloadUrl }) => (
+        {tools.map(({ name, icon, description, downloadUrl, detailUrl }) => (
           <div
             key={name}
             className="glass-block rounded-2xl bg-[var(--bg-main)] border border-[var(--border-color)] p-4"
@@ -311,6 +314,16 @@ function MoreToolsSection() {
             </div>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{description}</p>
             <div className="mt-4 flex flex-wrap gap-2">
+              {/* 详情放在下载前面：先了解、再下载，读起来是自然顺序 */}
+              <a
+                href={detailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--brand-green)] hover:border-[var(--brand-green)]/40 transition-colors"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                {t('detail')}
+              </a>
               <a
                 href={downloadUrl}
                 target="_blank"
