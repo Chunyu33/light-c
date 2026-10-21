@@ -24,6 +24,11 @@
   "aiModels": "AIモデルストレージ",
   "aiModelsDesc": "ローカルAIモデルの容量をすばやく分析",
   "sidebarLabel": "機能メニュー",
+  "groups": {
+    "cleanup": "整理",
+    "system": "システム",
+    "analyze": "分析"
+  },
   "sidebarCollapse": "サイドバーを折りたたむ",
   "sidebarExpand": "サイドバーを展開",
   "sidebarResize": "サイドバーの幅を変更"

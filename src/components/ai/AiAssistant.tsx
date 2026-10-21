@@ -130,6 +130,11 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     }
   }, []);
 
+  /**
+   * 面板已 portal 到 document.body（见 AiChatPanel），和模块卡彻底解耦 ——
+   * 原来"面板打开时关掉模块磨砂"的规避手段已经不需要了，对应 CSS 规则也已移除。
+   */
+
   // 订阅「AI 配置已变更」：设置页保存 / 切换档案 / 删除档案 / 换数据目录后都会广播。
   // 只在打开面板时刷新是不够的：刚配好服务商就直接点快捷提问，那条路径不经过面板，
   // 判断用的还是旧值，会被误拦（Evan 反馈过）。

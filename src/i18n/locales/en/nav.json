@@ -24,6 +24,11 @@
   "aiModels": "AI Model Storage",
   "aiModelsDesc": "Quickly analyze local AI model storage usage",
   "sidebarLabel": "Feature menu",
+  "groups": {
+    "cleanup": "Cleanup",
+    "system": "System",
+    "analyze": "Analysis"
+  },
   "sidebarCollapse": "Collapse sidebar",
   "sidebarExpand": "Expand sidebar",
   "sidebarResize": "Resize sidebar"

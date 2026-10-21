@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { AlertCircle, Check, Copy, Eraser, History, ImagePlus, Loader2, Minus, RefreshCw, Send, User, X } from 'lucide-react';
@@ -240,7 +241,17 @@ export function AiChatPanel({
   // 尺寸可拖拽调整并持久化；未调整时用 CSS 里的 em + 视口计算值
   const { sizeStyle, hasCustomSize, startResize, resetSize } = usePanelSize();
 
-  return (
+  /**
+   * 整块 portal 到 `document.body`。
+   *
+   * 为什么：面板是 `position: fixed`，DOM 位置不影响布局；但留在 App 根节点里时，
+   * 它和模块卡共享同一套合成上下文 —— WebView2 会把模块卡的 `backdrop-filter` 层
+   * 画到面板之上（"幽灵残影"）。移到 body 下，两者彻底解耦。
+   *
+   * ⚠️ 不会丢样式/上下文：主题类挂在 `<html>` 上，CSS 变量照样继承；
+   * React 的 portal 也保留 context。预览浮层一起搬（它本来就该在最顶层）。
+   */
+  return createPortal(
     <>
     {/* 放大预览。刻意放在面板**之外**：面板用了 framer-motion（带 transform），
         一旦有 transform，内部 position:fixed 的元素会被它的 overflow-hidden 裁掉。 */}
@@ -287,10 +298,10 @@ export function AiChatPanel({
         <div className="pointer-events-none absolute left-1 top-1 h-2.5 w-2.5 border-l border-t border-[var(--brand-green)] opacity-40 transition-opacity group-hover:opacity-90" />
       </div>
 
-      {/* glass-block 是项目既有的语义钩子：「去边框去底色，交给留白分层」。
-          非玻璃态下它不匹配，这条 border-b 原样保留；玻璃态下由 App.css 抹掉，
-          于是面板里剩下的分隔线就只有输入框那一圈 —— 不在组件里判断主题。 */}
-      <header className="glass-block flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
+      {/* ⚠️ 这里**不能**挂 glass-block：「去边框去底色」是给"卡片里的子区块"用的，
+          挂到浮层的头部上就等于让头部完全透明，背后的模块内容会清晰透上来（看着像一块幽灵）。
+          头部现在跟面板共用同一层底色，分隔线也保留。 */}
+      <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3 py-2">
         <AiMarkIcon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-green)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-primary)]">
           {t('panelTitle')}
@@ -629,6 +640,7 @@ export function AiChatPanel({
         onConfirm={onConfirmClear}
         onCancel={onCancelClear}
       />
-    </>
+    </>,
+    document.body,
   );
 }

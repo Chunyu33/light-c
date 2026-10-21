@@ -81,7 +81,10 @@
   align-items: center;
   justify-content: flex-end;
   min-height: 3.5em;
-  padding: 0.5em 0.65em 0.5em 1em;
+  /* 左内边距 = 列表内边距(0.55) + 项内边距(0.7) = 1.25em，
+     让标题和下面的图标**共用同一条左边缘**（原来三条参考线各差几个像素，
+     是整个侧边栏看起来散的直接原因）。 */
+  padding: 0.5em 0.65em 0.5em 1.25em;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -89,9 +92,12 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--fg-primary);
-  font-size: 0.92em;
+  /* 用弱化色 + 小字号 + 字距：它是这一栏叫什么的标签，
+     不是内容区的一级标题。原来 0.92em/600/主文字色，跟模块标题撞了权重。 */
+  color: var(--fg-muted);
+  font-size: 0.8em;
   font-weight: 600;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
@@ -120,17 +126,18 @@
   outline-offset: 1px;
 }
 
+/* 自绘图标是 20×16 的横长方形，不能强行套 1:1 —— 那样会被压扁变形 */
 .sidebar-nav__toggle svg {
-  width: 1.1em;
-  height: 1.1em;
+  width: 1.25em;
+  height: 1em;
 }
 
 .sidebar-nav__list {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 0.2em;
-  padding: 0.75em 0.55em;
+  gap: 0.1em;
+  padding: 0.35em 0.55em;
   overflow-y: auto;
 }
 
@@ -139,9 +146,9 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 2.65em;
-  gap: 0.75em;
-  padding: 0.55em 0.7em;
+  min-height: 2.2em;
+  gap: 0.7em;
+  padding: 0.28em 0.7em;
   border-radius: 0.7em;
   color: var(--fg-secondary);
   text-align: left;
@@ -171,15 +178,6 @@
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sidebar-nav__active-mark {
-  width: 0.35em;
-  height: 0.35em;
-  margin-left: auto;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: currentColor;
 }
 
 /* 将拖拽热区放在边框两侧，既容易命中又不会改变菜单内容宽度。 */
@@ -231,13 +229,6 @@
 .sidebar-nav--collapsed .sidebar-nav__item {
   justify-content: center;
   padding-inline: 0.5em;
-}
-
-.sidebar-nav--collapsed .sidebar-nav__active-mark {
-  position: absolute;
-  top: 0.45em;
-  right: 0.4em;
-  margin: 0;
 }
 
 /* 折叠菜单的提示挂到 body，避免被侧边栏滚动容器裁剪；颜色沿用应用主题变量。 */
@@ -342,3 +333,43 @@
   }
 }
 
+
+/* ===== 侧边栏分组 =====
+   组标签沿用 header 标题的样式语言（弱化色 + 小字号 + 字距），但再小一档、
+   左内边距和 item 的 padding 一致 —— 这样"组标签 / 图标 / 标题"共用同一条左边缘。 */
+.sidebar-nav__group-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+.sidebar-nav__group-block + .sidebar-nav__group-block {
+  margin-top: 0.3em;
+}
+
+.sidebar-nav__group {
+  padding: 0.42em 0.7em 0.1em;
+  color: var(--fg-muted);
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+/* 第一个组标签不要顶出额外间距（列表自身已有 padding） */
+.sidebar-nav__group-block:first-child .sidebar-nav__group {
+  padding-top: 0.05em;
+}
+
+/* 折叠态没有文字：把组标签变成一根极淡的分组线 —— 靠留白分组，不靠文字 */
+.sidebar-nav--collapsed .sidebar-nav__group {
+  height: 1px;
+  margin: 0.5em 0.55em 0.45em;
+  padding: 0;
+  font-size: 0;
+  background: color-mix(in srgb, var(--fg-primary) 12%, transparent);
+}
+
+.sidebar-nav--collapsed .sidebar-nav__group-block:first-child .sidebar-nav__group {
+  display: none;
+}

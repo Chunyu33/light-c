@@ -87,7 +87,7 @@ html.glass:not(.dark) {
   /* AI 面板是**悬浮在内容之上**的，比顶栏/侧栏需要更多遮蔽、比吸顶操作栏可以更透。
      用 --glass-toolbar-bg（0.78）会白得像一块板子，用 --glass-chrome-bg（0.4）
      又太透 —— 所以单独给一档，配合 blur 才是"液态玻璃"该有的样子。 */
-  --glass-panel-bg: rgba(255, 255, 255, 0.62);
+  --glass-panel-bg: rgba(255, 255, 255, 0.78);
   --glass-panel-border: rgba(255, 255, 255, 0.72);
 }
 
@@ -127,7 +127,7 @@ html.dark.glass {
   --glass-surface-bg: rgba(255, 255, 255, 0.07);
   --glass-chrome-bg: rgba(255, 255, 255, 0.07);
   /* 深色浮层用实色深底（与 --glass-overlay-bg 同一思路），叠白会变成白板 */
-  --glass-panel-bg: rgba(38, 38, 38, 0.66);
+  --glass-panel-bg: rgba(30, 36, 34, 0.82);
   /* ⚠️ 深色下描边不能用 --glass-toolbar-border（rgba(255,255,255,0.18)）——
       深底上那圈白会在面板边缘形成明显的亮边，看着像一圈浅色阴影。
       取与 --glass-edge 同量级的值。 */
@@ -157,26 +157,32 @@ html.glass body::before {
      透过半透明卡片看到的就是"更白的白"。所以浅色要往上顶。
      白雾同时压到很低 —— 它原本 0.8 且落在视口中心，而内容区正好在中间，
      等于在最该有色雾的地方把它冲掉了（这是浅色发闷的真正原因）。 */
+  /* 浅绿极光：全部换成绿系，去掉原先的蓝（96% 4%）与紫（34% 98%）——
+     那两个色团是浅色模式下"发灰发紫"的来源，跟品牌绿放在一起也不协调（Evan 反馈）。
+     现在是同一个绿的不同浓淡：明亮绿、灰绿（sage）、青绿，靠位置拉开层次。
+     色团 alpha 保持 0.18–0.3：再深会脏，再浅就没有透明感。 */
   background:
-    radial-gradient(circle 34vw at 84% 78%, rgba(7, 193, 96, 0.34) 0%, rgba(7, 193, 96, 0) 70%),
-    radial-gradient(circle 30vw at 96% 4%, rgba(90, 140, 255, 0.42) 0%, rgba(90, 140, 255, 0) 70%),
-    radial-gradient(circle 30vw at 34% 98%, rgba(180, 120, 255, 0.3) 0%, rgba(180, 120, 255, 0) 72%),
+    radial-gradient(circle 34vw at 84% 78%, rgba(7, 193, 96, 0.26) 0%, rgba(7, 193, 96, 0) 70%),
+    radial-gradient(circle 30vw at 96% 4%, rgba(96, 196, 148, 0.34) 0%, rgba(96, 196, 148, 0) 70%),
+    radial-gradient(circle 32vw at 30% 98%, rgba(140, 200, 160, 0.3) 0%, rgba(140, 200, 160, 0) 72%),
     /* 绿色雾从左上角(4% 2%)挪到内容区(30% 0%)并压低 alpha：
        原来整块压在侧边栏背后，导致侧边栏面板顶部浓绿、底部近白，
        纵向色差高达 50+，看起来像上下两块拼在一起。 */
-    radial-gradient(circle 34vw at 30% 0%, rgba(7, 193, 96, 0.28) 0%, rgba(7, 193, 96, 0) 70%),
+    radial-gradient(circle 34vw at 30% 0%, rgba(7, 193, 96, 0.24) 0%, rgba(7, 193, 96, 0) 70%),
     radial-gradient(circle 46vw at 52% 46%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 62%),
-    linear-gradient(168deg, #eaf4f0 0%, #e3edfa 100%);
+    linear-gradient(168deg, #eef7f1 0%, #e5f1e9 100%);
 }
 
+/* 深色同样是纯绿系：原来右下角的紫（22% 96%）和右上角的蓝（96% 2%）都换成青绿，
+   底色也从偏蓝的深海色改成偏绿的墨色，和浅色模式保持同一套语言。 */
 html.dark.glass body::before {
   background:
     radial-gradient(circle 30vw at 98% 92%, rgba(45, 212, 124, 0.18) 0%, rgba(45, 212, 124, 0) 70%),
     radial-gradient(circle 46vw at 44% 40%, rgba(180, 255, 220, 0.22) 0%, rgba(180, 255, 220, 0) 62%),
-    radial-gradient(circle 32vw at 22% 96%, rgba(178, 92, 255, 0.2) 0%, rgba(178, 92, 255, 0) 70%),
-    radial-gradient(circle 40vw at 96% 2%, rgba(74, 120, 255, 0.28) 0%, rgba(74, 120, 255, 0) 68%),
-    radial-gradient(circle 36vw at 6% 4%, rgba(7, 193, 96, 0.3) 0%, rgba(7, 193, 96, 0) 68%),
-    linear-gradient(168deg, #06090f 0%, #0c1526 100%);
+    radial-gradient(circle 32vw at 22% 96%, rgba(64, 190, 160, 0.16) 0%, rgba(64, 190, 160, 0) 70%),
+    radial-gradient(circle 40vw at 96% 2%, rgba(60, 200, 150, 0.22) 0%, rgba(60, 200, 150, 0) 68%),
+    radial-gradient(circle 36vw at 6% 4%, rgba(7, 193, 96, 0.28) 0%, rgba(7, 193, 96, 0) 68%),
+    linear-gradient(168deg, #060b09 0%, #0a1712 100%);
 }
 
 /* 点阵材质单独一层：多背景里 mask 会作用到整层，没法只遮点阵 */
@@ -424,10 +430,6 @@ html.glass .sidebar-nav__item--active .sidebar-nav__item-icon {
   color: var(--brand-green);
 }
 
-html.glass .sidebar-nav__item--active .sidebar-nav__active-mark {
-  background: var(--brand-green);
-}
-
 /* 设置弹窗左侧导航的图标同理：正文转深色后，图标用品牌绿做点缀
    （那里的图标是 lucide 的 svg，直接给 color 即可 —— 它是 stroke=currentColor） */
 html.glass .settings-tab--active svg {
@@ -453,17 +455,18 @@ html.glass .driver-toolbar {
 }
 
 /* AI 对话面板：它是浮在模块内容之上的浮层，必须真的挡得住内容 ——
-   所以沿用操作栏那套「高不透明 + 强模糊 + 白边 + 顶部内高光 + 浮起柔投影」，
+   所以沿用操作栏那套「高不透明 + 白边 + 顶部内高光 + 浮起柔投影」，
    而不是用普通卡片表面（玻璃态下只有 0.45 不透明，正文会透上来）。
-   刻意不叠加 glass-item 钩子：自带全套配方，避免两条规则抢同一个属性。 */
+
+   ⚠️ **刻意不加 backdrop-filter**（这里原来有 20px 模糊）：
+   面板背后就是带 backdrop-filter 的模块卡 —— 两个 backdrop-filter 叠在一起时，
+   WebView2 的合成会出错，把模块卡的像素画到面板上，表现为面板上出现一块"幽灵残影"。
+   面板本身已经 0.62/0.66 不透明，去掉模糊几乎看不出差别；模块卡那层磨砂才是有观感的。 */
 html.glass .ai-panel {
   background-color: var(--glass-panel-bg, var(--bg-elevated));
   border-color: var(--glass-panel-border, var(--border-color));
   /* 玻璃三味：白边（上面那条 border-color）+ 内高光 + 浮起柔投影。少一味都会显得像半成品。 */
   box-shadow: var(--glass-shadow), var(--glass-inner);
-  /* 前缀写在标准属性前面（原因见 .driver-toolbar 的注释） */
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
 }
 
 /* ===== 侧边栏：液态玻璃下做成浮起的圆角面板 =====
@@ -529,9 +532,11 @@ html.glass .sidebar-nav--collapsed::before {
   border-radius: 0.9em;
 }
 
-/* 面板自己就是一块玻璃，header 底下的那条分割线在玻璃里去掉了 */
+/* header 底下的分隔线：**留一条极淡的**。
+   去掉之后标题就是一段悬空的粗体字（Evan 说的"纯文字"），
+   和下面的列表没有依托关系。用文字色 8% 的混色，深浅主题都成立，也不像边框。 */
 html.glass .sidebar-nav__header {
-  border-bottom-color: transparent;
+  border-bottom-color: color-mix(in srgb, var(--fg-primary) 8%, transparent);
 }
 
 /* ===== 液态玻璃下的全局滚动条 =====
@@ -600,3 +605,25 @@ html.glass .settings-content .glass-block {
 html.glass .settings-content :is(button, input, select, textarea) {
   border-color: var(--glass-item-border);
 }
+
+
+
+/* ===== 模块舞台的图层隔离 + 面板层提升（修"幽灵残影"）=====
+   现象：AI 助手面板浮在模块上时，模块的头部/左侧栏会以**半透明残影**叠到面板上；
+   hover 时高频出现，只有玻璃主题、且模块里是大面积浅色卡片时才看得出来。
+
+   机制（两次都没修对之后重新判断）：这是**合成层穿插**，不是配色问题 ——
+   模块里有 transform / backdrop-filter 的元素各自成了合成层，和上层面板在合成阶段串了。
+   所以这次不再调颜色，改从图层下手：
+   ① 模块舞台 `isolation: isolate` —— 只建堆叠上下文、**不裁剪**
+      （不用 contain: paint：那会把溢出模块的提示气泡切掉）；
+   ② 面板 `translateZ(0)` —— 强制它成为独立合成层，稳定压在模块之上。
+   ⚠️ 面板的磨砂去掉了：它没解决问题，反而让面板的采样跟着模块重绘走（更容易闪）。 */
+html.glass .module-stage {
+  isolation: isolate;
+}
+
+html.glass .ai-panel {
+  transform: translateZ(0);
+}
+

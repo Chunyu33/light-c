@@ -3,7 +3,6 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { FONT_SIZE_CONFIGS, useFontSize, useSettings } from '../contexts';
@@ -14,6 +13,49 @@ const SIDEBAR_WIDTH_STORAGE_KEY = 'c-cleanup-sidebar-width';
 const SIDEBAR_WIDTH_DEFAULT = 220;
 const SIDEBAR_WIDTH_MIN = 180;
 const SIDEBAR_WIDTH_MAX = 360;
+
+/**
+ * 侧边栏分组。
+ *
+ * 分组的轴是**"动哪里"**，不是"清理的粒度"（后者是硬凑的：12 个里 8 个都叫清理，
+ * 按粒度切怎么切都不准 —— Evan 指出来过）。
+ *   清理：删的是**文件**（缓存、大文件、聊天记录、卸载残留的文件）
+ *   系统：动的是**系统配置**（系统组件、驱动仓库、注册表、右键菜单、外壳图标）
+ *   分析：**只读**，不改任何东西（占用分布、变化量、模型空间）
+ * 三层轴互不重叠，用户看一眼就知道这一组会不会动我的系统设置。
+ */
+const SIDEBAR_GROUPS: { id: string; ids: AppModuleId[] }[] = [
+  { id: 'cleanup', ids: ['junk-clean', 'big-files', 'social-clean', 'leftovers'] },
+  { id: 'system', ids: ['system-slim', 'driver-cleanup', 'registry', 'context-menu', 'shell-icons'] },
+  { id: 'analyze', ids: ['hotspot', 'disk-growth', 'ai-models'] },
+];
+
+/** 模块 id → 元信息，供分组渲染时按 id 取图标与文案 */
+const MODULE_META_BY_ID = new Map(APP_MODULE_META.map((meta) => [meta.id, meta]));
+
+/**
+ * 自绘的折叠图标：圆角外框 + 一条圆头竖线。
+ *
+ * 为什么不用图标库的 PanelLeft：那个外框圆角太小、线条偏硬，和侧边栏的
+ * 大圆角面板/胶囊选中态不是一套语言（Evan 明确说"一看就是默认图标库的"）。
+ * 这里把圆角放大到 4.5/16、线宽降到 1.5，并让竖线在折叠后翻到右侧，
+ * 让图标本身就能表达当前状态。
+ */
+function SidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <rect x="1" y="1" width="18" height="14" rx="4.5" />
+      <path d={collapsed ? 'M12.5 2v12' : 'M8 2v12'} />
+    </svg>
+  );
+}
 
 function readCollapsedState(): boolean {
   try {
@@ -152,30 +194,39 @@ export function SidebarNav() {
           aria-label={toggleLabel}
           aria-expanded={!isCollapsed}
         >
-          {isCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          <SidebarToggleIcon collapsed={isCollapsed} />
         </button>
       </div>
 
       <nav className="sidebar-nav__list">
-        {APP_MODULE_META.map(({ id, label, icon: Icon }) => {
-          const isActive = settings.activeModuleId === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => handleNavigate(id)}
-              className={`sidebar-nav__item${isActive ? ' sidebar-nav__item--active' : ''}`}
-              aria-current={isActive ? 'page' : undefined}
-              aria-label={t(label)}
-              onMouseEnter={(event) => handleItemMouseEnter(event, t(label))}
-              onMouseLeave={() => setTooltip(null)}
-            >
-              <Icon className="sidebar-nav__item-icon" />
-              {!isCollapsed && <span className="sidebar-nav__item-label">{t(label)}</span>}
-              {isActive && <span className="sidebar-nav__active-mark" aria-hidden="true" />}
-            </button>
-          );
-        })}
+        {SIDEBAR_GROUPS.map((group) => (
+          <div key={group.id} className="sidebar-nav__group-block">
+            {/* 折叠态没有文字，这一条会变成一根极淡的分组线（见 layout.css） */}
+            <span className="sidebar-nav__group">{t(`groups.${group.id}`)}</span>
+            {group.ids.map((moduleId) => {
+              const meta = MODULE_META_BY_ID.get(moduleId);
+              // 元信息缺项时跳过这一项，不让整个侧边栏崩掉
+              if (!meta) return null;
+              const { id, label, icon: Icon } = meta;
+              const isActive = settings.activeModuleId === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleNavigate(id)}
+                  className={`sidebar-nav__item${isActive ? ' sidebar-nav__item--active' : ''}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-label={t(label)}
+                  onMouseEnter={(event) => handleItemMouseEnter(event, t(label))}
+                  onMouseLeave={() => setTooltip(null)}
+                >
+                  <Icon className="sidebar-nav__item-icon" />
+                  {!isCollapsed && <span className="sidebar-nav__item-label">{t(label)}</span>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
       {!isCollapsed && (
         <div

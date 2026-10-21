@@ -24,6 +24,11 @@
   "aiModels": "AI 模型空间",
   "aiModelsDesc": "快速分析本机 AI 模型占用",
   "sidebarLabel": "功能菜单",
+  "groups": {
+    "cleanup": "清理",
+    "system": "系统",
+    "analyze": "分析"
+  },
   "sidebarCollapse": "收起侧边栏",
   "sidebarExpand": "展开侧边栏",
   "sidebarResize": "调整侧边栏宽度"

@@ -143,7 +143,7 @@ function DashboardContent() {
         {isSidebarLayout && <SidebarNav />}
         <div className="h-full min-h-0 min-w-0 flex flex-1 flex-col">
           <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-            <div className={`${isSinglePageLayout ? 'min-h-full box-border' : 'space-y-5'} relative p-6 dashboard-container`}>
+            <div className={`${isSinglePageLayout ? 'min-h-full box-border' : 'space-y-5'} relative p-6 dashboard-container module-stage`}>
               {APP_MODULES.map((moduleConfig) => {
                 const ModuleComponent = moduleConfig.component;
                 const isActivePage = visibleModuleId === moduleConfig.id;

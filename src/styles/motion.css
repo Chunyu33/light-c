@@ -183,11 +183,14 @@
   }
 }
 
-/* 两个等价 class 交替使用，让同一个模块实例在不卸载的情况下也能稳定重播动画。 */
+/* 两个等价 class 交替使用，让同一个模块实例在不卸载的情况下也能稳定重播动画。
+   ⚠️ **不要在这里常驻 `will-change`**：动画只有 220ms，常驻会让整个模块容器
+   永久保留一个合成层 —— 浮在它上面的 AI 面板会被这层的旧像素"串"到，
+   表现为 hover 时出现一块半透明的模块残影（Evan 反复反馈过，且只在模块卡片大面积浅色时可见）。
+   动画运行期间浏览器会自行提升，结束后让它回到普通绘制即可。 */
 .page-content-enter-even,
 .page-content-enter-odd {
   animation: page-content-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity, transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
