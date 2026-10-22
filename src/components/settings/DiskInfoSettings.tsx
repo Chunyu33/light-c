@@ -221,7 +221,7 @@ export function DiskInfoSettings() {
       )}
 
       {!isLoading && !error && disks === null && (
-        <div className="rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-4 py-12 text-center">
+        <div className="empty-state-inline rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-4 py-12 text-center">
           <HardDrive className="mx-auto h-8 w-8 text-[var(--brand-green)]" />
           <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{t('diskInfo.notRead')}</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">{t('diskInfo.notReadDesc')}</p>
@@ -229,7 +229,7 @@ export function DiskInfoSettings() {
       )}
 
       {!isLoading && !error && disks !== null && disks.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-4 py-12 text-center">
+        <div className="empty-state-inline rounded-2xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)] px-4 py-12 text-center">
           <HardDrive className="mx-auto h-8 w-8 text-[var(--brand-green)]" />
           <p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{t('diskInfo.none')}</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">{t('diskInfo.noneDesc')}</p>

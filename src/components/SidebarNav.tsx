@@ -3,13 +3,13 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Github, Globe } from 'lucide-react';
+import { Github, Globe, ScrollText, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getVersion } from '@tauri-apps/api/app';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { FONT_SIZE_CONFIGS, useFontSize, useSettings } from '../contexts';
 import { getDistributionChannel, type DistributionChannel } from '../api/commands';
-import { LIGHTC_GITHUB_URL, LIGHTC_OFFICIAL_WEBSITE_URL } from '../config/officialLinks';
+import { AUTHOR_HOMEPAGE_URL, LIGHTC_CHANGELOG_URL, LIGHTC_GITHUB_URL, LIGHTC_OFFICIAL_WEBSITE_URL } from '../config/officialLinks';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'c-cleanup-sidebar-collapsed';
 const SIDEBAR_WIDTH_STORAGE_KEY = 'c-cleanup-sidebar-width';
@@ -272,6 +272,18 @@ export function SidebarNav() {
         </a>
         {!isCollapsed && (
           <a
+            href={LIGHTC_CHANGELOG_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sidebar-nav__footer-icon"
+            aria-label={t('footerChangelog')}
+            title={t('footerChangelog')}
+          >
+            <ScrollText size={15} strokeWidth={1.7} />
+          </a>
+        )}
+        {!isCollapsed && (
+          <a
             href={LIGHTC_GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
@@ -280,6 +292,18 @@ export function SidebarNav() {
             title="GitHub"
           >
             <Github size={15} strokeWidth={1.7} />
+          </a>
+        )}
+        {!isCollapsed && (
+          <a
+            href={AUTHOR_HOMEPAGE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sidebar-nav__footer-icon"
+            aria-label={t('footerAuthor')}
+            title={t('footerAuthor')}
+          >
+            <UserRound size={15} strokeWidth={1.7} />
           </a>
         )}
         {!isCollapsed && appVersion ? (

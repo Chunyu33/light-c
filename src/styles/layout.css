@@ -383,9 +383,12 @@
    上一版是通栏 border-top，横穿底部圆角，看着像塞错的边框。 */
 .sidebar-nav__footer {
   display: flex;
+  /* 四个图标 + 版本号在 180px 的窄栏里放不下：允许换行，版本号落到第二行，
+     总比溢出面板或者把图标挤变形好。 */
+  flex-wrap: wrap;
   align-items: center;
   flex: 0 0 auto;
-  gap: 0.55em;
+  gap: 0.4em;
   margin: 0.5em 0.7em;
   padding-top: 0.55em;
   border-top: 1px solid var(--border-color);

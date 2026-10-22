@@ -32,5 +32,7 @@
   "sidebarCollapse": "Collapse sidebar",
   "sidebarExpand": "Expand sidebar",
   "sidebarResize": "Resize sidebar",
-  "footerWebsite": "Website"
+  "footerWebsite": "Website",
+  "footerChangelog": "Changelog",
+  "footerAuthor": "Author"
 }

@@ -32,5 +32,7 @@
   "sidebarCollapse": "收起側邊欄",
   "sidebarExpand": "展開側邊欄",
   "sidebarResize": "調整側邊欄寬度",
-  "footerWebsite": "官網"
+  "footerWebsite": "官網",
+  "footerChangelog": "更新日誌",
+  "footerAuthor": "作者主頁"
 }

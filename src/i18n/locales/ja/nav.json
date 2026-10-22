@@ -32,5 +32,7 @@
   "sidebarCollapse": "サイドバーを折りたたむ",
   "sidebarExpand": "サイドバーを展開",
   "sidebarResize": "サイドバーの幅を変更",
-  "footerWebsite": "サイト"
+  "footerWebsite": "サイト",
+  "footerChangelog": "更新履歴",
+  "footerAuthor": "作者"
 }

@@ -87,7 +87,7 @@ html.glass:not(.dark) {
   /* AI 面板是**悬浮在内容之上**的，比顶栏/侧栏需要更多遮蔽、比吸顶操作栏可以更透。
      用 --glass-toolbar-bg（0.78）会白得像一块板子，用 --glass-chrome-bg（0.4）
      又太透 —— 所以单独给一档，配合 blur 才是"液态玻璃"该有的样子。 */
-  --glass-panel-bg: rgba(255, 255, 255, 0.78);
+  --glass-panel-bg: rgba(255, 255, 255, 0.88);
   --glass-panel-border: rgba(255, 255, 255, 0.72);
 }
 
@@ -127,7 +127,7 @@ html.dark.glass {
   --glass-surface-bg: rgba(255, 255, 255, 0.07);
   --glass-chrome-bg: rgba(255, 255, 255, 0.07);
   /* 深色浮层用实色深底（与 --glass-overlay-bg 同一思路），叠白会变成白板 */
-  --glass-panel-bg: rgba(30, 36, 34, 0.82);
+  --glass-panel-bg: rgba(30, 36, 34, 0.9);
   /* ⚠️ 深色下描边不能用 --glass-toolbar-border（rgba(255,255,255,0.18)）——
       深底上那圈白会在面板边缘形成明显的亮边，看着像一圈浅色阴影。
       取与 --glass-edge 同量级的值。 */
@@ -465,8 +465,16 @@ html.glass .driver-toolbar {
 html.glass .ai-panel {
   background-color: var(--glass-panel-bg, var(--bg-elevated));
   border-color: var(--glass-panel-border, var(--border-color));
-  /* 玻璃三味：白边（上面那条 border-color）+ 内高光 + 浮起柔投影。少一味都会显得像半成品。 */
-  box-shadow: var(--glass-shadow), var(--glass-inner);
+  /* ⚠️ 这里单独用一套投影，不沿用 --glass-shadow。
+     --glass-shadow 是 30px 的大柔影，压在浅绿背景上等于没有边界 —— 面板会读成
+     "一块更浅的区域"而不是"浮在上面的窗口"。改成两层：
+       ① 1px 贴地影（把面板和背景切开）
+       ② 大范围低透明度柔影（表达高度）
+     再配合 border-color 的一圈实边，边界才立得住。 */
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 16px 40px -12px rgba(15, 23, 42, 0.22),
+    var(--glass-inner);
 }
 
 /* ===== 侧边栏：液态玻璃下做成浮起的圆角面板 =====
@@ -667,4 +675,25 @@ html.glass .sidebar-nav__list::-webkit-scrollbar-thumb {
 
 html.glass .sidebar-nav__list::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--fg-primary) 26%, transparent);
+}
+
+/* ===== 空状态（液态玻璃）=====
+   默认态是「虚线边框 + 绿色渐变底 + 装饰光斑」—— 那是"占位区/拖放区"的语言，
+   放进实心玻璃卡片里就像贴上去的一个框，和周围的材质不是一套（Evan 反馈）。
+   玻璃下改成一块**内凹的浅槽**：不要边框、去掉渐变，只靠内阴影和极淡底色区分层级。
+   ⚠️ 只覆盖 border-color 不动 border-style/width，避免盒模型尺寸变化导致布局跳动。 */
+html.glass .empty-state,
+html.glass .empty-state-inline {
+  border-color: transparent;
+  background-image: none;
+  /* 用**比卡片略深**的一点点底（不是白）—— 白叠白等于没有，
+     要的是"凹进去一点"的感觉，所以取 2.5% 的前景色。 */
+  background-color: rgba(15, 23, 42, 0.025);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html.dark.glass .empty-state,
+html.dark.glass .empty-state-inline {
+  background-color: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }

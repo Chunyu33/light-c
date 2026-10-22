@@ -18,6 +18,12 @@ export const LIGHTC_OFFICIAL_WEBSITE_URL = 'https://lightc.app/';
 /** 项目仓库主页。侧边栏底部与关于页共用，避免两处各写一份地址。 */
 export const LIGHTC_GITHUB_URL = 'https://github.com/Chunyu33/light-c';
 
+/** 英文更新日志（仓库里的 CHANGELOG.md）。侧边栏底部的文档入口用它。 */
+export const LIGHTC_CHANGELOG_URL = 'https://github.com/Chunyu33/light-c/blob/main/CHANGELOG.md';
+
+/** 作者个人主页。 */
+export const AUTHOR_HOMEPAGE_URL = 'https://www.evan666.cc/';
+
 /** 作者维护的项目下载入口，后续新增项目只需在这里补充。 */
 export const OFFICIAL_PROJECT_LINKS: Record<string, OfficialProjectLinks> = {
   lightc: {
