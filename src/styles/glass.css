@@ -499,7 +499,10 @@ html.glass .sidebar-nav {
   /* 高度跟着内容走，不撑满整列 —— 撑满会变成"一块背景板"，不像浮起的卡片。
      align-self 覆盖 flex 默认的 stretch；菜单很长时由 max-height 兜住，
      列表自身的 overflow-y: auto 负责滚动，不会溢出。 */
+  /* 高度：始终占满主内容区。面板自身在底部有 1.5em 内缩，视觉上就是"留一条缝、不顶满"；
+     内容少也不会塌成一小条，窗口拉伸时百分比跟着变。 */
   align-self: flex-start;
+  height: 100%;
   max-height: 100%;
 }
 
@@ -637,4 +640,31 @@ html.glass .settings-content a.glass-block:hover {
     0 0 0 1px var(--glass-edge),
     var(--glass-shadow),
     var(--glass-inner);
+}
+
+/* ===== 侧边栏列表的滚动条：比全局更细、更淡 =====
+   ⚠️ Chromium 121+ 里，只要 `scrollbar-width` **或** `scrollbar-color` 有一个不是
+   `auto`，`::-webkit-scrollbar` 系列就**整组失效**，退回系统滚动条。
+   全局那条 `html.glass *` 两个属性都设了（thin + 颜色），所以这里**两条都必须重置**
+   —— 只重置 width 的话，拿到的是系统**带箭头按钮的粗滚动条**，比原来更难看。 */
+html.glass .sidebar-nav__list {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+
+html.glass .sidebar-nav__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+html.glass .sidebar-nav__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.glass .sidebar-nav__list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--fg-primary) 14%, transparent);
+}
+
+html.glass .sidebar-nav__list::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--fg-primary) 26%, transparent);
 }

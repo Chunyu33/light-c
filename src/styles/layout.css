@@ -1,13 +1,15 @@
 /* ============================================================================
-   内容区宽度容器（4K / 大屏适配）
-   顶部统计栏、主内容列、底部区域共用同一宽度规则：
-   - 小窗口：占满可用宽度，与旧版行为一致
-   - 大窗口：随窗口放大，但封顶 1600px，避免单列内容在 4K 下无限拉伸
+   内容区宽度容器
+   顶部统计栏、主内容列、底部区域共用同一宽度规则：**跟着窗口走，左对齐，不封顶**。
+
+   ⚠️ 原来这里是 `max-width: min(96vw, 1600px)` + `margin-inline: auto` —— 全屏 1920 时
+   内容停在 1600 并被居中，左右各空一大块：顶栏的 C 盘进度条也跟着缩在中间，
+   看起来像整页没铺开（Evan 在 1920 全屏下反馈）。
+   现在顶栏和内容一起铺满，C 盘那条 `flex-1` 的进度条才能真正吃到剩余宽度。
    ============================================================================ */
 .dashboard-container {
   width: 100%;
-  max-width: min(96vw, 1600px);
-  margin-inline: auto;
+  margin-inline: 0;
 }
 
 /* 页面模式的空状态填充可用高度，避免窗口变高后模块卡片提前结束。 */
@@ -373,3 +375,48 @@
 .sidebar-nav--collapsed .sidebar-nav__group-block:first-child .sidebar-nav__group {
   display: none;
 }
+
+/* ===== 侧边栏底部：一行「官网 + 版本」 =====
+   排版照抄菜单项（同左边缘、同图标-文字间距），让它成为菜单的收尾，
+   而不是两块散落在角落的元信息。
+   ⚠️ 分隔线**内缩**（用 margin-inline 收进来），不碰面板的圆角 ——
+   上一版是通栏 border-top，横穿底部圆角，看着像塞错的边框。 */
+.sidebar-nav__footer {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 0.55em;
+  margin: 0.5em 0.7em;
+  padding-top: 0.55em;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 图标入口：只有 15px 的图标，用 1.6em 的命中区保证好点；hover 变品牌绿 */
+.sidebar-nav__footer-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  color: var(--fg-muted);
+  transition: color 150ms ease;
+}
+
+.sidebar-nav__footer-icon:hover {
+  color: var(--brand-green);
+}
+
+.sidebar-nav__footer-version {
+  margin-left: auto;
+  color: var(--fg-muted);
+  font-size: 0.72em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 折叠态：只剩地球图标，居中 */
+.sidebar-nav--collapsed .sidebar-nav__footer {
+  justify-content: center;
+  margin-inline: 0.35em;
+}
+
+

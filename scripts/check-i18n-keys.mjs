@@ -55,7 +55,8 @@ for (const file of walk(path.join(root, 'src'))) {
 
   for (const match of text.matchAll(/\b(?:t|moduleT|commonT)\(\s*['"`]([A-Za-z][\w.]*)['"`]/g)) {
     const key = match[1];
-    if (!key.includes('.')) continue;
+    // ⚠️ 不要跳过"没有点"的键：根级键（如 footerWebsite）同样会找不到而原样显示。
+    //    之前跳过它们，结果一个被误放进 groups 里的键顺利通过检查（2026-10-22 踩过）。
     // 键在这个文件用到的**所有**命名空间里都缺失，才算问题
     const missingEverywhere = namespaces.every((ns) =>
       langs.some((lang) => !nsKeys[ns]?.[lang]?.has(key)),

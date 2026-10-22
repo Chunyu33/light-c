@@ -117,9 +117,10 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
     >
       {/* 左侧：应用图标和标题 - 使用主文字色 */}
       <div className="flex items-center gap-2 px-3 h-full flex-1">
-        <div className="w-6 h-6 rounded-lg bg-[var(--brand-green)] flex items-center justify-center">
-          <span className="text-xs font-bold text-white">C:</span>
-        </div>
+        {/* 用项目真实 logo。之前是「绿底 + C: 文字 + rounded-lg」拼出来的近似品，
+            圆角 33%（8/24）和 logo 自身的 18.75%（rx 96/512）对不上，看起来比真 logo 圆。
+            logo 自带底色和圆角，这里只控制尺寸。 */}
+        <img src="/logo.svg" alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-contain" />
         <span className="text-sm font-semibold text-[var(--text-primary)]">LightC</span>
       </div>
 

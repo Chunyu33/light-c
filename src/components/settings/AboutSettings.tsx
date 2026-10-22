@@ -45,9 +45,10 @@ export function AboutSettings() {
         </h4>
         <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--brand-green)] flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">C:</span>
-            </div>
+            {/* 和标题栏、欢迎弹窗统一用项目 logo：之前这里是绿底 + C: 文字，
+                rounded-2xl 的圆角（16/64 = 25%）比 logo 自身的 18.75% 更圆。
+                logo 自带底色与圆角，容器只控制尺寸。 */}
+            <img src="/logo.svg" alt="" aria-hidden="true" className="h-16 w-16 shrink-0 object-contain" />
             <div>
               <h3 className="text-lg font-semibold text-[var(--text-primary)]">LightC</h3>
               <p className="text-sm text-[var(--text-muted)]">{t('about.appDescription')}</p>
@@ -194,7 +195,16 @@ export function AboutSettings() {
         <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">{t('about.author')}</span>
-            <span className="text-sm font-medium text-[var(--text-primary)]">Evan Lau</span>
+            {/* 作者个人主页，样式和下面的 GitHub / Source Available 保持一致 */}
+            <a
+              href="https://www.evan666.cc/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-[var(--brand-green)] hover:opacity-80 flex items-center gap-1"
+            >
+              Evan Lau
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
           {/* <div className="flex items-center justify-between">
             <span className="text-sm text-[var(--text-secondary)]">{t('about.source')}</span>

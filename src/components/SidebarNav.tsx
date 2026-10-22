@@ -3,9 +3,13 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { Github, Globe } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getVersion } from '@tauri-apps/api/app';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { FONT_SIZE_CONFIGS, useFontSize, useSettings } from '../contexts';
+import { getDistributionChannel, type DistributionChannel } from '../api/commands';
+import { LIGHTC_GITHUB_URL, LIGHTC_OFFICIAL_WEBSITE_URL } from '../config/officialLinks';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'c-cleanup-sidebar-collapsed';
 const SIDEBAR_WIDTH_STORAGE_KEY = 'c-cleanup-sidebar-width';
@@ -100,6 +104,8 @@ function writeSidebarWidth(width: number): void {
 
 export function SidebarNav() {
   const { t } = useTranslation('nav');
+  // 版本/渠道的文案在 settings 命名空间里（关于页已经在用），这里直接复用，不复制一份
+  const { t: settingsT } = useTranslation('settings');
   const { level, customFontSize } = useFontSize();
   const { settings, updateSettings } = useSettings();
   const [isCollapsed, setIsCollapsed] = useState(readCollapsedState);
@@ -124,6 +130,25 @@ export function SidebarNav() {
   useEffect(() => {
     if (!isCollapsed) setTooltip(null);
   }, [isCollapsed]);
+
+  /**
+   * 底部的版本信息。
+   *
+   * 只放**确定的事实**：程序版本、发行渠道（便携/安装）。这两项来自应用自身与安装登记，
+   * 不存在"统计口径"问题 —— 之前那个"累计释放"是从清理日志汇总的，
+   * 日志会被轮转，数字并不等于真实累计，所以撤掉了。
+   */
+  const [appVersion, setAppVersion] = useState('');
+  const [channel, setChannel] = useState<DistributionChannel | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersion)
+      .catch((error) => console.warn('读取版本号失败:', error));
+    getDistributionChannel()
+      .then(setChannel)
+      .catch((error) => console.warn('读取发行渠道失败:', error));
+  }, []);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -228,6 +253,45 @@ export function SidebarNav() {
           </div>
         ))}
       </nav>
+
+      {/* 底部：一行「官网 + 版本」，排版照抄菜单项（同左边缘、同图标间距），
+          让它读起来是菜单的收尾，而不是两块散落的元信息。
+          版本号右对齐用表格数字；渠道（便携/安装）放进 title，不占版面。 */}
+      <div className="sidebar-nav__footer">
+        {/* 折叠态只剩官网一个图标（4.25em 宽放不下两个，而且此时用户是在"图标模式"，
+            多一个入口反而更难认）。文案一律走 title/aria-label。 */}
+        <a
+          href={LIGHTC_OFFICIAL_WEBSITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="sidebar-nav__footer-icon"
+          aria-label={t('footerWebsite')}
+          title={t('footerWebsite')}
+        >
+          <Globe size={15} strokeWidth={1.7} />
+        </a>
+        {!isCollapsed && (
+          <a
+            href={LIGHTC_GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sidebar-nav__footer-icon"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <Github size={15} strokeWidth={1.7} />
+          </a>
+        )}
+        {!isCollapsed && appVersion ? (
+          <span
+            className="sidebar-nav__footer-version"
+            title={channel ? settingsT(channel === 'portable' ? 'about.portable' : 'about.installer') : undefined}
+          >
+            v{appVersion}
+          </span>
+        ) : null}
+      </div>
+
       {!isCollapsed && (
         <div
           className="sidebar-nav__resize-handle"

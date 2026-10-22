@@ -31,5 +31,6 @@
   },
   "sidebarCollapse": "Collapse sidebar",
   "sidebarExpand": "Expand sidebar",
-  "sidebarResize": "Resize sidebar"
+  "sidebarResize": "Resize sidebar",
+  "footerWebsite": "Website"
 }

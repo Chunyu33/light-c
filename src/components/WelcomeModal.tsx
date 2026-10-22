@@ -74,9 +74,14 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
         <div className="p-[1.43em]">
           {/* 标题区：图标与标题同行，右侧固定关闭入口 */}
           <div className="flex items-start gap-[0.86em]">
-            <div className="flex h-[3.14em] w-[3.14em] shrink-0 items-center justify-center rounded-[0.86em] bg-[var(--brand-green-10)]">
-              <span className="text-[1.14em] font-bold text-[var(--brand-green)]">C:</span>
-            </div>
+            {/* 用项目自己的 logo（和启动屏同一个资源），不再拿字母占位当图标。
+                logo 本身带绿色渐变底和圆角，所以这里只控制尺寸，不加底色和圆角。 */}
+            <img
+              src="/logo.svg"
+              alt=""
+              aria-hidden="true"
+              className="h-[3.14em] w-[3.14em] shrink-0 object-contain"
+            />
             <div className="min-w-0 flex-1 pt-[0.14em]">
               <h2 className="text-[1.14em] font-semibold text-[var(--text-primary)]">
                 {t('welcomeTitle')}
