@@ -100,7 +100,10 @@ if (Test-Path $PrivateKeyPath) {
 }
 
 Push-Location $ProjectRoot
-& cmd /c "npm run tauri build"
+# 注意：npm 会把 "npm notice ..." 写到 stderr，而脚本开头是 $ErrorActionPreference = "Stop"。
+# 不合并输出的话，PowerShell 会把它当成 NativeCommandError 抛异常，
+# 脚本会在构建已经成功、exit code 还是 0 的情况下直接中止（后面的打包/签名/校验全不执行）。
+& cmd /c "npm run tauri build 2>&1"
 $buildExit = $LASTEXITCODE
 Pop-Location
 
