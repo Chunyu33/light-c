@@ -885,7 +885,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                       <h4 className="text-sm font-semibold text-[var(--fg-primary)]">
                         {scanMode === 'deep' ? t('scanning.deepTitle') : t('scanning.quickTitle')}
                       </h4>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-card)] text-[var(--brand-green)]">
+                      <span className="px-1.5 py-0.5 rounded text-[0.71rem] font-medium bg-[var(--bg-card)] text-[var(--brand-green)]">
                         {scanMode === 'deep' ? t('scanning.deepBadge') : t('scanning.quickBadge')}
                       </span>
                     </div>
@@ -900,7 +900,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
                   <p className="text-sm font-semibold text-[var(--brand-green)] tabular-nums">
                     {formatScanDuration(scanProgress?.elapsed_ms ?? 0)}
                   </p>
-                  <p className="text-[10px] text-[var(--fg-muted)]">{t('scanning.elapsed')}</p>
+                  <p className="text-[0.71rem] text-[var(--fg-muted)]">{t('scanning.elapsed')}</p>
                 </div>
               </div>
 
@@ -912,21 +912,21 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />{t('scanning.partition')}</div>
+                  <div className="flex items-center gap-1.5 text-[0.79rem] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />{t('scanning.partition')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{scanProgress?.drive_letter || t('scanning.preparing')}</p>
                 </div>
                 <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><Database className="w-3.5 h-3.5" />{t('scanning.processedRecords')}</div>
+                  <div className="flex items-center gap-1.5 text-[0.79rem] text-[var(--fg-muted)]"><Database className="w-3.5 h-3.5" />{t('scanning.processedRecords')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.processed ?? 0).toLocaleString()}</p>
                 </div>
                 <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />{t('scanning.candidateFiles')}</div>
+                  <div className="flex items-center gap-1.5 text-[0.79rem] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />{t('scanning.candidateFiles')}</div>
                   <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.matched_count ?? 0).toLocaleString()}</p>
                 </div>
               </div>
 
               {scanMode === 'deep' && (
-                <div className="flex items-center gap-2 text-[11px] text-[var(--fg-muted)] border-t border-[var(--brand-green-20)] pt-3">
+                <div className="flex items-center gap-2 text-[0.79rem] text-[var(--fg-muted)] border-t border-[var(--brand-green-20)] pt-3">
                   <ShieldCheck className="w-3.5 h-3.5 text-[var(--brand-green)] shrink-0" />
                   <span>{t('scanning.safetyNote')}</span>
                 </div>
@@ -935,7 +935,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           )}
 
           {!isDeleting && deepScanResult && deepScanResult.drives.length > 0 && (
-            <div className="flex flex-wrap gap-2 text-[11px] text-[var(--fg-muted)]">
+            <div className="flex flex-wrap gap-2 text-[0.79rem] text-[var(--fg-muted)]">
               {deepScanResult.drives.map((drive) => (
                 <span key={drive.drive_letter} className="px-2 py-1 rounded-md bg-[var(--bg-hover)]" title={drive.warning ?? undefined}>
                   {drive.drive_letter} · {drive.backend === 'mft' ? t('drives.mft') : t('drives.walkdir')} · {formatSize(drive.matched_size)}

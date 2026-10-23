@@ -152,7 +152,10 @@
   gap: 0.7em;
   padding: 0.28em 0.7em;
   border-radius: 0.7em;
-  color: var(--fg-secondary);
+  /* 用主文字色而不是次要色：中文只有 400/700 两档字重，'加粗一点'会直接跳到伪粗体
+     （笔画粘连、发糊），实测 600/700 都不如'同一个字重 + 更深一档'清楚。
+     选中态靠胶囊底色区分，不靠颜色差。 */
+  color: var(--fg-primary);
   text-align: left;
   transition: background-color 150ms ease, color 150ms ease;
 }

@@ -61,7 +61,7 @@ function FailedFilesModal({
           
           {/* 弹窗 */}
           <motion.div
-            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden"
+            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[42.86rem] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden"
             {...MODAL_CARD_MOTION}
           >
             {/* 头部 */}

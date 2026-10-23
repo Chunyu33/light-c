@@ -208,7 +208,7 @@ export function DonutChart({ items, totalLabel, totalValueLabel, emptyText }: Do
           })}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[11px] text-[var(--text-muted)]">{totalLabel}</span>
+          <span className="text-[0.79rem] text-[var(--text-muted)]">{totalLabel}</span>
           <span className="text-sm font-bold text-[var(--text-primary)]">{totalValueLabel}</span>
         </div>
       </div>
@@ -290,7 +290,7 @@ export function ColumnChart({ items, emptyText }: ColumnChartProps) {
                     onMouseMove={(event) => updateTooltip(event, item)}
                   />
                 </div>
-                <span className="w-full truncate text-center text-[10px] text-[var(--text-muted)]" title={item.label}>
+                <span className="w-full truncate text-center text-[0.71rem] text-[var(--text-muted)]" title={item.label}>
                   {item.label}
                 </span>
               </div>
@@ -343,7 +343,7 @@ function ChartTooltip({ tooltip }: { tooltip: ChartTooltipState | null }) {
       </p>
       <p className="mt-1 text-sm font-bold tabular-nums text-[var(--brand-green)]">{tooltip.item.valueLabel}</p>
       {(tooltip.item.percentLabel || tooltip.item.secondaryLabel) && (
-        <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+        <p className="mt-0.5 text-[0.79rem] text-[var(--text-muted)]">
           {[tooltip.item.percentLabel, tooltip.item.secondaryLabel].filter(Boolean).join(' · ')}
         </p>
       )}

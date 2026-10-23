@@ -388,7 +388,7 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
                           {entry.path}
                         </p>
                         <p className="text-xs text-[var(--text-faint)] mt-1">{entry.issue}</p>
-                        <p className="text-[10px] text-[var(--text-faint)] mt-0.5 truncate">
+                        <p className="text-[0.71rem] text-[var(--text-faint)] mt-0.5 truncate">
                           {entry.associated_path}
                         </p>
                       </div>

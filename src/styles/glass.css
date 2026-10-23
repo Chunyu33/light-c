@@ -88,6 +88,9 @@ html.glass:not(.dark) {
      用 --glass-toolbar-bg（0.78）会白得像一块板子，用 --glass-chrome-bg（0.4）
      又太透 —— 所以单独给一档，配合 blur 才是"液态玻璃"该有的样子。 */
   --glass-panel-bg: rgba(255, 255, 255, 0.88);
+  /* 大尺寸弹窗的底色：比卡片(0.45)实、比浮层(0.88)透 —— 表格要能读，
+     同时保留"背后被模糊过"的磨砂观感（模糊来自遮罩那一层，不需要再叠 backdrop-filter）。 */
+  --glass-modal-bg: rgba(255, 255, 255, 0.74);
   --glass-panel-border: rgba(255, 255, 255, 0.72);
 }
 
@@ -128,6 +131,7 @@ html.dark.glass {
   --glass-chrome-bg: rgba(255, 255, 255, 0.07);
   /* 深色浮层用实色深底（与 --glass-overlay-bg 同一思路），叠白会变成白板 */
   --glass-panel-bg: rgba(30, 36, 34, 0.9);
+  --glass-modal-bg: rgba(30, 36, 34, 0.8);
   /* ⚠️ 深色下描边不能用 --glass-toolbar-border（rgba(255,255,255,0.18)）——
       深底上那圈白会在面板边缘形成明显的亮边，看着像一圈浅色阴影。
       取与 --glass-edge 同量级的值。 */
@@ -696,4 +700,23 @@ html.dark.glass .empty-state,
 html.dark.glass .empty-state-inline {
   background-color: rgba(255, 255, 255, 0.035);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== 社交专清的明细弹窗（液态玻璃）=====
+   弹窗压在「半透明遮罩 + 模糊背景」之上，如果本体还用 --bg-card（玻璃下只有 0.45 不透明），
+   背后的页面会整片透上来 —— 表格看起来发绿、发灰，边界也没有（Evan 反馈"难看得很"）。
+   这里换成实心表面 + 双层投影：贴地影切边界，大柔影给高度。 */
+html.glass .social-detail-modal {
+  /* ⚠️ 不能用 --bg-elevated：玻璃态下它本身就是 0.45 半透明（#ffffff73），
+     改完等于没改 —— 必须用浮层专用底色（0.88），表格才不会被背后的绿色染过去。 */
+  background-color: var(--glass-modal-bg);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 24px 60px -18px rgba(15, 23, 42, 0.35);
+}
+
+html.dark.glass .social-detail-modal {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 24px 60px -18px rgba(0, 0, 0, 0.6);
 }

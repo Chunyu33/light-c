@@ -281,7 +281,7 @@ export function AiChatPanel({
       exit={{ opacity: 0, y: 8, scale: 0.97 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       style={sizeStyle}
-      className="ai-panel fixed right-5 bottom-5 z-40 flex w-[min(28em,calc(100vw_-_2.5em))] max-h-[min(38em,calc(100vh_-_8em))] min-h-[14em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg select-text"
+      className="ai-panel fixed right-5 bottom-5 z-40 flex w-[min(28em,calc(100vw_-_2.5em))] max-h-[min(38em,calc(100vh_-_8em))] min-h-[22em] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-lg select-text"
     >
       {/* 左上角拖拽手柄：面板固定在右下角，所以「左上角」才是符合直觉的缩放角。
           双击恢复默认尺寸（回到跟随字号与窗口的自适应状态）。 */}

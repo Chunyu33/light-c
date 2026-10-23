@@ -113,7 +113,7 @@ export function ModuleCard({
   const getStatusBadge = () => {
     if (isScanning) {
       return (
-        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
+        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[0.79rem] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
           <Loader2 className="w-3 h-3 animate-spin" />
           {t('scanningShort')}
         </span>
@@ -121,7 +121,7 @@ export function ModuleCard({
     }
     if (hasError) {
       return (
-        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--color-danger)]/10 text-[var(--color-danger)]">
+        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[0.79rem] font-medium bg-[var(--color-danger)]/10 text-[var(--color-danger)]">
           <AlertCircle className="w-3 h-3" />
           {t('errorState')}
         </span>
@@ -130,7 +130,7 @@ export function ModuleCard({
     if (isDone && fileCount > 0) {
       if (hideDoneBadge) return null;
       return (
-        <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
+        <span className="px-2.5 py-1 rounded-full text-[0.79rem] font-medium bg-[var(--brand-green-10)] text-[var(--brand-green)]">
           {resolvedDoneBadgeText}
         </span>
       );
@@ -138,7 +138,7 @@ export function ModuleCard({
     if (isDone && fileCount === 0) {
       if (hideDoneBadge) return null;
       return (
-        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)]">
+        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[0.79rem] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)]">
           <CheckCircle2 className="w-3 h-3" />
           {resolvedEmptyDoneBadgeText}
         </span>
@@ -194,22 +194,22 @@ export function ModuleCard({
 
           {/* 模块信息 - 清晰的文字层次 */}
           <div
-            className={`min-w-0 flex-1 basis-[220px] ${isPageVariant ? '' : 'cursor-pointer'}`}
+            className={`min-w-0 flex-1 basis-[15.71rem] ${isPageVariant ? '' : 'cursor-pointer'}`}
             onClick={isPageVariant ? undefined : onToggleExpand}
           >
             <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-              <h3 className="min-w-0 text-[15px] font-bold text-[var(--text-primary)]">{title}</h3>
+              <h3 className="min-w-0 text-[1.07rem] font-bold text-[var(--text-primary)]">{title}</h3>
               {titleExtra}
               {getStatusBadge()}
             </div>
-            <p className="text-[13px] text-[var(--text-muted)] mt-1 truncate">{description}</p>
+            <p className="text-[0.93rem] text-[var(--text-muted)] mt-1 truncate">{description}</p>
           </div>
 
           {/* 统计信息 - 使用 tabular-nums 确保数字稳定不抖动 */}
           {isDone && fileCount > 0 && (
             <div className="text-right shrink-0 mr-3">
               {!hideTotalSize && <p className="text-xl font-bold text-[var(--brand-green)] tabular-nums">{formatSize(totalSize)}</p>}
-              <p className="text-[13px] text-[var(--text-muted)] tabular-nums">{fileCount.toLocaleString()} {resolvedCountLabel}</p>
+              <p className="text-[0.93rem] text-[var(--text-muted)] tabular-nums">{fileCount.toLocaleString()} {resolvedCountLabel}</p>
             </div>
           )}
 
@@ -224,7 +224,7 @@ export function ModuleCard({
             }}
             disabled={isScanning || scanDisabled}
             className={`
-              flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 shrink-0
+              flex items-center gap-2 px-5 py-2.5 rounded-xl text-[0.93rem] font-semibold transition-all duration-200 shrink-0
               border shadow-sm active:scale-[0.98]
               ${isScanning || scanDisabled
                 ? 'border-[var(--border-color)] bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed shadow-none'
@@ -263,7 +263,7 @@ export function ModuleCard({
         {/* 错误信息 */}
         {hasError && error && (
           <div className="mt-4 px-4 py-3 bg-[var(--color-danger)]/10 rounded-xl">
-            <p className="text-[13px] text-[var(--color-danger)]">{error}</p>
+            <p className="text-[0.93rem] text-[var(--color-danger)]">{error}</p>
           </div>
         )}
       </div>

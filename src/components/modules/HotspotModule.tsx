@@ -347,7 +347,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
           >
             <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-300 ${isChildrenExpanded ? 'rotate-90' : ''}`} />
             {!isChildrenExpanded && (
-              <span className="text-[10px] tabular-nums">{entry.children.length}</span>
+              <span className="text-[0.71rem] tabular-nums">{entry.children.length}</span>
             )}
           </span>
         )}
@@ -370,7 +370,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             }`} />
             <div className="absolute inset-x-0 bottom-0 h-5 rounded-md bg-gradient-to-b from-yellow-300 to-amber-500" />
           </div>
-          <span className={`absolute -right-0.5 -bottom-0.5 min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${
+          <span className={`absolute -right-0.5 -bottom-0.5 min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[0.71rem] font-bold shadow-sm ${
             entry.is_protected ? 'bg-red-500 text-white' : 'bg-[var(--brand-green)] text-white'
           }`}>
             {rank}
@@ -385,37 +385,37 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
             </span>
             {/* 下钻深度指示器 */}
             {entry.depth > 0 && (
-              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded status-chip text-purple-500">
+              <span className="flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-purple-500">
                 L{entry.depth}
               </span>
             )}
-            <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded ${getParentTypeColor(entry.parent_type)}`}>
+            <span className={`flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded ${getParentTypeColor(entry.parent_type)}`}>
               {entry.parent_type}
             </span>
             {/* 系统保护目录标签 - 深度扫描时显示 */}
             {entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-red-500">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-red-500">
                 <Shield className="w-3 h-3" />
                 {moduleT('hotspot.systemProtected')}
               </span>
             )}
             {/* 程序目录标签 - 红色警告，禁止删除 */}
             {entry.is_program && !entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-red-500">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-red-500">
                 <ShieldAlert className="w-3 h-3" />
                 {moduleT('hotspot.systemProgram')}
               </span>
             )}
             {/* 缓存目录标签 - 建议清理（仅非深度扫描模式显示） */}
             {entry.is_cache && !entry.is_program && !entry.is_protected && !isFullScan && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-orange-500">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-orange-500">
                 <Trash2 className="w-3 h-3" />
                 {moduleT('hotspot.temporaryCache')}
               </span>
             )}
             {/* 深度扫描只读提示 */}
             {isFullScan && !entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-blue-500">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-blue-500">
                 <Eye className="w-3 h-3" />
                 {moduleT('hotspot.viewOnly')}
               </span>
@@ -444,7 +444,7 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
           </div>
           
           {/* 大小 */}
-          <div className={`font-semibold min-w-[70px] text-right ${
+          <div className={`font-semibold min-w-[5.0rem] text-right ${
             entry.is_protected ? 'text-red-500' : 'text-[var(--brand-green)]'
           }`}>
             {formatSize(entry.total_size)}
@@ -945,7 +945,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
             {fullScanEnabled ? moduleT('hotspot.deepScanning', { drive: selectedDriveLabel }) : moduleT('hotspot.scanningAppData')}
             {/* 扫描引擎模式标签 — MFT 直读 vs 常规遍历 */}
             {fullScanEnabled && scanProgress && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              <span className={`text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${
                 scanProgress.backend === 'mft'
                   ? 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
                   : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'

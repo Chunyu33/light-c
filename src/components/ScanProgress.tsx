@@ -246,7 +246,7 @@ export function ScanProgress({
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {displayFileCount.toLocaleString()}
             </p>
-            <p className="text-[10px] text-[var(--fg-muted)]">{t('fileCountLabel')}</p>
+            <p className="text-[0.71rem] text-[var(--fg-muted)]">{t('fileCountLabel')}</p>
           </div>
           
           <div className="glass-block bg-[var(--bg-card)] rounded-lg p-3 text-center">
@@ -254,7 +254,7 @@ export function ScanProgress({
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {formatSize(displaySize)}
             </p>
-            <p className="text-[10px] text-[var(--fg-muted)]">{t('cleanable')}</p>
+            <p className="text-[0.71rem] text-[var(--fg-muted)]">{t('cleanable')}</p>
           </div>
           
           <div className="glass-block bg-[var(--bg-card)] rounded-lg p-3 text-center">
@@ -262,7 +262,7 @@ export function ScanProgress({
             <p className="text-sm font-semibold text-[var(--fg-primary)]">
               {isCompleted ? displayTotal : completedCategories}/{displayTotal}
             </p>
-            <p className="text-[10px] text-[var(--fg-muted)]">{t('categoryCountLabel')}</p>
+            <p className="text-[0.71rem] text-[var(--fg-muted)]">{t('categoryCountLabel')}</p>
           </div>
         </div>
 

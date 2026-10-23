@@ -111,7 +111,7 @@ export function AboutSettings() {
                   <MonitorIcon className="w-4 h-4 text-[var(--text-muted)]" />
                   <span className="text-sm text-[var(--text-secondary)]">{t('about.operatingSystem')}</span>
                 </div>
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[280px] truncate" title={systemInfo.os_version}>
+                <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[20.0rem] truncate" title={systemInfo.os_version}>
                   {systemInfo.os_version}
                 </span>
               </div>
@@ -127,7 +127,7 @@ export function AboutSettings() {
                   <Cpu className="w-4 h-4 text-[var(--text-muted)]" />
                   <span className="text-sm text-[var(--text-secondary)]">{t('about.processor')}</span>
                 </div>
-                <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[280px] truncate" title={systemInfo.cpu_info}>
+                <span className="text-sm font-medium text-[var(--text-primary)] text-right max-w-[20.0rem] truncate" title={systemInfo.cpu_info}>
                   {systemInfo.cpu_info}
                 </span>
               </div>
@@ -347,7 +347,7 @@ function MoreToolsSection() {
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-[var(--text-faint)] text-center">{t('moreToolsHint')}</p>
+      <p className="text-[0.79rem] text-[var(--text-faint)] text-center">{t('moreToolsHint')}</p>
     </div>
   );
 }

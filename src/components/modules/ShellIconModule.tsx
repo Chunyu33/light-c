@@ -84,11 +84,11 @@ function ShellIconRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-semibold text-[var(--text-primary)]" title={entry.name}>{entry.name}</p>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${risk.className}`}>{risk.label}</span>
-            <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{moduleT(isNavigationEntry ? 'shellIcons.navigationPane' : 'shellIcons.myComputer')}</span>
-            <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] text-[var(--text-muted)]">{entry.hive} / {entry.registryView}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[0.71rem] font-medium ${risk.className}`}>{risk.label}</span>
+            <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[0.71rem] text-[var(--text-muted)]">{moduleT(isNavigationEntry ? 'shellIcons.navigationPane' : 'shellIcons.myComputer')}</span>
+            <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[0.71rem] text-[var(--text-muted)]">{entry.hive} / {entry.registryView}</span>
           </div>
-          <p className="mt-1 break-all font-mono text-[11px] text-[var(--text-muted)]">{entry.clsid}</p>
+          <p className="mt-1 break-all font-mono text-[0.79rem] text-[var(--text-muted)]">{entry.clsid}</p>
           <p className="mt-1 break-all text-xs font-medium text-[var(--text-secondary)]">{t('associatedApp')}：{entry.applicationName || t('unknownApp')}</p>
           <p className="mt-1 break-all text-xs text-[var(--text-faint)]">{moduleT('shellIcons.component')}: {entry.sourcePath || entry.riskReason}</p>
         </div>
@@ -107,8 +107,8 @@ function ShellIconRow({
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2">
-        <p className="min-w-0 break-all text-[11px] text-[var(--text-faint)]">{entry.regPath}</p>
-        <button type="button" disabled={busy} onClick={() => onOpenRegistry(targetOf(entry))} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('openRegistryNode')}>
+        <p className="min-w-0 break-all text-[0.79rem] text-[var(--text-faint)]">{entry.regPath}</p>
+        <button type="button" disabled={busy} onClick={() => onOpenRegistry(targetOf(entry))} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-color)] px-2 py-1 text-[0.79rem] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] disabled:opacity-50" title={t('openRegistryNode')}>
           <FolderOpen className="h-3.5 w-3.5" />{moduleT('shellIcons.openRegistry')}
         </button>
       </div>
@@ -274,7 +274,7 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         error={moduleState.error}
         variant={layoutMode === 'pages' ? 'page' : 'card'}
         forceExpanded={layoutMode === 'pages'}
-        titleExtra={<span className="rounded-full bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-600 dark:text-orange-400">{moduleT('shellIcons.caution')}</span>}
+        titleExtra={<span className="rounded-full bg-orange-500/10 px-2 py-1 text-[0.71rem] font-medium text-orange-600 dark:text-orange-400">{moduleT('shellIcons.caution')}</span>}
       >
         <div className="space-y-4 p-5">
         {!entries && moduleState.status === 'idle' && <EmptyState icon={HardDriveDownload} title={t('notScannedShellIcons')} description={t('shellScanDescription')} />}

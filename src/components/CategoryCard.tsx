@@ -154,24 +154,24 @@ export function CategoryCard({
           </div>
 
           {/* 分类信息 */}
-          <div className="min-w-[140px] flex-1 sm:min-w-0">
+          <div className="min-w-[10.0rem] flex-1 sm:min-w-0">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="text-[14px] font-bold text-[var(--text-primary)] truncate">
+              <span className="text-[1rem] font-bold text-[var(--text-primary)] truncate">
                 {categoryName}
               </span>
-              <span className={`shrink-0 whitespace-nowrap px-2 py-0.5 text-[11px] font-medium rounded border ${getRiskBadgeStyle(category.risk_level)}`}>
+              <span className={`shrink-0 whitespace-nowrap px-2 py-0.5 text-[0.79rem] font-medium rounded border ${getRiskBadgeStyle(category.risk_level)}`}>
                 {commonT(getRiskText(category.risk_level))}
               </span>
             </div>
-            <p className="text-[13px] text-[var(--text-muted)] truncate mt-1">{categoryDescription}</p>
+            <p className="text-[0.93rem] text-[var(--text-muted)] truncate mt-1">{categoryDescription}</p>
           </div>
 
           {/* 统计信息 - tabular-nums 确保数字稳定 */}
           <div className="ml-auto shrink-0 text-right">
-            <p className="text-[15px] font-bold text-[var(--text-primary)] tabular-nums">
+            <p className="text-[1.07rem] font-bold text-[var(--text-primary)] tabular-nums">
               {formatSize(category.total_size)}
             </p>
-            <p className="text-[13px] text-[var(--text-muted)] tabular-nums">
+            <p className="text-[0.93rem] text-[var(--text-muted)] tabular-nums">
               {commonT('fileCount', { count: category.file_count.toLocaleString() })}
               {selectedCount > 0 && (
                 <span className="text-[var(--brand-green)] ml-1">
@@ -200,18 +200,18 @@ export function CategoryCard({
                 这类目录应用内删不掉（权限/占用），而且删掉会让用户失去回退旧版本的能力，
                 所以规范做法是交给 Windows 自带的磁盘清理。 */}
             {isSystemManaged ? (
-              <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex flex-wrap items-center gap-2 text-[13px] text-[var(--color-warning)]">
+              <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex flex-wrap items-center gap-2 text-[0.93rem] text-[var(--color-warning)]">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span className="flex-1 min-w-[12em]">{commonT('systemManagedHint')}</span>
                 <button
                   onClick={() => openDiskCleanup()}
-                  className="shrink-0 px-2.5 py-1 rounded-lg border border-[var(--color-warning)]/40 hover:bg-[var(--color-warning)]/15 transition text-[12px] font-medium"
+                  className="shrink-0 px-2.5 py-1 rounded-lg border border-[var(--color-warning)]/40 hover:bg-[var(--color-warning)]/15 transition text-[0.86rem] font-medium"
                 >
                   {commonT('openDiskCleanup')}
                 </button>
               </div>
             ) : category.risk_level >= 3 && (
-              <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[13px] text-[var(--color-warning)]">
+              <div className="px-5 py-2.5 bg-[var(--color-warning)]/10 border-b border-[var(--color-warning)]/20 flex items-center gap-2 text-[0.93rem] text-[var(--color-warning)]">
                 <AlertTriangle className="w-4 h-4" />
                 <span>{commonT('highRiskWarning')}</span>
               </div>
@@ -310,13 +310,13 @@ const VirtualFileItem = memo(function VirtualFileItem({ file, selected, selectab
 
       {/* 文件路径 */}
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] text-[var(--text-secondary)] truncate" title={displayTitle}>
+        <p className="text-[0.93rem] text-[var(--text-secondary)] truncate" title={displayTitle}>
           {displayPath}
         </p>
       </div>
 
       {/* 文件大小 */}
-      <div className="text-[13px] text-[var(--text-muted)] tabular-nums">
+      <div className="text-[0.93rem] text-[var(--text-muted)] tabular-nums">
         {formatSize(file.size)}
       </div>
 

@@ -100,7 +100,7 @@ export function FeatureSettings() {
               <span className="text-xs text-[var(--text-muted)]">{t('features.junkDeepScan.unit')}</span>
             </div>
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-[0.79rem] text-[var(--text-faint)]">
             {t('features.junkDeepScan.range', {
               min: JUNK_DEEP_SCAN_DEPTH_MIN,
               max: JUNK_DEEP_SCAN_DEPTH_MAX,
@@ -143,7 +143,7 @@ export function FeatureSettings() {
               <span className="text-xs text-[var(--text-muted)]">{t('units.items')}</span>
             </div>
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-[0.79rem] text-[var(--text-faint)]">
             {t('features.bigFiles.range', { min: BIG_FILES_SCAN_LIMIT_MIN, max: BIG_FILES_SCAN_LIMIT_MAX })}
           </p>
         </div>
@@ -229,7 +229,7 @@ export function FeatureSettings() {
             <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-2">
               {t('features.hotspot.autoIgnoredDesc')}
             </p>
-            <div className="space-y-1 text-[11px] text-[var(--text-muted)]">
+            <div className="space-y-1 text-[0.79rem] text-[var(--text-muted)]">
               <p className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                 {t('features.hotspot.systemCore')}
@@ -288,7 +288,7 @@ export function FeatureSettings() {
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-[var(--text-faint)]">
+          <p className="text-[0.79rem] text-[var(--text-faint)]">
             {t('features.diskGrowth.range')}
           </p>
           <div className="glass-block rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] p-4 space-y-3">

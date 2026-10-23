@@ -40,7 +40,7 @@ export function ModuleScanProgress({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h4>
-            <span className="rounded-full bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--brand-green)]">
+            <span className="rounded-full bg-[var(--bg-card)] px-2 py-0.5 text-[0.71rem] font-medium text-[var(--brand-green)]">
               {t('scanningShort')}
             </span>
           </div>

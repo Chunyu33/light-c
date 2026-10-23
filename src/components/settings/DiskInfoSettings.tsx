@@ -80,7 +80,7 @@ function HealthBadge({ status, translate }: { status: DiskHealthInfo['health_sta
   const presentation = getHealthPresentation(status);
   const Icon = presentation.icon;
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${presentation.className}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[0.79rem] font-semibold ${presentation.className}`}>
       <Icon className="h-3 w-3" />
       {translate(HEALTH_KEYS[status])}
     </span>
@@ -91,7 +91,7 @@ function InfoItem({ label, value, title }: { label: string; value: string; title
   return (
     <div className="glass-list min-w-0 overflow-hidden rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
       {/* 磁盘字段来自系统接口，标签和值都限制为单行，避免异常厂商文本撑开卡片。 */}
-      <p className="truncate text-[11px] font-medium text-[var(--text-muted)]" title={label}>{label}</p>
+      <p className="truncate text-[0.79rem] font-medium text-[var(--text-muted)]" title={label}>{label}</p>
       <p className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)]" title={title ?? value}>
         {value}
       </p>
@@ -107,14 +107,14 @@ function VolumeItem({ volume, translate }: { volume: DiskVolumeInfo; translate: 
         <span className="min-w-0 truncate text-xs font-semibold text-[var(--text-primary)]" title={getVolumeLabel(volume)}>
           {getVolumeLabel(volume)}
         </span>
-        <span className="min-w-0 whitespace-nowrap text-right text-[11px] tabular-nums text-[var(--text-muted)]" title={`${formatSize(volume.free_space)} ${translate('diskInfo.available')}`}>
+        <span className="min-w-0 whitespace-nowrap text-right text-[0.79rem] tabular-nums text-[var(--text-muted)]" title={`${formatSize(volume.free_space)} ${translate('diskInfo.available')}`}>
           {formatSize(volume.free_space)} {translate('diskInfo.available')}
         </span>
         <div className="col-span-2 mt-2 flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--bg-hover)]">
             <div className="h-1.5 rounded-full bg-[var(--brand-green)]" style={{ width: `${usagePercent}%` }} />
           </div>
-          <span className="w-11 shrink-0 whitespace-nowrap text-right text-[11px] font-semibold tabular-nums text-[var(--text-primary)]">
+          <span className="w-11 shrink-0 whitespace-nowrap text-right text-[0.79rem] font-semibold tabular-nums text-[var(--text-primary)]">
             {usagePercent.toFixed(1)}%
           </span>
         </div>

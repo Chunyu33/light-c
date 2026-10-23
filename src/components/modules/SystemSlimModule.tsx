@@ -491,7 +491,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
             <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-xs font-medium text-amber-600">{moduleT('systemSlim.adminRequired')}</p>
-              <p className="text-[11px] text-[var(--fg-muted)] mt-0.5">
+              <p className="text-[0.79rem] text-[var(--fg-muted)] mt-0.5">
                 {moduleT('systemSlim.adminHint')}
               </p>
             </div>
@@ -551,19 +551,19 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                             {item.id === 'search_index' && <span className="ml-1">（Beta）</span>}
                           </h4>
                           {item.enabled && item.size > 0 && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600">
+                            <span className="px-1.5 py-0.5 rounded-full text-[0.71rem] font-medium bg-emerald-500/10 text-emerald-600">
                               {formatSize(item.size)}
                             </span>
                           )}
                           {!item.enabled && item.id === 'hibernation' && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
+                            <span className="px-1.5 py-0.5 rounded-full text-[0.71rem] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
                               {moduleT('systemSlim.disabled')}
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-[var(--fg-secondary)] mt-0.5">{moduleT(`systemSlim.items.${item.id}.description`, { defaultValue: item.description })}</p>
                         {item.status_text && (
-                          <p className="text-[11px] text-[var(--fg-muted)] mt-1">
+                          <p className="text-[0.79rem] text-[var(--fg-muted)] mt-1">
                             {item.id === 'search_index' ? (
                               // 搜索索引的 itemStatus 键是固定文案；可操作时展示动态状态（服务 + 数据库大小），
                               // 不可操作时直接展示后端细分的置灰原因（服务停止/已禁用/未安装）
@@ -586,13 +586,13 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                         {/* 风险提示 */}
                         <div className="mt-2 flex items-start gap-1.5 bg-amber-500/5 rounded-lg px-2 py-1.5">
                           <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
-                          <p className="text-[10px] text-amber-600 leading-relaxed">{moduleT(`systemSlim.items.${item.id}.warning`, { defaultValue: item.warning })}</p>
+                          <p className="text-[0.71rem] text-amber-600 leading-relaxed">{moduleT(`systemSlim.items.${item.id}.warning`, { defaultValue: item.warning })}</p>
                         </div>
 
                         {/* 执行进度：让用户看到阶段、百分比和已用时间 */}
                         {isLoading && operationProgress && operationProgress.item_id === item.id && (
                           <div className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2">
-                            <div className="flex items-center justify-between gap-2 text-[11px] text-emerald-700 dark:text-emerald-400">
+                            <div className="flex items-center justify-between gap-2 text-[0.79rem] text-emerald-700 dark:text-emerald-400">
                               <span className="truncate">{operationProgress.message}</span>
                               <span className="shrink-0 tabular-nums">
                                 {operationProgress.percent > 0 ? `${operationProgress.percent}%` : formatElapsed(operationProgress.elapsed_ms)}
@@ -604,7 +604,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
                                 style={operationProgress.percent > 0 ? { width: `${operationProgress.percent}%` } : undefined}
                               />
                             </div>
-                            <p className="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--fg-muted)]">
+                            <p className="mt-1.5 flex items-center gap-1 text-[0.71rem] text-[var(--fg-muted)]">
                               <ShieldAlert className="h-3 w-3 shrink-0 text-amber-500" />
                               {moduleT('systemSlim.progressElapsed', { time: formatElapsed(operationProgress.elapsed_ms) })} · {moduleT('systemSlim.progressDoNotClose')}
                             </p>
@@ -660,7 +660,7 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
 
         {/* 底部说明 */}
         {status && (
-          <div className="glass-block bg-[var(--bg-elevated)] rounded-lg px-3 py-2 text-[10px] text-[var(--fg-muted)] leading-relaxed">
+          <div className="glass-block bg-[var(--bg-elevated)] rounded-lg px-3 py-2 text-[0.71rem] text-[var(--fg-muted)] leading-relaxed">
             <strong className="text-[var(--fg-secondary)]">{moduleT('systemSlim.tip')}</strong>
             {moduleT('systemSlim.tipDesc')}
           </div>

@@ -81,12 +81,12 @@ export function SupportAuthor() {
                 />
                 {/* 悬停放大提示 */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/60 text-white text-[0.71rem] px-2 py-1 rounded-full">
                     {t('zoom')}
                   </div>
                 </div>
               </div>
-              <p className="text-[10px] text-[var(--text-faint)] text-center mt-2">
+              <p className="text-[0.71rem] text-[var(--text-faint)] text-center mt-2">
                 {t('supportQrHint')}
               </p>
 

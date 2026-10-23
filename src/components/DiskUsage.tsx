@@ -93,7 +93,7 @@ export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsa
               <span className={compact ? 'text-xs font-medium text-[var(--fg-primary)]' : 'text-sm font-medium text-[var(--fg-primary)]'}>
                 {t('driveLabel', { drive: diskInfo.drive_letter })}
               </span>
-              <span className={compact ? 'text-[11px] text-[var(--fg-muted)] ml-2' : 'text-xs text-[var(--fg-muted)] ml-2'}>
+              <span className={compact ? 'text-[0.79rem] text-[var(--fg-muted)] ml-2' : 'text-xs text-[var(--fg-muted)] ml-2'}>
                 {t('systemDrive')}
               </span>
             </div>
@@ -113,7 +113,7 @@ export function DiskUsage({ diskInfo, loading, compact, onTripleClick }: DiskUsa
           </div>
 
           {/* 统计信息 */}
-          <div className={`flex items-center ${compact ? 'gap-3 text-[11px]' : 'gap-4 text-xs'}`}>
+          <div className={`flex items-center ${compact ? 'gap-3 text-[0.79rem]' : 'gap-4 text-xs'}`}>
             <span className="text-[var(--fg-muted)]">
               {t('totalCapacity')} <span className="text-[var(--fg-secondary)] font-medium">{formatSize(diskInfo.total_space)}</span>
             </span>

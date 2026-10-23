@@ -799,17 +799,17 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                         {leftover.app_name}
                       </p>
                       {/* 置信度分类标签 */}
-                      <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${getCategoryColor(leftover.detection_category)}`}>
+                      <span className={`flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${getCategoryColor(leftover.detection_category)}`}>
                         {getCategoryLabel(leftover.detection_category)}
                       </span>
                       {/* 模拟器/虚拟磁盘标签 */}
                       {leftover.is_emulator && (
-                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-[var(--color-danger)] bg-[var(--color-danger)]/10">
+                        <span className="flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded text-[var(--color-danger)] bg-[var(--color-danger)]/10">
                           {moduleT('leftovers.emulatorTag')}
                         </span>
                       )}
                       {leftover.is_virtual_disk && (
-                        <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded text-purple-500 bg-purple-500/10">
+                        <span className="flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded text-purple-500 bg-purple-500/10">
                           {moduleT('leftovers.virtualDiskTag')}
                         </span>
                       )}

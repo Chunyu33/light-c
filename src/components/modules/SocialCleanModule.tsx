@@ -183,7 +183,6 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
   const [pendingDeletePaths, setPendingDeletePaths] = useState<string[]>([]);
   /** 本次删除的文件数快照：进度遮罩用它，避免删除完成后统计被清空导致数字闪回 0 */
   const [deletingCount, setDeletingCount] = useState(0);
-  const [showTip, setShowTip] = useState(true);
 
   // 开始扫描
   const handleScan = useCallback(async () => {
@@ -484,7 +483,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
                 那是 position: fixed 的层，不占文档流，所以列表既不被撑开也没有位移 ——
                 社交专清需要保留"我在删哪几条"的参照。 */}
             {/* 展开内容 */}
-            <div className="min-h-[300px]">
+            <div className="min-h-[21.43rem]">
               {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && (
             // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由社交软件模块维护。
             <ModuleOperationToolbar
@@ -515,24 +514,6 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
             </ModuleOperationToolbar>
           )}
 
-          {/* 说明提示 */}
-          {showTip && (
-            <div className="mx-4 mt-4 mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
-              <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                <span className="text-amber-600 text-[10px] font-bold">!</span>
-              </div>
-              <p className="text-[11px] text-amber-600/80 leading-relaxed flex-1">
-                <span className="font-medium">{moduleT('social.riskGuide')}</span>
-                <span className="text-red-600">{moduleT('social.riskRed')}</span> {moduleT('social.riskRedDesc')}，
-                <span className="text-amber-600">{moduleT('social.riskOrange')}</span> {moduleT('social.riskOrangeDesc')}，
-                <span className="text-emerald-600">{moduleT('social.riskGreen')}</span> {moduleT('social.riskGreenDesc')}，
-                <span className="text-teal-600">{moduleT('social.riskCyan')}</span> {moduleT('social.riskCyanDesc')}。
-              </p>
-              <button onClick={() => setShowTip(false)} className="text-amber-500 hover:text-amber-700 transition shrink-0">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
 
           {/* 空状态 */}
           {moduleState.status === 'idle' && (
@@ -570,125 +551,135 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
             </div>
           )}
 
-          {/* 分类列表 */}
-          {moduleState.status === 'done' && scanResult && scanResult.categories.map((category) => {
-            const Icon = categoryIcons[category.id] || FolderOpen;
-            const colors = categoryColors[category.id] || categoryColors.imagevideo;
-            const isCategoryExpanded = expandedCategory === category.id;
-            const hasFiles = category.file_count > 0;
-            const deletableFiles = category.files.filter(f => f.deletable);
-            const categoryPaths = deletableFiles.map(f => f.path);
-            const selectedInCategory = categoryPaths.filter(p => selectedPaths.has(p)).length;
-            const isAllSelected = selectedInCategory === categoryPaths.length && categoryPaths.length > 0;
-            const isPartialSelected = selectedInCategory > 0 && selectedInCategory < categoryPaths.length;
+          {/* 分类列表：改成和垃圾清理一致的"卡片列"——每行是一张独立卡片，靠留白分组，
+              不再用分隔线把整块连成一条长表。 */}
+          {moduleState.status === 'done' && scanResult && (
+            <div className="space-y-2 p-4">
+              {scanResult.categories.map((category) => {
+                const Icon = categoryIcons[category.id] || FolderOpen;
+                const colors = categoryColors[category.id] || categoryColors.imagevideo;
+                const isCategoryExpanded = expandedCategory === category.id;
+                const hasFiles = category.file_count > 0;
+                const deletableFiles = category.files.filter(f => f.deletable);
+                const categoryPaths = deletableFiles.map(f => f.path);
+                const selectedInCategory = categoryPaths.filter(p => selectedPaths.has(p)).length;
+                const isAllSelected = selectedInCategory === categoryPaths.length && categoryPaths.length > 0;
+                const isPartialSelected = selectedInCategory > 0 && selectedInCategory < categoryPaths.length;
             
-            // 判断是否为危险分类（聊天记录）
-            const isCriticalCategory = category.id === 'chatdatabase';
+                // 判断是否为危险分类（聊天记录）
+                const isCriticalCategory = category.id === 'chatdatabase';
 
-            return (
-              <div key={category.id} className={`border-b border-[var(--border-default)] last:border-b-0 ${isCriticalCategory ? 'bg-red-500/5' : ''}`}>
-                {/* 分类行 */}
-                <div
-                  className={`px-4 py-3 flex items-center gap-3 transition-all ${hasFiles ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : 'opacity-50'}`}
-                  onClick={() => hasFiles && setExpandedCategory(isCategoryExpanded ? null : category.id)}
-                >
-                  <div className={`text-[var(--fg-muted)] transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`}>
-                    <ChevronRight className="w-4 h-4" />
-                  </div>
-
-                  {/* 复选框 - 危险分类禁用 */}
+                return (
                   <div
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      if (hasFiles && !isCriticalCategory) toggleCategory(category); 
-                    }}
-                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
-                      ${isCriticalCategory 
-                        ? 'soft-danger border-2 cursor-not-allowed' 
-                        : isAllSelected 
-                          ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
-                          : isPartialSelected 
-                            ? 'bg-emerald-500/50 border-emerald-500 cursor-pointer' 
-                            : 'border-[var(--fg-faint)] cursor-pointer'
-                      }`}
-                    title={isCriticalCategory ? moduleT('social.chatUndeletable') : undefined}
+                    key={category.id}
+                    className={`rounded-2xl shadow-sm overflow-hidden ${isCriticalCategory ? 'bg-red-500/5 border border-red-500/20' : 'bg-[var(--bg-card)]'}`}
                   >
-                    {isCriticalCategory ? (
-                      <X className="w-2.5 h-2.5 text-red-500" />
-                    ) : (isAllSelected || isPartialSelected) && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors.bg}`}>
-                    <Icon className={`w-4 h-4 ${colors.text}`} />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[var(--fg-primary)]">{moduleT(`social.category.${category.id}.name`)}</p>
-                      {isCriticalCategory ? (
-                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-red-500/10 text-red-600 flex items-center gap-0.5">
-                          <ShieldAlert className="w-2.5 h-2.5" />
-                          {moduleT('social.chatUndeletable')}
-                        </span>
-                      ) : (
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-medium ${colors.bg} ${colors.text}`}>
-                          {hasFiles ? `${moduleT('social.deletable')} ${category.deletable_count}` : t('noData')}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[var(--fg-muted)] mt-0.5 truncate">{moduleT(`social.category.${category.id}.description`)}</p>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <p className={`text-sm font-bold ${isCriticalCategory ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {formatSize(category.total_size)}
-                    </p>
-                    <p className="text-[11px] text-[var(--fg-muted)]">{category.file_count.toLocaleString()} {moduleT('social.files')}</p>
-                  </div>
-                </div>
-
-                {/* 展开的文件列表 */}
-                <AnimatePresence initial={false}>
-                  {isCategoryExpanded && hasFiles && (
-                    <motion.div
-                      key={`${category.id}-files`}
-                      className="overflow-hidden bg-[var(--bg-base)] border-t border-[var(--border-default)]"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                    {/* 分类行 */}
+                    <div
+                      className={`px-5 py-4 flex items-center gap-4 transition-all ${hasFiles ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : 'opacity-50'}`}
+                      onClick={() => hasFiles && setExpandedCategory(isCategoryExpanded ? null : category.id)}
                     >
-                      <div className="max-h-48 overflow-auto">
-                        {category.files.slice(0, 20).map((file, index) => (
-                          <FileRow
-                            key={file.path}
-                            index={index}
-                            file={file}
-                            isSelected={selectedPaths.has(file.path)}
-                            onToggle={() => toggleFile(file)}
-                          />
-                        ))}
+                      <div className={`text-[var(--fg-muted)] transition-transform duration-200 ${isCategoryExpanded ? 'rotate-90' : ''}`}>
+                        <ChevronRight className="w-5 h-5" />
                       </div>
-                      {category.files.length > 20 && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setFileModalData({ categoryId: category.id, name: moduleT(`social.category.${category.id}.name`) }); }}
-                          // 不再画上边框：它上面已经是数据行的分隔线，再加一条会让这一块显得很密。
-                          // 用主题色文字本身表达"可点"，悬停给一层淡底作为反馈。
-                          className="w-full rounded-b-xl px-4 py-2.5 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 transition"
+
+                      {/* 复选框 - 危险分类禁用 */}
+                      <div
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (hasFiles && !isCriticalCategory) toggleCategory(category); 
+                        }}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
+                          ${isCriticalCategory 
+                            ? 'soft-danger border-2 cursor-not-allowed' 
+                            : isAllSelected 
+                              ? 'bg-emerald-500 border-emerald-500 cursor-pointer' 
+                              : isPartialSelected 
+                                ? 'bg-emerald-500/50 border-emerald-500 cursor-pointer' 
+                                : 'border-[var(--fg-faint)] cursor-pointer'
+                          }`}
+                        title={isCriticalCategory ? moduleT('social.chatUndeletable') : undefined}
+                      >
+                        {isCriticalCategory ? (
+                          <X className="w-3 h-3 text-red-500" />
+                        ) : (isAllSelected || isPartialSelected) && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* 图标容器统一成垃圾清理那套：40px、rounded-xl、品牌绿 10% 底 + 绿色图标。
+                          原来按分类换颜色，会和右侧标签抢表达，一屏里颜色太多。 */}
+                      <div className="w-10 h-10 shrink-0 rounded-xl bg-[var(--brand-green-10)] flex items-center justify-center text-[var(--brand-green)]">
+                        <Icon className="w-5 h-5" />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[1rem] font-bold text-[var(--text-primary)] truncate">{moduleT(`social.category.${category.id}.name`)}</p>
+                          {isCriticalCategory ? (
+                            <span className="shrink-0 whitespace-nowrap px-2 py-0.5 rounded border text-[0.79rem] font-medium bg-red-500/10 border-red-500/20 text-red-600 flex items-center gap-1">
+                              <ShieldAlert className="w-2.5 h-2.5" />
+                              {moduleT('social.chatUndeletable')}
+                            </span>
+                          ) : (
+                            <span className={`shrink-0 whitespace-nowrap px-2 py-0.5 rounded border text-[0.79rem] font-medium ${colors.bg} ${colors.text}`}>
+                              {hasFiles ? `${moduleT('social.deletable')} ${category.deletable_count}` : t('noData')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[0.93rem] text-[var(--text-muted)] mt-1 truncate">{moduleT(`social.category.${category.id}.description`)}</p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <p className={`text-[1.07rem] font-bold tabular-nums ${isCriticalCategory ? 'text-red-600' : 'text-[var(--text-primary)]'}`}>
+                          {formatSize(category.total_size)}
+                        </p>
+                        <p className="text-[0.93rem] text-[var(--text-muted)] tabular-nums">{category.file_count.toLocaleString()} {moduleT('social.files')}</p>
+                      </div>
+                    </div>
+
+                    {/* 展开的文件列表 */}
+                    <AnimatePresence initial={false}>
+                      {isCategoryExpanded && hasFiles && (
+                        <motion.div
+                          key={`${category.id}-files`}
+                          className="overflow-hidden bg-[var(--bg-base)] border-t border-[var(--border-default)]"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                         >
-                          {moduleT('social.viewFiles')} ({category.files.length.toLocaleString()} {moduleT('social.files')}) →
-                        </button>
+                          <div className="max-h-48 overflow-auto">
+                            {category.files.slice(0, 20).map((file, index) => (
+                              <FileRow
+                                key={file.path}
+                                index={index}
+                                file={file}
+                                isSelected={selectedPaths.has(file.path)}
+                                onToggle={() => toggleFile(file)}
+                              />
+                            ))}
+                          </div>
+                          {category.files.length > 20 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setFileModalData({ categoryId: category.id, name: moduleT(`social.category.${category.id}.name`) }); }}
+                              // 不再画上边框：它上面已经是数据行的分隔线，再加一条会让这一块显得很密。
+                              // 用主题色文字本身表达"可点"，悬停给一层淡底作为反馈。
+                              className="w-full rounded-b-xl px-4 py-2.5 text-center text-xs text-emerald-600 hover:bg-emerald-500/5 transition"
+                            >
+                              {moduleT('social.viewFiles')} ({category.files.length.toLocaleString()} {moduleT('social.files')}) →
+                            </button>
+                          )}
+                        </motion.div>
                       )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </ModuleCard>
 
@@ -871,7 +862,7 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
       </div>
       
       {/* 应用名称 */}
-      <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] shrink-0 text-[10px]">
+      <span className="px-2 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] shrink-0 text-[0.79rem]">
         {getSourceLabel(getSourceKey(file.app_name), moduleT)}
       </span>
       
@@ -881,12 +872,12 @@ function FileRow({ index, file, isSelected, onToggle }: FileRowProps) {
       </span>
       
       {/* 风险标签 */}
-      <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${riskConfig.bgColor} ${riskConfig.color}`}>
+      <span className={`px-2 py-0.5 rounded text-[0.79rem] font-medium ${riskConfig.bgColor} ${riskConfig.color}`}>
         {getSocialRiskLabel(moduleT, file.risk_level)}
       </span>
       
       {/* 文件大小 */}
-      <span className={`font-medium shrink-0 ${isCritical ? 'text-red-600' : 'text-emerald-600'}`}>
+      <span className={`font-medium shrink-0 tabular-nums ${isCritical ? 'text-red-600' : 'text-[var(--text-primary)]'}`}>
         {formatSize(file.size)}
       </span>
       
@@ -1067,7 +1058,7 @@ function FileListModal({
         >
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
           <motion.div
-            className="relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden"
+            className="social-detail-modal relative bg-[var(--bg-card)] rounded-2xl border border-[var(--border-default)] shadow-2xl w-full max-w-5xl max-h-[80vh] flex flex-col overflow-hidden"
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -1090,7 +1081,7 @@ function FileListModal({
 
             {/* 来源筛选：标签可多选，再点一次已选中的标签即取消。
                 「全部」仅在存在多个来源时出现，单一来源时它和来源标签等价，显示出来反而冗余。 */}
-            <div className="glass-bar px-6 py-2.5 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-3 text-xs shrink-0">
+            <div className="px-6 py-3 flex items-center gap-3 text-xs shrink-0">
               <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto">
                 {sourceGroups.length > 1 && (
                   <button
@@ -1131,7 +1122,7 @@ function FileListModal({
                 {` (${visibleDeletablePaths.length.toLocaleString()})`}
               </button>
             </div>
-            <div className="glass-bar px-6 py-2 bg-[var(--bg-elevated)] border-b border-[var(--border-default)] flex items-center gap-4 text-xs font-medium text-[var(--fg-muted)] shrink-0">
+            <div className="px-6 py-2 bg-[var(--bg-hover)] border-b border-[var(--border-color)] flex items-center gap-4 text-xs font-medium text-[var(--text-muted)] shrink-0">
               <span className="w-8"></span>
               <span className="w-8 text-center">#</span>
               <span className="w-6"></span>
@@ -1232,7 +1223,7 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       // 整行可点击切换勾选：先前只有复选框本身能点，行内大片区域点了没反应。
       // 行尾两个操作按钮各自 stopPropagation，它们的优先级高于"点行勾选"。
       onClick={() => canToggle && onToggle()}
-      className={`px-6 flex items-center gap-4 text-xs border-b border-[var(--border-default)] hover:bg-[var(--bg-hover)] transition-colors
+      className={`px-6 flex items-center gap-4 text-xs hover:bg-[var(--bg-hover)] transition-colors
         ${canToggle ? 'cursor-pointer' : ''}
         ${isCritical ? 'bg-red-500/5' : ''}`}
     >
@@ -1278,7 +1269,7 @@ const VirtualFileRow = memo(function VirtualFileRow({ index, file, isSelected, o
       </div>
       
       {/* 风险标签 */}
-      <span className={`w-20 px-1.5 py-0.5 rounded text-[9px] font-medium text-center ${riskConfig.bgColor} ${riskConfig.color}`}>
+      <span className={`w-20 px-1.5 py-0.5 rounded text-[0.64rem] font-medium text-center ${riskConfig.bgColor} ${riskConfig.color}`}>
         {getSocialRiskLabel(moduleT, file.risk_level)}
       </span>
       

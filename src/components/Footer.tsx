@@ -10,14 +10,14 @@ export function Footer() {
     <footer className="py-4 px-4 border-t border-[var(--border-color)] bg-[var(--bg-card)]">
       <div className="dashboard-container flex flex-col items-center gap-3">
         {/* 版权信息 */}
-        <p className="text-[11px] text-[var(--text-muted)]">
+        <p className="text-[0.79rem] text-[var(--text-muted)]">
           © {currentYear} LightC · All rights reserved.
         </p>
 
         {/* 正版渠道提示 */}
         {/* <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-hover)]">
           <Shield className="w-3.5 h-3.5 text-[var(--brand-green)]" />
-          <p className="text-[11px] text-[var(--text-secondary)]">
+          <p className="text-[0.79rem] text-[var(--text-secondary)]">
             官方发布渠道：
             <a className="text-[var(--brand-green)] font-medium mx-1" href="https://github.com/Chunyu33/light-c/releases" target="_blank" >GitHub Releases</a>
             ·

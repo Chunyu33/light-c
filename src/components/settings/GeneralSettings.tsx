@@ -271,7 +271,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
           {/* 字体大小 */}
           <div className="pt-4 border-t border-[var(--border-color)]">
             <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-[140px] flex-1">
+            <div className="min-w-[10.0rem] flex-1">
               <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
                 <Type className="w-4 h-4 text-[var(--text-muted)]" />
                 {t('fontSize.label')}
@@ -311,7 +311,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
                   <div className="glass-block mt-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] px-3 py-2.5">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[var(--text-secondary)]">{t('fontSize.customLabel')}</p>
-                      <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{t('fontSize.customRange', { min: CUSTOM_FONT_SIZE_MIN, max: CUSTOM_FONT_SIZE_MAX })}</p>
+                      <p className="mt-0.5 text-[0.79rem] text-[var(--text-muted)]">{t('fontSize.customRange', { min: CUSTOM_FONT_SIZE_MIN, max: CUSTOM_FONT_SIZE_MAX })}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <input
@@ -413,13 +413,13 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
             <div className="flex items-center justify-between gap-3">
               <span className="shrink-0 text-xs text-[var(--text-muted)]">{t('dataDir.configLocation')}</span>
               <div className="flex min-w-0 items-center gap-2">
-                <span className="max-w-[230px] truncate text-right text-[10px] text-[var(--text-faint)]" title={storageInfo?.config_file}>
+                <span className="max-w-[16.43rem] truncate text-right text-[0.71rem] text-[var(--text-faint)]" title={storageInfo?.config_file}>
                   {storageInfo?.config_file ? shortenPathMiddle(storageInfo.config_file) : t('dataDir.loadingPath')}
                 </span>
                 <button
                   onClick={() => storageInfo?.config_file && handleOpenStoragePath(storageInfo.config_file, t('dataDir.configLocation'))}
                   disabled={!storageInfo?.config_file}
-                  className="shrink-0 text-[10px] text-[var(--brand-green)] transition hover:opacity-80 disabled:opacity-40"
+                  className="shrink-0 text-[0.71rem] text-[var(--brand-green)] transition hover:opacity-80 disabled:opacity-40"
                 >
                   {commonT('go')}
                 </button>
@@ -428,7 +428,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
             {storageInfo?.webview_data_directory && (
               <div className="flex items-center justify-between gap-3">
                 <span className="shrink-0 text-xs text-[var(--text-muted)]">{t('dataDir.webviewData')}</span>
-                <span className="max-w-[280px] truncate text-right text-[10px] text-[var(--text-faint)]" title={storageInfo.webview_data_directory}>
+                <span className="max-w-[20.0rem] truncate text-right text-[0.71rem] text-[var(--text-faint)]" title={storageInfo.webview_data_directory}>
                   {storageInfo.webview_data_directory}
                 </span>
               </div>
@@ -436,12 +436,12 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
             <div className="flex items-center justify-between gap-3">
               <span className="shrink-0 text-xs text-[var(--text-muted)]">{t('dataDir.dataLocation')}</span>
               <div className="flex min-w-0 items-center gap-2">
-                <span className="max-w-[230px] truncate text-[10px] text-[var(--text-faint)]" title={dataDir}>
+                <span className="max-w-[16.43rem] truncate text-[0.71rem] text-[var(--text-faint)]" title={dataDir}>
                   {dataDir || t('dataDir.loadingPath')}
                 </span>
                 <button
                   onClick={() => handleOpenStoragePath(dataDir, t('dataDir.dataLocation'))}
-                  className="shrink-0 text-[10px] text-[var(--brand-green)] transition hover:opacity-80"
+                  className="shrink-0 text-[0.71rem] text-[var(--brand-green)] transition hover:opacity-80"
                 >
                   {commonT('go')}
                 </button>
@@ -450,25 +450,25 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
             {writeDiagnostic?.portable_root && writeDiagnostic.preferred_writable === false && (
               // 便携目录不可写：数据只能临时存放在 AppData，必须明确告知并给出解决办法。
               <div className="space-y-1 rounded-xl bg-[var(--color-warning)]/10 px-3 py-2">
-                <p className="flex items-start gap-1.5 text-[11px] text-[var(--color-warning)]">
+                <p className="flex items-start gap-1.5 text-[0.79rem] text-[var(--color-warning)]">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {writeDiagnostic.active_writable
                     ? t('dataDir.portableFallbackWarning', { path: writeDiagnostic.preferred_data_directory })
                     : t('dataDir.portableReadOnlyBlocked')}
                 </p>
-                <p className="break-all pl-5 text-[10px] text-[var(--text-faint)]">
+                <p className="break-all pl-5 text-[0.71rem] text-[var(--text-faint)]">
                   {t('dataDir.portableRootLabel')}: {writeDiagnostic.portable_root}
                 </p>
               </div>
             )}
             {storageInfo && !storageInfo.can_write && (
-              <p className="flex items-start gap-1.5 text-[11px] text-[var(--color-danger)]">
+              <p className="flex items-start gap-1.5 text-[0.79rem] text-[var(--color-danger)]">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {t('dataDir.cannotWrite')}
               </p>
             )}
             {storageInfo?.migration_completed && storageInfo.distribution_channel === 'portable' && (
-              <p className="flex items-center gap-1.5 text-[11px] text-[var(--brand-green)]">
+              <p className="flex items-center gap-1.5 text-[0.79rem] text-[var(--brand-green)]">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                 {t('dataDir.migrationDone')}
               </p>

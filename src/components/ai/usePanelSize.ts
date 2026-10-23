@@ -15,7 +15,9 @@ const STORAGE_KEY = 'c-cleanup-ai-panel-size';
 
 /** 拖拽下限：再小就没法读对话了。 */
 const MIN_WIDTH = 320;
-const MIN_HEIGHT = 240;
+/* 拖拽下限。原来 240px：头部 40 + 输入区 ~70 之后只剩 ~130 给消息，
+   一进来就是"挤"的观感，所以抬到 320。 */
+const MIN_HEIGHT = 320;
 /** 与视口之间至少留出的边距（右侧 20px + 左侧留白）。 */
 const VIEWPORT_MARGIN_X = 48;
 const VIEWPORT_MARGIN_Y = 120;

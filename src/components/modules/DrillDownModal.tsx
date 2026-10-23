@@ -80,7 +80,7 @@ function FolderRankBadge({
         }`} />
         <div className="absolute inset-x-0 bottom-0 h-5 rounded-md bg-gradient-to-b from-yellow-300 to-amber-500" />
       </div>
-      <span className={`absolute -right-0.5 -bottom-0.5 min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${
+      <span className={`absolute -right-0.5 -bottom-0.5 min-w-5 h-5 px-1 rounded-full flex items-center justify-center text-[0.71rem] font-bold shadow-sm ${
         isProtected ? 'bg-red-500 text-white' : 'bg-[var(--brand-green)] text-white'
       }`}>
         {rank}
@@ -159,7 +159,7 @@ function ModalBreadcrumbs({
             {idx > 0 && <ChevronRight className="w-3 h-3 text-[var(--text-faint)]" />}
             {isLast ? (
               <span
-                className="font-semibold text-[var(--text-primary)] max-w-[180px] truncate"
+                className="font-semibold text-[var(--text-primary)] max-w-[12.86rem] truncate"
                 title={seg.path}
               >
                 {seg.name}
@@ -167,14 +167,14 @@ function ModalBreadcrumbs({
             ) : isClickable ? (
               <button
                 onClick={() => onNavigate(seg.path)}
-                className="text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:underline transition-colors max-w-[120px] truncate"
+                className="text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:underline transition-colors max-w-[8.57rem] truncate"
                 title={seg.path}
               >
                 {seg.name}
               </button>
             ) : (
               <span
-                className="text-[var(--text-faint)] max-w-[120px] truncate cursor-default"
+                className="text-[var(--text-faint)] max-w-[8.57rem] truncate cursor-default"
                 title={seg.path}
               >
                 {seg.name}
@@ -233,17 +233,17 @@ const ModalEntryItem = memo(function ModalEntryItem({
           <div className="flex items-center gap-2 flex-wrap">
             <FolderOpen className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
             <span className="font-medium text-sm text-[var(--text-primary)]">{entry.name}</span>
-            <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded ${getParentTypeColor(entry.parent_type)}`}>
+            <span className={`flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded ${getParentTypeColor(entry.parent_type)}`}>
               {entry.parent_type}
             </span>
             {entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-red-500">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-red-500">
                 <Shield className="w-3 h-3" />
                 {moduleT('hotspot.systemProtected')}
               </span>
             )}
             {entry.is_cache && !entry.is_program && !entry.is_protected && (
-              <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded status-chip text-orange-500">
+              <span className="flex-shrink-0 flex items-center gap-0.5 text-[0.71rem] px-1.5 py-0.5 rounded status-chip text-orange-500">
                 <Trash2 className="w-3 h-3" />
                 {moduleT('hotspot.temporaryCache')}
               </span>
@@ -261,7 +261,7 @@ const ModalEntryItem = memo(function ModalEntryItem({
             <Clock className="w-3 h-3" />
             <span>{formatDateTime(entry.last_modified)}</span>
           </div>
-          <div className={`font-semibold min-w-[70px] text-right ${
+          <div className={`font-semibold min-w-[5.0rem] text-right ${
             entry.is_protected ? 'text-red-500' : 'text-[var(--brand-green)]'
           }`}>
             {formatSize(entry.total_size)}

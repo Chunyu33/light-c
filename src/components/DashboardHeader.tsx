@@ -136,7 +136,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
       <div className="dashboard-container flex items-center gap-5">
         {/* 健康评分 - 微信风格圆环进度 */}
         <div 
-          className="flex items-center gap-3 cursor-pointer min-w-[230px]"
+          className="flex items-center gap-3 cursor-pointer min-w-[16.43rem]"
           onClick={handleTripleClick}
         >
           <div className={`relative w-12 h-12 rounded-full ${scoreColor.bgLight} flex items-center justify-center shrink-0`}>
@@ -155,15 +155,15 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[14px] font-bold text-[var(--text-primary)]">{t('healthScore')}</span>
+              <span className="text-[1rem] font-bold text-[var(--text-primary)]">{t('healthScore')}</span>
               {healthData && (
-                <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${scoreColor.bg} text-white`}>
+                <span className={`px-2 py-0.5 rounded text-[0.79rem] font-medium ${scoreColor.bg} text-white`}>
                   {t(scoreColor.labelKey)}
                 </span>
               )}
             </div>
             {healthData && (
-              <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--text-muted)] tabular-nums">
+              <div className="flex items-center gap-3 mt-1 text-[0.79rem] text-[var(--text-muted)] tabular-nums">
                 <span 
                   className="flex items-center gap-1 cursor-help"
                   title={t('scoreDetails.diskSpace')}
@@ -197,9 +197,9 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1.5">
             {/* 磁盘使用情况（盘符取后端返回的系统盘，兼容非 C 盘场景） */}
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">{t('diskSpace', { drive: diskInfo?.drive_letter ?? 'C' })}</span>
+            <span className="text-[1rem] font-bold text-[var(--text-primary)]">{t('diskSpace', { drive: diskInfo?.drive_letter ?? 'C' })}</span>
             {diskInfo && (
-              <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
+              <span className="text-[0.86rem] text-[var(--text-muted)] tabular-nums">
                 {t('freeOfTotal', { free: formatSize(diskInfo.free_space), total: formatSize(diskInfo.total_space) })}
               </span>
             )}
@@ -228,7 +228,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               {isAnyScanning ? (
                 <button
                   onClick={stopAllScans}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-[0.93rem] font-semibold transition-all duration-200 bg-[var(--color-danger)]/20 text-[var(--color-danger)] hover:bg-[var(--color-danger)]/30"
                   title={t('stopScan')}
                 >
                   <Square className="w-4 h-4" />
@@ -237,7 +237,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               ) : (
                 <button
                   onClick={onOneClickScan}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-[13px] font-semibold transition-all duration-200 bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] active:scale-[0.98]"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-[0.93rem] font-semibold transition-all duration-200 bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] active:scale-[0.98]"
                 >
                   <Zap className="w-4 h-4" />
                   {t('oneClickScan')}

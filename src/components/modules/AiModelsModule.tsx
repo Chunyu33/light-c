@@ -439,7 +439,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 <p className="text-xs font-semibold text-amber-600">{moduleT('aiModels.partialFailure')}</p>
                 <div className="mt-1 space-y-1">
                   {scanResult.warnings.slice(0, 3).map(warning => (
-                    <p key={warning} className="text-[11px] leading-relaxed text-amber-700">{warning}</p>
+                    <p key={warning} className="text-[0.79rem] leading-relaxed text-amber-700">{warning}</p>
                   ))}
                 </div>
               </div>
@@ -536,7 +536,7 @@ function HeroOverview({
                 {displayName?.title ?? moduleT('aiModels.notFoundModel')}
               </p>
               {largestModelType && (
-                <span className="shrink-0 rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                <span className="shrink-0 rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[0.71rem] font-medium text-[var(--text-muted)]">
                   {largestModelType === '__unknown__' ? moduleT('aiModels.unknownType') : largestModelType}
                 </span>
               )}
@@ -570,11 +570,11 @@ function ScanDurationPopover({ scanResult }: { scanResult: AiModelScanResult }) 
     <div className="group relative inline-flex">
       <button
         type="button"
-        className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--brand-green)] transition"
+        className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[0.71rem] font-medium text-[var(--text-muted)] hover:text-[var(--brand-green)] transition"
       >
         {moduleT('aiModels.scanDuration')} {formatDuration(scanResult.scan_duration_ms)}
       </button>
-      <div className="pointer-events-none absolute left-0 top-full z-20 w-[420px] pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+      <div className="pointer-events-none absolute left-0 top-full z-20 w-[30.0rem] pt-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
         <div className="glass-overlay rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-lg">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-semibold text-[var(--text-primary)]">{moduleT('aiModels.scanDuration')}</p>
@@ -625,7 +625,7 @@ function InsightsRow({
                 <Icon className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] text-[var(--text-muted)]">{insight.label}</p>
+                <p className="text-[0.79rem] text-[var(--text-muted)]">{insight.label}</p>
                 <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{insight.value}</p>
               </div>
             </div>
@@ -813,8 +813,8 @@ function ModelListFilters({
         <Select value={typeFilter} options={typeSelectOptions} onChange={onTypeChange} widthClass="w-36" size="sm" />
       </FilterField>
 
-      <FilterField label={moduleT('aiModels.search')} className="min-w-[280px] flex-1">
-        <div className="relative w-full min-w-[180px]">
+      <FilterField label={moduleT('aiModels.search')} className="min-w-[20.0rem] flex-1">
+        <div className="relative w-full min-w-[12.86rem]">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             value={modelKeyword}
@@ -1002,7 +1002,7 @@ function SourceTag({ sourceName }: { sourceName: string }) {
 
   return (
     <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[0.71rem] font-semibold ${
         isUncategorized
           ? 'border border-[color-mix(in_srgb,var(--color-warning)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_12%,transparent)] text-[var(--color-warning)]'
           : 'bg-[var(--brand-green)] text-white'
@@ -1016,7 +1016,7 @@ function SourceTag({ sourceName }: { sourceName: string }) {
 function TypeTag({ label }: { label: string }) {
   const { t: moduleT } = useTranslation('modules');
   return (
-    <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-transparent px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+    <span className="shrink-0 rounded-full border border-[var(--border-color)] bg-transparent px-2 py-0.5 text-[0.71rem] font-medium text-[var(--text-muted)]">
       {label === '__unknown__' ? moduleT('aiModels.unknownType') : label}
     </span>
   );

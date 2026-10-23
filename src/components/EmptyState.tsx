@@ -38,7 +38,7 @@ export function EmptyState({
   return (
     <div
       className={`empty-state relative overflow-hidden flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-color)] bg-[linear-gradient(135deg,var(--bg-main),var(--brand-green-10))] px-6 text-center ${
-        compact ? 'empty-state--compact min-h-[260px] py-8' : 'min-h-[320px] py-14'
+        compact ? 'empty-state--compact min-h-[18.57rem] py-8' : 'min-h-[22.86rem] py-14'
       } ${className}`}
     >
       {/* 用低对比度背景层增加空状态质感，避免纯灰色占位在页面模式下显得空。 */}

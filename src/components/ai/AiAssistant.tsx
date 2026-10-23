@@ -859,7 +859,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
               {/* 指向小球的小尖角：一个旋转 45° 的方块，只留底边与右边，
                   正好拼出朝下的三角，而且边框颜色与气泡一致（两层三角那种写法太啰嗦）。
                   这一层不是 motion 元素，所以这里用 translate 居中不会被覆盖。 */}
-              <span className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[3px] rotate-45 border-b border-r border-[var(--brand-green-20)] bg-[var(--bg-elevated)]" />
+              <span className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[0.21rem] rotate-45 border-b border-r border-[var(--brand-green-20)] bg-[var(--bg-elevated)]" />
             </motion.span>
           </motion.span>
           {/* 图标要比别处大一号：这个 SVG 的 viewBox 是 24 格，但图形本身只占

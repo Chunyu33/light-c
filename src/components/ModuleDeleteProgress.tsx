@@ -70,14 +70,14 @@ export function ModuleDeleteProgress({
       <div className="flex w-[11em] flex-col gap-1.5 px-1 py-0.5">
         <div className="flex items-center gap-1.5">
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--color-danger)]" />
-          <span className="truncate text-[13px] font-medium text-[var(--fg-primary)]">{phaseLabel}</span>
+          <span className="truncate text-[0.93rem] font-medium text-[var(--fg-primary)]">{phaseLabel}</span>
           {hasPercent && (
-            <span className="ml-auto shrink-0 text-[11px] font-medium text-[var(--color-danger)] tabular-nums">{percent}%</span>
+            <span className="ml-auto shrink-0 text-[0.79rem] font-medium text-[var(--color-danger)] tabular-nums">{percent}%</span>
           )}
         </div>
-        <span className="truncate text-[11px] text-[var(--fg-muted)] tabular-nums">{progressLabel}</span>
+        <span className="truncate text-[0.79rem] text-[var(--fg-muted)] tabular-nums">{progressLabel}</span>
         {progressBar}
-        {hint && <span className="text-[10px] text-[var(--fg-faint)]">{hint}</span>}
+        {hint && <span className="text-[0.71rem] text-[var(--fg-faint)]">{hint}</span>}
       </div>
     );
   }
@@ -95,7 +95,7 @@ export function ModuleDeleteProgress({
             <h4 className="text-sm font-semibold text-[var(--text-primary)]">{phaseLabel}</h4>
             {/* 百分比做成徽标而不是大字：与扫描态的状态徽标同一位置、同一量级 */}
             {hasPercent && (
-              <span className="rounded-full bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-danger)] tabular-nums">
+              <span className="rounded-full bg-[var(--bg-card)] px-2 py-0.5 text-[0.71rem] font-medium text-[var(--color-danger)] tabular-nums">
                 {percent}%
               </span>
             )}
@@ -113,7 +113,7 @@ export function ModuleDeleteProgress({
             ))}
           </div>
         )}
-        {hint && <p className="mt-2 text-[11px] text-[var(--fg-faint)]">{hint}</p>}
+        {hint && <p className="mt-2 text-[0.79rem] text-[var(--fg-faint)]">{hint}</p>}
       </div>
     </div>
   );

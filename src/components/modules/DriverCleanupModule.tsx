@@ -638,7 +638,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
                             </div>
                             <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                               <span className="rounded bg-[var(--bg-hover)] px-1.5 py-0.5 font-mono text-[var(--fg-secondary)]" title={packageInfo.published_name}>{packageInfo.published_name}</span>
-          <span className="max-w-[220px] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverUi.unknownVendor')}>{packageInfo.provider_name || moduleT('driverUi.unknownVendor')}</span>
+          <span className="max-w-[15.71rem] truncate font-medium text-[var(--fg-secondary)]" title={packageInfo.provider_name || moduleT('driverUi.unknownVendor')}>{packageInfo.provider_name || moduleT('driverUi.unknownVendor')}</span>
           <span className="text-[var(--fg-muted)]" title={packageInfo.driver_version || moduleT('driverUi.unknownVersion')}>{moduleT('driverUi.version')} {packageInfo.driver_version || moduleT('driverUi.unknownVersion')}</span>
                               <span className={`inline-flex items-center gap-1 rounded-full bg-[var(--bg-hover)] px-1.5 py-0.5 ${driverClassBadge.className}`}>
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${driverClassBadge.dotClassName}`} />

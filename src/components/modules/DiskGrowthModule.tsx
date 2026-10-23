@@ -220,7 +220,7 @@ function SummaryCards({
   return (
     <div className="grid grid-cols-4 gap-3">
       <div className="glass-block min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={`${driveLabel} ${moduleT('diskGrowth.indexed')}`}>
+        <p className="text-[0.79rem] text-[var(--text-muted)] mb-1 truncate" title={`${driveLabel} ${moduleT('diskGrowth.indexed')}`}>
           {driveLabel} {moduleT('diskGrowth.indexed')}
         </p>
         <p className="text-base font-bold text-[var(--text-primary)] tabular-nums truncate" title={indexedSizeText}>
@@ -228,7 +228,7 @@ function SummaryCards({
         </p>
       </div>
       <div className="glass-block min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.netChange')}>{moduleT('diskGrowth.netChange')}</p>
+        <p className="text-[0.79rem] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.netChange')}>{moduleT('diskGrowth.netChange')}</p>
         <p
           className={`text-base font-bold tabular-nums truncate ${
             totalGrowth > 0
@@ -243,19 +243,19 @@ function SummaryCards({
         </p>
       </div>
       <div className="glass-block min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.previousScan')}>{moduleT('diskGrowth.previousScan')}</p>
-        <p className="text-[13px] font-semibold text-[var(--text-primary)] tabular-nums truncate" title={previousScanText}>
+        <p className="text-[0.79rem] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.previousScan')}>{moduleT('diskGrowth.previousScan')}</p>
+        <p className="text-[0.93rem] font-semibold text-[var(--text-primary)] tabular-nums truncate" title={previousScanText}>
           {previousScanText}
         </p>
       </div>
       <div className="glass-block min-w-0 bg-[var(--bg-main)] rounded-xl px-3 py-3">
-        <p className="text-[11px] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.fileCount')}>{moduleT('diskGrowth.fileCount')}</p>
+        <p className="text-[0.79rem] text-[var(--text-muted)] mb-1 truncate" title={moduleT('diskGrowth.fileCount')}>{moduleT('diskGrowth.fileCount')}</p>
         <p className="text-base font-bold text-[var(--brand-green)] tabular-nums truncate" title={scannedFileCountText}>
           {scannedFileCountText}
         </p>
       </div>
       {growthReport.entries.length > 0 && (
-        <div className="col-span-4 flex items-center gap-3 text-[12px] text-[var(--text-muted)] min-w-0 overflow-hidden whitespace-nowrap">
+        <div className="col-span-4 flex items-center gap-3 text-[0.86rem] text-[var(--text-muted)] min-w-0 overflow-hidden whitespace-nowrap">
           <span className="text-red-500">{moduleT('diskGrowth.increased', { size: formatSize(scanSummary.analyze.increased_size ?? 0) })}</span>
           <span className="text-green-500">{moduleT('diskGrowth.decreased', { size: formatSize(scanSummary.analyze.decreased_size ?? 0) })}</span>
           <span className="truncate">{moduleT('diskGrowth.sorted')}</span>
@@ -270,7 +270,7 @@ function DiagnosticBanner({ report }: { report: DiskGrowthReport }) {
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 rounded-xl text-[13px] ${
+      className={`flex items-start gap-3 px-4 py-3 rounded-xl text-[0.93rem] ${
         hasGrowth
           ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
           : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
@@ -394,19 +394,19 @@ function ChangeRow({
 
       <div className="flex-1 min-w-0">
         <p
-          className="text-[13px] text-[var(--text-primary)] truncate cursor-pointer hover:text-[var(--brand-green)] transition-colors"
+          className="text-[0.93rem] text-[var(--text-primary)] truncate cursor-pointer hover:text-[var(--brand-green)] transition-colors"
           title={rowTitle}
           onClick={() => onOpenFolder(entry.path)}
         >
           {simplifyPath(entry.path)}
         </p>
-        <p className="text-[11px] text-[var(--text-faint)] mt-0.5 truncate">
+        <p className="text-[0.79rem] text-[var(--text-faint)] mt-0.5 truncate">
           {growth?.explanation ?? entry.reason}
         </p>
       </div>
 
       <span
-        className="w-20 text-center text-[11px] text-[var(--text-muted)] tabular-nums shrink-0"
+        className="w-20 text-center text-[0.79rem] text-[var(--text-muted)] tabular-nums shrink-0"
         title={modifiedTimeTitle === '-'
           ? moduleT('diskGrowth.modifiedTimeMissing')
           : moduleT('diskGrowth.modifiedTimeTitle', { time: modifiedTimeTitle })}
@@ -414,19 +414,19 @@ function ChangeRow({
         {modifiedTimeLabel}
       </span>
 
-      <span className={`flex items-center gap-1 w-24 justify-end text-[12px] shrink-0 ${style.color}`}>
+      <span className={`flex items-center gap-1 w-24 justify-end text-[0.86rem] shrink-0 ${style.color}`}>
         <Icon className="w-3.5 h-3.5" />
         {style.label}
       </span>
 
-      <span className="text-[13px] font-medium text-[var(--text-primary)] tabular-nums w-20 text-right shrink-0">
+      <span className="text-[0.93rem] font-medium text-[var(--text-primary)] tabular-nums w-20 text-right shrink-0">
         {formatSize(entry.size)}
       </span>
 
       <button
         onClick={() => growth && onShowDetails(growth)}
         disabled={!growth}
-        className={`flex w-24 shrink-0 items-center justify-end gap-1 text-[13px] font-medium tabular-nums ${style.color} ${
+        className={`flex w-24 shrink-0 items-center justify-end gap-1 text-[0.93rem] font-medium tabular-nums ${style.color} ${
           growth ? 'hover:underline underline-offset-4 cursor-pointer' : 'cursor-default'
         }`}
         title={growth ? moduleT('diskGrowth.viewDetails') : undefined}
@@ -620,7 +620,7 @@ function DiskGrowthDetailsModal({
       onClick={onClose}
     >
       <motion.div
-        className="w-[1040px] max-w-[calc(100vw-32px)] h-[90vh] max-h-[calc(100vh-32px)] rounded-2xl bg-[var(--bg-card)] shadow-2xl border border-[var(--border-color)] overflow-hidden flex flex-col"
+        className="w-[74.29rem] max-w-[calc(100vw-32px)] h-[90vh] max-h-[calc(100vh-32px)] rounded-2xl bg-[var(--bg-card)] shadow-2xl border border-[var(--border-color)] overflow-hidden flex flex-col"
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -663,19 +663,19 @@ function DiskGrowthDetailsModal({
         <div className="p-5 space-y-4 overflow-hidden flex-1 min-h-0 flex flex-col">
           <div className="grid grid-cols-3 gap-3 shrink-0">
             <div className="glass-block rounded-xl bg-[var(--bg-main)] px-3 py-2">
-              <p className="text-[11px] text-[var(--text-muted)]">{moduleT('diskGrowth.previousSize')}</p>
+              <p className="text-[0.79rem] text-[var(--text-muted)]">{moduleT('diskGrowth.previousSize')}</p>
               <p className="mt-1 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                 {formatSize(currentEntry.old_size)}
               </p>
             </div>
             <div className="glass-block rounded-xl bg-[var(--bg-main)] px-3 py-2">
-              <p className="text-[11px] text-[var(--text-muted)]">{moduleT('diskGrowth.currentSize')}</p>
+              <p className="text-[0.79rem] text-[var(--text-muted)]">{moduleT('diskGrowth.currentSize')}</p>
               <p className="mt-1 text-sm font-semibold text-[var(--text-primary)] tabular-nums">
                 {formatSize(currentEntry.new_size)}
               </p>
             </div>
             <div className="glass-block rounded-xl bg-[var(--bg-main)] px-3 py-2">
-              <p className="text-[11px] text-[var(--text-muted)]">{moduleT('diskGrowth.difference')}</p>
+              <p className="text-[0.79rem] text-[var(--text-muted)]">{moduleT('diskGrowth.difference')}</p>
               <p className={`mt-1 text-sm font-semibold tabular-nums ${style.color}`}>
                 {formatDiff(currentEntry.diff)}
               </p>
@@ -684,7 +684,7 @@ function DiskGrowthDetailsModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
             <div className="glass-list rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] overflow-hidden min-w-0 min-h-0 flex flex-col">
-              <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] shrink-0">
+              <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[0.79rem] text-[var(--text-faint)] shrink-0">
                 <span className="flex-1">{moduleT('diskGrowth.subdirectories')}</span>
                 <span className="w-20 text-right">{moduleT('diskGrowth.currentSize')}</span>
                 <span className="w-24 text-right">{moduleT('diskGrowth.difference')}</span>
@@ -706,11 +706,11 @@ function DiskGrowthDetailsModal({
                           style={{ transform: `translateY(${virtualItem.start}px)`, height: `${virtualItem.size}px` }}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] text-[var(--text-primary)] truncate" title={buildPathTitle(detail.path, detail.modified)}>{detail.name}</p>
-                            <p className="text-[11px] text-[var(--text-faint)] truncate" title={buildPathTitle(detail.path, detail.modified)}>{detail.path}</p>
+                            <p className="text-[0.93rem] text-[var(--text-primary)] truncate" title={buildPathTitle(detail.path, detail.modified)}>{detail.name}</p>
+                            <p className="text-[0.79rem] text-[var(--text-faint)] truncate" title={buildPathTitle(detail.path, detail.modified)}>{detail.path}</p>
                           </div>
-                          <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(detail.new_size)}</span>
-                          <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${detailStyle.color}`}>{formatDiff(detail.diff)}</span>
+                          <span className="w-20 text-right text-[0.93rem] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(detail.new_size)}</span>
+                          <span className={`w-24 text-right text-[0.93rem] font-medium tabular-nums ${detailStyle.color}`}>{formatDiff(detail.diff)}</span>
                           <div className="w-24 flex items-center justify-end gap-0.5">
                             {/* 快捷提问：这一行是**用户自己展开看到的**，问句里带的路径就是它本身，
                                 `skipLookup` → 不让助手去查（这层文件级明细本来就不在它的读取能力里，
@@ -755,7 +755,7 @@ function DiskGrowthDetailsModal({
             </div>
 
             <div className="glass-list rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] overflow-hidden min-w-0 min-h-0 flex flex-col">
-              <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] shrink-0">
+              <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[0.79rem] text-[var(--text-faint)] shrink-0">
                 <span className="flex-1">{moduleT('diskGrowth.files')}</span>
                 <span className="w-20 text-right">{moduleT('diskGrowth.currentSize')}</span>
                 <span className="w-24 text-right">{moduleT('diskGrowth.difference')}</span>
@@ -780,11 +780,11 @@ function DiskGrowthDetailsModal({
                           style={{ transform: `translateY(${virtualItem.start}px)`, height: `${virtualItem.size}px` }}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] text-[var(--text-primary)] truncate" title={buildPathTitle(file.path, file.modified)}>{file.name}</p>
-                            <p className="text-[11px] text-[var(--text-faint)] truncate" title={buildPathTitle(file.path, file.modified)}>{file.path}</p>
+                            <p className="text-[0.93rem] text-[var(--text-primary)] truncate" title={buildPathTitle(file.path, file.modified)}>{file.name}</p>
+                            <p className="text-[0.79rem] text-[var(--text-faint)] truncate" title={buildPathTitle(file.path, file.modified)}>{file.path}</p>
                           </div>
-                          <span className="w-20 text-right text-[13px] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(file.new_size)}</span>
-                          <span className={`w-24 text-right text-[13px] font-medium tabular-nums ${fileStyle.color}`}>{formatDiff(file.diff)}</span>
+                          <span className="w-20 text-right text-[0.93rem] font-medium text-[var(--text-primary)] tabular-nums">{formatSize(file.new_size)}</span>
+                          <span className={`w-24 text-right text-[0.93rem] font-medium tabular-nums ${fileStyle.color}`}>{formatDiff(file.diff)}</span>
                           <div className="w-16 flex items-center justify-end gap-0.5">
                             {/* 快捷提问：这一行是**具体文件**（用户展开明细才看到的），
                                 `skipLookup` → 不让助手去查，直接用模型自己的知识答"这是什么、能不能删" */}
@@ -825,7 +825,7 @@ function DiskGrowthDetailsModal({
             </div>
           </div>
 
-          <p className="text-[11px] text-[var(--text-faint)] shrink-0">
+          <p className="text-[0.79rem] text-[var(--text-faint)] shrink-0">
             {moduleT('diskGrowth.detailNote', { count: detailPageSize })}
           </p>
         </div>
@@ -1222,7 +1222,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       titleExtra={driveSelector}
       error={error}
     >
-      <div className="glass-block mx-4 mt-4 flex flex-col gap-2 rounded-xl bg-[var(--bg-main)] px-4 py-3 text-[12px] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="glass-block mx-4 mt-4 flex flex-col gap-2 rounded-xl bg-[var(--bg-main)] px-4 py-3 text-[0.86rem] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
         <span title={selectedDrive ? driveOptionTitle(selectedDrive) : selectedDriveLabel}>
           {moduleT('diskGrowth.analyzingDrive', { drive: selectedDriveLabel })}
           {selectedDrive?.volume_name ? ` · ${selectedDrive.volume_name}` : ''}
@@ -1240,14 +1240,14 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       </div>
 
       {isAdmin === false && (
-        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-700 dark:text-amber-400">
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[0.93rem] text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{moduleT('diskGrowth.adminHint')}</span>
         </div>
       )}
 
       {selectedDrive && !selectedDrive.is_ntfs && (
-        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] text-amber-700 dark:text-amber-400">
+        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[0.93rem] text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{moduleT('diskGrowth.ntfsHint')}</span>
         </div>
@@ -1295,17 +1295,17 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
           <DiagnosticBanner report={growthReport} />
 
           <div className="flex items-center justify-between">
-            <p className="text-[13px] text-[var(--text-muted)]">{moduleT('diskGrowth.resultCount', { count: entries.length })}</p>
+            <p className="text-[0.93rem] text-[var(--text-muted)]">{moduleT('diskGrowth.resultCount', { count: entries.length })}</p>
             <div className="flex items-center gap-3">
               <button
                 onClick={handleExportHtml}
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-[12px] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-[0.86rem] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                 title={moduleT('diskGrowth.exportHtml')}
               >
                 <Download className="h-3.5 w-3.5" />
                 <span>{moduleT('diskGrowth.exportHtml')}</span>
               </button>
-              <span className="text-[12px] text-[var(--text-faint)]">{isAdmin ? moduleT('diskGrowth.adminMode') : moduleT('diskGrowth.nonAdminMode')}</span>
+              <span className="text-[0.86rem] text-[var(--text-faint)]">{isAdmin ? moduleT('diskGrowth.adminMode') : moduleT('diskGrowth.nonAdminMode')}</span>
             </div>
           </div>
           <DiskGrowthDiagnostics
@@ -1315,7 +1315,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
           />
 
           <div className="glass-list bg-[var(--bg-main)] rounded-xl overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[11px] text-[var(--text-faint)] uppercase tracking-wider">
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--border-color)] text-[0.79rem] text-[var(--text-faint)] uppercase tracking-wider">
               <div className="w-1.5 shrink-0" />
               <div className="flex-1">{moduleT('diskGrowth.path')}</div>
               <div className="w-20 shrink-0 text-center">{moduleT('diskGrowth.changeTime')}</div>
@@ -1346,7 +1346,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
             {hasMore && (
               <button
                 onClick={() => setShowAll(true)}
-                className="w-full py-3 text-center text-[13px] text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="w-full py-3 text-center text-[0.93rem] text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 {moduleT('diskGrowth.showAll', { count: entries.length })}
               </button>

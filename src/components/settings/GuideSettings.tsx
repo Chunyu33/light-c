@@ -75,7 +75,7 @@ export function GuideSettings() {
         <div className="glass-block space-y-3 rounded-2xl bg-[var(--bg-main)] p-5">
           {RISK_LEVELS.map(({ key, className }) => (
             <div key={key} className="flex items-start gap-3">
-              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${className}`}>
+              <span className={`shrink-0 rounded px-2 py-0.5 text-[0.71rem] font-medium ${className}`}>
                 {t(`guide.risk.${key}`)}
               </span>
               <p className="text-xs text-[var(--text-muted)]">{t(`guide.risk.${key}Desc`)}</p>

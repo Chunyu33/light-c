@@ -507,7 +507,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
             }`}>
               <span className="truncate text-[var(--fg-muted)]">{isScanning ? t('bigFiles.scanningPrefix') : t('bigFiles.scanCompletedPrefix')} {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}</span>
               {scanBackend && (
-                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                <span className={`shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${
                   scanBackend === 'mft'
                     ? 'bg-[var(--brand-green)] text-white'
                     : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
@@ -621,7 +621,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                           {file.path.split('\\').pop() || file.path}
                         </p>
                         {localizedSourceLabel && (
-                          <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
+                          <span className="shrink-0 px-1.5 py-0.5 rounded text-[0.64rem] font-medium bg-[var(--bg-hover)] text-[var(--fg-muted)]">
                             {localizedSourceLabel}
                           </span>
                         )}
@@ -635,8 +635,8 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold text-emerald-600">{formatSize(file.size)}</p>
                       <div className="flex items-center justify-end gap-2 mt-0.5">
-                        <span className="text-[10px] text-[var(--fg-muted)]">{formatDate(file.modified)}</span>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${getRiskLevelColor(riskLevel)} ${getRiskLevelBgColor(riskLevel)}`}>
+                        <span className="text-[0.71rem] text-[var(--fg-muted)]">{formatDate(file.modified)}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[0.64rem] font-semibold ${getRiskLevelColor(riskLevel)} ${getRiskLevelBgColor(riskLevel)}`}>
                           {isLocked ? '🔒 ' : ''}{t(getRiskLevelKey(riskLevel))}
                         </span>
                       </div>
