@@ -468,8 +468,18 @@ impl SocialScanner {
         }
 
         // 扫描每个路径；适配器可能通过多个候选入口指向同一文件，统一去重。
+        //
+        // ⚠️ 必须**深的路径先扫**：同一个文件被父目录和子目录同时覆盖时，先扫到的那个
+        // 分类说了算。Telegram 的 tdata（聊天记录）里就包着 user_data（缓存），
+        // 原来按 push 顺序先扫 tdata，1.1GB 缓存全被并进聊天记录，界面上没有独立缓存项。
+        // 按层级从深到浅排序后，子路径先拿到自己的分类，父路径再跳过重复文件。
+        let mut ordered_paths: Vec<_> = app_paths.iter().collect();
+        ordered_paths.sort_by(|a, b| {
+            b.path.components().count().cmp(&a.path.components().count())
+        });
+
         let mut scanned_files = HashSet::new();
-        for app_path in app_paths {
+        for app_path in ordered_paths {
             if !app_path.path.exists() {
                 continue;
             }
@@ -632,10 +642,17 @@ impl SocialScanner {
             "/database/",
         ];
 
+        // Telegram 的缓存目录（user_data）在 tdata 里面，路径同样包含 "\tdata\"，
+        // 会被下面的特征误判成聊天记录 —— 把 1.1GB 缓存算进"不可删除"，
+        // 界面上就永远看不到独立的缓存项。这里先把它排除掉。
+        let is_telegram_cache =
+            path_str.contains("\\tdata\\user_data") || path_str.contains("/tdata/user_data");
+
         // 检查是否在数据库关键目录中
-        let in_critical_dir = critical_path_patterns
-            .iter()
-            .any(|pattern| path_str.contains(pattern));
+        let in_critical_dir = !is_telegram_cache
+            && critical_path_patterns
+                .iter()
+                .any(|pattern| path_str.contains(pattern));
 
         // 如果在关键目录中，或者是数据库文件后缀
         if in_critical_dir {
@@ -833,6 +850,7 @@ impl Default for SocialScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
 
     #[test]
     fn test_risk_level_deletable() {
