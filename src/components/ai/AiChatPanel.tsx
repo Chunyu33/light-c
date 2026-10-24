@@ -360,10 +360,12 @@ export function AiChatPanel({
                 className={`group flex flex-col gap-0.5 ${isUser ? 'items-end' : 'items-start'}`}
               >
                 {dayLabel && dayLabel !== previousDayLabel ? (
-                  <div className="flex w-full items-center gap-2 py-1 text-[0.72rem] text-[var(--text-faint)]">
-                    <span className="h-px flex-1 bg-[var(--border-color)]" />
+                  /* 首条消息的日期不画横线：它紧贴面板头部的下边框，
+                     两条线离得太近，看起来像重复的边框。只留文字并居中。 */
+                  <div className="flex w-full items-center justify-center gap-2 py-1 text-[0.72rem] text-[var(--text-faint)]">
+                    {index > 0 && <span className="h-px flex-1 bg-[var(--border-color)]" />}
                     <span className="shrink-0">{dayLabel}</span>
-                    <span className="h-px flex-1 bg-[var(--border-color)]" />
+                    {index > 0 && <span className="h-px flex-1 bg-[var(--border-color)]" />}
                   </div>
                 ) : null}
                 <div style={{ userSelect: 'all' }} className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
