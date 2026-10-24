@@ -141,6 +141,16 @@
     "emptyTitle": "没有发现可清理的缓存",
     "emptyDesc": "可能是这些工具还没装，或者缓存目录结构与预期不同。",
     "rescan": "重新扫描",
-    "summary": "{{dirs}} 个缓存目录 · {{files}} 个文件"
-  }
+    "summary": "{{dirs}} 个缓存目录 · {{files}} 个文件",
+      "deletedTitle": "已删除 {{count}} 个缓存目录",
+      "deletedDesc": "占用的空间已释放。",
+      "deleteFailed": "删除失败",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "selected": "已选 {{count}} 项 · {{size}}",
+      "delete": "删除选中",
+      "confirmTitle": "确认删除 {{count}} 个缓存目录？",
+      "confirmDesc": "共 {{size}}，删除后不会进入回收站。",
+      "confirmWarning": "删除的是工具自己生成的缓存，但正在运行的 AI 工具可能需要重新加载部分数据。"
+    }
 }

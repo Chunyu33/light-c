@@ -121,6 +121,16 @@
     "emptyTitle": "No cleanable caches found",
     "emptyDesc": "These tools may not be installed, or their cache layout differs from what we expect.",
     "rescan": "Scan again",
-    "summary": "{{dirs}} cache folders · {{files}} files"
-  }
+    "summary": "{{dirs}} cache folders · {{files}} files",
+      "deletedTitle": "Removed {{count}} cache folders",
+      "deletedDesc": "The space has been released.",
+      "deleteFailed": "Deletion failed",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "selected": "{{count}} selected · {{size}}",
+      "delete": "Delete selected",
+      "confirmTitle": "Delete {{count}} cache folders?",
+      "confirmDesc": "{{size}} in total. They are removed permanently, not moved to the recycle bin.",
+      "confirmWarning": "These are caches the tools generated themselves, but a running AI tool may need to reload some data."
+    }
 }

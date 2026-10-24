@@ -661,6 +661,16 @@
     "emptyTitle": "沒有發現可清理的快取",
     "emptyDesc": "可能是這些工具還沒安裝，或快取目錄結構與預期不同。",
     "rescan": "重新掃描",
-    "summary": "{{dirs}} 個快取目錄 · {{files}} 個檔案"
-  }
+    "summary": "{{dirs}} 個快取目錄 · {{files}} 個檔案",
+      "deletedTitle": "已刪除 {{count}} 個快取目錄",
+      "deletedDesc": "佔用的空間已釋放。",
+      "deleteFailed": "刪除失敗",
+      "selectAll": "全選",
+      "deselectAll": "取消全選",
+      "selected": "已選 {{count}} 項 · {{size}}",
+      "delete": "刪除選取",
+      "confirmTitle": "確認刪除 {{count}} 個快取目錄？",
+      "confirmDesc": "共 {{size}}，刪除後不會進入資源回收筒。",
+      "confirmWarning": "刪除的是工具自行產生的快取，但執行中的 AI 工具可能需要重新載入部分資料。"
+    }
 }

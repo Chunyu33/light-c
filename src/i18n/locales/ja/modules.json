@@ -121,6 +121,16 @@
     "emptyTitle": "整理できるキャッシュが見つかりません",
     "emptyDesc": "これらのツールが未インストールか、キャッシュの構成が想定と異なる可能性があります。",
     "rescan": "再スキャン",
-    "summary": "{{dirs}} 個のフォルダー · {{files}} 個のファイル"
-  }
+    "summary": "{{dirs}} 個のフォルダー · {{files}} 個のファイル",
+      "deletedTitle": "キャッシュフォルダーを {{count}} 個削除しました",
+      "deletedDesc": "使用していた容量が解放されました。",
+      "deleteFailed": "削除に失敗しました",
+      "selectAll": "すべて選択",
+      "deselectAll": "選択を解除",
+      "selected": "{{count}} 件選択 · {{size}}",
+      "delete": "選択を削除",
+      "confirmTitle": "{{count}} 個のキャッシュフォルダーを削除しますか？",
+      "confirmDesc": "合計 {{size}}。ゴミ箱には入らず直接削除されます。",
+      "confirmWarning": "削除するのはツール自身が生成したキャッシュですが、実行中の AI ツールは一部データを再読み込みする場合があります。"
+    }
 }

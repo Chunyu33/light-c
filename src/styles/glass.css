@@ -720,3 +720,20 @@ html.dark.glass .social-detail-modal {
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 24px 60px -18px rgba(0, 0, 0, 0.6);
 }
+
+/* ===== 二次确认弹窗（液态玻璃）=====
+   和明细弹窗同一个毛病：玻璃态下 --bg-elevated 只有 0.45 不透明，
+   压在模糊遮罩上会被背后内容染色、也没有边界。这里换成浮层底色 + 双层投影。
+   ⚠️ 不要在弹窗上再叠 backdrop-filter：遮罩那一层已经模糊过背景了。 */
+html.glass .confirm-dialog {
+  background-color: var(--glass-modal-bg);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.08),
+    0 24px 60px -18px rgba(15, 23, 42, 0.35);
+}
+
+html.dark.glass .confirm-dialog {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 24px 60px -18px rgba(0, 0, 0, 0.6);
+}

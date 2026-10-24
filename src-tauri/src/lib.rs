@@ -75,6 +75,7 @@ pub fn run() {
             cancel_large_file_scan,
             scan_social_cache,
             scan_ai_tool_caches,
+            delete_ai_tool_caches,
             get_categories,
             // 删除相关
             delete_files,

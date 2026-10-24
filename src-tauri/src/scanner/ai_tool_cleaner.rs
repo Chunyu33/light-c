@@ -124,6 +124,8 @@ impl AiToolScanner {
                 roots: vec![
                     self.local_appdata.join("WorkBuddy"),
                     self.appdata.join("WorkBuddy"),
+                    // CLI 的缓存写在用户目录点目录下，和桌面端 AppData 是两套
+                    self.user_profile.join(".workbuddy"),
                 ],
             },
             ToolSpec {
@@ -253,6 +255,25 @@ impl AiToolScanner {
             }
             self.walk_for_caches(&child.path(), depth + 1, entries);
         }
+    }
+
+    /// 判断一个路径是不是本模块管理的缓存目录。
+    ///
+    /// 删除是不可逆操作，前端传来的路径**一律不可信**，必须重新校验：
+    /// ① 目录名必须在白名单里 ② 必须位于某个已登记工具的根目录之下。
+    /// 两条都满足才允许删，避免被改参数删到用户目录本身。
+    pub fn is_managed_cache_dir(&self, path: &Path) -> bool {
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            return false;
+        };
+        if !CLEANABLE_DIR_NAMES.contains(&name) {
+            return false;
+        }
+        self.specs().iter().any(|spec| {
+            spec.roots
+                .iter()
+                .any(|root| path.starts_with(root) && path != root.as_path())
+        })
     }
 
     /// 统计目录内所有文件的总大小与数量。读不到的单条直接跳过（缓存目录常有占用）。
