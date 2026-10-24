@@ -17,6 +17,7 @@ mod registry;
 mod registry_scoring;
 mod scan_engine;
 pub(crate) mod shell_icons;
+mod ai_tool_cleaner;
 mod social_scanner;
 
 pub use categories::*;
@@ -27,4 +28,5 @@ pub use leftovers::*;
 pub use registry::*;
 pub use scan_engine::*;
 pub use shell_icons::*;
+pub use ai_tool_cleaner::*;
 pub use social_scanner::*;
