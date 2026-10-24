@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- New "AI tool cleanup": counts the cache folders left behind by WorkBuddy, Claude Code, Codex, DeepSeek and similar tools, so you can review each one before deleting, with a confirmation step.
+
 ## v2.17.0
 
 - New AI assistant: open it from the floating button in the lower right, ask what the files on screen are and whether they can be removed, and turn the answer straight into a selection or a deletion. Several AI providers can be saved and switched at any time, and screenshots can be attached to a question. Conversations and screenshots stay local, their location is configurable, and "clear local data" removes them too.
