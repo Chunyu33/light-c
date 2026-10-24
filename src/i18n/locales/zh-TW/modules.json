@@ -653,5 +653,14 @@
   "diskGrowthExtra": {
     "changeSummary": "展示變化目錄，按變化量排序，最多 {{count}} 項",
     "baselineSummary": "暫無變化目錄，展示本次佔用基線"
+  },
+  "aiTools": {
+    "idleTitle": "掃描 AI 工具快取",
+    "idleDesc": "統計 WorkBuddy、Claude Code、Codex、DeepSeek 等工具留下的快取目錄。",
+    "scan": "開始掃描",
+    "emptyTitle": "沒有發現可清理的快取",
+    "emptyDesc": "可能是這些工具還沒安裝，或快取目錄結構與預期不同。",
+    "rescan": "重新掃描",
+    "summary": "{{dirs}} 個快取目錄 · {{files}} 個檔案"
   }
 }

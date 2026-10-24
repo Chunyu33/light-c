@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import {
   AiModelsModule,
+  AiToolCleanupModule,
   BigFilesModule,
   ContextMenuModule,
   DriverCleanupModule,
@@ -25,6 +26,7 @@ const moduleComponents: Record<AppModuleId, ComponentType<{ layoutMode?: LayoutM
   'junk-clean': JunkCleanModule,
   'big-files': BigFilesModule,
   'social-clean': SocialCleanModule,
+  'ai-tool-cleanup': AiToolCleanupModule,
   'system-slim': SystemSlimModule,
   'driver-cleanup': DriverCleanupModule,
   leftovers: LeftoversModule,

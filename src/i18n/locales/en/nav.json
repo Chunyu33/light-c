@@ -4,6 +4,8 @@
   "bigFiles": "Large Files",
   "bigFilesDesc": "Find large files on disk and quickly free storage space",
   "socialClean": "Social App Cache",
+  "aiToolCleanup": "AI Tool Cleanup",
+  "aiToolCleanupDesc": "Track the caches left behind by AI clients and coding assistants.",
   "socialCleanDesc": "Clean cache files from WeChat, QQ, DingTalk, Lark and other apps",
   "systemSlim": "System Slim",
   "systemSlimDesc": "Adjust system settings to reclaim several GB of disk space",

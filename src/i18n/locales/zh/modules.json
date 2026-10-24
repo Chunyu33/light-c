@@ -133,5 +133,14 @@
   ,"driverUi": { "filteredList": "只显示可安全处理的 {{shown}} 个 · 已隐藏 {{hidden}} 个", "allList": "显示全部 {{total}} 个驱动", "showAllToggle": "显示全部", "noActionableDesc": "打开上面的开关可以看到其余驱动；判断不了的建议保留。",  "packageCount": "个驱动包", "noActionable": "未发现可处理项", "checking": "检测中...", "rescan": "重新检测", "scan": "检测驱动", "actionable": "可处理", "administrator": "管理员", "deleteAdminRequired": "可检测，删除需管理员", "scanning": "正在读取 Windows 驱动包信息...", "backup": "备份", "resultSummary": "成功 {{success}} 个，失败 {{failed}} 个。", "failureReason": "失败原因：{{reason}}", "backupSummary": "备份位置：{{path}}。可重新检测确认结果。", "restoreStarted": "驱动恢复命令已执行", "restoreIncomplete": "驱动恢复未完全成功", "restoreDesc": "{{message}}。已重新检测驱动状态。", "restoreFailed": "驱动恢复失败", "unknownVendor": "未知厂商", "unknownVersion": "未知", "version": "版本", "devices": "设备", "active": "活动", "current": "当前", "replaced": "替代", "files": "文件", "unknownInf": "未知 INF 文件", "backupHint": "删除前自动备份，软件不保留删除历史。", "rankVerified": "排名已核验", "rankUnavailable": "排名未取得", "rankHint": "高置信旧驱动来自设备匹配排名，其他候选仍需人工确认。", "rankMissingHint": "未取得设备驱动排名数据，当前结果仅供参考。", "selectHigh": "选中全部高置信旧驱动", "deselectHigh": "取消选中全部高置信旧驱动", "oldDriverCount": "旧驱动", "openBackup": "打开驱动备份目录", "restoreAll": "恢复全部驱动备份", "deleting": "删除中", "deleteSelected": "删除选中的 {{count}} 个驱动", "adminHint": "当前可以检测，但删除驱动包需要以管理员身份运行 LightC。", "driverDirectory": "打开驱动所在目录", "driverDirectoryUnavailable": "驱动目录信息不可用", "searchAria": "搜索 {{provider}} {{name}}", "openDriverAria": "打开 {{provider}} 驱动所在目录", "confirmDeleteDesc": "将永久删除“{{name}}”，占用约 {{size}}。删除前会自动备份，可在本模块内恢复。", "confirmDeleteTarget": "选中的 {{count}} 个驱动包", "unknownSize": "未知", "confirmRestoreDesc": "将读取当前数据目录 driver_backups 下的全部 INF 备份，并交由 Windows pnputil 递归安装。", "openBackupFailed": "打开备份目录失败", "openFolderFailed": "打开驱动目录失败" }
   ,"leftoversExtra": { "stage": { "search": "多路径检索", "searchDesc": "覆盖用户与公共数据目录", "installRecords": "安装记录匹配", "installRecordsDesc": "排除仍在使用的软件", "confidence": "置信度评分", "confidenceDesc": "优先识别高可信残留", "specialFolders": "特殊目录识别", "specialFoldersDesc": "标记模拟器与虚拟磁盘" }, "count": "{{count}} 个", "successSummary": "{{count}} 个，释放 {{size}}", "skippedExecutables": "（{{count}} 个因包含可执行文件被跳过，请使用深度清理）", "deleteErrorSummary": "{{count}} 个文件夹处理异常{{skipped}}", "permissionDenied": "权限不足，请以管理员身份运行", "fileLocked": "文件被占用，请关闭相关程序后重试", "fileMissing": "文件已不存在", "confirm": "确定" },
   "hotspotExtra": { "ntfsError": "{{drive}}当前文件系统为 {{fileSystem}}，MFT 深度扫描仅支持 NTFS 分区。", "unknownFileSystem": "未知", "searchPrefix": "Windows 文件夹", "searchSuffix": "可以删除吗" },
-  "diskGrowthExtra": { "changeSummary": "展示变化目录，按变化量排序，最多 {{count}} 项", "baselineSummary": "暂无变化目录，展示本次占用基线" }
+  "diskGrowthExtra": { "changeSummary": "展示变化目录，按变化量排序，最多 {{count}} 项", "baselineSummary": "暂无变化目录，展示本次占用基线" },
+  "aiTools": {
+    "idleTitle": "扫描 AI 工具缓存",
+    "idleDesc": "统计 WorkBuddy、Claude Code、Codex、DeepSeek 等工具留下的缓存目录。",
+    "scan": "开始扫描",
+    "emptyTitle": "没有发现可清理的缓存",
+    "emptyDesc": "可能是这些工具还没装，或者缓存目录结构与预期不同。",
+    "rescan": "重新扫描",
+    "summary": "{{dirs}} 个缓存目录 · {{files}} 个文件"
+  }
 }

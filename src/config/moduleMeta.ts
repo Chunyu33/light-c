@@ -4,6 +4,7 @@
 // ============================================================================
 
 import {
+  Bot,
   BrainCircuit,
   Cpu,
   Database,
@@ -28,6 +29,7 @@ export type AppModuleId =
   | 'junk-clean'
   | 'big-files'
   | 'social-clean'
+  | 'ai-tool-cleanup'
   | 'system-slim'
   | 'driver-cleanup'
   | 'leftovers'
@@ -49,6 +51,8 @@ export const APP_MODULE_META: AppModuleMeta[] = [
   { id: 'junk-clean', label: 'junkClean', icon: Trash2 },
   { id: 'big-files', label: 'bigFiles', icon: FileBox },
   { id: 'social-clean', label: 'socialClean', icon: MessageCircle },
+  // AI 工具清理和社交专清同属「清理」组：都是按工具聚合、可勾选删除的形态。
+  { id: 'ai-tool-cleanup', label: 'aiToolCleanup', icon: Bot },
   { id: 'system-slim', label: 'systemSlim', icon: Layers },
   { id: 'driver-cleanup', label: 'driverCleanup', icon: Cpu },
   { id: 'leftovers', label: 'leftovers', icon: Package },

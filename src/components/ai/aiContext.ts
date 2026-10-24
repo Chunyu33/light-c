@@ -21,6 +21,7 @@ const MODULE_INFO: Record<string, { name: string; role: string }> = {
   'junk-clean': { name: '垃圾清理', role: '扫描系统与各类应用的临时文件、缓存，由用户勾选后删除。' },
   'big-files': { name: '大文件清理', role: '按大小找出占空间的大文件，供用户判断后删除。' },
   'social-clean': { name: '社交软件专清', role: '定位微信、QQ 等聊天软件产生的缓存。' },
+  'ai-tool-cleanup': { name: 'AI 工具清理', role: '统计 AI 客户端和编程助手留下的缓存目录。' },
   'system-slim': { name: '系统瘦身', role: '处理系统组件、休眠文件、还原点等系统级占用。' },
   'driver-cleanup': { name: '旧驱动清理', role: '识别被更高版本替代的旧驱动包，删除前会自动备份。' },
   leftovers: { name: '残留清理', role: '查找软件卸载后遗留的目录与文件。' },

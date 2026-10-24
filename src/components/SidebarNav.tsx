@@ -29,7 +29,7 @@ const SIDEBAR_WIDTH_MAX = 360;
  * 三层轴互不重叠，用户看一眼就知道这一组会不会动我的系统设置。
  */
 const SIDEBAR_GROUPS: { id: string; ids: AppModuleId[] }[] = [
-  { id: 'cleanup', ids: ['junk-clean', 'big-files', 'social-clean', 'leftovers'] },
+  { id: 'cleanup', ids: ['junk-clean', 'big-files', 'social-clean', 'ai-tool-cleanup', 'leftovers'] },
   { id: 'system', ids: ['system-slim', 'driver-cleanup', 'registry', 'context-menu', 'shell-icons'] },
   { id: 'analyze', ids: ['hotspot', 'disk-growth', 'ai-models'] },
 ];

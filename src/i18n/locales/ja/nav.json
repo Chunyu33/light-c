@@ -4,6 +4,8 @@
   "bigFiles": "大きなファイル",
   "bigFilesDesc": "ディスク上の大きなファイルを探し、ストレージを解放",
   "socialClean": "SNSアプリキャッシュ",
+  "aiToolCleanup": "AI ツール整理",
+  "aiToolCleanupDesc": "AI クライアントやコーディング支援ツールが残すキャッシュを集計します。",
   "socialCleanDesc": "WeChat、QQ、DingTalk、Larkなどのキャッシュファイルを削除",
   "systemSlim": "システムスリム",
   "systemSlimDesc": "システム設定を調整し、数GBのディスク容量を解放",
