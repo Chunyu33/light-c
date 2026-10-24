@@ -32,6 +32,12 @@ const CLEANABLE_DIR_NAMES: &[&str] = &[
     "Crashpad",
 ];
 
+/// 从工具根目录往下找的最大层数。
+///
+/// 有些工具的缓存不是直接在根目录下（如 `.codeium/windsurf/<版本>/Cache`），
+/// 只扫一层会漏掉；但也不能无限往下走，免得把工具自己带的运行时目录当成缓存。
+const MAX_SCAN_DEPTH: usize = 3;
+
 /// 单个缓存目录的统计结果。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -130,6 +136,28 @@ impl AiToolScanner {
                 name: "Codex",
                 roots: vec![self.user_profile.join(".codex")],
             },
+            // 下面几个都是用户目录下的点目录，缓存藏在第二、三层，
+            // 靠 MAX_SCAN_DEPTH 才能找到。
+            ToolSpec {
+                id: "codeium",
+                name: "Codeium / Windsurf",
+                roots: vec![self.user_profile.join(".codeium")],
+            },
+            ToolSpec {
+                id: "continue",
+                name: "Continue",
+                roots: vec![self.user_profile.join(".continue")],
+            },
+            ToolSpec {
+                id: "codebuddy",
+                name: "CodeBuddy",
+                roots: vec![self.user_profile.join(".codebuddy")],
+            },
+            ToolSpec {
+                id: "gemini",
+                name: "Gemini CLI",
+                roots: vec![self.user_profile.join(".gemini")],
+            },
             ToolSpec {
                 id: "dsh",
                 name: "DeepSeek（dsh）",
@@ -176,16 +204,27 @@ impl AiToolScanner {
         }
     }
 
-    /// 在 root 下找**一层**白名单目录并统计。root 不存在就静默返回。
+    /// 在 root 下找白名单目录并统计。root 不存在就静默返回。
     fn collect_cleanable_children(&self, root: &Path, entries: &mut Vec<AiCacheEntry>) {
         if !root.is_dir() {
             return;
         }
-        let children = match std::fs::read_dir(root) {
+        self.walk_for_caches(root, 0, entries);
+    }
+
+    /// 递归找白名单目录，最多 MAX_SCAN_DEPTH 层。
+    ///
+    /// **命中即停**：白名单目录里不会再有需要单独统计的缓存，
+    /// 继续往下走只会把同一个 Cache 的子孙目录重复算一遍。
+    fn walk_for_caches(&self, dir: &Path, depth: usize, entries: &mut Vec<AiCacheEntry>) {
+        if depth > MAX_SCAN_DEPTH {
+            return;
+        }
+        let children = match std::fs::read_dir(dir) {
             Ok(children) => children,
             Err(error) => {
-                // 权限不足或目录正被占用：跳过这个 root，不让整次扫描失败
-                log::debug!("跳过 {}：{error}", root.display());
+                // 权限不足或目录正被占用：跳过这一层，不让整次扫描失败
+                log::debug!("跳过 {}：{error}", dir.display());
                 return;
             }
         };
@@ -195,20 +234,24 @@ impl AiToolScanner {
                 continue;
             }
             let name = child.file_name().to_string_lossy().to_string();
-            if !CLEANABLE_DIR_NAMES.contains(&name.as_str()) {
+            // 版本库目录整体跳过：白名单是按名字匹配的，而 `.git/logs` 存的是 reflog，
+            // 删掉会让用户丢失版本历史，和"清缓存"完全不是一回事。
+            if name == ".git" {
                 continue;
             }
-
-            let (size, file_count) = Self::measure_dir(&child.path());
-            if file_count == 0 {
+            if CLEANABLE_DIR_NAMES.contains(&name.as_str()) {
+                let (size, file_count) = Self::measure_dir(&child.path());
+                if file_count > 0 {
+                    entries.push(AiCacheEntry {
+                        name,
+                        path: child.path().to_string_lossy().to_string(),
+                        size,
+                        file_count,
+                    });
+                }
                 continue;
             }
-            entries.push(AiCacheEntry {
-                name,
-                path: child.path().to_string_lossy().to_string(),
-                size,
-                file_count,
-            });
+            self.walk_for_caches(&child.path(), depth + 1, entries);
         }
     }
 
