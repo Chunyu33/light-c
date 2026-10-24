@@ -4,11 +4,10 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## v2.17.0
 
-- New AI assistant: open it from the floating button in the lower right, ask what the files on screen are and whether they can be removed, then turn the answer into a selection or a deletion
-- Configure several AI providers and keep them saved side by side, switching provider or model at any time; screenshots can be attached to a question
-- Conversations and screenshots are kept locally, with copy, retry and click-to-enlarge; the location is configurable and is included in "clear local data"
-- Every module now has an "ask the assistant" entry next to each row, for questions about that specific item
-
+- New AI assistant: open it from the floating button in the lower right, ask what the files on screen are and whether they can be removed, and turn the answer straight into a selection or a deletion. Several AI providers can be saved and switched at any time, and screenshots can be attached to a question. Conversations and screenshots stay local, their location is configurable, and "clear local data" removes them too.
+- Every module now has an "ask the assistant" entry next to each row, for questions about that specific item.
+- Social clean now finds Telegram installed on another drive, and counts its cache separately from chat history instead of treating the cache as undeletable chat data.
+- Other improvements: the interface font follows the size setting; the sidebar footer gains website, changelog, GitHub and author entries; the content area fills the window; the title bar and about page share the new icon.
 
 ## v2.16.16
 

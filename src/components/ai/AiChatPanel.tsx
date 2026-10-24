@@ -22,6 +22,7 @@ import type { AiDeleteOutcome } from './moduleActionRegistry';
 import { collectImageFiles, compressImage, type AttachedImage } from './imageAttach';
 import { renderMarkdown } from './renderMarkdown';
 import { usePanelSize } from './usePanelSize';
+import { BetaBadge } from '../BetaBadge';
 import { formatSize } from '../../utils/format';
 
 /**
@@ -307,6 +308,7 @@ export function AiChatPanel({
           {t('panelTitle')}
           {moduleName ? <span className="text-[var(--text-muted)]"> · {moduleName}</span> : null}
         </span>
+        <BetaBadge />
         <button
           type="button"
           onClick={onClear}

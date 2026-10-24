@@ -13,6 +13,7 @@ import { FeedbackSettings } from './settings/FeedbackSettings';
 import { FeatureSettings } from './settings/FeatureSettings';
 import { GeneralSettings } from './settings/GeneralSettings';
 import { AiSettings } from './settings/AiSettings';
+import { BetaBadge } from './BetaBadge';
 import { GuideSettings } from './settings/GuideSettings';
 import { SecuritySettings } from './settings/SecuritySettings';
 import { DiskInfoSettings } from './settings/DiskInfoSettings';
@@ -217,6 +218,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="whitespace-nowrap">{t(label)}</span>
+                  {/* AI 助手是新能力，标清楚还在打磨中，避免用户按稳定功能的预期来用 */}
+                  {id === 'ai' && <BetaBadge />}
                 </button>
               ))}
             </nav>
