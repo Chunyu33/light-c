@@ -22,7 +22,7 @@ import { formatSize } from '../../utils/format';
 import { useToast } from '../Toast';
 import type { ModuleRenderProps } from './moduleProps';
 
-export function AiToolCleanupModule({ layoutMode = 'cards' }: ModuleRenderProps) {
+export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t: moduleT } = useTranslation('modules');
   const { showToast } = useToast();
@@ -113,6 +113,14 @@ export function AiToolCleanupModule({ layoutMode = 'cards' }: ModuleRenderProps)
   }, [handleScan, moduleT, selected, showToast]);
 
   const busy = scanning || deleting;
+  /**
+   * 底部操作条是否显示。
+   *
+   * ⚠️ 这一段不能省：`ModuleOperationToolbar` 用 portal 渲染成 `position: fixed` 的悬浮层，
+   * **不受模块容器约束** —— 不加这个开关，切到别的模块时它还会浮在人家页面上。
+   * 卡片模式看模块是否展开，页面模式看本模块是否是当前页。
+   */
+  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : expanded;
 
   return (
     <ModuleCard
@@ -296,6 +304,7 @@ export function AiToolCleanupModule({ layoutMode = 'cards' }: ModuleRenderProps)
 
             {/* 操作条复用公共组件：和社交专清、大文件、右键菜单同一个悬浮层，
                 位置、忙碌态、玻璃外观都由它统一处理，不在这里自己拼一套。 */}
+            {shouldShowOperationToolbar && (
             <ModuleOperationToolbar
               moduleId="aiTools"
               busy={deleting}
@@ -329,12 +338,13 @@ export function AiToolCleanupModule({ layoutMode = 'cards' }: ModuleRenderProps)
                 type="button"
                 onClick={() => setConfirmOpen(true)}
                 disabled={selected.size === 0 || deleting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-green)] px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
               >
                 <Trash2 className="h-4 w-4" />
                 {moduleT('aiTools.delete')}
               </button>
             </ModuleOperationToolbar>
+            )}
           </div>
         )}
       </div>
