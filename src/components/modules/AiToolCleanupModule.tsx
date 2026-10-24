@@ -20,18 +20,21 @@ import { deleteAiToolCaches, scanAiToolCaches } from '../../api/aiToolCleanup';
 import type { AiToolScanResult } from '../../types/aiToolCleanup';
 import { formatSize } from '../../utils/format';
 import { useToast } from '../Toast';
+import { useDashboard } from '../../contexts/DashboardContext';
 import type { ModuleRenderProps } from './moduleProps';
 
 export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t: moduleT } = useTranslation('modules');
   const { showToast } = useToast();
+  // 展开状态放在全局上下文里：和社交专清共用同一个 "当前展开的模块"，
+  // 否则各自维护一份就会同时出现两条操作条。
+  const { expandedModule, setExpandedModule } = useDashboard();
 
   const [scanning, setScanning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [result, setResult] = useState<AiToolScanResult | null>(null);
   const [error, setError] = useState('');
-  const [expanded, setExpanded] = useState(true);
   /** 当前展开的工具（手风琴：同时只展开一个） */
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   /** 已勾选的缓存目录路径 */
@@ -120,7 +123,8 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
    * **不受模块容器约束** —— 不加这个开关，切到别的模块时它还会浮在人家页面上。
    * 卡片模式看模块是否展开，页面模式看本模块是否是当前页。
    */
-  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : expanded;
+  const isExpanded = expandedModule === 'ai-tools';
+  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
 
   return (
     <ModuleCard
@@ -135,8 +139,8 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
       totalSize={result?.totalSize ?? 0}
       onScan={handleScan}
       error={error}
-      expanded={expanded}
-      onToggleExpand={() => setExpanded((value) => !value)}
+      expanded={isExpanded}
+      onToggleExpand={() => setExpandedModule(isExpanded ? null : 'ai-tools')}
     >
       <div className="p-4">
         {!result ? (
