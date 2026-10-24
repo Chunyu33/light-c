@@ -76,6 +76,7 @@ pub fn run() {
             scan_social_cache,
             scan_ai_tool_caches,
             delete_ai_tool_caches,
+            list_ai_cache_files,
             get_categories,
             // 删除相关
             delete_files,

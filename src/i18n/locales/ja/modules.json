@@ -127,12 +127,18 @@
       "deleteFailed": "削除に失敗しました",
       "selectAll": "すべて選択",
       "deselectAll": "選択を解除",
-      "selected": "{{count}} 件選択 · {{size}}",
       "delete": "選択を削除",
       "confirmTitle": "{{count}} 個のキャッシュフォルダーを削除しますか？",
       "confirmDesc": "合計 {{size}}。ゴミ箱には入らず直接削除されます。",
       "confirmWarning": "削除するのはツール自身が生成したキャッシュですが、実行中の AI ツールは一部データを再読み込みする場合があります。",
       "deleting": "キャッシュを削除しています…",
-      "deletingDesc": "{{count}} 件選択"
+      "deletingDesc": "{{count}} 件選択",
+      "viewAll": "すべて表示",
+      "fileSummary": "{{count}} 個のファイル · {{size}}",
+      "loadingFiles": "ファイル一覧を読み込んでいます…",
+      "noFiles": "このフォルダーにファイルはありません",
+      "columnPath": "ファイルパス",
+      "columnSize": "サイズ",
+      "openFolder": "フォルダーで開く"
     }
 }

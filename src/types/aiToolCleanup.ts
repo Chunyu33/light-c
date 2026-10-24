@@ -29,3 +29,9 @@ export interface AiToolScanResult {
   totalSize: number;
   totalFiles: number;
 }
+
+/** 缓存目录里的单个文件（明细弹窗按需拉取） */
+export interface AiCacheFile {
+  path: string;
+  size: number;
+}

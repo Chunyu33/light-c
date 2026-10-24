@@ -49,6 +49,14 @@ pub struct AiCacheEntry {
     pub file_count: usize,
 }
 
+/// 缓存目录里的单个文件，供明细弹窗按需拉取。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiCacheFile {
+    pub path: String,
+    pub size: u64,
+}
+
 /// 一个工具的汇总。界面按工具分组展示，用户先看到"哪个工具占了多少"。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -274,6 +282,28 @@ impl AiToolScanner {
                 .iter()
                 .any(|root| path.starts_with(root) && path != root.as_path())
         })
+    }
+
+    /// 列出某个缓存目录下的全部文件。
+    ///
+    /// 按需调用（用户点"查看全部"才进来），不在扫描阶段把所有文件塞进结果里 ——
+    /// 单个工具动辄上千个文件，全量返回会让扫描结果变得很大。
+    pub fn list_files(&self, path: &Path) -> Vec<AiCacheFile> {
+        let mut files = Vec::new();
+        for entry in WalkDir::new(path)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_file())
+        {
+            if let Ok(metadata) = entry.metadata() {
+                files.push(AiCacheFile {
+                    path: entry.path().to_string_lossy().to_string(),
+                    size: metadata.len(),
+                });
+            }
+        }
+        files
     }
 
     /// 统计目录内所有文件的总大小与数量。读不到的单条直接跳过（缓存目录常有占用）。

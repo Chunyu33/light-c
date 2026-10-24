@@ -127,12 +127,18 @@
       "deleteFailed": "Deletion failed",
       "selectAll": "Select all",
       "deselectAll": "Deselect all",
-      "selected": "{{count}} selected · {{size}}",
       "delete": "Delete selected",
       "confirmTitle": "Delete {{count}} cache folders?",
       "confirmDesc": "{{size}} in total. They are removed permanently, not moved to the recycle bin.",
       "confirmWarning": "These are caches the tools generated themselves, but a running AI tool may need to reload some data.",
       "deleting": "Removing caches…",
-      "deletingDesc": "{{count}} selected"
+      "deletingDesc": "{{count}} selected",
+      "viewAll": "View all",
+      "fileSummary": "{{count}} files · {{size}}",
+      "loadingFiles": "Loading file list…",
+      "noFiles": "No files in this folder",
+      "columnPath": "File path",
+      "columnSize": "Size",
+      "openFolder": "Show in folder"
     }
 }

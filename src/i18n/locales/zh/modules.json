@@ -147,12 +147,18 @@
       "deleteFailed": "删除失败",
       "selectAll": "全选",
       "deselectAll": "取消全选",
-      "selected": "已选 {{count}} 项 · {{size}}",
       "delete": "删除选中",
       "confirmTitle": "确认删除 {{count}} 个缓存目录？",
       "confirmDesc": "共 {{size}}，删除后不会进入回收站。",
       "confirmWarning": "删除的是工具自己生成的缓存，但正在运行的 AI 工具可能需要重新加载部分数据。",
       "deleting": "正在删除缓存…",
-      "deletingDesc": "已选 {{count}} 项"
+      "deletingDesc": "已选 {{count}} 项",
+      "viewAll": "查看全部",
+      "fileSummary": "{{count}} 个文件 · {{size}}",
+      "loadingFiles": "正在读取文件列表…",
+      "noFiles": "这个目录里没有文件",
+      "columnPath": "文件路径",
+      "columnSize": "大小",
+      "openFolder": "在文件夹中打开"
     }
 }

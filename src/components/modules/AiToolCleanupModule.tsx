@@ -10,13 +10,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Bot, ChevronRight, HardDrive, RefreshCw, Trash2 } from 'lucide-react';
+import { Bot, ChevronRight, FolderOpen, HardDrive, RefreshCw, Trash2 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { EmptyState } from '../EmptyState';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { AiCacheFileModal } from './AiCacheFileModal';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { deleteAiToolCaches, scanAiToolCaches } from '../../api/aiToolCleanup';
+import { openInFolder } from '../../api/commands';
 import type { AiToolScanResult } from '../../types/aiToolCleanup';
 import { formatSize } from '../../utils/format';
 import { useToast } from '../Toast';
@@ -40,6 +42,8 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
   /** 已勾选的缓存目录路径 */
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  /** 正在查看明细的缓存目录；null 表示弹窗关闭 */
+  const [viewDir, setViewDir] = useState<{ path: string; name: string } | null>(null);
 
   const allPaths = useMemo(
     () => (result ? result.groups.flatMap((group) => group.entries.map((entry) => entry.path)) : []),
@@ -254,7 +258,9 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                       >
-                        <div className="px-5 py-2">
+                        {/* 限高 + 内部滚动：单个工具可能有上千个目录/文件，
+                            不限高会把整张卡片撑得极长，同屏看不到其它工具 */}
+                        <div className="max-h-[15em] overflow-y-auto px-5 py-2">
                       {group.entries.map((entry) => (
                         <div
                           key={entry.path}
@@ -293,9 +299,32 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
                           >
                             {entry.path}
                           </span>
-                          <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
+                          <span className="w-20 shrink-0 text-right tabular-nums text-[var(--text-muted)]">
                             {formatSize(entry.size)}
                           </span>
+                          {/* 打开所在文件夹：先用资源管理器看一眼再决定要不要删 */}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openInFolder(entry.path);
+                            }}
+                            title={moduleT('aiTools.openFolder')}
+                            className="shrink-0 rounded p-0.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--brand-green)]"
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                          </button>
+                          {/* 明细走弹窗：目录下可能有上万个文件，不能就地展开 */}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setViewDir({ path: entry.path, name: entry.name });
+                            }}
+                            className="shrink-0 text-[var(--brand-green)] hover:underline"
+                          >
+                            {moduleT('aiTools.viewAll')}
+                          </button>
                         </div>
                       ))}
                         </div>
@@ -320,32 +349,27 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
                 />
               }
             >
+              {/* 样式全部用公共操作条的语义类，不在这里自己写颜色和字号 */}
               <button
                 type="button"
                 onClick={() =>
                   setSelected(selected.size === allPaths.length ? new Set() : new Set(allPaths))
                 }
                 disabled={allPaths.length === 0}
-                className="text-[0.93rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
+                className="module-operation-toolbar__button module-operation-toolbar__button--muted"
               >
                 {selected.size === allPaths.length && allPaths.length > 0
                   ? moduleT('aiTools.deselectAll')
                   : moduleT('aiTools.selectAll')}
               </button>
-              <span className="text-[0.93rem] tabular-nums text-[var(--text-muted)]">
-                {moduleT('aiTools.selected', {
-                  count: selected.size,
-                  size: formatSize(selectedSize),
-                })}
-              </span>
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
                 disabled={selected.size === 0 || deleting}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                className="module-operation-toolbar__button module-operation-toolbar__button--danger"
               >
-                <Trash2 className="h-4 w-4" />
-                {moduleT('aiTools.delete')}
+                <Trash2 className="h-3.5 w-3.5" />
+                {moduleT('aiTools.delete')} ({selected.size})
               </button>
             </ModuleOperationToolbar>
             )}
@@ -353,12 +377,21 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
         )}
       </div>
 
+      <AiCacheFileModal
+        isOpen={viewDir !== null}
+        dirPath={viewDir?.path ?? null}
+        dirName={viewDir?.name ?? ''}
+        onClose={() => setViewDir(null)}
+      />
+
       <ConfirmDialog
         isOpen={confirmOpen}
         title={moduleT('aiTools.confirmTitle', { count: selected.size })}
         description={moduleT('aiTools.confirmDesc', { size: formatSize(selectedSize) })}
         warning={moduleT('aiTools.confirmWarning')}
         confirmText={moduleT('aiTools.delete')}
+        /* 删目录不可逆：图标和确认按钮都要走危险色，别用默认的绿色 */
+        isDanger
         onConfirm={handleDelete}
         onCancel={() => setConfirmOpen(false)}
       />
