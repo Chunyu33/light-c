@@ -151,6 +151,8 @@
       "delete": "删除选中",
       "confirmTitle": "确认删除 {{count}} 个缓存目录？",
       "confirmDesc": "共 {{size}}，删除后不会进入回收站。",
-      "confirmWarning": "删除的是工具自己生成的缓存，但正在运行的 AI 工具可能需要重新加载部分数据。"
+      "confirmWarning": "删除的是工具自己生成的缓存，但正在运行的 AI 工具可能需要重新加载部分数据。",
+      "deleting": "正在删除缓存…",
+      "deletingDesc": "已选 {{count}} 项"
     }
 }

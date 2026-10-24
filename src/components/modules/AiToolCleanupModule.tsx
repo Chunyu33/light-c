@@ -8,11 +8,14 @@
  * 用户必须看到"删的是哪个工具的哪个目录"再确认。后端还会再校验一次路径归属。
  */
 import { useCallback, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Bot, ChevronRight, HardDrive, RefreshCw, Trash2 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { EmptyState } from '../EmptyState';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
+import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { deleteAiToolCaches, scanAiToolCaches } from '../../api/aiToolCleanup';
 import type { AiToolScanResult } from '../../types/aiToolCleanup';
 import { formatSize } from '../../utils/format';
@@ -230,8 +233,16 @@ export function AiToolCleanupModule({ layoutMode = 'cards' }: ModuleRenderProps)
                     </p>
                   </div>
 
-                  {isOpen && (
-                    <div className="border-t border-[var(--border-color)] bg-[var(--bg-main)] px-5 py-2">
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        className="overflow-hidden border-t border-[var(--border-color)] bg-[var(--bg-main)]"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <div className="px-5 py-2">
                       {group.entries.map((entry) => (
                         <div
                           key={entry.path}
@@ -275,44 +286,55 @@ export function AiToolCleanupModule({ layoutMode = 'cards' }: ModuleRenderProps)
                           </span>
                         </div>
                       ))}
-                    </div>
-                  )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
 
-            {/* 操作条：选中项统一在底部确认，位置和社交专清一致 */}
-            <div className="flex items-center justify-between rounded-2xl bg-[var(--bg-card)] px-5 py-3 shadow-sm">
+            {/* 操作条复用公共组件：和社交专清、大文件、右键菜单同一个悬浮层，
+                位置、忙碌态、玻璃外观都由它统一处理，不在这里自己拼一套。 */}
+            <ModuleOperationToolbar
+              moduleId="aiTools"
+              busy={deleting}
+              busyContent={
+                <ModuleDeleteProgress
+                  variant="floating"
+                  phaseLabel={moduleT('aiTools.deleting')}
+                  progressLabel={moduleT('aiTools.deletingDesc', { count: selected.size })}
+                />
+              }
+            >
               <button
                 type="button"
                 onClick={() =>
                   setSelected(selected.size === allPaths.length ? new Set() : new Set(allPaths))
                 }
                 disabled={allPaths.length === 0}
-                className="text-[0.93rem] text-[var(--brand-green)] hover:underline disabled:opacity-40 disabled:no-underline"
+                className="text-[0.93rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40"
               >
                 {selected.size === allPaths.length && allPaths.length > 0
                   ? moduleT('aiTools.deselectAll')
                   : moduleT('aiTools.selectAll')}
               </button>
-              <div className="flex items-center gap-3">
-                <span className="text-[0.93rem] tabular-nums text-[var(--text-muted)]">
-                  {moduleT('aiTools.selected', {
-                    count: selected.size,
-                    size: formatSize(selectedSize),
-                  })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={selected.size === 0 || deleting}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-green)] px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {moduleT('aiTools.delete')}
-                </button>
-              </div>
-            </div>
+              <span className="text-[0.93rem] tabular-nums text-[var(--text-muted)]">
+                {moduleT('aiTools.selected', {
+                  count: selected.size,
+                  size: formatSize(selectedSize),
+                })}
+              </span>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={selected.size === 0 || deleting}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-green)] px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" />
+                {moduleT('aiTools.delete')}
+              </button>
+            </ModuleOperationToolbar>
           </div>
         )}
       </div>

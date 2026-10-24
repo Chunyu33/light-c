@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, ListChecks } from 'lucide-react';
 
-export type ModuleOperationToolbarId = 'junk' | 'bigFiles' | 'social' | 'context';
+export type ModuleOperationToolbarId = 'junk' | 'bigFiles' | 'social' | 'context' | 'aiTools';
 
 interface ModuleOperationToolbarProps {
   moduleId: ModuleOperationToolbarId;

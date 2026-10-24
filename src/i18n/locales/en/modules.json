@@ -131,6 +131,8 @@
       "delete": "Delete selected",
       "confirmTitle": "Delete {{count}} cache folders?",
       "confirmDesc": "{{size}} in total. They are removed permanently, not moved to the recycle bin.",
-      "confirmWarning": "These are caches the tools generated themselves, but a running AI tool may need to reload some data."
+      "confirmWarning": "These are caches the tools generated themselves, but a running AI tool may need to reload some data.",
+      "deleting": "Removing caches…",
+      "deletingDesc": "{{count}} selected"
     }
 }

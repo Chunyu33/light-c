@@ -671,6 +671,8 @@
       "delete": "刪除選取",
       "confirmTitle": "確認刪除 {{count}} 個快取目錄？",
       "confirmDesc": "共 {{size}}，刪除後不會進入資源回收筒。",
-      "confirmWarning": "刪除的是工具自行產生的快取，但執行中的 AI 工具可能需要重新載入部分資料。"
+      "confirmWarning": "刪除的是工具自行產生的快取，但執行中的 AI 工具可能需要重新載入部分資料。",
+      "deleting": "正在刪除快取…",
+      "deletingDesc": "已選 {{count}} 項"
     }
 }
