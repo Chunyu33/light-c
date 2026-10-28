@@ -343,6 +343,17 @@ function DiskGrowthDiagnostics({
           {moduleT('diskGrowth.sizeSource', { mft: scanSummary.mft_size_count.toLocaleString(), fallback: scanSummary.metadata_fallback_count.toLocaleString() })}
         </span>
       </div>
+
+      {/* $MFT 读取明细：段数说明表碎不碎，读盘/解析分开看才知道瓶颈在盘还是 CPU */}
+      {typeof scanSummary.mft_fragments === 'number' && scanSummary.mft_fragments > 0 && (
+        <div className="text-[var(--text-faint)]">
+          {moduleT('diskGrowth.mftStats', {
+            fragments: scanSummary.mft_fragments,
+            io: ((scanSummary.mft_io_ms ?? 0) / 1000).toFixed(1),
+            parse: ((scanSummary.mft_parse_ms ?? 0) / 1000).toFixed(1),
+          })}
+        </div>
+      )}
     </div>
   );
 }

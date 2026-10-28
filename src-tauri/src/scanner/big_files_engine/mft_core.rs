@@ -88,6 +88,11 @@ pub struct MftRecordInfo {
     /// 目录恒为 0。
     pub size: u64,
     pub modified: i64,
+    /// 是否解析出了未命名的 `$DATA` 流。
+    ///
+    /// `size` 为 0 有两种来源：真的是空文件，或者 `$DATA` 没解析出来。
+    /// 需要区分时（比如要决定是否回退去 stat）看这个标记，别只看 size。
+    pub has_data_stream: bool,
 }
 
 /// 一次全量读取的统计。
@@ -971,6 +976,7 @@ fn parse_record_info(record: &[u8], mft_id: u64) -> Option<MftRecordInfo> {
         is_dir,
         size: if is_dir { 0 } else { data_size.unwrap_or(0) },
         modified,
+        has_data_stream: data_size.is_some(),
     })
 }
 

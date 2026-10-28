@@ -144,6 +144,10 @@ pub struct DiskScanAndAnalyzeResponse {
     pub phase_durations: Vec<DiskGrowthPhaseDuration>,
     pub mft_size_count: usize,
     pub metadata_fallback_count: usize,
+    /// $MFT 的段数 / 读盘耗时 / 解析耗时，用来判断瓶颈在盘还是 CPU。
+    pub mft_fragments: usize,
+    pub mft_io_ms: u64,
+    pub mft_parse_ms: u64,
     pub analyze: DiskAnalyzeResult,
     pub growth: DiskGrowthReport,
 }
@@ -235,6 +239,9 @@ where
         phase_durations: scan.phase_durations,
         mft_size_count: scan.mft_size_count,
         metadata_fallback_count: scan.metadata_fallback_count,
+        mft_fragments: scan.mft_fragments,
+        mft_io_ms: scan.mft_io_ms,
+        mft_parse_ms: scan.mft_parse_ms,
         analyze: DiskAnalyzeResult {
             entries: analyze_entries,
             changed_size: growth.total_growth.unsigned_abs(),

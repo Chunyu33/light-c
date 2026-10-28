@@ -358,6 +358,7 @@
     "elapsed": "總耗時 {{time}}",
     "engine": "引擎：{{name}}",
     "sizeSource": "大小來源：MFT {{mft}} 個，metadata 回退 {{fallback}} 個",
+    "mftStats": "MFT 分段 {{fragments}} · 讀取 {{io}}s · 解析 {{parse}}s",
     "details": "變化明細",
     "previousSize": "上次大小",
     "currentSize": "當前大小",

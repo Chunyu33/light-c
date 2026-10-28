@@ -1483,6 +1483,12 @@ export interface DiskGrowthScanResponse {
   mft_size_count: number;
   /** MFT 大小解析失败后回退 metadata 的文件数量 */
   metadata_fallback_count: number;
+  /** $MFT 的 data run 段数 */
+  mft_fragments?: number;
+  /** 读 $MFT 等磁盘的时间 */
+  mft_io_ms?: number;
+  /** 解析 $MFT 记录的时间 */
+  mft_parse_ms?: number;
   /** 分析结果 */
   analyze: DiskGrowthAnalyzeResult;
   /** 与上次快照相比的变化报告 */
