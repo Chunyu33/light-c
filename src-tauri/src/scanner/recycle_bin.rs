@@ -5,6 +5,8 @@
 
 use super::{CategoryScanResult, FileInfo, JunkCategory};
 use log::{debug, warn};
+use rayon::prelude::*;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 #[cfg(windows)]
@@ -80,46 +82,69 @@ fn collect_drive_entries(sid_path: &Path, category: &JunkCategory, entries: &mut
         }
     };
 
+    // 一次 read_dir 同时收下 $I 与 $R：原实现对每个条目还要 exists() + is_dir()
+    // 两次 stat，冷读时四个分区几千个条目就是上万次元数据访问——实测首次扫描
+    // 回收站要 7.3 秒，热起来只要 2 秒，慢的全在这里。
+    // DirEntry::file_type() 在 Windows 上直接取自目录枚举结果，不额外发系统调用。
+    let mut metadata_files: Vec<(PathBuf, String)> = Vec::new();
+    // 后缀统一转小写比较：NTFS 大小写不敏感，$I/$R 的主体部分可能不是同一大小写
+    let mut data_dirs: HashMap<String, bool> = HashMap::new();
+
     for directory_entry in directory_entries.filter_map(Result::ok) {
-        let metadata_path = directory_entry.path();
-        let Some(metadata_name) = metadata_path.file_name().and_then(|name| name.to_str()) else {
+        let Ok(file_name) = directory_entry.file_name().into_string() else {
             continue;
         };
-
-        // Windows 回收站条目由 $I 元数据和同后缀的 $R 数据组成，其他文件不是可见条目。
-        if !metadata_name.starts_with("$I") || metadata_name.len() <= 2 {
-            continue;
+        if let Some(suffix) = file_name.strip_prefix("$I") {
+            // Windows 回收站条目由 $I 元数据和同后缀的 $R 数据组成
+            if !suffix.is_empty() {
+                metadata_files.push((directory_entry.path(), suffix.to_owned()));
+            }
+        } else if let Some(suffix) = file_name.strip_prefix("$R") {
+            if !suffix.is_empty() {
+                let is_dir = directory_entry
+                    .file_type()
+                    .map(|kind| kind.is_dir())
+                    .unwrap_or(false);
+                data_dirs.insert(suffix.to_ascii_lowercase(), is_dir);
+            }
         }
-
-        let data_name = format!("$R{}", &metadata_name[2..]);
-        let data_path = sid_path.join(data_name);
-        if !data_path.exists() {
-            // 缺失 $R 数据的 $I 文件是孤儿元数据，Explorer 不会将其展示为回收站条目。
-            continue;
-        }
-
-        let Some((logical_size, original_path, deleted_at)) = parse_metadata(&metadata_path) else {
-            continue;
-        };
-
-        let visible_name = Path::new(&original_path)
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| original_path.clone());
-
-        entries.push(
-            FileInfo::new(
-                data_path.to_string_lossy().into_owned(),
-                visible_name,
-                logical_size,
-                deleted_at,
-                data_path.is_dir(),
-                category.clone(),
-            )
-            .with_original_path(original_path),
-        );
     }
+
+    // 每个 $I 都要单独打开读一次，彼此完全独立，必须并行。
+    // 冷盘上串行读几万个小文件就是几万次随机 I/O：
+    // 实测 E 盘回收站 33052 个条目时，首次扫描 16.3 秒、热了只要 1.3 秒。
+    let found: Vec<FileInfo> = metadata_files
+        .into_par_iter()
+        .filter_map(|(metadata_path, suffix)| {
+            // 缺失 $R 数据的 $I 文件是孤儿元数据，Explorer 不会将其展示为回收站条目。
+            let &is_dir = data_dirs.get(&suffix.to_ascii_lowercase())?;
+
+            let (logical_size, original_path, deleted_at) = parse_metadata(&metadata_path)?;
+
+            let visible_name = Path::new(&original_path)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| original_path.clone());
+
+            Some(
+                FileInfo::new(
+                    sid_path
+                        .join(format!("$R{}", suffix))
+                        .to_string_lossy()
+                        .into_owned(),
+                    visible_name,
+                    logical_size,
+                    deleted_at,
+                    is_dir,
+                    category.clone(),
+                )
+                .with_original_path(original_path),
+            )
+        })
+        .collect();
+
+    entries.extend(found);
 }
 
 #[cfg(windows)]

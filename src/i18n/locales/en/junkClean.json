@@ -13,6 +13,10 @@
     "discover": "Discovering local partitions",
     "mft": "Enumerating NTFS file records",
     "path": "Rebuilding candidate file paths",
+    "walkdir": "Supplement scan",
+    "recycle": "Recycle bin",
+    "parallel": "Drives + recycle bin (parallel)",
+    "merge": "Merge results",
     "filter": "Matching safe cleanup rules",
     "metadata": "Reading file sizes and timestamps",
     "result": "Organizing scan results",
@@ -34,7 +38,10 @@
   },
   "drives": {
     "mft": "MFT",
-    "walkdir": "Directory Walk"
+    "walkdir": "Directory Walk",
+    "mftStats": "MFT runs {{count}} · read {{io}}s · parse {{parse}}s",
+    "outerStages": "Outside drives",
+    "emitWait": "Progress reporting waited {{time}}s"
   },
   "deleteProgress": {
     "preparing": "Preparing cleanup tasks",

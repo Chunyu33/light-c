@@ -15,6 +15,7 @@ use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{info, warn};
+use rayon::prelude::*;
 use serde::Serialize;
 use tauri::{Emitter, Window};
 use walkdir::WalkDir;
@@ -49,6 +50,23 @@ pub struct DeepJunkDriveSummary {
     pub matched_file_count: usize,
     pub matched_size: u64,
     pub warning: Option<String>,
+    /// 各阶段耗时，用来定位一次扫描慢在哪一段。
+    pub stage_durations: Vec<DeepJunkStageDuration>,
+    /// 本盘从开始到结束的总耗时（含未单独计时的零碎开销）。
+    pub total_duration_ms: u64,
+    /// `$MFT` 的 data run 个数。段数越多说明表越碎，顺序读的预读越容易失效。
+    pub mft_fragments: usize,
+    /// 读 `$MFT` 时等磁盘的时间，与下面的解析时间分开计。
+    pub mft_io_ms: u64,
+    /// 解析 `$MFT` 记录（fixup + 属性）的时间。
+    pub mft_parse_ms: u64,
+}
+
+/// 单个扫描阶段的耗时。
+#[derive(Debug, Clone, Serialize)]
+pub struct DeepJunkStageDuration {
+    pub stage: String,
+    pub duration_ms: u64,
 }
 
 /// 深度垃圾扫描结果。快速扫描继续使用原有 ScanResult，避免破坏旧调用协议。
@@ -62,6 +80,13 @@ pub struct DeepJunkScanResult {
     pub scan_duration_ms: u64,
     pub scan_timestamp: i64,
     pub drives: Vec<DeepJunkDriveSummary>,
+    /// 各盘之外的开销：发现分区、回收站、并行等待、汇总。
+    ///
+    /// 之前只有单盘内部的耗时，第一次扫描 26.9 秒而四盘相加才 12.8 秒，
+    /// 中间十几秒落在哪个环节完全看不出来。
+    pub outer_stages: Vec<DeepJunkStageDuration>,
+    /// 进度上报累计等待（多线程求和）。用来判断发进度是否在阻塞扫描线程。
+    pub emit_wait_ms: u64,
 }
 
 struct DriveScanResult {
@@ -123,6 +148,8 @@ fn scan_depth() -> usize {
 /// 执行所有固定分区的深度垃圾扫描。
 pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
     let started_at = std::time::Instant::now();
+    let mut outer_stages: Vec<DeepJunkStageDuration> = Vec::new();
+    EMIT_WAIT_MS.store(0, Ordering::Relaxed);
     let mut categories = JunkCategory::all()
         .into_iter()
         .map(CategoryScanResult::new)
@@ -131,7 +158,9 @@ pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
 
     #[cfg(windows)]
     {
+        let stage = std::time::Instant::now();
         let drive_letters = fixed_drive_letters()?;
+        record_stage(&mut outer_stages, "discover", stage);
         if drive_letters.is_empty() {
             return Err("没有找到可访问的固定磁盘分区".to_string());
         }
@@ -146,9 +175,86 @@ pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
             started_at,
         );
 
-        // 深度模式仍保留回收站的 Explorer 可见条目，不能用 MFT 直接枚举内部文件。
-        let mut recycle_result = CategoryScanResult::new(JunkCategory::RecycleBin);
-        super::recycle_bin::scan_current_user(&JunkCategory::RecycleBin, &mut recycle_result);
+        // 各盘之间互不依赖，必须并行扫：串行时总耗时等于各盘之和
+        // （实测 C 7.3s + D 2.7s + E 6.9s + F 1.1s = 18s），
+        // 并行后总耗时接近最慢的那个盘，剩下的时间就是白等的。
+        // 磁盘相互独立时收益最大；若两个盘符在同一块物理盘上，会共享带宽，收益打折。
+        let stage = std::time::Instant::now();
+        let (drive_results, recycle_result, recycle_ms) =
+            std::thread::scope(|scope| {
+                // 深度模式仍保留回收站的 Explorer 可见条目，不能用 MFT 直接枚举内部文件。
+                // 它和各盘互不依赖，所以放进同一个 scope —— 原来串行跑在并行块之前，
+                // 实测要 1.5 秒，那 1.5 秒纯属排队。
+                let recycle_handle = scope.spawn(|| {
+                    let recycle_started = std::time::Instant::now();
+                    let mut result = CategoryScanResult::new(JunkCategory::RecycleBin);
+                    super::recycle_bin::scan_current_user(
+                        &JunkCategory::RecycleBin,
+                        &mut result,
+                    );
+                    (result, recycle_started.elapsed().as_millis() as u64)
+                });
+
+                let handles: Vec<_> = drive_letters
+                    .iter()
+                    .map(|&drive_letter| {
+                        scope.spawn(move || {
+                            let result =
+                                if super::big_files_engine::mft_core::is_ntfs(drive_letter) {
+                                    match scan_ntfs_drive(drive_letter, window, started_at) {
+                                        Ok(result) => Ok(result),
+                                        Err(error) if error == "扫描已取消" => Err(error),
+                                        Err(error) => {
+                                            warn!(
+                                                "{} 盘 MFT 深度扫描失败，降级为受控遍历: {}",
+                                                drive_letter, error
+                                            );
+                                            Ok(scan_non_ntfs_drive(
+                                                drive_letter,
+                                                window,
+                                                started_at,
+                                                "NTFS",
+                                                Some(format!(
+                                                    "MFT 扫描失败，已降级为受控目录遍历: {}",
+                                                    error
+                                                )),
+                                            ))
+                                        }
+                                    }
+                                } else {
+                                    Ok(scan_non_ntfs_drive(
+                                        drive_letter,
+                                        window,
+                                        started_at,
+                                        "非 NTFS",
+                                        Some(
+                                            "非 NTFS 分区使用受控目录遍历，未执行 MFT 扫描"
+                                                .to_string(),
+                                        ),
+                                    ))
+                                };
+                            (drive_letter, result)
+                        })
+                    })
+                    .collect();
+                // join 顺序与创建顺序一致，结果仍按盘符顺序返回
+                let drives: Vec<(char, Result<DriveScanResult, String>)> = handles
+                    .into_iter()
+                    .map(|handle| handle.join().expect("扫描线程异常退出"))
+                    .collect();
+                let (recycle, recycle_ms) =
+                    recycle_handle.join().expect("回收站扫描线程异常退出");
+                (drives, recycle, recycle_ms)
+            });
+
+        // 回收站和各盘在同一个并行窗口里跑，所以它不再累加到总时间上；
+        // 仍然单独记一笔，用来判断它是否成了最慢的那个分支。
+        outer_stages.push(DeepJunkStageDuration {
+            stage: "recycle".to_string(),
+            duration_ms: recycle_ms,
+        });
+        record_stage(&mut outer_stages, "parallel", stage);
+
         if let Some(category_result) = categories
             .iter_mut()
             .find(|item| item.category == JunkCategory::RecycleBin)
@@ -158,38 +264,9 @@ pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
             }
         }
 
-        for drive_letter in drive_letters {
-            if is_cancelled() {
-                return Err("扫描已取消".to_string());
-            }
-
-            let result = if super::big_files_engine::mft_core::is_ntfs(drive_letter) {
-                match scan_ntfs_drive(drive_letter, window, started_at) {
-                    Ok(result) => result,
-                    Err(error) if error == "扫描已取消" => return Err(error),
-                    Err(error) => {
-                        warn!(
-                            "{} 盘 MFT 深度扫描失败，降级为受控遍历: {}",
-                            drive_letter, error
-                        );
-                        scan_non_ntfs_drive(
-                            drive_letter,
-                            window,
-                            started_at,
-                            "NTFS",
-                            Some(format!("MFT 扫描失败，已降级为受控目录遍历: {}", error)),
-                        )
-                    }
-                }
-            } else {
-                scan_non_ntfs_drive(
-                    drive_letter,
-                    window,
-                    started_at,
-                    "非 NTFS",
-                    Some("非 NTFS 分区使用受控目录遍历，未执行 MFT 扫描".to_string()),
-                )
-            };
+        let stage = std::time::Instant::now();
+        for (_drive_letter, result) in drive_results {
+            let result = result?;
 
             if is_cancelled() {
                 return Err("扫描已取消".to_string());
@@ -204,6 +281,7 @@ pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
             }
             drives.push(result.summary);
         }
+        record_stage(&mut outer_stages, "merge", stage);
     }
 
     #[cfg(not(windows))]
@@ -221,6 +299,8 @@ pub fn scan_all(window: &Window) -> Result<DeepJunkScanResult, String> {
         scan_duration_ms: started_at.elapsed().as_millis() as u64,
         scan_timestamp: chrono::Utc::now().timestamp(),
         drives,
+        outer_stages,
+        emit_wait_ms: EMIT_WAIT_MS.load(Ordering::Relaxed),
     };
     result.total_size = result.categories.iter().map(|item| item.total_size).sum();
     result.total_file_count = result.categories.iter().map(|item| item.file_count).sum();
@@ -389,37 +469,42 @@ fn scan_ntfs_drive(
 ) -> Result<DriveScanResult, String> {
     use super::big_files_engine::mft_core;
 
+    let drive_started = std::time::Instant::now();
+    let mut stage_durations: Vec<DeepJunkStageDuration> = Vec::new();
     let drive_label = format!("{}:", drive_letter);
     emit_progress(
         window,
         "mft",
         &drive_label,
-        "正在枚举 NTFS 文件记录",
+        "正在读取 NTFS 主文件表",
         0,
         0,
         started_at,
     );
 
-    let device = mft_core::open_volume(drive_letter)?;
-    let enumerate_result = mft_core::enumerate_usn_records_v2(device, &|processed| {
+    // 一次顺序读 $MFT 就能同时拿到名字（$FILE_NAME 属性）、父子关系和大小（$DATA 属性）。
+    // 原先先走一次 USN 枚举拿名字、再读一遍 $MFT 拿大小，同一份数据过了两遍；
+    // 实测 USN 枚举是内核遍历整张表，比用户态顺序读慢 6 倍，所以这里只读一遍。
+    let stage = std::time::Instant::now();
+    let metadata_reader = mft_core::NtfsFileMetadataReader::open(drive_letter)?;
+    let (entries, mft_stats) = metadata_reader.read_all_records(&|processed| {
         if is_cancelled() {
             return false;
         }
-        if processed == 0 || processed % 10_000 == 0 {
+        if processed == 0 || processed % 100_000 == 0 {
             emit_progress(
                 window,
                 "mft",
                 &drive_label,
-                &format!("正在枚举 NTFS 文件记录，已处理 {} 条", processed),
+                &format!("正在读取 NTFS 主文件表，已检查 {} 条记录", processed),
                 processed,
                 0,
                 started_at,
             );
         }
         true
-    });
-    mft_core::close_volume(device);
-    let entries = enumerate_result?;
+    })?;
+    record_stage(&mut stage_durations, "mft", stage);
 
     if is_cancelled() {
         return Err("扫描已取消".to_string());
@@ -440,28 +525,65 @@ fn scan_ntfs_drive(
         .filter(|entry| !entry.is_dir)
         .map(|entry| entry.parent_id)
         .collect::<HashSet<_>>();
-    let directory_paths = mft_core::rebuild_paths_for_ids(&entries, drive_letter, &parent_ids);
-    let mut candidates = Vec::new();
-    let mut candidate_ids = HashSet::new();
-    let mut candidate_paths = HashSet::new();
+    let stage = std::time::Instant::now();
+    let directory_paths =
+        mft_core::rebuild_paths_for_records(&entries, drive_letter, &parent_ids);
+    record_stage(&mut stage_durations, "path", stage);
+    // 候选只记下标，不克隆整条记录：命中规则的文件通常只有几千条，
+    // 但记录的字段（含文件名字符串）在组装阶段还要用，存下标最省。
+    let stage = std::time::Instant::now();
+    // 规则匹配是纯 CPU：全盘上百万条路径逐条比对字符串，单线程要两秒多。
+    // 按块切分后交给 rayon，块内仍用两块复用缓冲，块间互不影响。
+    const FILTER_CHUNK: usize = 16_384;
+    let per_chunk: Vec<Vec<(usize, JunkCategory, String)>> = entries
+        .par_chunks(FILTER_CHUNK)
+        .enumerate()
+        .map(|(chunk_index, chunk)| {
+            let mut local: Vec<(usize, JunkCategory, String)> = Vec::new();
+            // 每块自带缓冲，避免线程间共享
+            let mut path_buffer = String::with_capacity(512);
+            let mut normalize_buffer: Vec<u8> = Vec::with_capacity(512);
+            for (offset, entry) in chunk.iter().enumerate() {
+                if is_cancelled() {
+                    return local;
+                }
+                if entry.is_dir {
+                    continue;
+                }
+                let Some(parent_path) = directory_paths.get(&entry.parent_id) else {
+                    continue;
+                };
+                // MFT 已经给出父目录字符串；直接拼接可以省掉 PathBuf 和 OsString 的中间转换。
+                join_mft_path_into(parent_path, &entry.name, &mut path_buffer);
+                let Some(category) =
+                    match_deep_junk_category_reusing(&path_buffer, &mut normalize_buffer)
+                else {
+                    continue;
+                };
+                // 走到这里才说明真的命中了，这时候才值得分配一份路径
+                local.push((
+                    chunk_index * FILTER_CHUNK + offset,
+                    category,
+                    path_buffer.clone(),
+                ));
+            }
+            local
+        })
+        .collect();
 
-    for entry in entries.iter().filter(|entry| !entry.is_dir) {
-        let Some(parent_path) = directory_paths.get(&entry.parent_id) else {
-            continue;
-        };
-        let path = PathBuf::from(parent_path).join(&entry.name);
-        let path_string = path.to_string_lossy().into_owned();
-        let Some(category) = match_deep_junk_category(&path_string) else {
-            continue;
-        };
-        if !candidate_paths.insert(path_string.to_ascii_lowercase()) {
-            continue;
+    // 去重放在合并之后串行做：par_chunks 保证按块顺序返回，结果与串行一致
+    let mut candidates: Vec<(usize, JunkCategory, String)> = Vec::new();
+    let mut candidate_paths = HashSet::new();
+    for chunk in per_chunk {
+        for (index, category, path_string) in chunk {
+            if !candidate_paths.insert(path_string.to_ascii_lowercase()) {
+                continue;
+            }
+            candidates.push((index, category, path_string));
         }
-        candidate_ids.insert(entry.mft_id);
-        candidates.push((entry.mft_id, category, path_string));
     }
+    record_stage(&mut stage_durations, "filter", stage);
     let enumerated_count = entries.len();
-    drop(entries);
     drop(directory_paths);
     drop(candidate_paths);
 
@@ -484,55 +606,27 @@ fn scan_ntfs_drive(
                 matched_file_count: 0,
                 matched_size: 0,
                 warning: None,
+                stage_durations,
+                total_duration_ms: drive_started.elapsed().as_millis() as u64,
+                mft_fragments: mft_stats.fragments,
+                mft_io_ms: mft_stats.io_ms,
+                mft_parse_ms: mft_stats.parse_ms,
             },
             files: Vec::new(),
         });
     }
 
-    emit_progress(
-        window,
-        "metadata",
-        &drive_label,
-        "正在读取候选文件大小和修改时间",
-        0,
-        candidates.len(),
-        started_at,
-    );
-    let metadata_reader = mft_core::NtfsFileMetadataReader::open(drive_letter)?;
-    let metadata = metadata_reader.read_file_metadata_map(&candidate_ids, &|processed| {
-        if is_cancelled() {
-            return false;
-        }
-        if processed == 0 || processed % 100_000 == 0 {
-            emit_progress(
-                window,
-                "metadata",
-                &drive_label,
-                &format!("正在读取 $MFT 文件大小，已处理 {} 条", processed),
-                processed,
-                candidates.len(),
-                started_at,
-            );
-        }
-        true
-    })?;
-
+    // 大小和修改时间在顺序读 $MFT 时已经解析好，这里不再二次读盘
     let mut files = Vec::new();
-    for (mft_id, category, path) in candidates {
-        let Some(file_metadata) = metadata.get(&mft_id) else {
-            continue;
-        };
-        let name = Path::new(&path)
-            .file_name()
-            .map(|value| value.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "未知文件".to_string());
+    for (index, category, path) in candidates {
+        let record = &entries[index];
         files.push((
             category.clone(),
             FileInfo::new(
                 path,
-                name,
-                file_metadata.size,
-                file_metadata.modified,
+                record.name.clone(),
+                record.size,
+                record.modified,
                 false,
                 category,
             ),
@@ -541,7 +635,9 @@ fn scan_ntfs_drive(
 
     // MFT/USN 枚举只覆盖变更日志中尚存的记录，老且长期未变的系统缓存文件会被跳过；
     // 这里对所有白名单缓存根目录做一次受控遍历，与 MFT 结果按小写路径去重后补齐缺口。
+    let stage = std::time::Instant::now();
     scan_supplement_roots(drive_letter, window, started_at, &mut files);
+    record_stage(&mut stage_durations, "walkdir", stage);
 
     files.sort_by(|left, right| left.1.path.cmp(&right.1.path));
     let matched_size = files.iter().map(|(_, file)| file.size).sum();
@@ -563,6 +659,11 @@ fn scan_ntfs_drive(
             matched_file_count: files.len(),
             matched_size,
             warning: None,
+            stage_durations,
+            total_duration_ms: drive_started.elapsed().as_millis() as u64,
+            mft_fragments: mft_stats.fragments,
+            mft_io_ms: mft_stats.io_ms,
+            mft_parse_ms: mft_stats.parse_ms,
         },
         files,
     })
@@ -576,6 +677,7 @@ fn scan_non_ntfs_drive(
     file_system: &str,
     warning: Option<String>,
 ) -> DriveScanResult {
+    let drive_started = std::time::Instant::now();
     let drive_label = format!("{}:", drive_letter);
     let mut files = Vec::new();
     let mut visited = HashSet::new();
@@ -655,6 +757,12 @@ fn scan_non_ntfs_drive(
             matched_file_count: files.len(),
             matched_size,
             warning,
+            // 常规遍历只有一次完整扫描，不再细分阶段；没有 MFT 也就没有这些统计
+            stage_durations: Vec::new(),
+            total_duration_ms: drive_started.elapsed().as_millis() as u64,
+            mft_fragments: 0,
+            mft_io_ms: 0,
+            mft_parse_ms: 0,
         },
         files,
     }
@@ -830,23 +938,85 @@ fn scan_supplement_roots(
 
     let drive_root = PathBuf::from(format!("{}:\\", drive_letter));
 
+    // 先把补扫根筛成一份待办清单，再并行跑。
+    // 筛选（去掉被父目录覆盖的根）必须串行 —— 它依赖"已经收下哪些根"的顺序。
+    let mut jobs: Vec<(PathBuf, usize)> = Vec::new();
+    let mut scanned_roots = Vec::new();
     for root in supplement_ntfs_scan_roots(drive_letter) {
         if is_cancelled() {
-            break;
+            return;
+        }
+        if is_redundant_supplement_root(&root, &scanned_roots) {
+            continue;
         }
         // 没有单独限深的补扫根目录，跟着设置页的层数走。
-        scan_supplement_root(&root, scan_depth(), results, &mut visited);
+        jobs.push((root.clone(), scan_depth()));
+        scanned_roots.push(root);
     }
 
     // 深度受限的补充根：只覆盖根目录附近的真实垃圾，避免深入无意义的多层子目录。
     for (root, max_depth) in depth_limited_system_cache_roots(&drive_root) {
         if is_cancelled() {
-            break;
+            return;
+        }
+        if is_redundant_supplement_root(&root, &scanned_roots) {
+            continue;
         }
         // 这些根目录自带限深（避免在超深的目录树里跑太久），取两者较大值：
         // 设置页调大时能生效，调小时仍保留各根目录自己的下限，不会因为用户调小就漏扫。
-        scan_supplement_root(&root, max_depth.max(scan_depth()), results, &mut visited);
+        jobs.push((root.clone(), max_depth.max(scan_depth())));
+        scanned_roots.push(root);
     }
+
+    // 各根目录互不依赖，并行走：实测 C 盘这一阶段 1.5 秒，原来是单线程把几十个
+    // 目录排队遍历完，而它们分布在不同的子树里，本身没有先后关系。
+    let batches: Vec<Vec<(JunkCategory, FileInfo)>> = jobs
+        .par_iter()
+        .map(|(root, max_depth)| {
+            let mut local = Vec::new();
+            // 每个根自带一份去重集：根之间可能有嵌套，合并时再统一去重
+            let mut local_visited = HashSet::new();
+            scan_supplement_root(root, *max_depth, &mut local, &mut local_visited);
+            local
+        })
+        .collect();
+
+    // 合并按待办清单顺序做，重复路径以先出现的为准，结果和串行一致
+    for batch in batches {
+        for (category, file) in batch {
+            let key = file.path.to_ascii_lowercase();
+            if !visited.insert(key) {
+                continue;
+            }
+            results.push((category, file));
+        }
+    }
+}
+
+#[cfg(windows)]
+fn join_mft_path_into(parent: &str, name: &str, buffer: &mut String) {
+    // 写进调用方的缓冲：全盘几百万条路径逐条分配 String 是这步的主要开销，
+    // 只有命中规则的那几千条才需要真正拥有一份路径。
+    buffer.clear();
+    buffer.reserve(parent.len() + 1 + name.len());
+    buffer.push_str(parent);
+    if !parent.ends_with('\\') && !parent.ends_with('/') {
+        buffer.push('\\');
+    }
+    buffer.push_str(name);
+}
+
+#[cfg(windows)]
+fn is_redundant_supplement_root(root: &Path, scanned_roots: &[PathBuf]) -> bool {
+    let normalized = root.to_string_lossy().replace('/', "\\").to_ascii_lowercase();
+    scanned_roots.iter().any(|scanned| {
+        let existing = scanned
+            .to_string_lossy()
+            .replace('/', "\\")
+            .trim_end_matches('\\')
+            .to_ascii_lowercase();
+        normalized == existing || normalized.starts_with(&format!("{}\\", existing))
+    })
 }
 
 /// 对单个补扫根做受控遍历，把命中的高置信缓存文件追加到 results。
@@ -862,26 +1032,30 @@ fn scan_supplement_root(
         return;
     }
 
-    for entry in WalkDir::new(root)
-        .max_depth(max_depth)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(Result::ok)
-    {
-        if is_cancelled() {
-            break;
-        }
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        let path = entry.path().to_string_lossy().into_owned();
+    // 1) 目录树内并行收集文件路径。
+    // 补扫的开销几乎全压在单个大目录上（实测 Temp 19671 项 / 1.4 秒，
+    // 其余三十多个根加起来 10 毫秒），跨根并行救不了它，必须在树内部分叉。
+    let mut files: Vec<PathBuf> = Vec::new();
+    collect_files_parallel(root, max_depth, &mut files);
+
+    // 2) 规则匹配也是纯 CPU，跟着并行；不命中的文件到此为止，不碰 stat
+    let hits: Vec<(JunkCategory, PathBuf)> = files
+        .into_par_iter()
+        .filter_map(|path| {
+            let mut normalize_buffer: Vec<u8> = Vec::with_capacity(512);
+            let text = path.to_string_lossy();
+            match_deep_junk_category_reusing(&text, &mut normalize_buffer)
+                .map(|category| (category, path))
+        })
+        .collect();
+
+    // 3) 去重和取元数据串行做：走到这里的只有命中的条目，量级是几千而不是几万
+    for (category, path) in hits {
+        let path = path.to_string_lossy().into_owned();
         if !visited.insert(path.to_ascii_lowercase()) {
             continue;
         }
-        let Some(category) = match_deep_junk_category(&path) else {
-            continue;
-        };
-        let Ok(metadata) = entry.metadata() else {
+        let Ok(metadata) = std::fs::metadata(&path) else {
             continue;
         };
         let modified = metadata
@@ -890,13 +1064,100 @@ fn scan_supplement_root(
             .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
             .map(|value| value.as_secs() as i64)
             .unwrap_or(0);
-        let name = entry.file_name().to_string_lossy().into_owned();
+        let name = Path::new(&path)
+            .file_name()
+            .map(|value| value.to_string_lossy().into_owned())
+            .unwrap_or_default();
         results.push((
             category.clone(),
             FileInfo::new(path, name, metadata.len(), modified, false, category),
         ));
     }
 }
+
+/// 收集 `dir` 下这一层的文件，子目录追加到 `subdirs`（`remaining` 为 1 时不往下走）。
+/// 只认真实文件：符号链接和重解析点一律跳过，和原来 `WalkDir::follow_links(false)` 一致。
+#[cfg(windows)]
+fn collect_level(
+    dir: &Path,
+    remaining: usize,
+    out: &mut Vec<PathBuf>,
+    subdirs: &mut Vec<PathBuf>,
+) {
+    if remaining == 0 {
+        return;
+    }
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in read.filter_map(Result::ok) {
+        if is_cancelled() {
+            return;
+        }
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_file() {
+            out.push(entry.path());
+        } else if kind.is_dir() && remaining > 1 {
+            subdirs.push(entry.path());
+        }
+    }
+}
+
+/// 串行遍历一棵子树（并行分支内部用）。
+#[cfg(windows)]
+fn collect_tree_serial(dir: &Path, remaining: usize, out: &mut Vec<PathBuf>) {
+    if remaining == 0 {
+        return;
+    }
+    let mut subdirs = Vec::new();
+    collect_level(dir, remaining, out, &mut subdirs);
+    for child in subdirs {
+        collect_tree_serial(&child, remaining - 1, out);
+    }
+}
+
+/// 只在根目录的第一层分叉，各子树内部串行。
+///
+/// 只分叉一层是有意的：更深的递归会让任务碎到调度开销超过收益，
+/// 而这一层的分布本来就是不均的（大目录各自成任务，正好被分到不同线程）。
+#[cfg(windows)]
+fn collect_files_parallel(root: &Path, max_depth: usize, out: &mut Vec<PathBuf>) {
+    let mut subdirs = Vec::new();
+    collect_level(root, max_depth, out, &mut subdirs);
+    if subdirs.is_empty() {
+        return;
+    }
+    let nested: Vec<Vec<PathBuf>> = subdirs
+        .par_iter()
+        .map(|child| {
+            let mut local = Vec::new();
+            collect_tree_serial(child, max_depth - 1, &mut local);
+            local
+        })
+        .collect();
+    for chunk in nested {
+        out.extend(chunk);
+    }
+}
+
+/// 记录一个阶段的耗时。
+///
+/// 阶段之间是串行的，单独计时才看得出哪一段是大头 —— 之前只能靠猜。
+fn record_stage(
+    durations: &mut Vec<DeepJunkStageDuration>,
+    stage: &str,
+    started: std::time::Instant,
+) {
+    durations.push(DeepJunkStageDuration {
+        stage: stage.to_string(),
+        duration_ms: started.elapsed().as_millis() as u64,
+    });
+}
+
+/// 进度上报累计等待毫秒。四个盘并发上报，这里存的是各线程等待之和。
+static EMIT_WAIT_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn emit_progress(
     window: &Window,
@@ -915,9 +1176,16 @@ fn emit_progress(
         matched_count,
         elapsed_ms: started_at.elapsed().as_millis() as u64,
     };
+    // 计时包住 emit：如果它内部要等主线程处理，扫描线程就会被拖住，
+    // 这也是"第一次扫描特别慢"的一个候选原因（首次启动时 WebView 还在初始化）。
+    let emit_started = std::time::Instant::now();
     if let Err(error) = window.emit("junk-clean:progress", &progress) {
         warn!("发送垃圾深度扫描进度失败: {}", error);
     }
+    EMIT_WAIT_MS.fetch_add(
+        emit_started.elapsed().as_millis() as u64,
+        Ordering::Relaxed,
+    );
 }
 
 fn current_unix_timestamp() -> i64 {
@@ -933,7 +1201,120 @@ pub fn is_deep_junk_path(path: &str) -> bool {
 }
 
 fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
-    let normalized = normalize_path(path);
+    let mut buffer = Vec::new();
+    match_deep_junk_category_reusing(path, &mut buffer)
+}
+
+/// 规则命中的必要条件：规范化（小写）后的路径必须含以下之一。
+///
+/// 这份清单是从下面全部规则反推出来的，**每一条规则都至少需要其中一个**，
+/// 漏一个就会让那一类垃圾扫不出来。改动规则时必须同步检查这里。
+const JUNK_PATH_HINTS: &[&str] = &[
+    // 三个系统级根目录，覆盖绝大多数规则
+    "\\appdata\\",
+    "\\windows\\",
+    "\\programdata\\",
+    // 旧系统残留：目录名本身就是关键字，不以 \windows\ 开头
+    "\\windows.old\\",
+    "\\$windows.~bt\\",
+    "\\$windows.~ws\\",
+    // 浏览器与第三方应用的缓存不一定放在 AppData 下
+    // （实测用例：E://Google//Chrome//User Data\Default\Cache 同样要算浏览器缓存）
+    "\\google\\",
+    "\\microsoft\\edge\\",
+    "\\bravesoftware\\",
+    "\\mozilla\\firefox\\",
+    "\\opera software\\",
+    "\\tencent\\qqbrowser\\",
+    "\\360chrome\\",
+    "\\360se6\\",
+    "\\sogouexplorer\\",
+    "\\ucbrowser\\",
+    "\\2345explorer\\",
+    "\\liebao\\",
+    "\\vivaldi\\",
+    "\\yandexbrowser\\",
+    "\\centbrowser\\",
+    "\\discord\\",
+    "\\slack\\",
+    "\\microsoft\\teams\\",
+    "\\steam\\",
+    "\\epicgameslauncher\\",
+    "\\netease\\cloudmusic\\",
+    "\\tencent\\qqmusic\\",
+];
+
+/// 粗筛：路径里是否可能出现上面某个前缀。只做字节比较，不分配、不转换大小写。
+///
+/// 全盘百万级路径里，绝大多数跟垃圾规则无关。先在这里挡掉，
+/// 后面那几个字符串分配和十几条规则就不用跑了。
+fn could_be_junk_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    for (index, &byte) in bytes.iter().enumerate() {
+        // 前缀都以分隔符开头
+        if byte != b'\\' && byte != b'/' {
+            continue;
+        }
+        let Some(&next) = bytes.get(index + 1) else {
+            continue;
+        };
+        // 先看首字母，对不上就不用做完整比较
+        match next.to_ascii_lowercase() {
+            b'a' | b'b' | b'c' | b'd' | b'e' | b'g' | b'l' | b'm' | b'n' | b'o' | b'p' | b's'
+            | b't' | b'u' | b'v' | b'w' | b'y' | b'$' | b'2' | b'3' => {}
+            _ => continue,
+        }
+        let rest = &bytes[index..];
+        if JUNK_PATH_HINTS
+            .iter()
+            .any(|hint| starts_with_ignore_ascii_case(rest, hint.as_bytes()))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn starts_with_ignore_ascii_case(haystack: &[u8], needle: &[u8]) -> bool {
+    if haystack.len() < needle.len() {
+        return false;
+    }
+    haystack
+        .iter()
+        .zip(needle)
+        .all(|(left, right)| left.to_ascii_lowercase() == *right)
+}
+
+/// 把路径写进可复用的字节缓冲：`/` 统一成 `\`，ASCII 大写转小写。
+///
+/// 逐字节处理，非 ASCII 字节原样保留，所以中文路径不会被破坏；
+/// 缓冲复用让百万次调用只分配一次，而不是每次两个 String。
+fn normalize_into(path: &str, buffer: &mut Vec<u8>) {
+    buffer.clear();
+    buffer.reserve(path.len());
+    for &byte in path.as_bytes() {
+        buffer.push(match byte {
+            b'/' => b'\\',
+            b'A'..=b'Z' => byte + 32,
+            _ => byte,
+        });
+    }
+}
+
+/// 与 `match_deep_junk_category` 相同，但复用调用方的缓冲做规范化。
+///
+/// 深度扫描是对全盘每个文件调用一次，这里的分配次数直接反映在耗时上。
+fn match_deep_junk_category_reusing(
+    path: &str,
+    normalize_buffer: &mut Vec<u8>,
+) -> Option<JunkCategory> {
+    if !could_be_junk_path(path) {
+        return None;
+    }
+    normalize_into(path, normalize_buffer);
+    let Ok(normalized) = std::str::from_utf8(normalize_buffer) else {
+        return None;
+    };
     if normalized.is_empty() {
         return None;
     }
@@ -941,21 +1322,21 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     // 这三个白名单目录必须早于系统排除规则判断：
     // d3d_cache 位于 System32 下，Defender 目录位于被排除的 Defender 根目录下，
     // 而 Windows.old 内部本身还有一份 \Windows\System32\，晚了就会被当成系统目录整片丢掉。
-    if is_shader_cache(&normalized) {
+    if is_shader_cache(normalized) {
         return Some(JunkCategory::ShaderCache);
     }
-    if is_defender_cache(&normalized) {
+    if is_defender_cache(normalized) {
         return Some(JunkCategory::WindowsDefenderCache);
     }
-    if is_old_windows_installation(&normalized) {
+    if is_old_windows_installation(normalized) {
         return Some(JunkCategory::OldWindowsInstallation);
     }
-    if is_excluded_path(&normalized) {
+    if is_excluded_path(normalized) {
         return None;
     }
 
     if contains_any(
-        &normalized,
+        normalized,
         &[
             "\\appdata\\local\\temp\\",
             "\\windows\\temp\\",
@@ -966,7 +1347,7 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
         return Some(JunkCategory::WindowsTemp);
     }
     if contains_any(
-        &normalized,
+        normalized,
         &[
             "\\windows\\softwaredistribution\\deliveryoptimization\\",
             "\\windows\\serviceprofiles\\networkservice\\appdata\\local\\microsoft\\windows\\deliveryoptimization\\",
@@ -974,12 +1355,12 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     ) {
         return Some(JunkCategory::DeliveryOptimization);
     }
-    if is_windows_internet_cache(&normalized) {
+    if is_windows_internet_cache(normalized) {
         // 旧版 IE/WinINet 的缓存属于浏览器资源缓存，Cookies 使用独立目录并不会命中这里。
         return Some(JunkCategory::BrowserCache);
     }
     if contains_any(
-        &normalized,
+        normalized,
         &[
             "\\windows\\prefetch\\",
             "\\appdata\\local\\microsoft\\windows\\caches\\",
@@ -990,30 +1371,30 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     ) {
         return Some(JunkCategory::SystemCache);
     }
-    if is_browser_cache(&normalized) {
+    if is_browser_cache(normalized) {
         return Some(JunkCategory::BrowserCache);
     }
-    if is_user_profile_cache(&normalized) {
+    if is_user_profile_cache(normalized) {
         // 第三方应用通常把可重建缓存放在用户配置目录下；仅匹配明确的缓存目录名，
         // 不把整个 AppData 当作垃圾，也不触碰 MSIX/WebView 持久化数据。
         return Some(JunkCategory::AppCache);
     }
-    if is_third_party_app_cache(&normalized) {
+    if is_third_party_app_cache(normalized) {
         // 补充已知应用的非常规缓存目录名（如 Steam htmlcache、Epic webcache），
         // 这些目录删除后应用会自动重建，归入独立分类便于用户识别。
         return Some(JunkCategory::ThirdPartyAppCache);
     }
     if contains_any(
-        &normalized,
+        normalized,
         &["\\windows\\softwaredistribution\\download\\"],
     ) {
         return Some(JunkCategory::WindowsUpdate);
     }
-    if is_thumbnail_cache(&normalized) {
+    if is_thumbnail_cache(normalized) {
         return Some(JunkCategory::ThumbnailCache);
     }
     if contains_any(
-        &normalized,
+        normalized,
         &[
             "\\appdata\\local\\crashdumps\\",
             "\\windows\\minidump\\",
@@ -1029,11 +1410,11 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
     {
         return Some(JunkCategory::MemoryDump);
     }
-    if is_windows_log(&normalized) {
+    if is_windows_log(normalized) {
         return Some(JunkCategory::LogFiles);
     }
     if contains_any(
-        &normalized,
+        normalized,
         &[
             // 安装/升级日志（Windows\Panther）与更新协调器日志（USOShared\Logs）：
             // 同属排障历史记录，删掉不影响功能，但体积会随更新持续增长。
@@ -1044,7 +1425,7 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
         return Some(JunkCategory::LogFiles);
     }
     if contains_any(
-        &normalized,
+        normalized,
         &[
             "\\appdata\\local\\downloaded installations\\",
             "\\windows\\installer\\$patchcache$\\",
@@ -1065,10 +1446,6 @@ fn match_deep_junk_category(path: &str) -> Option<JunkCategory> {
         return Some(JunkCategory::ClipboardCache);
     }
     None
-}
-
-fn normalize_path(path: &str) -> String {
-    path.replace('/', "\\").to_ascii_lowercase()
 }
 
 fn contains_any(path: &str, markers: &[&str]) -> bool {
@@ -1322,10 +1699,126 @@ fn is_windows_log(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_session, get_category_page, get_paths_for_categories, is_deep_junk_path,
-        DeepJunkScanResult,
+        could_be_junk_path, create_session, get_category_page, get_paths_for_categories,
+        is_deep_junk_path, match_deep_junk_category, DeepJunkScanResult,
     };
     use crate::scanner::{CategoryScanResult, FileInfo, JunkCategory};
+
+    /// 粗筛是纯性能优化，一旦漏掉某类路径，那一类垃圾就永远扫不出来。
+    ///
+    /// 这里对**每一条规则**取一个典型路径，粗筛必须放行、完整规则也必须命中。
+    /// 以后加规则忘了更新 `JUNK_PATH_HINTS`，这条测试会先报警。
+    #[test]
+    fn junk_hint_filter_covers_every_rule() {
+        let samples = [
+            // 着色器缓存 / Defender 缓存 / 旧系统残留
+            r"C:\Windows\System32\d3d_cache\a",
+            r"C:\Users\a\AppData\Local\NVIDIA\DXCache\b",
+            r"C:\ProgramData\Microsoft\Windows Defender\Scans\History\Service\c",
+            r"C:\Windows.old\Windows\System32\d.dll",
+            r"C:\$WINDOWS.~BT\e",
+            r"D:\$WINDOWS.~WS\f",
+            // 临时目录 / 分发优化 / IE 缓存 / 系统缓存
+            r"C:\Windows\Temp\g.tmp",
+            r"C:\Users\a\AppData\Local\Temp\h.tmp",
+            r"C:\Windows\SystemTemp\i",
+            r"C:\Windows\SoftwareDistribution\DeliveryOptimization\j",
+            r"C:\Users\a\AppData\Local\Microsoft\Windows\INetCache\k",
+            r"C:\Windows\Prefetch\l.pf",
+            r"C:\ProgramData\NVIDIA Corporation\NV_Cache\m",
+            // 浏览器 / 用户目录缓存 / 第三方应用缓存
+            r"C:\Users\a\AppData\Local\Google\Chrome\User Data\Default\Cache\n",
+            r"C:\Users\a\AppData\Roaming\Mozilla\Firefox\Profiles\x\startupCache\o",
+            r"C:\Users\a\AppData\Roaming\Code\Cache\p",
+            r"C:\Steam\htmlcache\q",
+            r"C:\Users\a\AppData\Roaming\Discord\Cache\r",
+            // 更新包 / 缩略图 / 错误报告 / 内核转储
+            r"C:\Windows\SoftwareDistribution\Download\s.cab",
+            r"C:\Users\a\AppData\Local\Microsoft\Windows\Explorer\thumbcache_128.db",
+            r"C:\Users\a\AppData\Local\CrashDumps\t.dmp",
+            r"C:\Windows\Minidump\u.dmp",
+            r"C:\Windows\LiveKernelReports\v.dmp",
+            // 日志 / 安装包残留 / 网页缓存 / 字体与剪贴板缓存
+            r"C:\Windows\Logs\MeasuredBoot\w.log",
+            r"C:\Windows\Panther\x.xml",
+            r"C:\ProgramData\USOShared\Logs\y",
+            r"C:\Users\a\AppData\Local\Downloaded Installations\z",
+            r"C:\Windows\Installer\$PatchCache$\1",
+            r"C:\Users\a\AppData\Local\Microsoft\Windows\WebCache\2",
+            r"C:\Windows\ServiceProfiles\LocalService\AppData\Local\FontCache\3",
+            r"C:\Users\a\AppData\Local\Microsoft\Windows\Clipboard\4",
+        ];
+        for path in samples {
+            assert!(could_be_junk_path(path), "粗筛漏掉了这条路径: {path}");
+            assert!(
+                match_deep_junk_category(path).is_some(),
+                "规则没有命中（样本或规则有问题）: {path}"
+            );
+        }
+    }
+
+    /// 粗筛不能把无关路径放过去太多次，也不能误判成命中。
+    #[test]
+    fn junk_hint_filter_rejects_unrelated_paths() {
+        for path in [
+            r"D:\code\project\src\main.rs",
+            r"C:\Users\a\Documents\report.docx",
+            r"C:\Program Files\App\app.exe",
+            r"F:\backup\photos\1.jpg",
+        ] {
+            assert!(!could_be_junk_path(path), "无关路径不该通过粗筛: {path}");
+            assert!(
+                match_deep_junk_category(path).is_none(),
+                "无关路径不该命中规则: {path}"
+            );
+        }
+    }
+
+    /// 并行遍历必须和 `WalkDir` 收集到**完全相同**的文件集。
+    ///
+    /// 这一步是拿正确性换速度的改造：补扫的结果会直接进"发现文件"总数，
+    /// 少一个文件用户就会发现数字变了，所以先用多层结构把各深度都对齐一遍。
+    #[cfg(windows)]
+    #[test]
+    fn parallel_walk_collects_the_same_files_as_walkdir() {
+        use walkdir::WalkDir;
+
+        let base = std::env::temp_dir().join("lightc-walk-equivalence");
+        let _ = std::fs::remove_dir_all(&base);
+        for relative in [
+            "top.bin",
+            "a/one.bin",
+            "a/b/two.bin",
+            "a/b/c/three.bin",
+            "d/deep/four.bin",
+        ] {
+            let path = base.join(relative);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, b"x").unwrap();
+        }
+        // 空目录也要建：并行遍历不能因为读不到内容就报错
+        std::fs::create_dir_all(base.join("empty")).unwrap();
+
+        for depth in 1..=5usize {
+            let mut fast = Vec::new();
+            super::collect_files_parallel(&base, depth, &mut fast);
+            fast.sort();
+
+            let mut slow: Vec<std::path::PathBuf> = WalkDir::new(&base)
+                .max_depth(depth)
+                .follow_links(false)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_type().is_file())
+                .map(|entry| entry.path().to_path_buf())
+                .collect();
+            slow.sort();
+
+            assert_eq!(fast, slow, "max_depth = {depth} 时收集结果不一致");
+        }
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
 
     #[test]
     fn matches_only_high_confidence_junk_paths() {
@@ -1632,6 +2125,8 @@ mod tests {
             scan_duration_ms: 0,
             scan_timestamp: 0,
             drives: Vec::new(),
+            outer_stages: Vec::new(),
+            emit_wait_ms: 0,
         };
 
         let first_page = create_session(result).expect("创建深度扫描会话");
@@ -1678,6 +2173,8 @@ mod tests {
             scan_duration_ms: 0,
             scan_timestamp: 0,
             drives: Vec::new(),
+            outer_stages: Vec::new(),
+            emit_wait_ms: 0,
         };
 
         // 首屏必须直接给出最大的文件，避免用户为了找大文件反复翻页。

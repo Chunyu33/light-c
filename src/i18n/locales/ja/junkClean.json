@@ -13,6 +13,10 @@
     "discover": "ローカルパーティションを検出中",
     "mft": "NTFSファイルレコードを列挙中",
     "path": "候補ファイルパスを再構築中",
+    "walkdir": "キャッシュ補充スキャン",
+    "recycle": "ごみ箱スキャン",
+    "parallel": "各ドライブ＋ごみ箱（並列）",
+    "merge": "結果の統合",
     "filter": "安全なクリーンルールに照合中",
     "metadata": "ファイルサイズとタイムスタンプを読み取り中",
     "result": "スキャン結果を整理中",
@@ -34,7 +38,10 @@
   },
   "drives": {
     "mft": "MFT",
-    "walkdir": "ディレクトリウォーク"
+    "walkdir": "ディレクトリウォーク",
+    "mftStats": "MFT セグメント {{count}} · 読み取り {{io}}s · 解析 {{parse}}s",
+    "outerStages": "並列以外",
+    "emitWait": "進捗通知の待ち時間 合計 {{time}}s"
   },
   "deleteProgress": {
     "preparing": "クリーンタスクを準備中",

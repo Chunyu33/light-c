@@ -13,6 +13,10 @@
     "discover": "發現本地分割槽",
     "mft": "列舉 NTFS 檔案記錄",
     "path": "重建候選檔案路徑",
+    "walkdir": "補掃快取目錄",
+    "recycle": "資源回收筒掃描",
+    "parallel": "各磁碟＋資源回收筒（並行）",
+    "merge": "合併結果",
     "filter": "匹配安全清理規則",
     "metadata": "讀取檔案大小與時間",
     "result": "整理掃描結果",
@@ -34,7 +38,10 @@
   },
   "drives": {
     "mft": "MFT",
-    "walkdir": "常規遍歷"
+    "walkdir": "常規遍歷",
+    "mftStats": "MFT 分段 {{count}} · 讀取 {{io}}s · 解析 {{parse}}s",
+    "outerStages": "並行以外",
+    "emitWait": "進度回報累計等待 {{time}}s"
   },
   "deleteProgress": {
     "preparing": "正在準備清理任務",

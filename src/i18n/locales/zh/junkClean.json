@@ -13,6 +13,10 @@
     "discover": "发现本地分区",
     "mft": "枚举 NTFS 文件记录",
     "path": "重建候选文件路径",
+    "walkdir": "补扫缓存目录",
+    "recycle": "回收站扫描",
+    "parallel": "各盘 + 回收站（并行）",
+    "merge": "合并结果",
     "filter": "匹配安全清理规则",
     "metadata": "读取文件大小与时间",
     "result": "整理扫描结果",
@@ -34,7 +38,10 @@
   },
   "drives": {
     "mft": "MFT",
-    "walkdir": "常规遍历"
+    "walkdir": "常规遍历",
+    "mftStats": "MFT 分段 {{count}} · 读盘 {{io}}s · 解析 {{parse}}s",
+    "outerStages": "并行之外",
+    "emitWait": "进度上报累计等待 {{time}}s"
   },
   "deleteProgress": {
     "preparing": "正在准备清理任务",

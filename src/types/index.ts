@@ -84,6 +84,16 @@ export interface DeepJunkDriveSummary {
   matched_file_count: number;
   matched_size: number;
   warning?: string | null;
+  /** 各阶段耗时，用来定位一次扫描慢在哪一段 */
+  stage_durations?: { stage: string; duration_ms: number }[];
+  /** 本盘总耗时 */
+  total_duration_ms?: number;
+  /** $MFT 的 data run 个数，段数越多说明表越碎 */
+  mft_fragments?: number;
+  /** 读 $MFT 等磁盘的时间 */
+  mft_io_ms?: number;
+  /** 解析 $MFT 记录的时间 */
+  mft_parse_ms?: number;
 }
 
 /** 深度垃圾扫描结果，分类文件结构与普通扫描保持一致。 */
@@ -91,6 +101,10 @@ export interface DeepJunkScanResult extends ScanResult {
   scan_mode: 'deep';
   scan_id: string;
   drives: DeepJunkDriveSummary[];
+  /** 各盘之外的开销：发现分区 / 回收站 / 并行等待 / 汇总 */
+  outer_stages?: { stage: string; duration_ms: number }[];
+  /** 进度上报累计等待（多线程求和） */
+  emit_wait_ms?: number;
 }
 
 /** 深度垃圾扫描阶段进度。 */

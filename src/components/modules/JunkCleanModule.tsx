@@ -90,7 +90,11 @@ function getScanStageLabel(stage: string, isDeep: boolean): string {
     case 'discover': return i18n.t('scanStages.discover', { ns: 'junkClean' });
     case 'mft': return i18n.t('scanStages.mft', { ns: 'junkClean' });
     case 'path': return i18n.t('scanStages.path', { ns: 'junkClean' });
+    case 'walkdir': return i18n.t('scanStages.walkdir', { ns: 'junkClean' });
     case 'filter': return i18n.t('scanStages.filter', { ns: 'junkClean' });
+    case 'recycle': return i18n.t('scanStages.recycle', { ns: 'junkClean' });
+    case 'parallel': return i18n.t('scanStages.parallel', { ns: 'junkClean' });
+    case 'merge': return i18n.t('scanStages.merge', { ns: 'junkClean' });
     case 'metadata': return i18n.t('scanStages.metadata', { ns: 'junkClean' });
     case 'result': return i18n.t('scanStages.result', { ns: 'junkClean' });
     case 'summary': return i18n.t('scanStages.summary', { ns: 'junkClean' });
@@ -936,11 +940,55 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
 
           {!isDeleting && deepScanResult && deepScanResult.drives.length > 0 && (
             <div className="flex flex-wrap gap-2 text-[0.79rem] text-[var(--fg-muted)]">
-              {deepScanResult.drives.map((drive) => (
-                <span key={drive.drive_letter} className="px-2 py-1 rounded-md bg-[var(--bg-hover)]" title={drive.warning ?? undefined}>
-                  {drive.drive_letter} · {drive.backend === 'mft' ? t('drives.mft') : t('drives.walkdir')} · {formatSize(drive.matched_size)}
-                </span>
-              ))}
+              {deepScanResult.drives.map((drive) => {
+                // 排查信息直接印在页面上，不放 title —— 悬停提示在截图时就消失了
+                const stageDetail = (drive.stage_durations ?? [])
+                  .map((item) => `${getScanStageLabel(item.stage, true)} ${(item.duration_ms / 1000).toFixed(1)}s`)
+                  .join(' · ');
+                const mftStats = drive.mft_fragments
+                  ? t('drives.mftStats', {
+                      count: drive.mft_fragments,
+                      io: ((drive.mft_io_ms ?? 0) / 1000).toFixed(1),
+                      parse: ((drive.mft_parse_ms ?? 0) / 1000).toFixed(1),
+                    })
+                  : '';
+                return (
+                  <div
+                    key={drive.drive_letter}
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded-md bg-[var(--bg-hover)]"
+                  >
+                    <span>
+                      {drive.drive_letter} · {drive.backend === 'mft' ? t('drives.mft') : t('drives.walkdir')} · {formatSize(drive.matched_size)}
+                      {drive.total_duration_ms ? ` · ${(drive.total_duration_ms / 1000).toFixed(1)}s` : ''}
+                    </span>
+                    {mftStats ? (
+                      <span className="text-[0.72rem] text-[var(--text-faint)]">{mftStats}</span>
+                    ) : null}
+                    {stageDetail ? (
+                      <span className="text-[0.72rem] text-[var(--text-faint)]">{stageDetail}</span>
+                    ) : null}
+                    {drive.warning ? (
+                      <span className="text-[0.72rem] text-[var(--color-warning,inherit)]">{drive.warning}</span>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {/* 各盘之外的开销：总耗时减去单盘之后剩下的那部分落在这里 */}
+              {(deepScanResult.outer_stages?.length ?? 0) > 0 && (
+                <div className="col-span-full flex flex-col gap-0.5 px-2 py-1">
+                  <span className="text-[0.72rem] text-[var(--text-faint)]">
+                    {t('drives.outerStages')}{' '}
+                    {(deepScanResult.outer_stages ?? [])
+                      .map((item) => `${getScanStageLabel(item.stage, true)} ${(item.duration_ms / 1000).toFixed(1)}s`)
+                      .join(' · ')}
+                  </span>
+                  {(deepScanResult.emit_wait_ms ?? 0) > 0 && (
+                    <span className="text-[0.72rem] text-[var(--text-faint)]">
+                      {t('drives.emitWait', { time: ((deepScanResult.emit_wait_ms ?? 0) / 1000).toFixed(1) })}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

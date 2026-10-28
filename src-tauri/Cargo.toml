@@ -1,6 +1,6 @@
 [package]
 name = "LightC"
-version = "2.17.0"
+version = "2.18.0"
 description = "Windows C盘智能清理工具"
 authors = ["Evan Lau"]
 edition = "2021"
@@ -60,3 +60,11 @@ trash = "5"
 # 正则匹配（卸载残留包名/版本号过滤）
 regex = "1"
 quick-xml = "0.38"
+
+# 开发构建开一级优化。
+#
+# 默认的 dev profile 是 opt-level = 0，扫描、解析这类纯 CPU 代码会慢 4-5 倍
+# （本项目实测：MFT 后处理 686ms → 3377ms）。在 dev 里测性能会得出完全错误的结论，
+# 所以这里只开 1 级：运行时接近 release 的一半以上，编译时间几乎不变。
+[profile.dev]
+opt-level = 1
