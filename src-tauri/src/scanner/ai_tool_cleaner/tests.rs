@@ -35,3 +35,38 @@ use std::path::Path;
             scanner.collect_cleanable_children(Path::new(r"Z:\definitely-not-exists"), &mut entries);
             assert!(entries.is_empty());
         }
+
+
+/// 扩展 / 插件 / 依赖目录里的 `cache` 不能被当成可清理缓存。
+///
+/// 这不是假设出来的场景：VS Code 系客户端的扩展是
+/// `extensions/<扩展名>/node_modules/<包>/cache` 这样的嵌套结构，
+/// 按目录名匹配的话正好会命中，删掉整段扩展依赖就废了。
+#[test]
+fn cache_inside_extension_or_plugin_dirs_is_skipped() {
+    let base = std::env::temp_dir().join("lightc-ai-clean-skip");
+    let _ = fs::remove_dir_all(&base);
+
+    // 真正该清理的：根目录下的 Cache
+    fs::create_dir_all(base.join("Cache")).unwrap();
+    fs::write(base.join("Cache").join("a.bin"), vec![0u8; 512]).unwrap();
+
+    // 不该清理的三种嵌套：扩展依赖、插件、git 版本库
+    for path in [
+        base.join("extensions").join("foo.pkg").join("node_modules").join("bar").join("cache"),
+        base.join("plugins").join("cache"),
+        base.join(".git").join("logs"),
+    ] {
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join("x.bin"), vec![0u8; 4096]).unwrap();
+    }
+
+    let scanner = AiToolScanner::new();
+    let mut entries = Vec::new();
+    scanner.collect_cleanable_children(&base, &mut entries);
+
+    assert_eq!(entries.len(), 1, "只有根目录下的 Cache 应该被收集");
+    assert_eq!(entries[0].name, "Cache");
+
+    let _ = fs::remove_dir_all(&base);
+}

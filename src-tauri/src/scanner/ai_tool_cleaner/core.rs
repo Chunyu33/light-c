@@ -21,8 +21,35 @@ const CLEANABLE_DIR_NAMES: &[&str] = &[
     "Code Cache",
     "logs",
     "Crashpad",
+    // 下面三个是 VS Code 套壳客户端（Cursor / Trae / Devin / Windsurf）共有的缓存目录，
+    // 删掉只会让下次启动时重新生成，不影响已装的扩展和设置：
+    // - CachedData             V8 编译快照，体积最大（Devin 上 105MB）
+    // - CachedExtensionVSIXs   扩展安装包缓存，更新扩展时重新下载
+    // - CachedProfilesData     配置读取缓存
+    "CachedData",
+    "CachedExtensionVSIXs",
+    "CachedProfilesData",
+    // Windsurf 下载并解包后的扩展产物，和上面的 CachedExtensionVSIXs（原始安装包）不是一回事
+    "CachedExtensions",
 ];
 
+/// 名字像缓存、但**绝对不能**进白名单的目录（写在这里是为了不再被误加）：
+///
+/// - `WebStorage` / `IndexedDB` / `Local Storage` / `Session Storage`
+///   客户端把登录态和站点数据存在这些目录里，删了等于把用户踢下线。
+///   Devin 的 `WebStorage` 有 66MB，体积上很有诱惑力，性质上是用户数据。
+/// - `Network`   存放 cookies，几十 KB 却能让人丢掉所有登录状态。
+/// - `Backups`   VS Code 系的未保存文件备份，删了会丢没保存的编辑内容。
+/// - `User`      设置、snippets、workspaceStorage、globalStorage。
+/// - `cli`       部分客户端的命令行本体，不是缓存。
+/// - `plugins`   已安装的插件本体。里面的子目录多叫 `cache`，但装的是插件包，
+///               实测 WorkBuddy 224MB、Codex 31MB，删了对应功能直接不可用。
+/// - `extensions` / `node_modules`
+///               扩展本体与它的依赖。里面确实存在名为 `cache` 的子目录，
+///               但属于依赖内部，删了会让扩展损坏（见下面的跳过逻辑）。
+/// - `ModularData`  TRAE 的对话记录库，加密绑定机器，删了历史对话全没。
+/// - `sessions`  各家 CLI 的会话历史（Codex 136MB、Grok Build 全家桶都在这）。
+/// - `bin`       Grok Build / Qwen 等 CLI 的可执行文件本体。
 /// 从工具根目录往下找的最大层数。
 ///
 /// 有些工具的缓存不是直接在根目录下（如 `.codeium/windsurf/<版本>/Cache`），
@@ -86,6 +113,11 @@ impl AiToolScanner {
             });
         }
 
+        // 按占用体积倒序：第一眼看到的就是最能释放空间的那一项。
+        // 体积相同时保持 tools.rs 里的清单顺序（sort_by 是稳定排序），
+        // 所以常用工具仍然排在同类量的前面。
+        groups.sort_by(|a, b| b.total_size.cmp(&a.total_size));
+
         AiToolScanResult {
             total_size: groups.iter().map(|g| g.total_size).sum(),
             total_files: groups.iter().map(|g| g.file_count).sum(),
@@ -127,6 +159,19 @@ impl AiToolScanner {
             // 版本库目录整体跳过：白名单是按名字匹配的，而 `.git/logs` 存的是 reflog，
             // 删掉会让用户丢失版本历史，和"清缓存"完全不是一回事。
             if name == ".git" {
+                continue;
+            }
+            // `plugins` 目录整体跳过：里面的 `cache` 存的是**已安装的插件本体**，不是缓存。
+            // 实测 WorkBuddy 的 plugins/cache 有 224MB（内置插件 + 连接器），
+            // Codex 的 plugins/cache 是 openai-bundled 运行时 —— 删了功能直接缺失。
+            if name == "plugins" {
+                continue;
+            }
+            // `extensions` / `node_modules` 同样整体跳过。
+            // VS Code 系客户端的扩展目录形如 `extensions/<扩展名>/node_modules/<包>/cache`，
+            // 正好落在扫描深度内，按名字会被当成缓存 —— 但那是扩展依赖内部的目录，
+            // 删掉会让扩展直接损坏。用户要清的是客户端的缓存，不是扩展自己的。
+            if name == "extensions" || name == "node_modules" {
                 continue;
             }
             if CLEANABLE_DIR_NAMES.contains(&name.as_str()) {

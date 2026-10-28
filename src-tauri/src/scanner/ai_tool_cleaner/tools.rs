@@ -42,6 +42,26 @@ pub(super) fn build_specs(appdata: &Path, local_appdata: &Path, user_profile: &P
                     appdata.join("@deepseek-ai").join("dsh-desktop"),
                 ],
             },
+            // VS Code 套壳家族共用同一套缓存目录名（见 core 里的白名单），
+            // 所以一个白名单能吃下全部，加一个工具只是加几行路径。
+            ToolSpec {
+                id: "cursor",
+                name: "Cursor",
+                // 只扫 Roaming。用户目录下的 ~/.cursor 放的是 cli-config.json、插件和
+                // worktrees（git 工作树里有用户的未提交代码），既没有缓存也不该由我们来删。
+                roots: vec![appdata.join("Cursor")],
+            },
+            ToolSpec {
+                id: "trae",
+                name: "Trae",
+                // 官方文档里国际版、国内版、SOLO 模式是三个独立应用名，都试一遍，
+                // 不存在的会被自动跳过。~/.trae-cn 存的是项目快照和扩展，不扫。
+                roots: vec![
+                    appdata.join("Trae"),
+                    appdata.join("Trae CN"),
+                    appdata.join("TRAE SOLO CN"),
+                ],
+            },
             ToolSpec {
                 id: "workbuddy",
                 name: "WorkBuddy",
@@ -51,6 +71,17 @@ pub(super) fn build_specs(appdata: &Path, local_appdata: &Path, user_profile: &P
                     // CLI 的缓存写在用户目录点目录下，和桌面端 AppData 是两套
                     user_profile.join(".workbuddy"),
                 ],
+            },
+            ToolSpec {
+                id: "devin",
+                name: "Devin",
+                roots: vec![appdata.join("devin")],
+            },
+            ToolSpec {
+                id: "windsurf",
+                name: "Windsurf",
+                // ~/.windsurf 只有 extensions 和 plans（草稿），缓存都在 Roaming 这份里
+                roots: vec![appdata.join("Windsurf")],
             },
             ToolSpec {
                 id: "codeium",
@@ -81,6 +112,21 @@ pub(super) fn build_specs(appdata: &Path, local_appdata: &Path, user_profile: &P
                 id: "kimi",
                 name: "Kimi",
                 roots: vec![appdata.join("kimi-desktop")],
+            },
+            // 国内 CLI 类：目录名按公开约定，本机没装所以没实测，
+            // 路径不对的唯一后果是这个工具不出现，不会误删。
+            ToolSpec {
+                id: "qwen",
+                name: "Qwen Code",
+                roots: vec![user_profile.join(".qwen")],
+            },
+            ToolSpec {
+                // xAI 的官方终端编码助手叫 Grok Build（不是社区那个 grok-cli），
+                // 全家桶都在 ~/.grok：bin 是二进制、auth.json 是凭据、sessions 是会话，
+                // 只有 cache 类目录会命中白名单
+                id: "grok",
+                name: "Grok Build",
+                roots: vec![user_profile.join(".grok")],
             },
         ]
     }
