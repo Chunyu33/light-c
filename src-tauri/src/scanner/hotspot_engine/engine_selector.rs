@@ -73,7 +73,7 @@ pub fn scan_full_drive(
     max_depth: u8,
     track_modified: bool,
     cancel_flag: &AtomicBool,
-    progress_cb: impl Fn(MftScanProgress),
+    progress_cb: impl Fn(MftScanProgress) + Sync,
 ) -> (HashMap<PathBuf, FolderStats>, HotspotBackend) {
     let backend = detect_backend(drive_letter);
 

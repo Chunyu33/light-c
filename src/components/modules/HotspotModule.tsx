@@ -139,6 +139,10 @@ function HotspotDiagnostics({
               <div className="mt-0.5 text-[var(--text-primary)] font-semibold tabular-nums">
                 {formatDuration(log.stage_elapsed_ms)}
               </div>
+              {/* 阶段关键数字（后端给的原文）：一眼看出慢在读盘、解析还是聚合 */}
+              {log.detail && (
+                <div className="mt-0.5 text-[var(--text-faint)] leading-snug">{log.detail}</div>
+              )}
             </div>
           ))}
         </div>

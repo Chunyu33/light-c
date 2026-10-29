@@ -96,6 +96,9 @@ pub struct HotspotScanProgress {
     /// 当前阶段耗时（毫秒）
     #[serde(default)]
     pub stage_elapsed_ms: u64,
+    /// 当前阶段的关键数字（分段/读盘/解析、目录数、回退 stat 数…），前端直接展示
+    #[serde(default)]
+    pub detail: String,
 }
 
 fn build_hotspot_progress(
@@ -108,6 +111,7 @@ fn build_hotspot_progress(
     completed_roots: usize,
     scan_start: &Instant,
     stage_elapsed_ms: u64,
+    detail: &str,
 ) -> HotspotScanProgress {
     HotspotScanProgress {
         current_dir: message.to_string(),
@@ -121,6 +125,7 @@ fn build_hotspot_progress(
         message: message.to_string(),
         elapsed_ms: scan_start.elapsed().as_millis() as u64,
         stage_elapsed_ms,
+        detail: detail.to_string(),
     }
 }
 
@@ -586,6 +591,7 @@ impl HotspotScanner {
                             0,
                             &start_time,
                             0,
+                            "",
                         ),
                     );
                 }
@@ -612,6 +618,7 @@ impl HotspotScanner {
                                         .min(total_first_level.saturating_sub(1)),
                                     &start_time,
                                     progress.stage_elapsed_ms,
+                                    &progress.detail,
                                 ),
                             );
                         }
@@ -752,6 +759,7 @@ impl HotspotScanner {
                                 completed,
                                 &start_time,
                                 0,
+                                "",
                             ),
                         );
                     }
@@ -795,6 +803,7 @@ impl HotspotScanner {
                     completed_roots.load(Ordering::Relaxed),
                     &start_time,
                     0,
+                    "",
                 ),
             );
         }
@@ -846,6 +855,7 @@ impl HotspotScanner {
                 completed_roots.load(Ordering::Relaxed),
                 &start_time,
                 result_stage_start.elapsed().as_millis() as u64,
+                "",
             );
             final_progress.found_entries = entries.len();
             let _ = app.emit("hotspot-scan:progress", &final_progress);

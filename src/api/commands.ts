@@ -1115,6 +1115,8 @@ export interface HotspotScanProgress {
   elapsed_ms?: number;
   /** 当前阶段耗时，单位毫秒 */
   stage_elapsed_ms?: number;
+  /** 当前阶段的关键数字（分段/读盘/解析、目录数、回退 stat 数…），用于定位瓶颈 */
+  detail?: string;
 }
 
 /**
