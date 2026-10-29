@@ -39,7 +39,7 @@
   "drives": {
     "mft": "MFT",
     "walkdir": "常規遍歷",
-    "mftStats": "MFT 分段 {{count}} · 讀取 {{io}}s · 解析 {{parse}}s",
+    "mftStats": "MFT 分段 {{count}} · 讀取 {{io}}s、解析 {{parse}}s（同時進行）",
     "outerStages": "並行以外",
     "emitWait": "進度回報累計等待 {{time}}s"
   },

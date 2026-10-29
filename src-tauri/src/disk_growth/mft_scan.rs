@@ -10,7 +10,7 @@
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Instant, UNIX_EPOCH};
@@ -23,6 +23,8 @@ use crate::scanner::big_files_engine::mft_core;
 
 const DEFAULT_MAX_DEPTH: u8 = 4;
 const METADATA_PROGRESS_STEP: usize = 10_000;
+/// 卷根目录在 NTFS 里的固定记录号：MFT 前 16 条记录都是元文件，`$Root` 就是 5。
+const ROOT_MFT_ID: u64 = 5;
 
 static DISK_GROWTH_SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
 
@@ -202,11 +204,12 @@ where
         None,
     );
     let phase_start = Instant::now();
-    let paths = rebuild_paths(&raw_entries, drive_letter);
+    // 目录索引一次建完：路径在 BFS 里直接拼成最终形式（正斜杠 + 小写），
+    // 文件路径再拿父目录路径补一个文件名 —— 原实现给目录和文件各建一遍再规范化，
+    // 71 万条记录要付近三百万次字符串分配。
+    let directory_index = build_directory_index(&raw_entries, &drive_root);
     ensure_not_cancelled()?;
-    let directory_index = build_directory_index(&raw_entries, &paths, &drive_root);
-    ensure_not_cancelled()?;
-    let file_records = collect_file_records(&raw_entries, &paths);
+    let file_records = collect_file_records(&raw_entries, &directory_index);
     push_phase_duration(&mut phase_durations, "path", phase_start);
     ensure_not_cancelled()?;
 
@@ -279,57 +282,25 @@ fn normalize_drive_letter(value: &str) -> Result<char, String> {
     Ok(letter.to_ascii_uppercase())
 }
 
-fn rebuild_paths(entries: &[RawEntry], drive_letter: char) -> HashMap<u64, String> {
-    let mut paths = HashMap::with_capacity(entries.len());
-    let mut children: HashMap<u64, Vec<usize>> = HashMap::with_capacity(entries.len());
-
+/// 一次遍历建出目录索引：BFS 往下走的同时把路径拼成**最终形式**（正斜杠 + 小写）。
+///
+/// 原实现分三步：给每个目录建一份反斜杠路径 → 再 clone 出来整体规范化 → 再为每个文件
+/// 单独建一条路径。现在目录路径只分配一次，深度顺着 BFS 累加（不再拿字符串去数分隔符），
+/// 环检测直接用「索引里有没有这条路径」代替额外的 `HashSet`。
+fn build_directory_index(entries: &[RawEntry], drive_root: &str) -> HashMap<u64, DirectoryInfo> {
+    // 目录大约占全部有效记录的六分之一
+    let mut children: HashMap<u64, Vec<u32>> = HashMap::with_capacity(entries.len() / 6);
     for (index, entry) in entries.iter().enumerate() {
-        if entry.mft_id == 0 {
+        // 文件没有子节点，放进 children 只会让 BFS 白跑一遍
+        if entry.mft_id == 0 || !entry.is_dir {
             continue;
         }
-        children.entry(entry.parent_id).or_default().push(index);
+        children.entry(entry.parent_id).or_default().push(index as u32);
     }
 
-    let root = format!("{}:\\", drive_letter);
-    paths.insert(5, root.clone());
-
-    let mut queue = VecDeque::new();
-    let mut seen = HashSet::new();
-    seen.insert(5u64);
-
-    if let Some(root_children) = children.get(&5) {
-        queue.extend(root_children.iter().copied());
-    }
-
-    while let Some(index) = queue.pop_front() {
-        let entry = &entries[index];
-        if entry.mft_id == 0 || !seen.insert(entry.mft_id) {
-            continue;
-        }
-
-        let Some(parent_path) = paths.get(&entry.parent_id).cloned() else {
-            continue;
-        };
-
-        let full_path = join_windows_path(&parent_path, &entry.name);
-        paths.insert(entry.mft_id, full_path);
-
-        if let Some(next_children) = children.get(&entry.mft_id) {
-            queue.extend(next_children.iter().copied());
-        }
-    }
-
-    paths
-}
-
-fn build_directory_index(
-    entries: &[RawEntry],
-    paths: &HashMap<u64, String>,
-    drive_root: &str,
-) -> HashMap<u64, DirectoryInfo> {
-    let mut directories = HashMap::new();
+    let mut directories: HashMap<u64, DirectoryInfo> = HashMap::with_capacity(children.len() + 1);
     directories.insert(
-        5,
+        ROOT_MFT_ID,
         DirectoryInfo {
             parent_id: 0,
             path: normalize_path(drive_root),
@@ -337,41 +308,90 @@ fn build_directory_index(
         },
     );
 
-    for entry in entries
-        .iter()
-        .filter(|entry| entry.is_dir && entry.mft_id != 0)
-    {
-        let Some(path) = paths.get(&entry.mft_id) else {
+    let mut queue = VecDeque::new();
+    if let Some(root_children) = children.get(&ROOT_MFT_ID) {
+        queue.extend(root_children.iter().copied());
+    }
+
+    while let Some(index) = queue.pop_front() {
+        let entry = &entries[index as usize];
+        // 已经建过路径的目录直接跳过：这也挡住了异常父链造成的死循环
+        if entry.mft_id == 0 || directories.contains_key(&entry.mft_id) {
+            continue;
+        }
+        // 父目录不在索引里，说明这条链断在从根不可达的位置，整支都建不出来
+        let Some(parent) = directories.get(&entry.parent_id) else {
             continue;
         };
+        let depth = parent.depth.saturating_add(1);
+        let path = join_normalized_path(&parent.path, &entry.name);
+        // 上面对 directories 的不可变借用到此结束，可以插入了
         directories.insert(
             entry.mft_id,
             DirectoryInfo {
                 parent_id: entry.parent_id,
-                path: normalize_path(path),
-                depth: depth_from_root(path, drive_root) as u8,
+                path,
+                depth,
             },
         );
+
+        if let Some(next_children) = children.get(&entry.mft_id) {
+            queue.extend(next_children.iter().copied());
+        }
     }
 
     directories
 }
 
-fn collect_file_records(entries: &[RawEntry], paths: &HashMap<u64, String>) -> Vec<FileRecord> {
-    entries
-        .iter()
-        .filter(|entry| !entry.is_dir && entry.mft_id != 0)
-        .filter_map(|entry| {
-            paths.get(&entry.mft_id).map(|path| FileRecord {
-                path: path.clone(),
-                parent_id: entry.parent_id,
-                // 大小和时间在顺序读 $MFT 时已经拿到了，这里直接带下去
-                size: entry.size,
-                modified: entry.modified,
-                has_data_stream: entry.has_data_stream,
-            })
-        })
-        .collect()
+fn collect_file_records(
+    entries: &[RawEntry],
+    directory_index: &HashMap<u64, DirectoryInfo>,
+) -> Vec<FileRecord> {
+    // 提前按记录总数预留：靠 collect 自动扩容会把几十 MB 的数组反复搬几遍
+    let mut records = Vec::with_capacity(entries.len());
+    for entry in entries {
+        if entry.is_dir || entry.mft_id == 0 {
+            continue;
+        }
+        // 父目录路径在目录索引里**已经是规范化形式**（小写 + 正斜杠）
+        let Some(parent) = directory_index.get(&entry.parent_id) else {
+            continue;
+        };
+        records.push(FileRecord {
+            path: join_normalized_path(&parent.path, &entry.name),
+            parent_id: entry.parent_id,
+            // 大小和时间在顺序读 $MFT 时已经拿到了，这里直接带下去
+            size: entry.size,
+            modified: entry.modified,
+            has_data_stream: entry.has_data_stream,
+        });
+    }
+    records
+}
+
+/// 拼出文件的完整路径，并顺手规范化成 `normalize_path` 的形式：**正斜杠 + 小写**。
+///
+/// 父路径取自目录索引，已经是规范化形式；所以这里只需要补一个分隔符、把文件名接上，
+/// 再原地小写。这样一条文件路径只分配一次 —— 原实现是「建全量路径 → clone → 再规范化」三次。
+///
+/// 小写分两步：先 `make_ascii_lowercase`（原地、零分配），只有剩下非 ASCII 的大写字母时
+/// 才退回 `to_lowercase()`。这样和旧实现（直接 `to_lowercase()`）的结果逐字一致，
+/// 中文、日文文件名不会多付一次分配。
+fn join_normalized_path(parent: &str, name: &str) -> String {
+    // 调用方只传目录索引里的路径，那已经是规范化形式；传原始路径进来会拼出混合分隔符
+    debug_assert!(!parent.contains('\\'), "父路径应先规范化: {parent}");
+    let mut path = String::with_capacity(parent.len() + 1 + name.len());
+    path.push_str(parent);
+    if !parent.ends_with('/') {
+        path.push('/');
+    }
+    path.push_str(name);
+    path.make_ascii_lowercase();
+    if path.chars().any(char::is_uppercase) {
+        // 只有非 ASCII 大写（如 Ö、Д）才会走到这里
+        path = path.to_lowercase();
+    }
+    path
 }
 
 fn collect_file_sizes<F>(
@@ -444,7 +464,8 @@ where
                 }
                 Some(FileSizeRecord {
                     parent_id: record.parent_id,
-                    path: normalize_path(&record.path),
+                    // collect_file_records 已经产出规范化路径，这里不再重复处理
+                    path: record.path,
                     size: metadata.size,
                     modified: metadata.modified,
                 })
@@ -521,14 +542,6 @@ fn aggregate_directories(
     entries
 }
 
-fn join_windows_path(parent: &str, name: &str) -> String {
-    if parent.ends_with('\\') {
-        format!("{}{}", parent, name)
-    } else {
-        format!("{}\\{}", parent, name)
-    }
-}
-
 pub fn normalize_path(path: &str) -> String {
     path.to_lowercase().replace('\\', "/")
 }
@@ -566,20 +579,6 @@ fn emit_progress<F>(
         total,
         elapsed_ms: scan_start.elapsed().as_millis() as u64,
     });
-}
-
-fn depth_from_root(path: &str, root: &str) -> usize {
-    let normalized_path = path.to_lowercase();
-    let normalized_root = root.to_lowercase();
-    if !normalized_path.starts_with(&normalized_root) {
-        return 0;
-    }
-
-    normalized_path[normalized_root.len()..]
-        .trim_matches('\\')
-        .split('\\')
-        .filter(|part| !part.is_empty())
-        .count()
 }
 
 #[cfg(test)]
@@ -641,10 +640,76 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// 一步式拼接必须和「先拼路径、再整体规范化」完全一致。
+    ///
+    /// 这是把三次路径构建合成一次的等价性依据：路径会直接显示给用户、
+    /// 也会拿去 stat 回退，差一个字符就会变成"文件不存在"。
     #[test]
-    fn depth_from_root_counts_segments() {
-        assert_eq!(depth_from_root("C:\\", "C:\\"), 0);
-        assert_eq!(depth_from_root("C:\\Users", "C:\\"), 1);
-        assert_eq!(depth_from_root("C:\\Users\\Evan\\AppData", "C:\\"), 3);
+    fn join_normalized_path_matches_the_two_step_version() {
+        let cases = [
+            ("c:\\users\\evan", "Report.TXT"),
+            ("c:\\", "A.BIN"),
+            ("c:\\users\\张三\\appdata\\local", "中文文件.LOG"),
+            ("d:\\program files\\app", "MixedCase.Dll"),
+            ("c:\\users\\Ömer", "Ärger.TXT"),
+        ];
+        for (raw_parent, name) in cases {
+            // 旧链路：原始父路径 + 名字 → 拼接 → 整体规范化
+            let joined = if raw_parent.ends_with('\\') {
+                format!("{raw_parent}{name}")
+            } else {
+                format!("{raw_parent}\\{name}")
+            };
+            let legacy = normalize_path(&joined);
+            // 新链路：父路径先规范化（目录索引里存的就是这个）→ 拼接时就地规范化
+            let normalized_parent = normalize_path(raw_parent);
+            assert_eq!(
+                join_normalized_path(&normalized_parent, name),
+                legacy,
+                "parent={raw_parent} name={name}"
+            );
+        }
+    }
+
+    /// 目录索引的路径与深度：深度改成顺着 BFS 逐层累加（不再拿字符串数分隔符），
+    /// 所以必须验证它和「路径里有几段」完全一致 —— 前端按 depth 分层聚合，
+    /// 差一层就会把某个目录的占用统计挂到父目录头上。
+    #[test]
+    fn build_directory_index_matches_path_segments() {
+        let entry = |mft_id: u64, parent_id: u64, name: &str, is_dir: bool| RawEntry {
+            mft_id,
+            parent_id,
+            name: name.to_string(),
+            is_dir,
+            size: 0,
+            modified: 0,
+            has_data_stream: is_dir,
+        };
+        let entries = vec![
+            entry(ROOT_MFT_ID, ROOT_MFT_ID, ".", true),
+            entry(26, ROOT_MFT_ID, "Users", true),
+            entry(30, 26, "Evan", true),
+            entry(31, 30, "Desktop", true),
+            entry(40, 31, "report.txt", false),
+            // 父目录不在表里（从根不可达）：整支都建不出路径
+            entry(50, 999, "orphan", true),
+            entry(51, 50, "inside", true),
+        ];
+
+        let index = build_directory_index(&entries, "C:\\");
+        assert_eq!(index[&ROOT_MFT_ID].depth, 0);
+        assert_eq!(index[&26].path, "c:/users");
+        assert_eq!(index[&26].depth, 1);
+        assert_eq!(index[&30].depth, 2);
+        assert_eq!(index[&31].depth, 3);
+        assert!(
+            !index.contains_key(&50) && !index.contains_key(&51),
+            "不可达目录不该进索引"
+        );
+
+        // 文件路径由「父目录路径 + 文件名」拼出，父目录已经在索引里
+        let files = collect_file_records(&entries, &index);
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "c:/users/evan/desktop/report.txt");
     }
 }

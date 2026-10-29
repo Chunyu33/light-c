@@ -6,6 +6,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 - New "AI tool cleanup": counts the cache folders left behind by WorkBuddy, Claude Code, Codex, DeepSeek and similar tools, so you can review each one before deleting, with a confirmation step.
 - Deep scan in junk clean is much faster: all drives are scanned in parallel, bringing a full four-drive scan from about 23 seconds to under 5.
+- Disk change analysis is much faster: a full-drive analysis now takes under 4 seconds instead of about 38.
 
 ## v2.17.0
 

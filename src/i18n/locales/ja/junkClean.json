@@ -39,7 +39,7 @@
   "drives": {
     "mft": "MFT",
     "walkdir": "ディレクトリウォーク",
-    "mftStats": "MFT セグメント {{count}} · 読み取り {{io}}s · 解析 {{parse}}s",
+    "mftStats": "MFT セグメント {{count}} · 読み取り {{io}}s・解析 {{parse}}s（同時実行）",
     "outerStages": "並列以外",
     "emitWait": "進捗通知の待ち時間 合計 {{time}}s"
   },

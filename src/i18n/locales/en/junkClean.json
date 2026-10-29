@@ -39,7 +39,7 @@
   "drives": {
     "mft": "MFT",
     "walkdir": "Directory Walk",
-    "mftStats": "MFT runs {{count}} · read {{io}}s · parse {{parse}}s",
+    "mftStats": "MFT runs {{count}} · read {{io}}s and parse {{parse}}s in parallel",
     "outerStages": "Outside drives",
     "emitWait": "Progress reporting waited {{time}}s"
   },
