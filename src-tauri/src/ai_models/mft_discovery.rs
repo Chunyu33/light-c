@@ -3,6 +3,7 @@
 use crate::ai_models::model_file_rules::mft_model_min_size;
 use crate::ai_models::types::{AiModelPhaseDuration, AiModelScanProgress, AssetSource, ModelItem};
 use crate::scanner::big_files_engine::mft_core;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -21,22 +22,45 @@ pub fn discover_models_via_mft<F>(
 where
     F: Fn(AiModelScanProgress) + Sync,
 {
-    let mut warnings = Vec::new();
+    let drives: Vec<char> = local_drive_letters()
+        .into_iter()
+        .filter(|drive_letter| mft_core::is_ntfs(*drive_letter))
+        .collect();
+
+    // 各盘的 $MFT 互不依赖，串行时总时间等于三盘之和，并行后等于最慢那一盘。
+    // 每个盘自己的阶段耗时放进各自的 Vec，最后按 spawn 顺序合并，保证界面顺序稳定。
+    let per_drive: Vec<(char, Result<Vec<(String, ModelItem)>, String>, Vec<AiModelPhaseDuration>)> =
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = drives
+                .iter()
+                .map(|&drive_letter| {
+                    scope.spawn(move || {
+                        let mut phases = Vec::new();
+                        let outcome = scan_drive_for_model_candidates(
+                            drive_letter,
+                            covered_roots,
+                            scan_started_at,
+                            progress,
+                            &mut phases,
+                        );
+                        (drive_letter, outcome, phases)
+                    })
+                })
+                .collect();
+
+            handles
+                .into_iter()
+                .filter_map(|handle| handle.join().ok())
+                .collect()
+        });
+
     let mut grouped_models: HashMap<String, Vec<ModelItem>> = HashMap::new();
+    let mut warnings = Vec::new();
     let mut phase_durations = Vec::new();
 
-    for drive_letter in local_drive_letters() {
-        if !mft_core::is_ntfs(drive_letter) {
-            continue;
-        }
-
-        match scan_drive_for_model_candidates(
-            drive_letter,
-            covered_roots,
-            scan_started_at,
-            progress,
-            &mut phase_durations,
-        ) {
+    for (drive_letter, outcome, phases) in per_drive {
+        phase_durations.extend(phases);
+        match outcome {
             Ok(models) => {
                 for (source_name, model) in models {
                     grouped_models.entry(source_name).or_default().push(model);
@@ -174,49 +198,53 @@ where
         "mftMetadata",
         &format!("正在校验 {} 盘候选文件大小", drive_letter),
     );
-    let mut models = Vec::new();
+    // 路径拿到之后记录就没用了：一路全盘的记录带着名字，占上百 MB，
+    // 多盘并行时会同时压着好几份，尽早释放
+    drop(entries);
 
-    for (mft_id, min_size) in candidate_min_sizes {
-        let Some(path) = paths.get(&mft_id).map(PathBuf::from) else {
-            continue;
-        };
+    // 先在内存里把候选缩到「路径 + 阈值」，再并行 stat：
+    // 候选通常只有几十上百个，但分散在整个盘上，串行 stat 实测能占到一秒以上
+    let resolved: Vec<(PathBuf, u64)> = candidate_min_sizes
+        .into_iter()
+        .filter_map(|(mft_id, min_size)| {
+            let path = PathBuf::from(paths.get(&mft_id)?);
+            if should_skip_path(&path)
+                || !is_plausible_mft_model_candidate(&path)
+                || is_covered_by_config_layer(&path, covered_roots)
+            {
+                return None;
+            }
+            Some((path, min_size))
+        })
+        .collect();
 
-        if should_skip_path(&path) {
-            continue;
-        }
+    let models: Vec<(String, ModelItem)> = resolved
+        .par_iter()
+        .filter_map(|(path, min_size)| {
+            // MFT 负责快速定位候选，大小读取回到标准 metadata，
+            // 避免少量文件因 NTFS 记录解析差异在进入路径层前被误丢。
+            let metadata = path.metadata().ok()?;
+            if !metadata.is_file() || metadata.len() < *min_size {
+                return None;
+            }
 
-        if !is_plausible_mft_model_candidate(&path) {
-            continue;
-        }
+            let source_name = infer_source_name(path, covered_roots);
+            let name = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("未知模型")
+                .to_string();
 
-        if is_covered_by_config_layer(&path, covered_roots) {
-            continue;
-        }
-
-        let Ok(metadata) = path.metadata() else {
-            continue;
-        };
-        if !metadata.is_file() || metadata.len() < min_size {
-            continue;
-        }
-
-        let source_name = infer_source_name(&path, covered_roots);
-        let name = path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("未知模型")
-            .to_string();
-
-        // MFT 负责快速定位候选，大小读取回到标准 metadata，避免少量文件因 NTFS 记录解析差异在进入路径层前被误丢。
-        models.push((
-            source_name,
-            ModelItem {
-                name,
-                size: metadata.len(),
-                path,
-            },
-        ));
-    }
+            Some((
+                source_name,
+                ModelItem {
+                    name,
+                    size: metadata.len(),
+                    path: path.clone(),
+                },
+            ))
+        })
+        .collect();
     finish_mft_phase(
         phase_durations,
         "mftMetadata",
