@@ -202,6 +202,7 @@
     "detect": "Detecting the scan engine",
     "init": "Initializing the full MFT scan engine",
     "mft": "Reading MFT file records",
+    "paths": "Rebuilding candidate paths",
     "topn": "Building the large-file results",
     "summary": "Summarizing scan results",
     "fallback": "MFT unavailable; switching to standard scan",

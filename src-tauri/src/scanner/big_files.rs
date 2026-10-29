@@ -75,6 +75,9 @@ pub struct LargeFileScanProgress {
     pub message: String,
     #[serde(default)]
     pub elapsed_ms: u64,
+    /// 当前阶段的关键数字（分段/读盘/解析、记录数、候选数…）
+    #[serde(default)]
+    pub detail: String,
 }
 
 // ============================================================================
@@ -144,6 +147,7 @@ pub fn scan(
                     stage: "detect".into(),
                     message: "正在检测扫描引擎".into(),
                     elapsed_ms: 0,
+                    detail: String::new(),
                 },
             );
             if is_admin && is_ntfs_drive {
@@ -158,6 +162,7 @@ pub fn scan(
                         stage: "init".into(),
                         message: "正在初始化 MFT 全量扫描引擎".into(),
                         elapsed_ms: 0,
+                        detail: String::new(),
                     },
                 );
 
@@ -175,6 +180,7 @@ pub fn scan(
                                 stage: progress.stage.clone(),
                                 message: progress.message,
                                 elapsed_ms: progress.elapsed_ms,
+                                detail: progress.detail,
                             },
                         );
                     },
@@ -194,6 +200,7 @@ pub fn scan(
                                 stage: "fallback".into(),
                                 message: "MFT 返回空结果，降级到常规扫描".into(),
                                 elapsed_ms: 0,
+                                detail: String::new(),
                             },
                         );
                     }
@@ -213,6 +220,7 @@ pub fn scan(
                                 stage: "fallback".into(),
                                 message: format!("MFT 失败: {}，降级到常规扫描", e),
                                 elapsed_ms: 0,
+                                detail: String::new(),
                             },
                         );
                     }
@@ -289,6 +297,7 @@ pub fn scan(
                         stage: "walkdir".into(),
                         message: format!("正在遍历 {} 盘文件", drive_letter),
                         elapsed_ms: 0,
+                        detail: String::new(),
                     };
                     let _ = window.emit("large-file-scan:progress", &progress);
                     last_emit = Instant::now();

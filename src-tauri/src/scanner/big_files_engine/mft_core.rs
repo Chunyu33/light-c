@@ -1,11 +1,10 @@
 // ============================================================================
-// MFT 核心 — USN 枚举 + $MFT 顺序读取（供 big_files 使用）
+// MFT 核心 — USN 枚举 + $MFT 顺序读取（多个扫描模块共用）
 // ============================================================================
 
 #![cfg(target_os = "windows")]
 
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::os::windows::fs::{FileExt, OpenOptionsExt};
 use std::sync::mpsc;
@@ -108,20 +107,6 @@ pub struct MftReadStats {
     pub io_ms: u64,
     /// 解析记录（fixup + 属性）的时间
     pub parse_ms: u64,
-}
-
-#[derive(Clone)]
-pub struct MftFileMetadata {
-    pub size: u64,
-    pub modified: i64,
-    pub is_cloud_placeholder: bool,
-}
-
-#[derive(Clone)]
-pub struct MftTopFileCandidate {
-    pub mft_id: u64,
-    pub size: u64,
-    pub modified: i64,
 }
 
 #[derive(Clone)]
@@ -679,96 +664,6 @@ impl NtfsFileMetadataReader {
         })
     }
 
-    pub fn read_top_file_candidates(
-        &self,
-        top_limit: usize,
-        progress_cb: &impl Fn(usize) -> bool,
-    ) -> Result<Vec<MftTopFileCandidate>, String> {
-        let mut heap: BinaryHeap<Reverse<(u64, u64, i64)>> = BinaryHeap::new();
-        let mut logical_record_id = 0u64;
-
-        for run in &self.mft_runs {
-            let run_start = (run.start_lcn as u64)
-                .checked_mul(self.cluster_size)
-                .ok_or_else(|| "$MFT data run 起始位置溢出".to_string())?;
-            let run_bytes = run
-                .cluster_count
-                .checked_mul(self.cluster_size)
-                .ok_or_else(|| "$MFT data run 大小溢出".to_string())?;
-            let records_in_run = run_bytes / self.file_record_size as u64;
-            let mut bytes_read_in_run = 0u64;
-            let mut buffer = vec![0u8; MFT_READ_CHUNK.max(self.file_record_size)];
-
-            while bytes_read_in_run < run_bytes {
-                let remaining = (run_bytes - bytes_read_in_run) as usize;
-                let read_len = remaining.min(buffer.len());
-                let aligned_read_len = read_len - (read_len % self.file_record_size);
-                if aligned_read_len == 0 {
-                    break;
-                }
-
-                self.volume
-                    .seek_read(
-                        &mut buffer[..aligned_read_len],
-                        run_start + bytes_read_in_run,
-                    )
-                    .map_err(|error| format!("顺序读取 $MFT 失败: {}", error))?;
-
-                let records_before_chunk = bytes_read_in_run / self.file_record_size as u64;
-                for (record_index, record_bytes) in buffer[..aligned_read_len]
-                    .chunks_exact(self.file_record_size)
-                    .enumerate()
-                {
-                    let record_id = logical_record_id + records_before_chunk + record_index as u64;
-                    if !looks_like_active_file(record_bytes) {
-                        if record_id % 100_000 == 0 && !progress_cb(record_id as usize) {
-                            return Err("扫描已取消".into());
-                        }
-                        continue;
-                    }
-
-                    let mut record = record_bytes.to_vec();
-                    if self.apply_fixup(&mut record).is_some() {
-                        if let Some(metadata) = parse_active_file_record_metadata(&record) {
-                            // 在进入 Top-N 堆之前过滤，避免云端占位文件挤掉真正占用本地空间的文件。
-                            if metadata.size > 0 && !metadata.is_cloud_placeholder {
-                                heap.push(Reverse((metadata.size, record_id, metadata.modified)));
-                                if heap.len() > top_limit {
-                                    heap.pop();
-                                }
-                            }
-                        }
-                    }
-
-                    if record_id % 100_000 == 0 && !progress_cb(record_id as usize) {
-                        return Err("扫描已取消".into());
-                    }
-                }
-
-                bytes_read_in_run += aligned_read_len as u64;
-            }
-
-            logical_record_id += records_in_run;
-        }
-
-        let mut candidates: Vec<MftTopFileCandidate> = heap
-            .into_iter()
-            .map(|Reverse((size, mft_id, modified))| MftTopFileCandidate {
-                mft_id,
-                size,
-                modified,
-            })
-            .collect();
-        candidates.sort_by(|left, right| {
-            right
-                .size
-                .cmp(&left.size)
-                .then_with(|| left.mft_id.cmp(&right.mft_id))
-        });
-        Ok(candidates)
-    }
-
-
     fn read_mft_data_runs(&self) -> Option<Vec<DataRun>> {
         let mut record = vec![0u8; self.file_record_size];
         let first_run = self.mft_runs.first()?;
@@ -924,78 +819,6 @@ fn parse_file_name_attribute(record: &[u8], attribute_offset: usize) -> Option<(
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
         .collect();
     Some((parent_reference, String::from_utf16_lossy(&units), namespace))
-}
-
-fn looks_like_active_file(record: &[u8]) -> bool {
-    if record.len() < 24 || &record[0..4] != b"FILE" {
-        return false;
-    }
-    let Some(flags) = read_u16(record, 22) else {
-        return false;
-    };
-    // 先用头部 flags 粗过滤，减少对目录、空闲记录和异常记录的拷贝/fixup 成本。
-    (flags & FILE_RECORD_FLAG_IN_USE) != 0 && (flags & FILE_RECORD_FLAG_DIRECTORY) == 0
-}
-
-fn parse_active_file_record_metadata(record: &[u8]) -> Option<MftFileMetadata> {
-    let flags = read_u16(record, 22)?;
-    if (flags & FILE_RECORD_FLAG_IN_USE) == 0 || (flags & FILE_RECORD_FLAG_DIRECTORY) != 0 {
-        return None;
-    }
-    parse_file_record_metadata(record)
-}
-
-fn parse_file_record_metadata(record: &[u8]) -> Option<MftFileMetadata> {
-    let attributes_offset = read_u16(record, 20)? as usize;
-    let mut offset = attributes_offset;
-    let mut modified = 0i64;
-    let mut file_attributes = 0u32;
-    let mut unnamed_data_size = None;
-    let mut fallback_data_size = None;
-
-    while offset + 16 <= record.len() {
-        let attribute_type = read_u32(record, offset)?;
-        if attribute_type == 0xFFFF_FFFF {
-            break;
-        }
-
-        let attribute_length = read_u32(record, offset + 4)? as usize;
-        if attribute_length == 0 || offset + attribute_length > record.len() {
-            return None;
-        }
-
-        if attribute_type == 0x10 && modified == 0 {
-            if let Some((standard_modified, standard_attributes)) =
-                parse_standard_info(record, offset)
-            {
-                modified = standard_modified;
-                file_attributes = standard_attributes;
-            }
-        }
-
-        if attribute_type == 0x80 {
-            let name_length = *record.get(offset + 9)?;
-            let size = parse_data_attribute_size(record, offset);
-            if name_length == 0 {
-                unnamed_data_size = size;
-                break;
-            } else if fallback_data_size.is_none() {
-                // 只有没有主数据流时才保留备用数据流大小，避免 ADS 抢占普通文件大小。
-                fallback_data_size = size;
-            }
-        }
-
-        offset += attribute_length;
-    }
-
-    let size = unnamed_data_size.or(fallback_data_size)?;
-    Some(MftFileMetadata {
-        size,
-        modified,
-        is_cloud_placeholder: crate::scanner::big_files::has_cloud_placeholder_attributes(
-            file_attributes,
-        ),
-    })
 }
 
 fn parse_standard_info(record: &[u8], attribute_offset: usize) -> Option<(i64, u32)> {
@@ -1191,18 +1014,16 @@ mod tests {
             assert_eq!(chunk.len % 1024, 0);
         }
 
-        // 同一段内：下一块的偏移 = 上一块偏移 + 长度，记录号同样连续
-        let mut expected_record_id = 0u64;
+        // 相邻两块：记录号必须接着上一块的记录数往下数，换 data run 也不能从 0 重来
         for pair in chunks.windows(2) {
             let (previous, current) = (&pair[0], &pair[1]);
             let records_in_previous = previous.len as u64 / 1024;
-            if current.offset == previous.offset + previous.len as u64 {
-                assert_eq!(current.base_record_id, previous.base_record_id + records_in_previous);
-            } else {
-                // 换段：新段起点接着上一段的总记录数，不能从 0 重新数
-                expected_record_id = previous.base_record_id + records_in_previous;
-                assert_eq!(current.base_record_id, expected_record_id);
-            }
+            assert_eq!(
+                current.base_record_id,
+                previous.base_record_id + records_in_previous,
+                "记录号断在偏移 {} 处",
+                current.offset
+            );
         }
         assert_eq!(chunks.first().unwrap().offset, 2 * cluster_size);
     }

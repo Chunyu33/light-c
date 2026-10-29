@@ -227,6 +227,8 @@ export interface LargeFileScanProgress {
   message?: string;
   /** 后端已耗时（毫秒） */
   elapsed_ms?: number;
+  /** 当前阶段的关键数字（分段/读盘/解析、记录数、候选数…），用于定位瓶颈 */
+  detail?: string;
 }
 
 /** 应用状态 */

@@ -8,6 +8,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 - Deep scan in junk clean is much faster: all drives are scanned in parallel, bringing a full four-drive scan from about 23 seconds to under 5.
 - Disk change analysis is much faster: a full-drive analysis now takes under 4 seconds instead of about 38.
 - Full-drive hotspot analysis drops from tens of seconds to about 3, and the progress panel now shows what each stage is doing and how long it took.
+- Full-drive large-file scans drop from tens of seconds to under 3.
 
 ## v2.17.0
 

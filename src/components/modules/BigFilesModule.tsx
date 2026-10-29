@@ -133,6 +133,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
     }
   }, [showToast, t]);
   const [scanStage, setScanStage] = useState('');
+  const [scanDetail, setScanDetail] = useState('');
   const [backendElapsedMs, setBackendElapsedMs] = useState(0);
   const [scannedCount, setScannedCount] = useState(0);
   const [scanElapsed, setScanElapsed] = useState(0);
@@ -176,11 +177,12 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
     const setupListener = async () => {
       unlisten = await listen<LargeFileScanProgress>('large-file-scan:progress', (event) => {
-        const { current_path, scanned_count, backend, stage, elapsed_ms } = event.payload;
+        const { current_path, scanned_count, backend, stage, elapsed_ms, detail } = event.payload;
         setCurrentPath(current_path);
         setScannedCount(scanned_count);
         setScanStage(stage || '');
         setBackendElapsedMs(elapsed_ms || 0);
+        setScanDetail(detail || '');
         if (backend) {
           setScanBackend(backend);
         }
@@ -502,25 +504,31 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
           {/* 扫描进度 + 引擎 + 时长（扫描中 & 扫描完成后都显示） */}
           {(isScanning || scanBackend) && (displayScanPath || localizedScanStage) && (
-            <div className={`px-4 py-2 border-b border-[var(--border-default)] text-xs truncate flex items-center gap-3 ${
+            <div className={`px-4 py-2 border-b border-[var(--border-default)] text-xs ${
               scanBackend === 'mft' ? 'bg-[var(--brand-green-10)]' : 'bg-emerald-500/5'
             }`}>
-              <span className="truncate text-[var(--fg-muted)]">{isScanning ? t('bigFiles.scanningPrefix') : t('bigFiles.scanCompletedPrefix')} {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}</span>
-              {scanBackend && (
-                <span className={`shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${
-                  scanBackend === 'mft'
-                    ? 'bg-[var(--brand-green)] text-white'
-                    : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
-                }`}>
-                  {scanBackend === 'mft' ? t('bigFiles.mftFullScan') : t('bigFiles.normalScan')}
-                </span>
-              )}
-              <span className="shrink-0 text-[var(--fg-faint)]">{t('fileCount', { count: scannedCount.toLocaleString() })}</span>
-              {scanStage && scanBackend === 'mft' && (
-                <span className="shrink-0 text-[var(--fg-faint)]">{localizedScanStage}</span>
-              )}
-              {displayElapsedSeconds > 0 && (
-                <span className="shrink-0 text-[var(--fg-faint)]">{displayElapsedSeconds}s</span>
+              <div className="truncate flex items-center gap-3">
+                <span className="truncate text-[var(--fg-muted)]">{isScanning ? t('bigFiles.scanningPrefix') : t('bigFiles.scanCompletedPrefix')} {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}</span>
+                {scanBackend && (
+                  <span className={`shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${
+                    scanBackend === 'mft'
+                      ? 'bg-[var(--brand-green)] text-white'
+                      : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
+                  }`}>
+                    {scanBackend === 'mft' ? t('bigFiles.mftFullScan') : t('bigFiles.normalScan')}
+                  </span>
+                )}
+                <span className="shrink-0 text-[var(--fg-faint)]">{t('fileCount', { count: scannedCount.toLocaleString() })}</span>
+                {scanStage && scanBackend === 'mft' && (
+                  <span className="shrink-0 text-[var(--fg-faint)]">{localizedScanStage}</span>
+                )}
+                {displayElapsedSeconds > 0 && (
+                  <span className="shrink-0 text-[var(--fg-faint)]">{displayElapsedSeconds}s</span>
+                )}
+              </div>
+              {/* 阶段的关键数字（后端给的原文）：一眼看出慢在读盘、解析还是路径重建 */}
+              {scanDetail && (
+                <div className="mt-1 truncate text-[var(--fg-faint)]">{scanDetail}</div>
               )}
             </div>
           )}
