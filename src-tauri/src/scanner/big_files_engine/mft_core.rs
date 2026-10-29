@@ -1,5 +1,5 @@
 // ============================================================================
-// MFT 核心 — USN 枚举 + $MFT 顺序读取（多个扫描模块共用）
+// MFT 核心 — $MFT 顺序读取与记录解析（垃圾清理 / 磁盘变化 / 大目录 / 大文件共用）
 // ============================================================================
 
 #![cfg(target_os = "windows")]
@@ -12,15 +12,11 @@ use std::time::Instant;
 
 use winapi::shared::minwindef::{BOOL, DWORD, LPVOID};
 use winapi::shared::ntdef::HANDLE;
-use winapi::um::errhandlingapi::GetLastError;
-use winapi::um::fileapi::{CreateFileW, OPEN_EXISTING};
 use winapi::um::handleapi::CloseHandle;
-use winapi::um::ioapiset::DeviceIoControl;
 use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
 use winapi::um::securitybaseapi::GetTokenInformation;
 use winapi::um::winnt::{
-    TokenElevation, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_SHARE_READ,
-    FILE_SHARE_WRITE, GENERIC_READ, TOKEN_ELEVATION, TOKEN_QUERY,
+    TokenElevation, FILE_SHARE_READ, FILE_SHARE_WRITE, TOKEN_ELEVATION, TOKEN_QUERY,
 };
 
 extern "system" {
@@ -36,9 +32,6 @@ extern "system" {
     ) -> BOOL;
 }
 
-pub const FSCTL_ENUM_USN_DATA: DWORD = (9 << 16) | (0 << 14) | (44 << 2) | 3;
-pub const ERROR_HANDLE_EOF: DWORD = 38;
-pub const USN_BUFFER_SIZE: usize = 1024 * 1024;
 const MFT_METADATA_MAX: u64 = 25;
 const MFT_READ_CHUNK: usize = 16 * 1024 * 1024;
 /// 读盘与解析流水线里最多同时存在几块缓冲（16MB × 3 = 48MB）。
@@ -57,22 +50,6 @@ const FILE_RECORD_FLAG_DIRECTORY: u16 = 0x0002;
 const FILE_NAME_NAMESPACE_DOS: u8 = 2;
 /// 重解析点（junction / 符号链接）在 `$STANDARD_INFORMATION` 里的属性位。
 const FILE_ATTRIBUTE_REPARSE_POINT_BIT: u32 = 0x0000_0400;
-
-#[repr(C)]
-#[allow(non_snake_case)]
-pub struct MftEnumDataV0 {
-    pub StartFileReferenceNumber: u64,
-    pub LowUsn: i64,
-    pub HighUsn: i64,
-}
-
-#[derive(Clone)]
-pub struct MftEntry {
-    pub mft_id: u64,
-    pub parent_id: u64,
-    pub name: String,
-    pub is_dir: bool,
-}
 
 /// 一条 `$MFT` 记录里能一次拿到的全部信息。
 ///
@@ -173,40 +150,6 @@ fn plan_read_chunks(
     Ok(chunks)
 }
 
-/// 路径重建只关心三件事：自身 id、父 id、名字。
-///
-/// `MftEntry`（USN 枚举结果）和 `MftRecordInfo`（$MFT 直读结果）结构不同，
-/// 但重建路径的逻辑完全一样，用这个 trait 避免维护两份实现。
-trait PathNode {
-    fn node_id(&self) -> u64;
-    fn parent_id(&self) -> u64;
-    fn node_name(&self) -> &str;
-}
-
-impl PathNode for MftEntry {
-    fn node_id(&self) -> u64 {
-        self.mft_id
-    }
-    fn parent_id(&self) -> u64 {
-        self.parent_id
-    }
-    fn node_name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl PathNode for MftRecordInfo {
-    fn node_id(&self) -> u64 {
-        self.mft_id
-    }
-    fn parent_id(&self) -> u64 {
-        self.parent_id
-    }
-    fn node_name(&self) -> &str {
-        &self.name
-    }
-}
-
 pub struct NtfsFileMetadataReader {
     volume: fs::File,
     bytes_per_sector: usize,
@@ -215,166 +158,18 @@ pub struct NtfsFileMetadataReader {
     mft_runs: Vec<DataRun>,
 }
 
-pub fn open_volume(drive_letter: char) -> Result<HANDLE, String> {
-    let p = format!("\\\\.\\{}:", drive_letter);
-    let w: Vec<u16> = p.encode_utf16().chain(std::iter::once(0)).collect();
-    let h = unsafe {
-        CreateFileW(
-            w.as_ptr(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            std::ptr::null_mut(),
-            OPEN_EXISTING,
-            0,
-            std::ptr::null_mut(),
-        )
-    };
-    if h == winapi::um::handleapi::INVALID_HANDLE_VALUE {
-        let err = unsafe { GetLastError() };
-        return Err(format!("无法打开卷设备 {} (错误码: {})", p, err));
-    }
-    Ok(h)
-}
-
-pub fn close_volume(h: HANDLE) {
-    unsafe { CloseHandle(h) };
-}
-
-pub fn enumerate_usn_records_v2(
-    h_device: HANDLE,
-    cb: &impl Fn(usize) -> bool,
-) -> Result<Vec<MftEntry>, String> {
-    let mut entries: Vec<MftEntry> = Vec::new();
-    let mut buf: Vec<u8> = vec![0u8; USN_BUFFER_SIZE];
-    let mut processed: usize = 0;
-    let mut frn: u64 = 0;
-    loop {
-        let mut br: DWORD = 0;
-        let mut ed = MftEnumDataV0 {
-            StartFileReferenceNumber: frn,
-            LowUsn: 0,
-            HighUsn: i64::MAX,
-        };
-        let ok = unsafe {
-            DeviceIoControl(
-                h_device,
-                FSCTL_ENUM_USN_DATA,
-                &mut ed as *mut _ as LPVOID,
-                std::mem::size_of::<MftEnumDataV0>() as DWORD,
-                buf.as_mut_ptr() as LPVOID,
-                USN_BUFFER_SIZE as DWORD,
-                &mut br,
-                std::ptr::null_mut(),
-            )
-        };
-        if ok == 0 {
-            if unsafe { GetLastError() } == ERROR_HANDLE_EOF {
-                break;
-            }
-            return Err("DeviceIoControl 失败".into());
-        }
-        if br == 0 {
-            break;
-        }
-        if processed == 0 && !cb(0) {
-            return Err("扫描已取消".into());
-        }
-        let mut offset: usize = 8;
-        while offset < br as usize {
-            let Some((rlen, mft_id, parent_id, file_name, _is_dir, is_reparse)) =
-                read_usn_record(&buf, offset, br as usize)
-            else {
-                break;
-            };
-            if !file_name.is_empty() && !is_reparse && mft_id > MFT_METADATA_MAX {
-                entries.push(MftEntry {
-                    mft_id,
-                    parent_id,
-                    name: file_name,
-                    is_dir: _is_dir,
-                });
-            }
-            processed += 1;
-            if processed % 10_000 == 0 && !cb(processed) {
-                return Err("扫描已取消".into());
-            }
-            offset += rlen;
-        }
-        frn = unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const u64) };
-    }
-    cb(processed);
-    Ok(entries)
-}
-
-fn read_usn_record(
-    buffer: &[u8],
-    offset: usize,
-    bytes_returned: usize,
-) -> Option<(usize, u64, u64, String, bool, bool)> {
-    unsafe {
-        let base = buffer.as_ptr().add(offset);
-        let record_len = std::ptr::read_unaligned(base as *const u32) as usize;
-        if record_len == 0 || offset + record_len > bytes_returned {
-            return None;
-        }
-
-        let file_ref = std::ptr::read_unaligned(base.add(8) as *const u64);
-        let parent_ref = std::ptr::read_unaligned(base.add(16) as *const u64);
-        let attributes = std::ptr::read_unaligned(base.add(52) as *const u32);
-        let name_len = std::ptr::read_unaligned(base.add(56) as *const u16) as usize / 2;
-        let name_offset = std::ptr::read_unaligned(base.add(58) as *const u16) as usize;
-        if name_offset + name_len * 2 > record_len {
-            return None;
-        }
-
-        let name = if name_len > 0 {
-            String::from_utf16_lossy(std::slice::from_raw_parts(
-                buffer.as_ptr().add(offset + name_offset) as *const u16,
-                name_len,
-            ))
-        } else {
-            String::new()
-        };
-        let is_dir = (attributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY;
-        let is_reparse =
-            (attributes & FILE_ATTRIBUTE_REPARSE_POINT) == FILE_ATTRIBUTE_REPARSE_POINT;
-
-        Some((
-            record_len,
-            file_ref & 0x0000_FFFF_FFFF_FFFF,
-            parent_ref & 0x0000_FFFF_FFFF_FFFF,
-            name,
-            is_dir,
-            is_reparse,
-        ))
-    }
-}
-
-pub fn rebuild_paths_for_ids(
-    entries: &[MftEntry],
-    drive_letter: char,
-    target_ids: &HashSet<u64>,
-) -> HashMap<u64, String> {
-    rebuild_paths_for_nodes(entries, drive_letter, target_ids)
-}
-
-/// 与 `rebuild_paths_for_ids` 相同，只是输入是 `$MFT` 直读出来的记录。
+/// 只为 `target_ids` 里的记录重建完整路径（含祖先目录）。
+///
+/// 调用方通常是「大文件 / AI 模型候选」这种**少量**目标：全盘 120 万条记录里
+/// 只给几十上百个建路径，避免上百万次字符串分配。
 pub fn rebuild_paths_for_records(
     records: &[MftRecordInfo],
     drive_letter: char,
     target_ids: &HashSet<u64>,
 ) -> HashMap<u64, String> {
-    rebuild_paths_for_nodes(records, drive_letter, target_ids)
-}
-
-fn rebuild_paths_for_nodes<T: PathNode>(
-    entries: &[T],
-    drive_letter: char,
-    target_ids: &HashSet<u64>,
-) -> HashMap<u64, String> {
-    let mut entry_by_id: HashMap<u64, &T> = HashMap::with_capacity(entries.len());
-    for entry in entries {
-        entry_by_id.insert(entry.node_id(), entry);
+    let mut record_by_id: HashMap<u64, &MftRecordInfo> = HashMap::with_capacity(records.len());
+    for record in records {
+        record_by_id.insert(record.mft_id, record);
     }
 
     let mut paths = HashMap::with_capacity(target_ids.len() + 1);
@@ -384,15 +179,15 @@ fn rebuild_paths_for_nodes<T: PathNode>(
     for target_id in target_ids {
         let mut visiting = HashSet::new();
         // 只为候选路径做懒解析，避免全盘文件都分配完整路径字符串。
-        let _ = resolve_path(*target_id, &entry_by_id, &mut paths, &mut visiting);
+        let _ = resolve_path(*target_id, &record_by_id, &mut paths, &mut visiting);
     }
 
     paths
 }
 
-fn resolve_path<T: PathNode>(
+fn resolve_path(
     mft_id: u64,
-    entry_by_id: &HashMap<u64, &T>,
+    record_by_id: &HashMap<u64, &MftRecordInfo>,
     paths: &mut HashMap<u64, String>,
     visiting: &mut HashSet<u64>,
 ) -> Option<()> {
@@ -404,10 +199,10 @@ fn resolve_path<T: PathNode>(
         return None;
     }
 
-    let entry = entry_by_id.get(&mft_id)?;
-    resolve_path(entry.parent_id(), entry_by_id, paths, visiting)?;
-    let parent_path = paths.get(&entry.parent_id())?.clone();
-    let name = entry.node_name();
+    let record = record_by_id.get(&mft_id)?;
+    resolve_path(record.parent_id, record_by_id, paths, visiting)?;
+    let parent_path = paths.get(&record.parent_id)?.clone();
+    let name = &record.name;
     let mut full_path = String::with_capacity(parent_path.len() + 1 + name.len());
     full_path.push_str(&parent_path);
     if !parent_path.ends_with('\\') {

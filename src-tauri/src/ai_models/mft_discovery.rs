@@ -81,7 +81,6 @@ fn scan_drive_for_model_candidates<F>(
 where
     F: Fn(AiModelScanProgress) + Sync,
 {
-    let handle = mft_core::open_volume(drive_letter)?;
     let mut phase_started_at = Instant::now();
     emit_mft_progress(
         progress,
@@ -89,15 +88,30 @@ where
         &phase_started_at,
         drive_letter,
         "mftEnumerate",
-        &format!("正在枚举 {} 盘 MFT 文件记录", drive_letter),
+        &format!("正在读取 {} 盘 NTFS 主文件表", drive_letter),
     );
-    let entries_result = mft_core::enumerate_usn_records_v2(handle, &|_| true);
-    mft_core::close_volume(handle);
-    let entries = entries_result?;
+    // 一遍顺序读：名字（用来筛扩展名）、父子关系、大小一起拿到。
+    // 原来先走 USN 枚举拿名字、再按 id 回读 $MFT —— 同一份数据过两遍，而 USN 枚举是慢的那一遍。
+    let metadata_reader = mft_core::NtfsFileMetadataReader::open(drive_letter)?;
+    let (entries, mft_stats) = metadata_reader.read_all_records(&|_| true)?;
+    log::info!(
+        "[AiModels-MFT] {} 盘读取完成：{} 条记录，分段 {}，读盘 {}ms，解析 {}ms",
+        drive_letter,
+        entries.len(),
+        mft_stats.fragments,
+        mft_stats.io_ms,
+        mft_stats.parse_ms
+    );
     finish_mft_phase(
         phase_durations,
         "mftEnumerate",
-        &format!("{} 盘 MFT 枚举", drive_letter),
+        &format!(
+            "{} 盘 MFT 读取（分段 {} · 读盘 {:.1}s、解析 {:.1}s）",
+            drive_letter,
+            mft_stats.fragments,
+            mft_stats.io_ms as f64 / 1000.0,
+            mft_stats.parse_ms as f64 / 1000.0
+        ),
         phase_started_at,
     );
 
@@ -114,7 +128,7 @@ where
         .iter()
         .filter(|entry| !entry.is_dir)
         .filter_map(|entry| {
-            // MFT 兜底只关注少量大模型扩展名，先在 USN 文件名层面过滤，避免对全盘文件都读取大小。
+            // MFT 兜底只关注少量大模型扩展名，先在文件名层面过滤，避免对全盘文件都读一遍大小
             model_extension_threshold(&entry.name).map(|min_size| (entry.mft_id, min_size))
         })
         .collect::<HashMap<_, _>>();
@@ -139,7 +153,7 @@ where
         &format!("正在重建 {} 盘模型路径", drive_letter),
     );
     let candidate_ids = candidate_min_sizes.keys().copied().collect::<HashSet<_>>();
-    let paths = mft_core::rebuild_paths_for_ids(&entries, drive_letter, &candidate_ids);
+    let paths = mft_core::rebuild_paths_for_records(&entries, drive_letter, &candidate_ids);
     finish_mft_phase(
         phase_durations,
         "mftPaths",
