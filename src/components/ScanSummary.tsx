@@ -3,7 +3,7 @@
 // 支持增强删除结果显示（物理大小、跳过原因、重启待删除）
 // ============================================================================
 
-import { useState, useRef } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FileSearch, Clock, Trash2, CheckCircle2, X, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -20,6 +20,8 @@ interface ScanSummaryProps {
   deleteResult: EnhancedDeleteResult | null;
   selectedCount: number;
   selectedSize: number;
+  /** 「扫描耗时」卡右上角的附加入口（耗时明细浮层），不传则不渲染 */
+  timingDetail?: ReactNode;
 }
 
 // 失败明细弹窗组件
@@ -161,6 +163,7 @@ export function ScanSummary({
   deleteResult,
   selectedCount,
   selectedSize,
+  timingDetail,
 }: ScanSummaryProps) {
   const { t } = useTranslation('common');
   const [showFailedModal, setShowFailedModal] = useState(false);
@@ -216,6 +219,7 @@ export function ScanSummary({
           <div className="flex items-center gap-2 mb-1">
             <Clock className="w-4 h-4 text-teal-500" />
             <span className="text-xs text-[var(--fg-muted)]">{t('scanDuration')}</span>
+            {timingDetail && <span className="ml-auto -mr-1 flex items-center">{timingDetail}</span>}
           </div>
           <p className="text-lg font-bold text-[var(--fg-primary)] tabular-nums">
             {formatDuration(scanResult.scan_duration_ms)}

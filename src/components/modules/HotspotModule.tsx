@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
 import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2, XCircle } from 'lucide-react';
+import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
 import { listen } from '@tauri-apps/api/event';
 import { AccordionContent, ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -900,6 +901,20 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     </div>
   );
 
+  // 结果页原来挂一整套阶段耗时卡片，发版后收进浮层：数字留着，位置还给结果列表
+  const stageRows = progressLogs
+    .filter((log) => log.stage && log.stage !== 'result')
+    .map((log) => ({
+      label: getProgressStageLabel(log.stage),
+      value: formatDuration(log.stage_elapsed_ms),
+    }));
+  const detailNotes = progressLogs
+    .map((log) => log.detail)
+    .filter((detail): detail is string => Boolean(detail));
+  const timingGroups: TimingGroup[] = stageRows.length > 0
+    ? [{ title: '', rows: stageRows, note: detailNotes.join(' · ') }]
+    : [];
+
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !cleanupTarget && !selectedPath) {
     return null;
   }
@@ -1015,16 +1030,11 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
                 <strong className="text-[var(--brand-green)]">{formatSize(scanResult.scanned_total_size)}</strong>
               </span>
             </div>
-            <span>{moduleT('hotspot.durationValue', { time: (scanResult.scan_duration_ms / 1000).toFixed(1) })}</span>
+            <div className="flex items-center gap-1.5">
+              <span>{moduleT('hotspot.durationValue', { time: (scanResult.scan_duration_ms / 1000).toFixed(1) })}</span>
+              <ScanTimingPopover groups={timingGroups} />
+            </div>
           </div>
-
-          {scanResult.is_full_scan && (
-            <HotspotDiagnostics
-              logs={progressLogs}
-              totalElapsedMs={scanResult.scan_duration_ms}
-              compact
-            />
-          )}
 
           {/* 目录列表：左右留出内边距，避免行卡片与模块边框贴在一起 */}
           <div className="space-y-2 px-2">

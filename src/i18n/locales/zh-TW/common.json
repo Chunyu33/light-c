@@ -243,6 +243,8 @@
     "fallback": "MFT 不可用，正在切換常規掃描",
     "walkdir": "正在遍歷磁碟檔案"
   },
+  "timingDetails": "耗時明細",
+  "timingDetailsHint": "排查用，可截圖回饋",
   "scanStages": {
     "mft": "列舉 MFT",
     "index": "建立索引",

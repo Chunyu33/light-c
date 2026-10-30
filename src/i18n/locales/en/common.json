@@ -208,6 +208,8 @@
     "fallback": "MFT unavailable; switching to standard scan",
     "walkdir": "Walking files on the drive"
   },
+  "timingDetails": "Timing details",
+  "timingDetailsHint": "For troubleshooting; safe to screenshot",
   "scanStages": {
     "mft": "Enumerating MFT",
     "index": "Building index",

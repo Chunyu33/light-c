@@ -208,6 +208,8 @@
     "fallback": "MFT 不可用，正在切换常规扫描",
     "walkdir": "正在遍历磁盘文件"
   },
+  "timingDetails": "耗时明细",
+  "timingDetailsHint": "排查用，可截图反馈",
   "scanStages": {
     "mft": "枚举 MFT",
     "index": "建立索引",

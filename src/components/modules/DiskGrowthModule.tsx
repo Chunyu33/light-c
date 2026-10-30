@@ -1,3 +1,4 @@
+import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import { AiAskButton } from '../ai/AiAskButton';
 import { buildItemQuestion } from '../ai/aiQuestions';
@@ -296,6 +297,28 @@ function DiskGrowthDiagnostics({
   maxEntries: number;
 }) {
   const { t: moduleT } = useTranslation('modules');
+  // 阶段耗时、$MFT 分段、大小来源都是排查用的数字：收进浮层，页面只留一个小秒表
+  const phaseRows = scanSummary.phase_durations.map((phase) => ({
+    label: getPhaseLabel(phase.stage),
+    value: formatDuration(phase.duration_ms),
+  }));
+  const detailNotes = [
+    moduleT('diskGrowth.engine', { name: scanSummary.backend === 'mft' ? 'MFT' : scanSummary.backend }),
+    typeof scanSummary.mft_fragments === 'number' && scanSummary.mft_fragments > 0
+      ? moduleT('diskGrowth.mftStats', {
+          fragments: scanSummary.mft_fragments,
+          io: ((scanSummary.mft_io_ms ?? 0) / 1000).toFixed(1),
+          parse: ((scanSummary.mft_parse_ms ?? 0) / 1000).toFixed(1),
+        })
+      : '',
+    moduleT('diskGrowth.sizeSource', {
+      mft: scanSummary.mft_size_count.toLocaleString(),
+      fallback: scanSummary.metadata_fallback_count.toLocaleString(),
+    }),
+  ].filter(Boolean);
+  const timingGroups: TimingGroup[] = phaseRows.length > 0 || detailNotes.length > 0
+    ? [{ title: '', rows: phaseRows, note: detailNotes.join(' · ') }]
+    : [];
   // 与大目录分析复用同一类诊断布局，让用户在不同 MFT 模块里看到一致的阶段耗时信息。
   const hasPhaseDurations = scanSummary.phase_durations.length > 0;
   const latestPhase = hasPhaseDurations
@@ -303,7 +326,7 @@ function DiskGrowthDiagnostics({
     : null;
 
   return (
-    <div className="glass-block rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-4 py-3 text-xs space-y-3">
+    <div className="glass-block rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-4 py-3 text-xs">
       <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 md:gap-4">
         <div className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--brand-green)] text-white font-medium">
@@ -318,42 +341,10 @@ function DiskGrowthDiagnostics({
         <div className="flex items-center justify-start md:justify-end gap-4 text-[var(--text-muted)] tabular-nums">
           <span>{moduleT('diskGrowth.processed', { count: scanSummary.total_files_scanned.toLocaleString() })}</span>
           <span>{moduleT('diskGrowth.elapsed', { time: formatDuration(scanSummary.scan_duration_ms) })}</span>
+          <ScanTimingPopover groups={timingGroups} />
         </div>
       </div>
 
-      {hasPhaseDurations && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {scanSummary.phase_durations.map((phase, index) => (
-            <div
-              key={`${phase.stage}-${index}`}
-              className="glass-block min-w-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] px-2.5 py-2"
-            >
-              <div className="truncate text-[var(--text-muted)]">{getPhaseLabel(phase.stage)}</div>
-              <div className="mt-0.5 text-[var(--text-primary)] font-semibold tabular-nums">
-                {formatDuration(phase.duration_ms)}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[var(--text-faint)]">
-        <span>{moduleT('diskGrowth.engine', { name: scanSummary.backend === 'mft' ? 'MFT' : scanSummary.backend })}</span>
-        <span>
-          {moduleT('diskGrowth.sizeSource', { mft: scanSummary.mft_size_count.toLocaleString(), fallback: scanSummary.metadata_fallback_count.toLocaleString() })}
-        </span>
-      </div>
-
-      {/* $MFT 读取明细：段数说明表碎不碎，读盘/解析分开看才知道瓶颈在盘还是 CPU */}
-      {typeof scanSummary.mft_fragments === 'number' && scanSummary.mft_fragments > 0 && (
-        <div className="text-[var(--text-faint)]">
-          {moduleT('diskGrowth.mftStats', {
-            fragments: scanSummary.mft_fragments,
-            io: ((scanSummary.mft_io_ms ?? 0) / 1000).toFixed(1),
-            parse: ((scanSummary.mft_parse_ms ?? 0) / 1000).toFixed(1),
-          })}
-        </div>
-      )}
     </div>
   );
 }

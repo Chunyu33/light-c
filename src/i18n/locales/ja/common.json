@@ -208,6 +208,8 @@
     "fallback": "MFT が使用できないため標準スキャンに切り替え中",
     "walkdir": "ドライブのファイルを走査中"
   },
+  "timingDetails": "所要時間の内訳",
+  "timingDetailsHint": "不具合報告用（スクリーンショット可）",
   "scanStages": {
     "mft": "MFT を列挙中",
     "index": "インデックスを作成中",

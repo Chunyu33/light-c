@@ -9,6 +9,7 @@ import { buildItemQuestion } from '../ai/aiQuestions';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
+import { ScanTimingPopover } from '../ScanTimingPopover';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
@@ -504,10 +505,11 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
           {/* 扫描进度 + 引擎 + 时长（扫描中 & 扫描完成后都显示） */}
           {(isScanning || scanBackend) && (displayScanPath || localizedScanStage) && (
-            <div className={`px-4 py-2 border-b border-[var(--border-default)] text-xs ${
+            <div className={`px-4 py-2 border-b border-[var(--border-default)] text-xs flex items-center gap-2 ${
               scanBackend === 'mft' ? 'bg-[var(--brand-green-10)]' : 'bg-emerald-500/5'
             }`}>
-              <div className="truncate flex items-center gap-3">
+              {/* 左边这段必须单独包一层：truncate 带 overflow-hidden，会把浮层裁掉 */}
+              <div className="truncate flex items-center gap-3 min-w-0 flex-1">
                 <span className="truncate text-[var(--fg-muted)]">{isScanning ? t('bigFiles.scanningPrefix') : t('bigFiles.scanCompletedPrefix')} {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}</span>
                 {scanBackend && (
                   <span className={`shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${
@@ -526,10 +528,10 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                   <span className="shrink-0 text-[var(--fg-faint)]">{displayElapsedSeconds}s</span>
                 )}
               </div>
-              {/* 阶段的关键数字（后端给的原文）：一眼看出慢在读盘、解析还是路径重建 */}
-              {scanDetail && (
-                <div className="mt-1 truncate text-[var(--fg-faint)]">{scanDetail}</div>
-              )}
+              {/* 阶段的关键数字（后端给的原文）：默认收起，点秒表才看 —— 发版后这里只留一个图标 */}
+              <ScanTimingPopover
+                groups={scanDetail ? [{ title: '', rows: [], note: scanDetail }] : []}
+              />
             </div>
           )}
 

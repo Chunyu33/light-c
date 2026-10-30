@@ -22,6 +22,7 @@ import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { CategoryCard } from '../CategoryCard';
 import { ScanSummary } from '../ScanSummary';
+import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { Switch } from '../ui/Switch';
@@ -752,6 +753,53 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     ? Math.min(100, Math.round((deleteProcessedCount / deleteTotalCount) * 100))
     : 0;
 
+  // 耗时明细：原来这一整块「每盘阶段耗时」直接印在页面上，发版后收进浮层，页面只留一个小秒表图标。
+  // 数据本身留着 —— 它是排查卡顿和继续优化的第一手依据，只是不该占用户的地方。
+  const timingGroups: TimingGroup[] = [];
+  if (deepScanResult) {
+    for (const drive of deepScanResult.drives) {
+      const rows = (drive.stage_durations ?? []).map((item) => ({
+        label: getScanStageLabel(item.stage, true),
+        value: `${(item.duration_ms / 1000).toFixed(1)}s`,
+      }));
+      // MFT 分段/读盘/解析不放进 rows：读盘和解析是同时跑的，摆成并列阶段会让人以为要相加
+      const notes: string[] = [];
+      if (drive.mft_fragments) {
+        notes.push(
+          t('drives.mftStats', {
+            count: drive.mft_fragments,
+            io: ((drive.mft_io_ms ?? 0) / 1000).toFixed(1),
+            parse: ((drive.mft_parse_ms ?? 0) / 1000).toFixed(1),
+          }),
+        );
+      }
+      if (drive.total_duration_ms) {
+        notes.push(`${(drive.total_duration_ms / 1000).toFixed(1)}s`);
+      }
+      timingGroups.push({
+        title: `${drive.drive_letter} · ${formatSize(drive.matched_size)}`,
+        rows,
+        note: notes.join(' · '),
+      });
+    }
+
+    const outerStages = deepScanResult.outer_stages ?? [];
+    if (outerStages.length > 0) {
+      timingGroups.push({
+        title: t('drives.outerStages'),
+        rows: outerStages.map((item) => ({
+          label: getScanStageLabel(item.stage, true),
+          value: `${(item.duration_ms / 1000).toFixed(1)}s`,
+        })),
+        note: (deepScanResult.emit_wait_ms ?? 0) > 0
+          ? t('drives.emitWait', { time: ((deepScanResult.emit_wait_ms ?? 0) / 1000).toFixed(1) })
+          : undefined,
+      });
+    }
+  }
+  // 扫描失败/降级的盘必须留在页面上，不能被收进浮层
+  const driveWarnings = (deepScanResult?.drives ?? []).filter((drive) => Boolean(drive.warning));
+
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
     return null;
   }
@@ -874,6 +922,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               deleteResult={deleteResult}
               selectedCount={selectedPaths.size}
               selectedSize={selectedSize}
+              timingDetail={timingGroups.length > 0 ? <ScanTimingPopover groups={timingGroups} /> : undefined}
             />
           )}
 
@@ -938,57 +987,14 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             </div>
           )}
 
-          {!isDeleting && deepScanResult && deepScanResult.drives.length > 0 && (
-            <div className="flex flex-wrap gap-2 text-[0.79rem] text-[var(--fg-muted)]">
-              {deepScanResult.drives.map((drive) => {
-                // 排查信息直接印在页面上，不放 title —— 悬停提示在截图时就消失了
-                const stageDetail = (drive.stage_durations ?? [])
-                  .map((item) => `${getScanStageLabel(item.stage, true)} ${(item.duration_ms / 1000).toFixed(1)}s`)
-                  .join(' · ');
-                const mftStats = drive.mft_fragments
-                  ? t('drives.mftStats', {
-                      count: drive.mft_fragments,
-                      io: ((drive.mft_io_ms ?? 0) / 1000).toFixed(1),
-                      parse: ((drive.mft_parse_ms ?? 0) / 1000).toFixed(1),
-                    })
-                  : '';
-                return (
-                  <div
-                    key={drive.drive_letter}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded-md bg-[var(--bg-hover)]"
-                  >
-                    <span>
-                      {drive.drive_letter} · {drive.backend === 'mft' ? t('drives.mft') : t('drives.walkdir')} · {formatSize(drive.matched_size)}
-                      {drive.total_duration_ms ? ` · ${(drive.total_duration_ms / 1000).toFixed(1)}s` : ''}
-                    </span>
-                    {mftStats ? (
-                      <span className="text-[0.72rem] text-[var(--text-faint)]">{mftStats}</span>
-                    ) : null}
-                    {stageDetail ? (
-                      <span className="text-[0.72rem] text-[var(--text-faint)]">{stageDetail}</span>
-                    ) : null}
-                    {drive.warning ? (
-                      <span className="text-[0.72rem] text-[var(--color-warning,inherit)]">{drive.warning}</span>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {/* 各盘之外的开销：总耗时减去单盘之后剩下的那部分落在这里 */}
-              {(deepScanResult.outer_stages?.length ?? 0) > 0 && (
-                <div className="col-span-full flex flex-col gap-0.5 px-2 py-1">
-                  <span className="text-[0.72rem] text-[var(--text-faint)]">
-                    {t('drives.outerStages')}{' '}
-                    {(deepScanResult.outer_stages ?? [])
-                      .map((item) => `${getScanStageLabel(item.stage, true)} ${(item.duration_ms / 1000).toFixed(1)}s`)
-                      .join(' · ')}
-                  </span>
-                  {(deepScanResult.emit_wait_ms ?? 0) > 0 && (
-                    <span className="text-[0.72rem] text-[var(--text-faint)]">
-                      {t('drives.emitWait', { time: ((deepScanResult.emit_wait_ms ?? 0) / 1000).toFixed(1) })}
-                    </span>
-                  )}
+          {/* 扫描失败或降级的盘：这类提示必须留在页面上，不随耗时明细一起收进浮层 */}
+          {!isDeleting && driveWarnings.length > 0 && (
+            <div className="space-y-1 text-[0.72rem] text-[var(--color-warning,inherit)]">
+              {driveWarnings.map((drive) => (
+                <div key={drive.drive_letter}>
+                  {drive.drive_letter} · {drive.warning}
                 </div>
-              )}
+              ))}
             </div>
           )}
 
