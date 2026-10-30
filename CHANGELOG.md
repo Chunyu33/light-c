@@ -4,7 +4,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## v2.18.0
 
-- New "AI tool cleanup": counts the cache folders left behind by WorkBuddy, Claude Code, Codex, DeepSeek and similar tools, so you can review each one before deleting, with a confirmation step.
+- New "AI tool cleanup": counts the cache folders left behind by WorkBuddy, Claude Code, Codex, DeepSeek and similar tools, so you can review each one before deleting, with a confirmation step. Anything that could not be removed, such as a folder locked by a running tool, is reported back.
 - Every scanner is much faster: a full four-drive junk clean drops from about 23 seconds to under 5, and full-drive change analysis, hotspot analysis and large-file scans drop from tens of seconds to 3–4 seconds. AI model discovery across all drives drops from about 6 seconds to 3.
 - Stage timings are collapsed behind a small icon, keeping the results clean while the details stay one click away.
 

@@ -35,3 +35,25 @@ export interface AiCacheFile {
   path: string;
   size: number;
 }
+
+/** 明细弹窗的文件列表 */
+export interface AiCacheFileList {
+  files: AiCacheFile[];
+  /** 目录文件数超过上限被截断：界面必须说明只显示了前 N 条 */
+  truncated: boolean;
+}
+
+/** 单个删除失败的目录 */
+export interface AiCacheDeleteFailure {
+  path: string;
+  /** 失败原因（系统错误原文），仅用于排查，界面上不直接展示 */
+  reason: string;
+}
+
+/** 批量删除结果 */
+export interface AiCacheDeleteResult {
+  /** 成功删掉的目录数 */
+  deleted: number;
+  /** 没删掉的目录及原因（工具开启时文件被占用是最常见的情况） */
+  failed: AiCacheDeleteFailure[];
+}

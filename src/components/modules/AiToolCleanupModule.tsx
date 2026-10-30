@@ -36,6 +36,13 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
   const [scanning, setScanning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [result, setResult] = useState<AiToolScanResult | null>(null);
+  /**
+   * 刚把可清理项删光了。
+   *
+   * 和"从没扫到过"是两回事：前者是完成态，后者是"可能没装 / 结构不符"，
+   * 刚清完还提示"这些工具可能没装"会让人以为扫描坏了。
+   */
+  const [justCleared, setJustCleared] = useState(false);
   const [error, setError] = useState('');
   /** 当前展开的工具（手风琴：同时只展开一个） */
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
@@ -57,7 +64,14 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
       .reduce((total, entry) => total + entry.size, 0);
   }, [result, selected]);
 
-  const handleScan = useCallback(async () => {
+  /**
+   * 执行扫描。
+   *
+   * `preserveCleared` 为真表示这是删除后的自动重扫：不清掉"刚清空"标记，
+   * 否则空结果会先闪一帧"没有发现可清理的缓存"再变成完成态。
+   */
+  const runScan = useCallback(async (preserveCleared: boolean) => {
+    if (!preserveCleared) setJustCleared(false);
     setScanning(true);
     setError('');
     try {
@@ -73,6 +87,9 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
       setScanning(false);
     }
   }, []);
+
+  /** 用户主动扫描：回到常规空状态文案 */
+  const handleScan = useCallback(() => runScan(false), [runScan]);
 
   const toggleEntry = useCallback((path: string) => {
     setSelected((previous) => {
@@ -100,13 +117,35 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
     if (selected.size === 0) return;
     setDeleting(true);
     try {
-      const count = await deleteAiToolCaches([...selected]);
-      showToast({
-        type: 'success',
-        title: moduleT('aiTools.deletedTitle', { count }),
-        description: moduleT('aiTools.deletedDesc'),
-      });
-      await handleScan();
+      const result = await deleteAiToolCaches([...selected]);
+      // 三种结果分开报：工具开着时缓存文件被占用是常态，
+      // 只报"已删除 N 个"会让用户以为清干净了，实际上大小一点没降。
+      if (result.failed.length === 0) {
+        showToast({
+          type: 'success',
+          title: moduleT('aiTools.deletedTitle', { count: result.deleted }),
+          description: moduleT('aiTools.deletedDesc'),
+        });
+      } else if (result.deleted === 0) {
+        showToast({
+          type: 'error',
+          title: moduleT('aiTools.deleteFailed'),
+          description: moduleT('aiTools.deleteFailedDesc'),
+        });
+      } else {
+        showToast({
+          type: 'warning',
+          title: moduleT('aiTools.deletePartialTitle', {
+            success: result.deleted,
+            failed: result.failed.length,
+          }),
+          description: moduleT('aiTools.deletePartialDesc'),
+        });
+      }
+      // 标记要在重扫之前落下：删干净后列表为空，若等重扫回来再置位，
+      // 会先渲染一帧"没有发现可清理的缓存"
+      if (result.deleted > 0) setJustCleared(true);
+      await runScan(result.deleted > 0);
     } catch (deleteError) {
       console.error('删除 AI 工具缓存失败:', deleteError);
       showToast({
@@ -117,7 +156,7 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
     } finally {
       setDeleting(false);
     }
-  }, [handleScan, moduleT, selected, showToast]);
+  }, [moduleT, runScan, selected, showToast]);
 
   const busy = scanning || deleting;
   /**
@@ -166,9 +205,12 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
           />
         ) : result.groups.length === 0 ? (
           <EmptyState
-            icon={Bot}
-            title={moduleT('aiTools.emptyTitle')}
-            description={moduleT('aiTools.emptyDesc')}
+            /* 刚删干净是完成态：换成对勾图标 + 完成文案，不再提示"可能没装" */
+            icon={justCleared ? undefined : Bot}
+            tone={justCleared ? 'success' : 'neutral'}
+            title={justCleared ? moduleT('aiTools.clearedTitle') : moduleT('aiTools.emptyTitle')}
+            /* 空字符串而不是 undefined：EmptyState 对 undefined 会回落到通用描述 */
+            description={justCleared ? '' : moduleT('aiTools.emptyDesc')}
             action={
               <button
                 type="button"

@@ -15,7 +15,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { FolderOpen, X } from 'lucide-react';
 import { listAiCacheFiles } from '../../api/aiToolCleanup';
 import { openInFolder } from '../../api/commands';
-import type { AiCacheFile } from '../../types/aiToolCleanup';
+import type { AiCacheFileList } from '../../types/aiToolCleanup';
 import { formatSize } from '../../utils/format';
 
 interface AiCacheFileModalProps {
@@ -28,14 +28,17 @@ interface AiCacheFileModalProps {
 
 export function AiCacheFileModal({ isOpen, dirPath, dirName, onClose }: AiCacheFileModalProps) {
   const { t } = useTranslation('modules');
-  const [files, setFiles] = useState<AiCacheFile[]>([]);
+  // 后端可能因为目录过大而截断（`truncated`），截断时必须告诉用户，
+  // 否则"文件数 × 大小"和目录实际占用对不上，会被当成统计错误。
+  const [listing, setListing] = useState<AiCacheFileList>({ files: [], truncated: false });
+  const files = listing.files;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOpen || !dirPath) {
-      setFiles([]);
+      setListing({ files: [], truncated: false });
       return;
     }
     let cancelled = false;
@@ -43,7 +46,7 @@ export function AiCacheFileModal({ isOpen, dirPath, dirName, onClose }: AiCacheF
     setError('');
     listAiCacheFiles(dirPath)
       .then((next) => {
-        if (!cancelled) setFiles(next);
+        if (!cancelled) setListing(next);
       })
       .catch((loadError) => {
         if (!cancelled) setError(String(loadError));
@@ -110,6 +113,11 @@ export function AiCacheFileModal({ isOpen, dirPath, dirName, onClose }: AiCacheF
                 count: files.length.toLocaleString(),
                 size: formatSize(totalSize),
               })}
+              {listing.truncated && (
+                <span className="ml-2 text-[var(--text-faint)]">
+                  {t('aiTools.filesTruncated', { count: files.length.toLocaleString() })}
+                </span>
+              )}
             </p>
           </div>
           <button

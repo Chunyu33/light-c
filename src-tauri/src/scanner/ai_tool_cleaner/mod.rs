@@ -13,4 +13,4 @@ mod tools;
 mod types;
 
 pub use core::AiToolScanner;
-pub use types::{AiCacheFile, AiToolScanResult};
+pub use types::{AiCacheDeleteResult, AiCacheFileList, AiToolScanResult};
