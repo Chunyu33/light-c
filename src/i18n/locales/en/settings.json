@@ -396,6 +396,10 @@
         "title": "Social-app cleanup",
         "desc": "Detects common social-app caches and registry-defined custom locations. Chat databases are locked, transfer files need review, and image/video cache is usually safe."
       },
+      "aiTools": {
+        "title": "AI tool cleanup",
+        "desc": "Counts the cache folders left by WorkBuddy, Claude Code, Codex, DeepSeek and similar clients, grouped per tool. Only caches are listed, never chat history, credentials or plugin bodies; deletion skips the recycle bin and may fail while the tool is running."
+      },
       "systemSlim": {
         "title": "System slimming",
         "desc": "Manages hibernation, Windows component storage and virtual memory. Administrator access is required; ResetBase affects update rollback."

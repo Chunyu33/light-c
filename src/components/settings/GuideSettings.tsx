@@ -8,6 +8,8 @@ const GUIDE_ITEMS = [
   { key: 'bigFiles', icon: FileBox },
   { key: 'diskInfo', icon: HardDrive },
   { key: 'social', icon: MessageCircle },
+  // AI 工具清理：按工具统计缓存目录，排在社交专清后面（同为"某类软件留下的缓存"）
+  { key: 'aiTools', icon: Bot },
   { key: 'systemSlim', icon: Layers },
   { key: 'drivers', icon: Cpu },
   { key: 'leftovers', icon: Package },
