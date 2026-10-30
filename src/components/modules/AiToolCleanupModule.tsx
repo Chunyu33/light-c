@@ -23,6 +23,7 @@ import type { AiToolScanResult } from '../../types/aiToolCleanup';
 import { formatSize } from '../../utils/format';
 import { useToast } from '../Toast';
 import { useDashboard } from '../../contexts/DashboardContext';
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import type { ModuleRenderProps } from './moduleProps';
 
 export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
@@ -63,6 +64,112 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
       .filter((entry) => selected.has(entry.path))
       .reduce((total, entry) => total + entry.size, 0);
   }, [result, selected]);
+
+  /**
+   * 把分组摊平成「缓存目录 + 所属工具」。
+   *
+   * 顺序沿用界面：工具按总占用倒序、组内按体积倒序 —— 助手读到的第一条就是最占空间的那块，
+   * 和用户屏幕上看到的顺序一致，回答里引用起来不会对不上。
+   */
+  const flattenEntries = useCallback(() => {
+    if (!result) return [];
+    return result.groups.flatMap((group) =>
+      group.entries.map((entry) => ({
+        toolId: group.toolId,
+        toolName: group.toolName,
+        entry,
+      })),
+    );
+  }, [result]);
+
+  // 接入 AI 助手：**只读**。不给 select/delete —— 删缓存必须由用户看着列表逐项确认，
+  // 这条路上还牵扯「工具开着会删不掉」，不适合让模型提议后一键执行。
+  useAiModuleBridge('ai-tool-cleanup', {
+    // 读取缓存目录列表（一页一批，由模型决定要不要继续往下看）。
+    readItems: (targetId, offset, limit) => {
+      const all = flattenEntries();
+      const wanted = targetId.trim();
+      // targetId 可能是工具名、工具 id，也可能是某个父目录路径 —— 三种都认
+      const matched = wanted
+        ? all.filter(
+            (row) =>
+              row.toolName === wanted ||
+              row.toolId === wanted ||
+              row.entry.path.startsWith(wanted),
+          )
+        : all;
+      if (matched.length === 0) {
+        // 不返回 null：公共层只会回一句"没有读到内容"，模型就只能猜原因，
+        // 而"还没扫描"和"没匹配到"是两条完全不同的排查方向，要让它能直接说出来
+        return {
+          total: 0,
+          lines: [
+            all.length === 0
+              ? '（当前还没有扫描结果 —— 请先点一次「开始扫描」，再问这个问题）'
+              : `（没有匹配「${wanted}」的缓存目录；本次扫描共 ${all.length} 个，不带参数即可读全部）`,
+          ],
+        };
+      }
+      return {
+        total: matched.length,
+        lines: matched
+          .slice(offset, offset + limit)
+          .map(
+            (row) =>
+              `${row.entry.path}  ${formatSize(row.entry.size)}  （${row.toolName} · ${row.entry.name} · ${row.entry.fileCount} 个文件）`,
+          ),
+      };
+    },
+    // 单条详情。itemId 是上面每行行首的完整路径；模型也可能只回一个目录名（"Cache"），
+    // 那种只有在全表唯一命中时才认 —— 否则会把 Devin 的 Cache 说成 Kimi 的。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      if (!wanted) return null;
+      const all = flattenEntries();
+      const sameName = all.filter((row) => row.entry.name === wanted);
+      const row =
+        all.find((item) => item.entry.path === wanted) ??
+        all.find((item) => item.entry.path.endsWith(`\\${wanted}`)) ??
+        (sameName.length === 1 ? sameName[0] : undefined);
+      if (!row) return null;
+
+      const siblings = all.filter(
+        (item) => item.toolId === row.toolId && item.entry.path !== row.entry.path,
+      );
+      const siblingSize = siblings.reduce((total, item) => total + item.entry.size, 0);
+      return [
+        `工具：${row.toolName}`,
+        `目录：${row.entry.name}`,
+        `路径：${row.entry.path}`,
+        `占用：${formatSize(row.entry.size)}（${row.entry.fileCount} 个文件）`,
+        '性质：客户端自己生成的缓存，删掉后工具下次运行会重新生成，不影响已装扩展、设置和登录状态。',
+        siblings.length > 0
+          ? `同一工具下还有 ${siblings.length} 个可清理目录，合计 ${formatSize(siblingSize)}。`
+          : '同一工具下没有别的可清理目录。',
+        '删除方式：不进回收站、不可恢复；工具正在运行时可能因文件被占用而删不掉。',
+      ].join('\n');
+    },
+    summary: () => {
+      // 没扫过返回 null，助手会如实说"还没有数据"，而不是编一段
+      if (!result) return null;
+      if (result.groups.length === 0) {
+        return '已完成扫描：当前没有发现可清理的 AI 工具缓存（这些工具可能都没安装，或者缓存目录结构与预期不同）。';
+      }
+      const all = flattenEntries();
+      const top = result.groups
+        .slice(0, 3)
+        .map((group) => `${group.toolName} ${formatSize(group.totalSize)}`)
+        .join('、');
+      return [
+        `扫描到 ${result.groups.length} 个工具留下的 ${all.length} 个缓存目录，合计 ${formatSize(result.totalSize)}（${result.totalFiles} 个文件）。`,
+        `占用最多的：${top}。`,
+        `当前已勾选 ${selected.size} 个目录。`,
+        '口径说明：只统计缓存类目录（Cache / GPUCache / logs / CachedData 这类）。',
+        '会话历史、登录凭据、插件本体、站点数据都不在统计范围内，',
+        '所以这些工具的实际总占用会明显大于这里的数字，这是设计如此，不是漏扫。',
+      ].join('');
+    },
+  });
 
   /**
    * 执行扫描。
