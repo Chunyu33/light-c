@@ -105,21 +105,18 @@ static WINSXS_ANALYZE_RUNNING: AtomicBool = AtomicBool::new(false);
 // 权限检测
 // ============================================================================
 
-/// 检查是否以管理员权限运行（直接调用 shell32::IsUserAnAdmin）
+/// 检查当前进程**是否真的具备管理员能力**。
+///
+/// ⚠️ 不要改回 `shell32!IsUserAnAdmin` —— 两者语义不同：它问的是「这个账号是不是管理员组成员」，
+/// 而这里要的是「这个进程能不能读 $MFT、能不能改系统设置」。
+/// 开启 UAC 后普通方式启动的进程带的是**受限令牌**，账号是管理员但进程没有权限，
+/// 两个函数在这种机器上会给出相反答案 → 前端提示和「后端实际会不会降级」对不上，
+/// 表现就是「功能悄悄退化成慢路径，界面上却没有任何提示」。
+///
+/// 统一走 `TokenElevation`（和 AI 模型深度发现、大文件/大目录引擎选择用的是同一个判定），
+/// 保证「界面看到的权限状态」和「后端的行为」永远来自同一个事实。
 pub fn check_admin() -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        #[link(name = "shell32")]
-        extern "system" {
-            fn IsUserAnAdmin() -> i32;
-        }
-        unsafe { IsUserAnAdmin() != 0 }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        false
-    }
+    crate::scanner::big_files_engine::mft_core::is_elevated()
 }
 
 // ============================================================================
