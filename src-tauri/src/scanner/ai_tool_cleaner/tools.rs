@@ -138,6 +138,28 @@ pub(super) fn build_specs(
             roots: vec![appdata.join("kimi-desktop")],
             extra_cleanable_names: &[],
         },
+        ToolSpec {
+            id: "doubao",
+            name: "豆包（Doubao）",
+            // 桌面端是 Chromium 外壳，缓存全在 `User Data\Default` 下
+            // （`Cache` 55MB / `Code Cache` / `GPUCache` / 顶层的 `GrShaderCache`），
+            // 结构和 Cursor / Trae 同构，所以**不用扩白名单**，加个根目录就够。
+            //
+            // ⚠️ 这个目录下 1.37GB 里约 1.1GB 是 AI 沙箱的运行时，不是缓存：
+            // - `sandbox_runtime\bases`（617MB）解压后的 node/python/pwsh 运行时
+            // - `sandbox_runtime\downloads`（234MB）上面那些运行时的安装包
+            // - `Default\sandbox_envs_dir`（274MB）每个会话的环境
+            // 前两个可清（`downloads` 见下面的 extra_cleanable_names），
+            // `bases` 是正在用的运行时，删了功能直接不可用，永远不要碰。
+            //
+            // 另外 `gecko_cache`（19MB）名字像缓存，里面却是 `gecko2.db` 数据库；
+            // `DoubaoLinkRouter` 是独立的路由组件（只有 bin 和 telemetry），都没有可清项。
+            roots: vec![local_appdata.join("Doubao")],
+            // `downloads` 存的是 `sandbox_runtime\bases` 的安装包（本机 234MB），
+            // 已经解压过的运行时不受影响，删掉只是下次初始化沙箱时重新下载。
+            // 不进全局白名单：这个名字在别的工具里很可能是用户的下载目录。
+            extra_cleanable_names: &["downloads"],
+        },
         // 国内 CLI 类：目录名按公开约定，本机没装所以没实测，
         // 路径不对的唯一后果是这个工具不出现，不会误删。
         ToolSpec {

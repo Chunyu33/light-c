@@ -174,3 +174,61 @@ fn extra_names_are_scoped_to_their_tool() {
     assert!(scanner.is_managed_cache_dir(&user_profile().join(".codex").join(".tmp")));
     assert!(!scanner.is_managed_cache_dir(&appdata().join("devin").join(".tmp")));
 }
+
+/// 豆包的目录结构：缓存埋在 `User Data\Default` 里，运行时要分开对待。
+///
+/// 这条钉的是三个容易搞错的点：
+/// 1. 多层嵌套（`Doubao\User Data\Default\Cache`）必须能扫到，否则豆包会显示 0；
+/// 2. `sandbox_runtime\downloads` 是**这个工具授权**的可清目录（运行时安装包，本机 234MB），
+///    但它不在全局白名单里 —— 别的工具叫这个名字时可能是用户的下载目录；
+/// 3. `sandbox_runtime\bases`（正在用的运行时）和 `Default\sandbox_envs_dir`（会话环境）
+///    删了功能就用不了，无论如何都不能进名单。
+#[test]
+fn doubao_layout_separates_cache_from_sandbox_runtime() {
+    let base = std::env::temp_dir().join("lightc-ai-clean-doubao");
+    let _ = fs::remove_dir_all(&base);
+    let user_data = base.join("User Data");
+    let default = user_data.join("Default");
+
+    fs::create_dir_all(default.join("Cache")).unwrap();
+    fs::create_dir_all(default.join("GPUCache")).unwrap();
+    fs::create_dir_all(default.join("Cache").join("nested")).unwrap();
+    fs::create_dir_all(user_data.join("sandbox_runtime").join("bases").join("hash")).unwrap();
+    fs::create_dir_all(user_data.join("sandbox_runtime").join("downloads")).unwrap();
+    fs::create_dir_all(default.join("sandbox_envs_dir").join("envs")).unwrap();
+    fs::create_dir_all(user_data.join("gecko_cache")).unwrap();
+
+    fs::write(default.join("Cache").join("a.bin"), vec![0u8; 2048]).unwrap();
+    fs::write(default.join("GPUCache").join("g.bin"), vec![0u8; 512]).unwrap();
+    fs::write(
+        user_data.join("sandbox_runtime").join("downloads").join("runtime.tar"),
+        vec![0u8; 4096],
+    )
+    .unwrap();
+    fs::write(user_data.join("gecko_cache").join("gecko2.db"), vec![0u8; 1024]).unwrap();
+
+    let scanner = AiToolScanner::new();
+
+    // ① 豆包自己的名单：downloads 算，bases / sandbox_envs_dir / gecko_cache 不算
+    let mut entries = Vec::new();
+    scanner.collect_cleanable_children(&base, &["downloads"], &mut entries);
+
+    let mut names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, vec!["Cache", "GPUCache", "downloads"]);
+    assert_eq!(
+        entries.iter().map(|entry| entry.size).sum::<u64>(),
+        2048 + 512 + 4096,
+        "bases / sandbox_envs_dir / gecko_cache 不计入体积"
+    );
+
+    // ② 不给额外名单（其它工具）：downloads 不算。防止有人把它塞进全局白名单
+    let mut without = Vec::new();
+    scanner.collect_cleanable_children(&base, &[], &mut without);
+    assert!(
+        without.iter().all(|entry| entry.name != "downloads"),
+        "downloads 只能按工具授权，不能进全局白名单"
+    );
+
+    let _ = fs::remove_dir_all(&base);
+}
