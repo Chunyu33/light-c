@@ -17,6 +17,7 @@ import { ConfirmDialog } from '../ConfirmDialog';
 import { AiCacheFileModal } from './AiCacheFileModal';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { deleteAiToolCaches, scanAiToolCaches } from '../../api/aiToolCleanup';
 import { openInFolder } from '../../api/commands';
 import type { AiToolScanResult } from '../../types/aiToolCleanup';
@@ -293,7 +294,15 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
       onToggleExpand={() => setExpandedModule(isExpanded ? null : 'ai-tools')}
     >
       <div className="p-4">
-        {!result ? (
+        {scanning ? (
+          /* 扫描中不渲染上一次的结果：旧数据在重扫期间既可能已经过期，
+             也会让用户对着「正在重扫的旧列表」去勾选、删除。
+             首次扫描同样走这里，所以不必再区分「有没有旧结果」。 */
+          <ModuleScanProgress
+            title={moduleT('aiTools.scanning')}
+            description={moduleT('aiTools.scanningDesc')}
+          />
+        ) : !result ? (
           <EmptyState
             icon={Bot}
             title={moduleT('aiTools.idleTitle')}

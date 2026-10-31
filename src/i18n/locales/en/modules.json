@@ -124,6 +124,8 @@
     "idleTitle": "Scan AI tool caches",
     "idleDesc": "Count the cache folders left by WorkBuddy, Claude Code, Codex and DeepSeek.",
     "scan": "Start scan",
+    "scanning": "Scanning AI tool caches…",
+    "scanningDesc": "Checking cache folders of the detected clients — usually a few seconds.",
     "emptyTitle": "No cleanable caches found",
     "emptyDesc": "These tools may not be installed, or their cache layout differs from what we expect.",
     "clearedTitle": "All caches cleaned",

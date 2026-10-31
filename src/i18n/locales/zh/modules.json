@@ -144,6 +144,8 @@
     "idleTitle": "扫描 AI 工具缓存",
     "idleDesc": "统计 WorkBuddy、Claude Code、Codex、DeepSeek 等工具留下的缓存目录。",
     "scan": "开始扫描",
+    "scanning": "正在扫描 AI 工具缓存…",
+    "scanningDesc": "逐个检查已识别客户端的缓存目录，通常几秒完成。",
     "emptyTitle": "没有发现可清理的缓存",
     "emptyDesc": "可能是这些工具还没装，或者缓存目录结构与预期不同。",
     "clearedTitle": "缓存已清理干净",

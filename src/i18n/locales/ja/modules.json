@@ -124,6 +124,8 @@
     "idleTitle": "AI ツールのキャッシュをスキャン",
     "idleDesc": "WorkBuddy、Claude Code、Codex、DeepSeek などが残すキャッシュフォルダーを集計します。",
     "scan": "スキャン開始",
+    "scanning": "AI ツールのキャッシュをスキャン中…",
+    "scanningDesc": "検出したクライアントのキャッシュフォルダーを確認しています。通常は数秒で完了します。",
     "emptyTitle": "整理できるキャッシュが見つかりません",
     "emptyDesc": "これらのツールが未インストールか、キャッシュの構成が想定と異なる可能性があります。",
     "clearedTitle": "キャッシュをすべて削除しました",
