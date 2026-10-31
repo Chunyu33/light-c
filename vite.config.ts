@@ -27,7 +27,14 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      ignored: [
+        "**/src-tauri/**",
+        // 打包/便携包的产物目录：里面有跑起来的便携版写下的 WebView2 用户数据
+        // （EBWebView/Default/Network/Cookies 这类文件被占用），一旦被 chokidar 盯上就
+        // EBUSY 把 dev server 整个带崩 —— 而它根本不参与前端开发。
+        "**/dist_release/**",
+        "**/dist/**",
+      ],
     },
   },
 }));
