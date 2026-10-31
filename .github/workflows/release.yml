@@ -356,11 +356,33 @@ jobs:
           $PortableSigPath = "LightC_portable_exe.sig"
           $DownloadConfigPath = "download.json"
           $WebView2OfflineInstallerPath = "LightC_webview2_offline_x64_v$env:RELEASE_VERSION.exe"
-          if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $WebView2OfflineSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath) -and (Test-Path $WebView2OfflineInstallerPath)) {
+
+          # 生成校验值：下载页要能直接核对安装包完整性。
+          # 本地 pack.ps1 一直会生成 SHA256SUMS.txt，但线上发版走这里，之前漏了这一步。
+          # ⚠️ 必须写无 BOM 的 UTF-8：带 BOM 会让 `sha256sum -c` 在第一行就失败。
+          $ChecksumTargets = @()
+          $ChecksumTargets += Get-ChildItem -Path $ZipPath -File -ErrorAction SilentlyContinue
+          $ChecksumTargets += Get-ChildItem -Path $WebView2OfflineInstallerPath -File -ErrorAction SilentlyContinue
+          $ChecksumTargets += Get-ChildItem -Path "src-tauri\target\release\bundle\nsis" -Filter "*.exe" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($ChecksumTargets.Count -eq 0) {
+            Write-Host "Error: no release asset found for checksum generation" -ForegroundColor Red
+            exit 1
+          }
+          $ChecksumLines = [System.Collections.Generic.List[string]]::new()
+          foreach ($target in $ChecksumTargets) {
+            $hash = (Get-FileHash -Path $target.FullName -Algorithm SHA256).Hash
+            # 两个空格是 sha256sum 的格式要求
+            $ChecksumLines.Add("$hash  $($target.Name)")
+            Write-Host "  $($target.Name)  $hash" -ForegroundColor Gray
+          }
+          [System.IO.File]::WriteAllLines("SHA256SUMS.txt", $ChecksumLines, (New-Object System.Text.UTF8Encoding $false))
+          Write-Host "  Created: SHA256SUMS.txt" -ForegroundColor Green
+
+          if ((Test-Path $ZipPath) -and (Test-Path $InstallerSigPath) -and (Test-Path $WebView2OfflineSigPath) -and (Test-Path $PortableSigPath) -and (Test-Path $DownloadConfigPath) -and (Test-Path $WebView2OfflineInstallerPath) -and (Test-Path "SHA256SUMS.txt")) {
             Write-Host "Uploading extra assets to release..." -ForegroundColor Cyan
-            gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $WebView2OfflineSigPath $PortableSigPath $DownloadConfigPath $WebView2OfflineInstallerPath --clobber
+            gh release upload ${{ github.ref_name }} $ZipPath $InstallerSigPath $WebView2OfflineSigPath $PortableSigPath $DownloadConfigPath $WebView2OfflineInstallerPath SHA256SUMS.txt --clobber
             Write-Host "Upload done!" -ForegroundColor Green
           } else {
-            Write-Host "Error: portable zip, exe signatures, download config or WebView2 offline installer not found" -ForegroundColor Red
+            Write-Host "Error: portable zip, exe signatures, download config, WebView2 offline installer or checksum file not found" -ForegroundColor Red
             exit 1
           }
