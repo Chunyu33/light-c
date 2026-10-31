@@ -514,6 +514,38 @@ export interface SocialScanResult {
   deletable_size: number;
   /** 妫€娴嬪埌鐨勭ぞ浜よ蒋浠跺垪琛?*/
   detected_apps: string[];
+  /** 阶段耗时明细（排查性能用，前端收在「耗时明细」浮层里） */
+  phase_durations: SocialPhaseDuration[];
+  /** 最慢的几条扫描路径（最多 5 条），按耗时降序 */
+  slow_paths: SocialSlowPath[];
+}
+
+/** 社交扫描的单个阶段耗时 */
+export interface SocialPhaseDuration {
+  /** 阶段标识：detect（路径探测）/ categorize（遍历并分级）/ total（合计） */
+  stage: string;
+  /** 阶段耗时，单位毫秒 */
+  duration_ms: number;
+}
+
+/**
+ * 单条扫描路径的耗时明细。
+ *
+ * `directory_count` 是排查关键：这个模块的开销主要在「列目录」而不是「读文件」，
+ * 目录数远大于文件数时（例如 QQ 的 Image：4388 个目录只有 1803 个文件），
+ * 慢的原因就是 readdir 次数，看这一项就能判断。
+ */
+export interface SocialSlowPath {
+  /** 扫描路径 */
+  path: string;
+  /** 所属应用 */
+  app_name: string;
+  /** 耗时，单位毫秒 */
+  duration_ms: number;
+  /** 该路径下的文件数 */
+  file_count: number;
+  /** 该路径下的目录数（含自身） */
+  directory_count: number;
 }
 
 /**

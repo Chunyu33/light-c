@@ -34,6 +34,7 @@ import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { EmptyState } from '../EmptyState';
+import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
 import { useToast } from '../Toast';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import {
@@ -49,6 +50,7 @@ import {
   type CleanupLogEntryInput,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import i18n from '../../i18n';
 import { getSourceKey, getSourceLabel } from '../../utils/socialSource';
 import { applyDeletedPaths, resolveDeletedPaths } from '../../utils/socialScanResult';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
@@ -107,6 +109,34 @@ const riskLevelConfig: Record<RiskLevel, {
 };
 
 // ============================================================================
+// 耗时明细展示
+// ============================================================================
+
+/** 浮层里一行一个数字，用 ms / s 短格式比「1.4 秒」省地方 */
+function formatElapsed(milliseconds: number): string {
+  if (milliseconds <= 0) return '<1ms';
+  if (milliseconds < 1000) return `${milliseconds}ms`;
+  return `${(milliseconds / 1000).toFixed(1)}s`;
+}
+
+/**
+ * 阶段名走 common 命名空间的 scanStages，和另外几个扫描模块共用一套文案。
+ *
+ * 这里用全局 i18n 而不是 useTranslation 的 t：文案在 useMemo 里生成，
+ * 把 t 放进依赖数组会让这段映射在每次渲染重跑（t 的引用会变，详见
+ * docs/dev/03-社交软件专清.md §4.6）。
+ */
+function getScanStageLabel(stage: string): string {
+  return i18n.t(`scanStages.${stage}`, { ns: 'common', defaultValue: stage });
+}
+
+/** 路径太长，浮层只显示最后一级目录；同名路径靠「目录数 / 文件数」区分 */
+function getLastPathSegment(path: string): string {
+  const segments = path.split(/[\\/]/).filter(Boolean);
+  return segments[segments.length - 1] ?? path;
+}
+
+// ============================================================================
 // 组件实现
 // ============================================================================
 
@@ -122,6 +152,55 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
 
   // 本地状态
   const [scanResult, setScanResult] = useState<SocialScanResult | null>(null);
+
+  /**
+   * 耗时明细：默认不显示，点秒表才展开。
+   *
+   * 只在扫描结果变化时重建 —— 勾选、筛选、列表滚动都不重算。
+   * 数据本身由后端在阶段边界收集（一次扫描多花 8 µs，实测上界），
+   * 见 docs/dev/扫描性能优化.md §6.7。
+   */
+  const timingGroups = useMemo<TimingGroup[]>(() => {
+    if (!scanResult) return [];
+
+    const totalPhase = scanResult.phase_durations.find((phase) => phase.stage === 'total');
+    const phaseRows = scanResult.phase_durations
+      .filter((phase) => phase.stage !== 'total')
+      .map((phase) => ({
+        label: getScanStageLabel(phase.stage),
+        value: formatElapsed(phase.duration_ms),
+      }));
+
+    const slowRows = scanResult.slow_paths.map((slow) => ({
+      label: `${slow.app_name} · ${getLastPathSegment(slow.path)}`,
+      value: i18n.t('social.slowPathValue', {
+        ns: 'modules',
+        time: formatElapsed(slow.duration_ms),
+        directories: slow.directory_count.toLocaleString(),
+        files: slow.file_count.toLocaleString(),
+      }),
+    }));
+
+    const groups: TimingGroup[] = [
+      {
+        title: '',
+        rows: phaseRows,
+        note: totalPhase
+          ? i18n.t('social.timingTotal', { ns: 'modules', time: formatElapsed(totalPhase.duration_ms) })
+          : undefined,
+      },
+    ];
+
+    if (slowRows.length > 0) {
+      groups.push({
+        title: i18n.t('social.slowPaths', { ns: 'modules' }),
+        rows: slowRows,
+        note: i18n.t('social.slowPathsHint', { ns: 'modules' }),
+      });
+    }
+
+    return groups;
+  }, [scanResult]);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('social-clean', {
     // 只读读取：分类列表（截图里也是"有哪些聊天软件"这种问法）
@@ -485,7 +564,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
             {/* 展开内容 */}
             <div className="min-h-[21.43rem]">
               {shouldShowOperationToolbar && scanResult && scanResult.total_files > 0 && (
-            // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由社交软件模块维护。
+            // 公共操作条统一处理底部定位，按钮内容仍由社交软件模块维护。
             <ModuleOperationToolbar
               moduleId="social"
               busy={isDeleting}
@@ -554,7 +633,23 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
           {/* 分类列表：改成和垃圾清理一致的"卡片列"——每行是一张独立卡片，靠留白分组，
               不再用分隔线把整块连成一条长表。 */}
           {moduleState.status === 'done' && scanResult && (
-            <div className="space-y-2 p-4">
+            // pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一条分类被它压住
+            <div className="space-y-2 p-4 pb-20">
+              {/* 耗时明细默认不展开：多数用户只看分类和大小，排查的人点秒表才看阶段与慢路径。
+                  刻意放左边 —— 右边是 ModuleOperationToolbar 的专属区域（fixed 悬浮、z-index 20），
+                  浮在右侧时秒表会被它盖住，点不到。 */}
+              {scanResult.phase_durations.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                  <span className="tabular-nums">
+                    {moduleT('social.scanElapsed', {
+                      time: formatElapsed(
+                        scanResult.phase_durations.find((phase) => phase.stage === 'total')?.duration_ms ?? 0,
+                      ),
+                    })}
+                  </span>
+                  <ScanTimingPopover groups={timingGroups} align="left" />
+                </div>
+              )}
               {scanResult.categories.map((category) => {
                 const Icon = categoryIcons[category.id] || FolderOpen;
                 const colors = categoryColors[category.id] || categoryColors.imagevideo;
