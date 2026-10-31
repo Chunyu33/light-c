@@ -67,13 +67,26 @@ where
         phase_started_at,
     );
 
+    // 深度发现读的是各盘的 $MFT，而打开原始卷必须提权。非管理员时原来会逐盘失败，
+    // 只在结果里留下一句「打开 NTFS 卷失败: 拒绝访问」，用户看到的就是
+    // 「我明明开了深度发现，怎么什么都没发生」。这里提前判定：跳过 MFT、说清原因，
+    // 并且如实把模式报成 quick —— 结果确实只是快速扫描的结果，不能谎称深度。
+    let mut deep_discovery_ran = false;
     if enable_deep_discovery {
-        let covered_roots = covered_roots_from_sources(&sources);
-        let (mut mft_sources, mut mft_warnings, mut mft_phase_durations) =
-            discover_models_via_mft(&covered_roots, &started_at, progress);
-        sources.append(&mut mft_sources);
-        warnings.append(&mut mft_warnings);
-        phase_durations.append(&mut mft_phase_durations);
+        if crate::scanner::big_files_engine::mft_core::is_elevated() {
+            let covered_roots = covered_roots_from_sources(&sources);
+            let (mut mft_sources, mut mft_warnings, mut mft_phase_durations) =
+                discover_models_via_mft(&covered_roots, &started_at, progress);
+            sources.append(&mut mft_sources);
+            warnings.append(&mut mft_warnings);
+            phase_durations.append(&mut mft_phase_durations);
+            deep_discovery_ran = true;
+        } else {
+            warnings.push(
+                "深度发现需要以管理员身份运行：未提权无法读取磁盘主文件表，本次只扫描了已知模型目录"
+                    .to_string(),
+            );
+        }
     }
 
     phase_started_at = Instant::now();
@@ -102,7 +115,7 @@ where
         sources,
         warnings,
         scan_duration_ms: started_at.elapsed().as_millis(),
-        discovery_mode: if enable_deep_discovery {
+        discovery_mode: if deep_discovery_ran {
             "deep".to_string()
         } else {
             "quick".to_string()
