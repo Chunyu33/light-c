@@ -21,6 +21,7 @@ import { ModuleCard } from '../ModuleCard';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { CategoryCard } from '../CategoryCard';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { ScanSummary } from '../ScanSummary';
 import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -871,6 +872,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         {/* 展开内容 */}
         {/* pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一条分类被它压住 */}
         <div className="p-4 space-y-3 pb-20">
+          {/* 深度发现靠直读各盘 $MFT，打开原始卷需要管理员权限；非管理员会退回逐目录遍历，
+              耗时差一个量级。只在用户开了深度发现时提示 —— 用快速扫描的人不需要这条噪音。 */}
+          {!isDeleting && deepScanEnabled && (
+            <AdminRequiredHint variant="performance" description={t('deepAdminHint')} />
+          )}
+
           {/* 删除期间只显示进度面板，下面的统计卡与分类列表都是"删除前"的数据，
               继续摆着会让人以为没删干净。删除本身在后端线程执行，界面不必阻塞。 */}
           {isDeleting && (

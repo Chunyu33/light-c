@@ -3,6 +3,7 @@
   "desc": "Clean system cache, temporary files, logs and other junk",
   "deepDiscovery": "Deep Discovery",
   "deepDiscoveryTitle": "Scan all fixed partitions. NTFS partitions use MFT to quickly identify cache directories.",
+  "deepAdminHint": "Deep discovery reads each drive's master file table directly. Without administrator rights it falls back to walking every folder, which is much slower.",
   "cleanBtn": "Clean ({{count}})",
   "selectAllDeepTitle": "Select the current page; cleanup will include the full scan results for these categories",
   "searchQuery": "Can the Windows file {{path}} be deleted",

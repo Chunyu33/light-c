@@ -513,7 +513,7 @@
     "confirmDeletePath": "路徑：{{path}}。刪除後無法透過 LightC 恢復，請確認它不是正在使用的模型。",
     "confirmDeleteButton": "確認刪除",
     "deepDiscovery": "深度發現",
-    "deepDiscoveryTip": "開啟後深度掃描全盤模型特徵檔案；管理員許可權下速度和覆蓋率更好。",
+    "deepDiscoveryTip": "開啟後深度掃描全盤模型特徵檔案；管理員許可權下速度和覆蓋率更好。", "deepAdminHint": "深度發現需要直讀各盤主檔案表（$MFT），未以管理員身分執行時會跳過全盤發現，只掃描已知模型目錄。",
     "discoverySummary": "發現 {{models}} 個資產 · {{sources}} 個來源 · {{mode}}",
     "totalUsage": "AI 資產總佔用",
     "largestModel": "最大模型",

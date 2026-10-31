@@ -3,6 +3,7 @@
   "desc": "清理系統快取、臨時檔案、日誌等垃圾檔案",
   "deepDiscovery": "深度發現",
   "deepDiscoveryTitle": "掃描所有固定分割槽，NTFS 分割槽使用 MFT 快速識別明確的快取目錄",
+  "deepAdminHint": "深度發現需要直讀各盤主檔案表（$MFT），未以管理員身分執行時會退回逐目錄遍歷，耗時明顯變長。",
   "cleanBtn": "清理 ({{count}})",
   "selectAllDeepTitle": "當前頁全部選中；執行清理時會包含這些分類的完整掃描結果",
   "searchQuery": "Windows 檔案 {{path}} 可以刪除嗎",

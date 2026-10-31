@@ -3,6 +3,7 @@
   "desc": "清理系统缓存、临时文件、日志等垃圾文件",
   "deepDiscovery": "深度发现",
   "deepDiscoveryTitle": "扫描所有固定分区，NTFS 分区使用 MFT 快速识别明确的缓存目录",
+  "deepAdminHint": "深度发现需要直读各盘主文件表（$MFT），未以管理员身份运行时会退回逐目录遍历，耗时明显变长。",
   "cleanBtn": "清理 ({{count}})",
   "selectAllDeepTitle": "当前页全部选中；执行清理时会包含这些分类的完整扫描结果",
   "searchQuery": "Windows 文件 {{path}} 可以删除吗",

@@ -21,6 +21,7 @@ import type { ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleScanProgress } from '../ModuleScanProgress';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -350,6 +351,12 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       }
     >
       <div className="p-5 space-y-5">
+        {/* 深度发现靠直读各盘 $MFT，打开原始卷需要管理员权限。非管理员时后端会直接跳过
+            全盘发现、只留配置层结果 —— 不提示的话，用户会以为"开了深度发现却没反应"。 */}
+        {enableDeepDiscovery && (
+          <AdminRequiredHint variant="performance" description={moduleT('aiModels.deepAdminHint')} />
+        )}
+
         {moduleState.status === 'idle' && !scanResult && (
           <EmptyState
             icon={BrainCircuit}
