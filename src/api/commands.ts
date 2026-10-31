@@ -1768,6 +1768,23 @@ export interface ClearableDataItem {
 export interface ClearLocalDataResult {
   deleted_files: number;
   freed_bytes: number;
+  /** 成功清理的项数 */
+  cleared_items: number;
+  /**
+   * 清理失败的项。
+   *
+   * 单项失败不会中断整批：其余项照常清理，这里只带回失败的那几项，
+   * 界面据此提示「哪一项没删掉、为什么」。
+   */
+  failed_items: ClearLocalDataFailure[];
+}
+
+/** 单个清理项的失败原因 */
+export interface ClearLocalDataFailure {
+  /** 清理项标识 */
+  item: string;
+  /** 失败原因（可直接展示） */
+  reason: string;
 }
 
 /**

@@ -117,6 +117,22 @@ pub struct ClearableDataItem {
 pub struct ClearLocalDataResult {
     pub deleted_files: usize,
     pub freed_bytes: u64,
+    /// 成功清理的项数
+    pub cleared_items: usize,
+    /// 清理失败的项及原因
+    ///
+    /// 单项失败不会中断整批：用户勾了三项，其中一项的日志文件被占用，
+    /// 另外两项照样清掉，这里只把失败的那项带回去给界面提示。
+    pub failed_items: Vec<ClearLocalDataFailure>,
+}
+
+/// 单个清理项失败的原因
+#[derive(Debug, Clone, Serialize)]
+pub struct ClearLocalDataFailure {
+    /// 清理项标识
+    pub item: String,
+    /// 失败原因（直接展示给用户）
+    pub reason: String,
 }
 
 /// 便携版写入能力诊断。
@@ -1025,44 +1041,57 @@ pub fn list_clearable_data_items() -> Result<Vec<ClearableDataItem>, String> {
 
 pub fn clear_selected_local_data(item_ids: &[String]) -> Result<ClearLocalDataResult, String> {
     let data_dir = get_data_dir();
-    let mut file_count = 0usize;
-    let mut total_size = 0u64;
+    let mut result = ClearLocalDataResult {
+        deleted_files: 0,
+        freed_bytes: 0,
+        cleared_items: 0,
+        failed_items: Vec::new(),
+    };
 
+    // 逐项隔离：一项失败（文件被占用、权限不足、目录结构异常）只记录原因，不中断后面的项。
+    // 原来每一项都用 `?` 传播，用户勾了 5 项、第 1 项被占用，等于另外 4 项也白勾了。
     for item_id in item_ids {
-        // AI 对话记录是动态项（路径取决于 AI 数据目录设置），先于白名单处理
-        if item_id == AI_SESSION_ITEM_ID {
-            let (deleted_files, deleted_bytes) = clear_ai_sessions()?;
-            file_count += deleted_files;
-            total_size += deleted_bytes;
-            continue;
+        match clear_single_item(item_id, &data_dir) {
+            Ok((deleted_files, deleted_bytes)) => {
+                result.deleted_files += deleted_files;
+                result.freed_bytes += deleted_bytes;
+                result.cleared_items += 1;
+            }
+            Err(reason) => {
+                log::warn!("清理本地数据项失败 {}: {}", item_id, reason);
+                result.failed_items.push(ClearLocalDataFailure {
+                    item: item_id.clone(),
+                    reason,
+                });
+            }
         }
-
-        if let Some(drive_letter) = parse_disk_growth_snapshot_item_id(item_id) {
-            let snapshot_dir = data_dir.join(DISK_GROWTH_SNAPSHOT_DIR);
-            let (deleted_files, deleted_bytes) =
-                clear_disk_growth_snapshots_for_drive(&snapshot_dir, drive_letter)?;
-            file_count += deleted_files;
-            total_size += deleted_bytes;
-            continue;
-        }
-
-        let Some(definition) = CLEARABLE_DATA_DEFINITIONS
-            .iter()
-            .find(|definition| definition.id == item_id)
-        else {
-            return Err(format!("未知的本地数据清理项: {}", item_id));
-        };
-
-        let target_path = data_dir.join(definition.relative_path);
-        let (deleted_files, deleted_bytes) = clear_data_item(definition, &target_path)?;
-        file_count += deleted_files;
-        total_size += deleted_bytes;
     }
 
-    Ok(ClearLocalDataResult {
-        deleted_files: file_count,
-        freed_bytes: total_size,
-    })
+    Ok(result)
+}
+
+/// 清理单个数据项，返回（文件数, 字节数）。
+///
+/// 三种项的来源不同：AI 会话是动态路径、磁盘快照按盘符分片、其余走白名单。
+/// 统一收敛成「一项一次调用」后，上层才能逐项隔离失败、逐项汇总统计。
+fn clear_single_item(item_id: &str, data_dir: &Path) -> Result<(usize, u64), String> {
+    // AI 对话记录是动态项（路径取决于 AI 数据目录设置），先于白名单处理
+    if item_id == AI_SESSION_ITEM_ID {
+        return clear_ai_sessions();
+    }
+
+    if let Some(drive_letter) = parse_disk_growth_snapshot_item_id(item_id) {
+        let snapshot_dir = data_dir.join(DISK_GROWTH_SNAPSHOT_DIR);
+        return clear_disk_growth_snapshots_for_drive(&snapshot_dir, drive_letter);
+    }
+
+    let definition = CLEARABLE_DATA_DEFINITIONS
+        .iter()
+        .find(|definition| definition.id == item_id)
+        .ok_or_else(|| format!("未知的本地数据清理项: {}", item_id))?;
+
+    let target_path = data_dir.join(definition.relative_path);
+    clear_data_item(definition, &target_path)
 }
 
 /// 清空本地数据：保留旧命令兼容，一次性清理所有白名单项。
@@ -1401,16 +1430,21 @@ fn clear_directory_contents(
         }) {
             continue;
         }
-        if path.is_dir() {
+        // 一次 metadata 同时拿到「是不是目录」和「文件大小」：
+        // 原来是 is_dir() + is_file() + metadata() 三次系统调用，在零碎文件上是纯浪费。
+        // 语义不变 —— metadata 跟随符号链接，与原来的 is_dir()/is_file() 处理一致。
+        let Ok(metadata) = fs::metadata(&path) else {
+            // 统计期间被删掉 / 无权访问：跳过这一条，不影响同目录其它条目
+            continue;
+        };
+        if metadata.is_dir() {
             let (child_files, child_bytes) = directory_usage(&path, &[])?;
             file_count += child_files;
             total_size += child_bytes;
             fs::remove_dir_all(&path)
                 .map_err(|e| format!("删除目录 {} 失败: {}", path.display(), e))?;
-        } else if path.is_file() {
-            if let Ok(meta) = fs::metadata(&path) {
-                total_size += meta.len();
-            }
+        } else if metadata.is_file() {
+            total_size += metadata.len();
             fs::remove_file(&path)
                 .map_err(|e| format!("删除文件 {} 失败: {}", path.display(), e))?;
             file_count += 1;
@@ -1438,14 +1472,16 @@ fn directory_usage(dir: &Path, excluded_relative_paths: &[&str]) -> Result<(usiz
         }) {
             continue;
         }
-        if path.is_dir() {
+        // 同 clear_directory_contents：一次 metadata 取代 is_dir + is_file + metadata 三次调用
+        let Ok(metadata) = fs::metadata(&path) else {
+            continue;
+        };
+        if metadata.is_dir() {
             let (child_files, child_bytes) = directory_usage(&path, &[])?;
             file_count += child_files;
             total_size += child_bytes;
-        } else if path.is_file() {
-            if let Ok(meta) = fs::metadata(&path) {
-                total_size += meta.len();
-            }
+        } else if metadata.is_file() {
+            total_size += metadata.len();
             file_count += 1;
         }
     }
@@ -1705,5 +1741,46 @@ mod tests {
         assert!(!new_path.join("unrelated.txt").exists());
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 统计口径必须覆盖嵌套目录，且排除项不计入。
+    ///
+    /// 这条守住的是「一次 metadata 拿类型和大小」的改动：换成 metadata 之后
+    /// 目录与文件的判断变了，统计结果不能跟着变。
+    #[test]
+    fn counts_nested_files_and_skips_excluded_entries() {
+        let root = std::env::temp_dir().join(format!(
+            "lightc-directory-usage-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("获取测试时间失败")
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("nested").join("deep")).expect("创建测试目录失败");
+        fs::write(root.join("top.bin"), [0u8; 10]).expect("写入测试文件失败");
+        fs::write(root.join("nested").join("mid.bin"), [0u8; 20]).expect("写入测试文件失败");
+        fs::write(root.join("nested").join("deep").join("leaf.bin"), [0u8; 30])
+            .expect("写入测试文件失败");
+
+        let (files, bytes) = directory_usage(&root, &[]).expect("统计失败");
+        assert_eq!(files, 3, "嵌套三层的文件都要统计到");
+        assert_eq!(bytes, 60, "字节数应与实际大小一致");
+
+        // 演示目录是独立清理项时，父级统计要把它排除在外
+        let (files, bytes) = directory_usage(&root, &["nested"]).expect("统计失败");
+        assert_eq!(files, 1);
+        assert_eq!(bytes, 10);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 未知清理项必须返回错误而不是 panic —— 逐项清理靠这个错误继续下一项。
+    #[test]
+    fn unknown_clear_item_returns_error() {
+        let data_dir = std::env::temp_dir();
+        let error = clear_single_item("not-a-real-item", &data_dir).expect_err("未知项必须报错");
+        assert!(error.contains("not-a-real-item"), "错误信息要带上出错的项");
     }
 }

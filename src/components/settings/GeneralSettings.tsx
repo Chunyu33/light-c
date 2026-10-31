@@ -179,11 +179,36 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
       setIsClearing(true);
       const result = await clearSelectedLocalData(selectedClearItemIds);
       setClearDialogOpen(false);
-      showToast({
-        type: 'success',
-        title: t('dataDir.clearSuccess'),
-        description: t('dataDir.clearSuccessDesc', { files: result.deleted_files, size: formatSize(result.freed_bytes) }),
-      });
+
+      // 单项失败不再中断整批，所以结果要分三种情况说清楚：
+      // 全成功只报释放量；部分失败补上「哪项没删掉、为什么」；全失败直接报错。
+      const failedCount = result.failed_items.length;
+      const firstFailureReason = result.failed_items[0]?.reason ?? '';
+
+      if (failedCount === 0) {
+        showToast({
+          type: 'success',
+          title: t('dataDir.clearSuccess'),
+          description: t('dataDir.clearSuccessDesc', { files: result.deleted_files, size: formatSize(result.freed_bytes) }),
+        });
+      } else if (result.cleared_items === 0) {
+        showToast({
+          type: 'error',
+          title: t('dataDir.clearFailed'),
+          description: t('dataDir.clearAllFailedDesc', { count: failedCount, detail: firstFailureReason }),
+        });
+      } else {
+        showToast({
+          type: 'warning',
+          title: t('dataDir.clearPartial'),
+          description: t('dataDir.clearPartialDesc', {
+            cleared: result.cleared_items,
+            failed: failedCount,
+            size: formatSize(result.freed_bytes),
+            detail: firstFailureReason,
+          }),
+        });
+      }
     } catch (error) {
       showToast({
         type: 'error',
