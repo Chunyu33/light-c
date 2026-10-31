@@ -135,8 +135,9 @@ function DashboardContent() {
       {!isSidebarLayout && <AnchorNav scrollContainerRef={scrollContainerRef} />}
       <BackToTopButton scrollContainerRef={scrollContainerRef} />
       {/* AI 助手：横向新增的独立浮层，不参与任何模块逻辑。
-          传入当前模块 id，让助手知道用户正停留在哪个模块。 */}
-      <AiAssistant activeModuleId={visibleModuleId} />
+          传入当前模块 id，让助手知道用户正停留在哪个模块。
+          入口可在「设置 → AI 助手」里关掉，关掉只隐藏界面，服务商与密钥都保留。 */}
+      {settings.aiAssistantEnabled && <AiAssistant activeModuleId={visibleModuleId} />}
 
       {/* 主内容区 - 页面模式下模块实例仍常驻，但 inactive 模块会自行跳过重结果 DOM。 */}
       <main className={`flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)]${isSidebarLayout ? ' sidebar-layout' : ''}`}>

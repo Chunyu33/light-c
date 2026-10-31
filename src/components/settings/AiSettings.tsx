@@ -9,7 +9,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, CheckCircle2, Loader2, Plus, Sparkles } from 'lucide-react';
 import { Select } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 import { useToast } from '../Toast';
+import { useSettings } from '../../contexts';
 import {
   clearAiProfileKey,
   deleteAiProfile,
@@ -75,6 +77,7 @@ function TextField({
 export function AiSettings() {
   const { t } = useTranslation('settings');
   const { showToast } = useToast();
+  const { settings, updateSettings } = useSettings();
 
   const [providers, setProviders] = useState<AiProviderPreset[]>([]);
   const [saved, setSaved] = useState<AiPublicConfig | null>(null);
@@ -422,6 +425,20 @@ export function AiSettings() {
           <Sparkles className="w-3.5 h-3.5" />
           {t('aiAssistant.section')}
         </h4>
+
+        {/* 入口显示开关：没配服务商的用户不希望右下角悬浮球和行内 AI 按钮一直占着界面。
+            关掉只隐藏入口，服务商配置与密钥全部保留（重新打开立刻恢复）。 */}
+        <div className="glass-block bg-[var(--bg-main)] rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-[var(--text-primary)]">{t('aiAssistant.enableEntry')}</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">{t('aiAssistant.enableEntryDesc')}</p>
+          </div>
+          <Switch
+            checked={settings.aiAssistantEnabled}
+            onChange={(checked) => updateSettings({ aiAssistantEnabled: checked })}
+            aria-label={t('aiAssistant.enableEntry')}
+          />
+        </div>
 
         <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5 space-y-5">
           {/* 服务商列表：参考 deepseek harness —— 竖排列表、每行一个删除、

@@ -37,6 +37,8 @@
   "navResize": "設定ナビゲーションの幅を変更",
   "aiAssistant": {
     "section": "AI アシスタント",
+    "enableEntry": "AI アシスタントの入口を表示",
+    "enableEntryDesc": "オフにすると右下のフローティングボタンとリスト内の AI アイコンが非表示になります。設定済みのプロバイダーとキーは保持されます。",
     "provider": "プロバイダー",
     "providerDesc": "利用するモデルサービスを選択します。多くの国内サービスは OpenAI 互換プロトコルです",
     "baseUrl": "エンドポイント",

@@ -37,6 +37,8 @@
   "navResize": "調整設定導覽寬度",
   "aiAssistant": {
     "section": "AI 助手",
+    "enableEntry": "顯示 AI 助手入口",
+    "enableEntryDesc": "關閉後隱藏右下角懸浮球和各列表裡的 AI 按鈕，已設定的服務商與金鑰會保留。",
     "provider": "服務商",
     "providerDesc": "選擇要接入的模型服務商，絕大多數國內服務商都使用 OpenAI 相容協議",
     "baseUrl": "介面位址",

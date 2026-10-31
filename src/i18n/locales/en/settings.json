@@ -37,6 +37,8 @@
   "navResize": "Resize settings navigation",
   "aiAssistant": {
     "section": "AI assistant",
+    "enableEntry": "Show AI assistant entry",
+    "enableEntryDesc": "Turn off to hide the floating button and the AI icons in lists. Configured providers and keys are kept.",
     "provider": "Provider",
     "providerDesc": "Pick the model service to use. Most providers speak the OpenAI-compatible protocol",
     "baseUrl": "Endpoint",

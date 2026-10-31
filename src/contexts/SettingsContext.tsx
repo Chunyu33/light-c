@@ -32,6 +32,13 @@ interface AppSettings {
   diskGrowthMaxEntries: number;
   /** 清理日志最多保留文件数（默认 10） */
   cleanupLogRetention: number;
+  /**
+   * 是否显示 AI 助手入口（右下角悬浮球 + 各列表行内的 AI 按钮）。
+   *
+   * 默认开启。关掉只隐藏入口，已配置的服务商和密钥全部保留 ——
+   * 有些用户没配服务商，也不希望这两个图标一直占着界面。
+   */
+  aiAssistantEnabled: boolean;
 }
 
 interface SettingsContextValue {
@@ -64,6 +71,7 @@ const defaultSettings: AppSettings = {
   junkDeepScanDepth: 16,
   diskGrowthMaxEntries: 300, // 默认最多展示 300 个变化目录
   cleanupLogRetention: 10, // 默认保留 10 份清理日志，兼容历史行为
+  aiAssistantEnabled: true, // 默认显示 AI 助手入口，保持老用户看到的样子
 };
 
 function normalizeSettings(settings: AppSettings): AppSettings {
@@ -91,6 +99,8 @@ function normalizeSettings(settings: AppSettings): AppSettings {
     junkDeepScanDepth: Math.min(24, Math.max(4, Math.floor(Number(settings.junkDeepScanDepth) || defaultSettings.junkDeepScanDepth))),
     diskGrowthMaxEntries: Math.min(1000, Math.max(50, Number(settings.diskGrowthMaxEntries) || defaultSettings.diskGrowthMaxEntries)),
     cleanupLogRetention: Math.min(100, Math.max(1, Math.floor(Number(settings.cleanupLogRetention) || defaultSettings.cleanupLogRetention))),
+    // 只有显式存了 false 才算关闭：老版本缓存里根本没这个字段，必须保持默认开启
+    aiAssistantEnabled: settings.aiAssistantEnabled !== false,
   };
 }
 

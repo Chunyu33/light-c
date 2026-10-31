@@ -11,6 +11,7 @@
 import { useTranslation } from 'react-i18next';
 import { AiMarkIcon } from './AiMarkIcon';
 import { requestAiAsk } from './aiAsk';
+import { useSettings } from '../../contexts';
 
 interface AiAskButtonProps {
   /** 要问 AI 的问题；空字符串时按钮不渲染，避免出现点了没反应的入口 */
@@ -26,6 +27,11 @@ interface AiAskButtonProps {
 
 export function AiAskButton({ question, skipLookup = false, className = '' }: AiAskButtonProps) {
   const { t } = useTranslation('ai');
+  const { settings } = useSettings();
+
+  // 入口关掉后行内按钮一起隐藏：只藏悬浮球的话，列表里还留着一堆点了会弹出
+  // 助手面板的入口，等于没关干净。
+  if (!settings.aiAssistantEnabled) return null;
 
   if (!question.trim()) return null;
 

@@ -37,6 +37,8 @@
   "navResize": "调整设置导航宽度",
   "aiAssistant": {
     "section": "AI 助手",
+    "enableEntry": "显示 AI 助手入口",
+    "enableEntryDesc": "关闭后隐藏右下角悬浮球和各列表里的 AI 按钮，已配置的服务商和密钥会保留。",
     "provider": "服务商",
     "providerDesc": "选择要接入的模型服务商，绝大多数国内服务商都使用 OpenAI 兼容协议",
     "baseUrl": "接口地址",
