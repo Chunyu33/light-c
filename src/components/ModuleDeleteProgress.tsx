@@ -64,10 +64,11 @@ export function ModuleDeleteProgress({
     </div>
   );
 
-  // 悬浮形态：塞进 ModuleOperationToolbar 的窄列里，所以是紧凑的纵向堆叠。
+  // 悬浮形态：塞进底部的 ModuleOperationToolbar（横向操作条，居中一块进度面板）。
+  // 宽度给足是为了让「阶段名 + 已处理数」两行都不被截断 —— 太窄会变成一串省略号。
   if (variant === 'floating') {
     return (
-      <div className="flex w-[11em] flex-col gap-1.5 px-1 py-0.5">
+      <div className="flex w-[20em] flex-col gap-1.5 px-1 py-0.5">
         <div className="flex items-center gap-1.5">
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--color-danger)]" />
           <span className="truncate text-[0.93rem] font-medium text-[var(--fg-primary)]">{phaseLabel}</span>

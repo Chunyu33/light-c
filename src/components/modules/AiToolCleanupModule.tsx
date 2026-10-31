@@ -329,7 +329,8 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
             }
           />
         ) : (
-          <div className="space-y-2">
+          // pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一个工具卡片被它压住
+          <div className="space-y-2 pb-20">
             {result.groups.map((group) => {
               const paths = group.entries.map((entry) => entry.path);
               const selectedInGroup = paths.filter((path) => selected.has(path)).length;

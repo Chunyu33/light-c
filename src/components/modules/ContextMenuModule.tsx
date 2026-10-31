@@ -606,7 +606,8 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
 
         {/* ── 扫描结果内容 ── */}
         {scanResult && (
-          <div className="p-5 space-y-4">
+          // pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一行被它压住
+          <div className="p-5 space-y-4 pb-20">
 
             {/* 安全提示横幅 */}
             <div className="flex items-start gap-3 p-4 bg-[var(--brand-green-10)] rounded-xl border border-[var(--brand-green-20)]">
@@ -663,7 +664,7 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               </span>
             </div>
 
-            {/* 操作按钮区：默认展开、跟随视口，下拉列表再长也能找到删除按钮 */}
+            {/* 操作按钮区：固定在视口底部，下拉列表再长也不用滚回去找删除按钮 */}
             <ModuleOperationToolbar
               moduleId="context"
               busy={isDeleting}

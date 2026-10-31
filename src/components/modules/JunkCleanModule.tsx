@@ -869,7 +869,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         allowStickyContent
       >
         {/* 展开内容 */}
-        <div className="p-4 space-y-3">
+        {/* pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一条分类被它压住 */}
+        <div className="p-4 space-y-3 pb-20">
           {/* 删除期间只显示进度面板，下面的统计卡与分类列表都是"删除前"的数据，
               继续摆着会让人以为没删干净。删除本身在后端线程执行，界面不必阻塞。 */}
           {isDeleting && (
@@ -888,7 +889,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
           )}
 
           {!isDeleting && shouldShowOperationToolbar && scanResult && scanResult.total_file_count > 0 && (
-            // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由垃圾清理模块维护。
+            // 公共操作条统一处理底部定位，按钮内容仍由垃圾清理模块维护。
             <ModuleOperationToolbar moduleId="junk">
               <button
                 onClick={() => toggleAllSelection(true)}

@@ -472,9 +472,10 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
                 那是 position: fixed 的层，不占文档流，所以列表既不被撑开也没有位移 ——
                 大文件需要保留"我在删哪几个"的参照。 */}
             {/* 展开内容 */}
-            <div>
+            {/* pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一行文件被它压住 */}
+            <div className="pb-20">
               {shouldShowOperationToolbar && files.length > 0 && !isScanning && (
-            // 公共操作区统一处理固定定位和折叠状态，按钮内容仍由大文件模块维护。
+            // 公共操作条统一处理底部定位，按钮内容仍由大文件模块维护。
             <ModuleOperationToolbar
               moduleId="bigFiles"
               busy={isDeleting}

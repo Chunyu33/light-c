@@ -253,6 +253,8 @@
     "aggregate": "聚合目錄",
     "result": "生成結果",
     "walkdir": "常規遍歷檔案",
+    "detect": "偵測資料目錄",
+    "categorize": "遍歷並分級",
     "mftEnumerate": "正在列舉 {{drive}} 盤 MFT 檔案記錄",
     "mftFilter": "正在篩選 {{drive}} 盤模型候選",
     "mftPaths": "正在重建 {{drive}} 盤模型路徑",
@@ -291,7 +293,5 @@
   "updateErrorFormat": "更新資訊格式錯誤，請聯絡開發者",
   "updateErrorPermission": "沒有寫入許可權，請以管理員身份執行",
   "updateErrorDisk": "磁碟空間不足，請清理後重試",
-  "collapseToolbar": "收起操作區",
-  "expandToolbar": "展開操作區",
   "layoutSwitching": "正在切換佈局…"
 }

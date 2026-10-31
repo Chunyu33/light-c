@@ -107,31 +107,43 @@
   letter-spacing: 0.03em;
 }
 
-/* 固定在模块扫描按钮下方，滚动结果时仍保持可见且不占用内容流空间。 */
+/* 批量操作条：固定在视口底部居中。
+   为什么在底部而不是右侧悬浮 —— 右侧会压住列表里的数字和行内图标，
+   用户必须先折叠操作区才能看清内容；底部横排是「对选中项批量做事」的常规位置，
+   而且横向排布不占用任何数据列。
+   为什么不做折叠 —— 折叠态只剩一个图标，多数用户认不出那里是操作区，
+   这比「挡住内容」更糟。
+   视觉上仍是一块悬浮面板（半透明 + 模糊），和右侧悬浮的区别只有位置。
+
+   ⚠️ 出现时机由调用方控制：模块扫到数据、且有可操作项时才渲染，不要改成常驻。 */
 .module-operation-toolbar {
   position: fixed;
-  /* 固定在视口右侧，避免结果容器滚动或过渡动画影响操作区。 */
-  top: 244px;
-  right: 20px;
+  bottom: 20px;
+  /* 水平居中用盒模型（left/right 都为 0 + auto margin + fit-content），
+     不用 translateX(-50%) —— transform 会和动画抢同一个属性，见《项目UI约定》 */
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 0.3em;
+  gap: 0.5em;
   width: fit-content;
-  max-width: calc(100vw - 76px);
-  margin: 0;
-  padding: 0.35em;
+  /* 左右各留 24px，窄窗口下按钮换行而不是溢出屏幕 */
+  max-width: calc(100vw - 48px);
+  padding: 0.45em 0.55em;
   border: 1px solid color-mix(in srgb, var(--border-default) 82%, transparent);
-  border-radius: 0.8em;
+  border-radius: 0.9em;
   /* 不透明度这块踩过两次坑，记录清楚：
      ① 原来写死 78% —— 太透，内容透上来和按钮叠在一起。
      ② 改成 color-mix(var(--bg-elevated) 96%) 仍然没用 ✗ ——
         玻璃主题下 --bg-elevated 本身就是 rgba(255,255,255,0.45)，
         对一个 45% 的颜色再取 96%，结果还是 ~43%，等于没改。
-     现在用 --glass-toolbar-bg：玻璃态是 84% + 强模糊，非玻璃态回落到 --bg-elevated。
-     悬浮层下面会滚过内容，靠「高不透明 + 强模糊」挡住，同时保住液态玻璃质感。 */
+     现在用 --glass-toolbar-bg：玻璃态是 78% + 强模糊，非玻璃态回落到 --bg-elevated。
+     底部条下面会滚过内容，靠「高不透明 + 强模糊」挡住，同时保住液态玻璃质感。 */
   background: var(--glass-toolbar-bg, var(--bg-elevated));
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  /* 底部悬浮要更"离地"：投影比原来重一档，否则贴在列表末尾时像内容的一部分 */
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
   /* 前缀写在标准属性前面（原因见 .driver-toolbar 的注释） */
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(20px) saturate(160%);
@@ -139,50 +151,9 @@
 
 .module-operation-toolbar__actions {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.3em;
-}
-
-/* 折叠态仅保留操作入口，尺寸跟随应用字号，避免固定按钮在不同字号下失衡。 */
-.module-operation-toolbar--collapsed {
-  padding: 0.25em;
-}
-
-.module-operation-toolbar__toggle {
-  display: flex;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 2.1em;
-  height: 2.1em;
-  padding: 0.35em;
-  border: 1px solid var(--border-default);
-  border-radius: 0.6em;
-  color: var(--fg-muted);
-  background: var(--bg-card);
-  transition: background-color 150ms ease, color 150ms ease;
-}
-
-.module-operation-toolbar__toggle:hover {
-  color: var(--fg-primary);
-  background: var(--bg-hover);
-}
-
-.module-operation-toolbar__toggle:focus-visible {
-  outline: 2px solid var(--fg-secondary);
-  outline-offset: 1px;
-}
-
-.module-operation-toolbar__toggle-icon {
-  width: 1.1em;
-  height: 1.1em;
-  stroke-width: 2;
-}
-
-/* 展开态入口位于左侧并由父级垂直居中，操作按钮保持原有纵向排列。 */
-.module-operation-toolbar:not(.module-operation-toolbar--collapsed) .module-operation-toolbar__toggle {
-  align-self: center;
+  gap: 0.5em;
 }
 
 .module-operation-toolbar__button {
