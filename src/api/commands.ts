@@ -294,6 +294,16 @@ export async function checkAdminPrivilege(): Promise<boolean> {
 }
 
 /**
+ * 以管理员权限重新启动当前程序。
+ *
+ * 走系统 UAC，用户要在弹窗里点确认。
+ * @returns true = 管理员实例已拉起（当前进程随后自动退出）；false = 用户取消了 UAC
+ */
+export async function relaunchAsAdmin(): Promise<boolean> {
+  return invoke<boolean>('relaunch_as_admin');
+}
+
+/**
  * 鑾峰彇绯荤粺鐦﹁韩鐘舵€? */
 export async function getSystemSlimStatus(): Promise<SystemSlimStatus> {
   return invoke<SystemSlimStatus>('get_system_slim_status');

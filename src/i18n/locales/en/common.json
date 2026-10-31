@@ -210,6 +210,10 @@
   },
   "timingDetails": "Timing details",
   "timingDetailsHint": "For troubleshooting; safe to screenshot",
+  "adminRequiredTitle": "Administrator rights required",
+  "adminPerformanceTitle": "Run as administrator to speed this up",
+  "adminRelaunch": "Restart with administrator rights",
+  "adminRequesting": "Requesting administrator rights…",
   "scanStages": {
     "mft": "Enumerating MFT",
     "index": "Building index",

@@ -245,6 +245,10 @@
   },
   "timingDetails": "耗時明細",
   "timingDetailsHint": "排查用，可截圖回饋",
+  "adminRequiredTitle": "需要管理員權限",
+  "adminPerformanceTitle": "以管理員身分執行可大幅加速",
+  "adminRelaunch": "以管理員權限重新啟動",
+  "adminRequesting": "正在請求管理員權限…",
   "scanStages": {
     "mft": "列舉 MFT",
     "index": "建立索引",

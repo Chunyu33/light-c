@@ -17,11 +17,11 @@ import {
   Loader2,
   CheckCircle2,
   ShieldAlert,
-  ChevronRight,
-  X
+  ChevronRight
 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleScanProgress } from '../ModuleScanProgress';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { EmptyState } from '../EmptyState';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { useToast } from '../Toast';
@@ -485,20 +485,15 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
     >
       {/* 展开内容 */}
       <div className="p-4 space-y-3">
-        {/* 管理员权限警告 */}
-        {status && !status.is_admin && showAdminWarning && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 flex items-start gap-2 relative">
-            <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-xs font-medium text-amber-600">{moduleT('systemSlim.adminRequired')}</p>
-              <p className="text-[0.79rem] text-[var(--fg-muted)] mt-0.5">
-                {moduleT('systemSlim.adminHint')}
-              </p>
-            </div>
-            <button onClick={() => setShowAdminWarning(false)} className="text-amber-500 hover:text-amber-700 transition shrink-0">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        {/* 管理员权限警告：是否已提权由公共组件自己判断，本模块只管"要不要显示"。
+            ⚠️ 不要加 `status &&` —— 那要等扫描返回，用户在扫描前完全看不到这条提示，
+            而这恰恰是他最该知道"我现在没有权限"的时候。 */}
+        {showAdminWarning && (
+          <AdminRequiredHint
+            description={moduleT('systemSlim.adminHint')}
+            dismissible
+            onDismiss={() => setShowAdminWarning(false)}
+          />
         )}
 
         {/* 加载状态 */}

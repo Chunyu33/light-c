@@ -1,4 +1,5 @@
 import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import { AiAskButton } from '../ai/AiAskButton';
 import { buildItemQuestion } from '../ai/aiQuestions';
@@ -1242,10 +1243,7 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       </div>
 
       {isAdmin === false && (
-        <div className="mx-4 mt-4 flex items-start gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[0.93rem] text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{moduleT('diskGrowth.adminHint')}</span>
-        </div>
+        <AdminRequiredHint className="mx-4 mt-4" description={moduleT('diskGrowth.adminHint')} />
       )}
 
       {selectedDrive && !selectedDrive.is_ntfs && (

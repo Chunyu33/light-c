@@ -10,6 +10,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
 import { ScanTimingPopover } from '../ScanTimingPopover';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
@@ -503,6 +504,9 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
               </button>
             </ModuleOperationToolbar>
           )}
+
+          {/* 非管理员时退回常规遍历（几十秒 vs 几秒）。只说「可加速」——不提权也能扫完。 */}
+          <AdminRequiredHint className="mx-4 mt-3" variant="performance" />
 
           {/* 扫描进度 + 引擎 + 时长（扫描中 & 扫描完成后都显示） */}
           {(isScanning || scanBackend) && (displayScanPath || localizedScanStage) && (

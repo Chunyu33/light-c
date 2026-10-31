@@ -210,6 +210,10 @@
   },
   "timingDetails": "所要時間の内訳",
   "timingDetailsHint": "不具合報告用（スクリーンショット可）",
+  "adminRequiredTitle": "管理者権限が必要です",
+  "adminPerformanceTitle": "管理者として実行すると大幅に高速化されます",
+  "adminRelaunch": "管理者権限で再起動",
+  "adminRequesting": "管理者権限を要求しています…",
   "scanStages": {
     "mft": "MFT を列挙中",
     "index": "インデックスを作成中",

@@ -12,6 +12,7 @@ import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
 import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2, XCircle } from 'lucide-react';
 import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { listen } from '@tauri-apps/api/event';
 import { AccordionContent, ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -956,6 +957,11 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
         </div>
       }
     >
+      {/* 非管理员时全盘分析会退回逐目录遍历（几十秒 vs 几秒）。
+          这里只说「可加速」而不是「需要权限」—— 不提权也能完成，说成必需会让人以为功能坏了。
+          左右留白跟本模块其他状态块的 p-5 对齐。 */}
+      <AdminRequiredHint className="mx-5 mt-4" variant="performance" />
+
       {/* 扫描中状态 */}
       {moduleState.status === 'scanning' && (
         <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-[var(--text-muted)] sm:p-6">

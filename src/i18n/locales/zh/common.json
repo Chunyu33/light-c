@@ -210,6 +210,10 @@
   },
   "timingDetails": "耗时明细",
   "timingDetailsHint": "排查用，可截图反馈",
+  "adminRequiredTitle": "需要管理员权限",
+  "adminPerformanceTitle": "以管理员身份运行可大幅加速",
+  "adminRelaunch": "以管理员权限重新启动",
+  "adminRequesting": "正在请求管理员权限…",
   "scanStages": {
     "mft": "枚举 MFT",
     "index": "建立索引",

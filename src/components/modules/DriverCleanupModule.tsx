@@ -5,9 +5,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Archive, CheckCheck, CheckCircle2, Cpu, FolderOpen, Loader2, RotateCcw, Search, ShieldAlert, Trash2 } from 'lucide-react';
+import { Archive, CheckCheck, CheckCircle2, Cpu, FolderOpen, Loader2, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleScanProgress } from '../ModuleScanProgress';
+import { AdminRequiredHint } from '../AdminRequiredHint';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { Checkbox } from '../ui/Checkbox';
@@ -598,12 +599,8 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
               </div>
 
               <div className="min-w-0">
-              {!scanResult.is_admin && (
-                <div className="flex items-start gap-2 rounded-xl soft-warning border px-3 py-2 text-xs">
-                  <ShieldAlert className="w-4 h-4 shrink-0" />
-                  <span>{moduleT('driverUi.adminHint')}</span>
-                </div>
-              )}
+              {/* 权限提示由公共组件自己判断，模块不再持有 is_admin 分支 */}
+              <AdminRequiredHint description={moduleT('driverUi.adminHint')} />
 
               {visiblePackages.length === 0 ? (
                 scanResult.packages.length === 0 ? (

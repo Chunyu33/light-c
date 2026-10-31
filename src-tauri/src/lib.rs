@@ -88,6 +88,7 @@ pub fn run() {
             open_recycle_bin,
             // 系统瘦身
             check_admin_privilege,
+            relaunch_as_admin,
             get_system_slim_status,
             disable_hibernation,
             enable_hibernation,
