@@ -41,10 +41,29 @@
 // ============================================================================
 
 use log::info;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
+use std::time::Instant;
+
+/// 单条扫描路径的最大递归深度。
+///
+/// 与原先 `walkdir` 的 `max_depth(16)` 保持一致：微信深层目录
+/// （`msg/attach/<hash>/<日期>/…`）很容易超过 10 层，调小会漏扫。
+const SOCIAL_SCAN_MAX_DEPTH: usize = 16;
+
+/// 前几层把子目录交给 rayon 分叉。
+///
+/// 实测（本机 10.5 万文件 / 1.5 万目录）：只分 1 层时，一旦某个子目录占掉绝大部分
+/// 开销就毫无收益 —— QQ 的 `Image` 有 4388 个目录，其中 `Group2` 独占 1618 个，
+/// 分 1 层只有 1.0×；分到 3 层能到 1.8×～3.7×。
+const SOCIAL_SCAN_FORK_DEPTH: usize = 3;
+
+/// 耗时浮层里最多列几条最慢的扫描路径。
+///
+/// 取 5 条：一屏放得下，也足够判断「是某个软件的某个目录拖慢的」。
+const SOCIAL_SLOW_PATH_LIMIT: usize = 5;
 
 // ============================================================================
 // 枚举定义
@@ -228,6 +247,63 @@ pub struct SocialScanResult {
     pub deletable_size: u64,
     /// 检测到的社交软件列表
     pub detected_apps: Vec<String>,
+    /// 阶段耗时明细（排查性能用，前端默认收在「秒表」浮层里，不点不显示）
+    pub phase_durations: Vec<SocialPhaseDuration>,
+    /// 最慢的几条扫描路径（最多 5 条），用来回答「为什么这个用户扫得慢」
+    pub slow_paths: Vec<SocialSlowPath>,
+}
+
+/// 单个扫描阶段的耗时
+///
+/// 只在阶段边界取一次时间戳，不参与遍历循环 —— 十几次 `Instant::now()`
+/// 相对整次扫描（百毫秒级）完全可以忽略。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialPhaseDuration {
+    /// 阶段标识：detect（路径探测）/ categorize（遍历并分级）/ total
+    pub stage: String,
+    /// 阶段耗时，单位毫秒
+    pub duration_ms: u64,
+}
+
+/// 单条扫描路径的耗时明细
+///
+/// 同时给出目录数：这个模块的开销主要来自 `readdir` 次数，目录数远大于文件数时
+/// （比如 QQ 的 `Image`：4388 个目录只有 1803 个文件），慢的原因就是"列目录"
+/// 而不是"文件多"，看这一行就能判断，不用让用户装工具。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialSlowPath {
+    /// 扫描路径
+    pub path: String,
+    /// 所属应用
+    pub app_name: String,
+    /// 该路径耗时，单位毫秒
+    pub duration_ms: u64,
+    /// 该路径下的文件数
+    pub file_count: usize,
+    /// 该路径下的目录数（含自身）
+    pub directory_count: usize,
+}
+
+/// 一次子树遍历的产出：文件条目 + 走过的目录数
+///
+/// 目录数要单独返回，是因为这个模块的耗时几乎全在 `readdir` 上
+/// （见 `docs/dev/扫描性能优化.md` §6.1）：排查「为什么扫得慢」必须能区分
+/// 是「文件多」还是「目录多」—— 两者的单位成本差两个数量级。
+struct DirectoryWalk {
+    /// 该子树下收集到的文件条目
+    entries: Vec<SocialFileEntry>,
+    /// 该子树下的目录数（含子树根自身）
+    directory_count: usize,
+}
+
+impl DirectoryWalk {
+    /// 空产出：深度超限或目录读不了时用，不参与目录统计
+    fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+            directory_count: 0,
+        }
+    }
 }
 
 /// 社交软件路径信息
@@ -336,6 +412,8 @@ impl SocialScanner {
 
     /// 执行扫描
     pub fn scan(&self) -> SocialScanResult {
+        // 三个时间点就够定位问题：探测（跟数据量无关）、遍历（跟目录数相关）、合计
+        let scan_started = Instant::now();
         let mut all_paths = Vec::new();
         let mut detected_apps = Vec::new();
 
@@ -417,14 +495,34 @@ impl SocialScanner {
             all_paths.len()
         );
 
+        // 路径探测到此结束：这一段是注册表 + 全盘浅层搜索，与聊天数据大小无关
+        let detect_duration = scan_started.elapsed();
+
         // 执行文件扫描并分类
-        let categories = self.scan_and_classify(&all_paths);
+        let walk_started = Instant::now();
+        let (categories, slow_paths) = self.scan_and_classify(&all_paths);
+        let categorize_duration = walk_started.elapsed();
 
         // 统计汇总
         let total_files: usize = categories.iter().map(|c| c.file_count).sum();
         let total_size: u64 = categories.iter().map(|c| c.total_size).sum();
         let deletable_files: usize = categories.iter().map(|c| c.deletable_count).sum();
         let deletable_size: u64 = categories.iter().map(|c| c.deletable_size).sum();
+
+        let phase_durations = vec![
+            SocialPhaseDuration {
+                stage: "detect".to_string(),
+                duration_ms: detect_duration.as_millis() as u64,
+            },
+            SocialPhaseDuration {
+                stage: "categorize".to_string(),
+                duration_ms: categorize_duration.as_millis() as u64,
+            },
+            SocialPhaseDuration {
+                stage: "total".to_string(),
+                duration_ms: scan_started.elapsed().as_millis() as u64,
+            },
+        ];
 
         SocialScanResult {
             categories,
@@ -433,6 +531,8 @@ impl SocialScanner {
             deletable_files,
             deletable_size,
             detected_apps,
+            phase_durations,
+            slow_paths,
         }
     }
 
@@ -441,7 +541,10 @@ impl SocialScanner {
     // ========================================================================
 
     /// 扫描并分类文件
-    fn scan_and_classify(&self, app_paths: &[SocialAppPath]) -> Vec<SocialCategoryStats> {
+    fn scan_and_classify(
+        &self,
+        app_paths: &[SocialAppPath],
+    ) -> (Vec<SocialCategoryStats>, Vec<SocialSlowPath>) {
         // 初始化分类统计
         let mut category_map: HashMap<FileCategory, SocialCategoryStats> = HashMap::new();
 
@@ -479,19 +582,41 @@ impl SocialScanner {
         });
 
         let mut scanned_files = HashSet::new();
+        // 已经完整遍历过的子树。深的路径先扫，父路径后扫时直接跳过这些子目录，
+        // 免得同一批文件再走一遍目录树、再被去重全部丢掉。
+        // Telegram 的 tdata 里就包着 user_data（缓存），本机实测这一项白走 33 ms。
+        let mut scanned_roots: Vec<PathBuf> = Vec::new();
+        // 每条路径的耗时都记下来（一百多条，开销可忽略），最后只留最慢的几条
+        let mut slow_paths: Vec<SocialSlowPath> = Vec::new();
         for app_path in ordered_paths {
             if !app_path.path.exists() {
                 continue;
             }
 
-            self.scan_directory(
+            let path_started = Instant::now();
+            let (file_count, directory_count) = self.scan_directory(
                 &app_path.path,
                 &app_path.app_name,
                 app_path.category,
                 &mut category_map,
                 &mut scanned_files,
+                &scanned_roots,
             );
+
+            slow_paths.push(SocialSlowPath {
+                path: app_path.path.to_string_lossy().to_string(),
+                app_name: app_path.app_name.clone(),
+                duration_ms: path_started.elapsed().as_millis() as u64,
+                file_count,
+                directory_count,
+            });
+
+            scanned_roots.push(app_path.path.clone());
         }
+
+        // 只留最慢的几条：浮层里放得下，也足够回答「慢在哪」
+        slow_paths.sort_by(|left, right| right.duration_ms.cmp(&left.duration_ms));
+        slow_paths.truncate(SOCIAL_SLOW_PATH_LIMIT);
 
         // 转换为 Vec 并排序
         let mut categories: Vec<SocialCategoryStats> = category_map.into_values().collect();
@@ -503,10 +628,14 @@ impl SocialScanner {
             risk_b.cmp(&risk_a)
         });
 
-        categories
+        (categories, slow_paths)
     }
 
     /// 扫描目录并添加到分类
+    ///
+    /// 遍历内部按层分叉并行（见 `SOCIAL_SCAN_FORK_DEPTH`），收集完再统一做跨路径去重。
+    /// 去重放到最后是安全的：一条扫描路径内部不可能出现同一个文件，跨路径的重复
+    /// 仍然按原有顺序判定"先扫到的分类说了算"。
     fn scan_directory(
         &self,
         path: &Path,
@@ -514,47 +643,153 @@ impl SocialScanner {
         base_category: FileCategory,
         category_map: &mut HashMap<FileCategory, SocialCategoryStats>,
         scanned_files: &mut HashSet<String>,
-    ) {
-        for entry in WalkDir::new(path)
-            .follow_links(false)
-            .max_depth(16)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
-        {
-            if let Ok(metadata) = entry.metadata() {
-                let file_path = entry.path();
-                let file_key = Self::normalize_path_key(file_path);
-                if !scanned_files.insert(file_key) {
-                    continue;
-                }
-                let size = metadata.len();
+        scanned_roots: &[PathBuf],
+    ) -> (usize, usize) {
+        let walked = self.collect_directory_entries(path, app_name, base_category, 0, scanned_roots);
+        let mut counted_files = 0usize;
 
-                // 根据文件特征确定分类和风险等级
-                let (category, risk_level) = self.classify_file(file_path, base_category);
-                let deletable = risk_level.is_deletable();
-
-                let file_entry = SocialFileEntry {
-                    path: file_path.to_string_lossy().to_string(),
-                    size,
-                    app_name: app_name.to_string(),
-                    category,
-                    risk_level,
-                    deletable,
-                };
-
-                if let Some(stats) = category_map.get_mut(&category) {
-                    stats.file_count += 1;
-                    stats.total_size += size;
-
-                    if deletable {
-                        stats.deletable_count += 1;
-                        stats.deletable_size += size;
-                    }
-
-                    stats.files.push(file_entry);
-                }
+        for file_entry in walked.entries {
+            let file_key = Self::normalize_path_key(Path::new(&file_entry.path));
+            if !scanned_files.insert(file_key) {
+                continue;
             }
+
+            let size = file_entry.size;
+            let deletable = file_entry.deletable;
+            if let Some(stats) = category_map.get_mut(&file_entry.category) {
+                stats.file_count += 1;
+                stats.total_size += size;
+
+                if deletable {
+                    stats.deletable_count += 1;
+                    stats.deletable_size += size;
+                }
+
+                stats.files.push(file_entry);
+                counted_files += 1;
+            }
+        }
+
+        (counted_files, walked.directory_count)
+    }
+
+    /// 收集一个目录（含子目录）下的全部文件条目，顺带统计走过的目录数。
+    ///
+    /// 与原先 `walkdir` 的遍历等价：不跟随符号链接、只取普通文件、深度上限 16 层。
+    /// 唯一的差别是顺序（先直属文件、再各子目录），后端本来就不保证文件顺序，
+    /// 前端按分类整体展示、弹窗自己筛选，不依赖它。
+    ///
+    /// 并行只作用在**同一棵子树内**：子目录之间互不重叠，分给不同线程不会改变结果集合。
+    fn collect_directory_entries(
+        &self,
+        directory: &Path,
+        app_name: &str,
+        base_category: FileCategory,
+        depth: usize,
+        scanned_roots: &[PathBuf],
+    ) -> DirectoryWalk {
+        // 目录自身已经处在深度上限，再往下就超过原实现的 max_depth(16)
+        if depth >= SOCIAL_SCAN_MAX_DEPTH {
+            return DirectoryWalk::empty();
+        }
+
+        // 权限不足 / 目录刚被删掉：原实现同样静默跳过，不中断整次扫描
+        let Ok(read_dir) = std::fs::read_dir(directory) else {
+            return DirectoryWalk::empty();
+        };
+
+        let mut entries = Vec::new();
+        let mut subdirectories = Vec::new();
+        for dir_entry in read_dir.filter_map(|item| item.ok()) {
+            let Ok(file_type) = dir_entry.file_type() else {
+                continue;
+            };
+
+            if file_type.is_dir() {
+                let child = dir_entry.path();
+                // 已被更深的扫描路径完整覆盖的子树直接跳过（结果会由那条路径产出）
+                let covered = scanned_roots.iter().any(|root| child.starts_with(root));
+                if !covered {
+                    subdirectories.push(child);
+                }
+                continue;
+            }
+
+            // 只要普通文件：符号链接、设备等一律不计入（与原 walkdir 的 is_file 过滤一致）
+            if !file_type.is_file() {
+                continue;
+            }
+
+            // Windows 上 read_dir 已经带回文件大小，metadata 不会额外发起系统调用
+            if let Ok(metadata) = dir_entry.metadata() {
+                entries.push(self.build_file_entry(
+                    &dir_entry.path(),
+                    metadata.len(),
+                    app_name,
+                    base_category,
+                ));
+            }
+        }
+
+        // 只有前几层才分叉：再深就退回单线程，避免小目录派生出大量空任务
+        let child_walks: Vec<DirectoryWalk> =
+            if depth < SOCIAL_SCAN_FORK_DEPTH && subdirectories.len() > 1 {
+                subdirectories
+                    .par_iter()
+                    .map(|child| {
+                        self.collect_directory_entries(
+                            child,
+                            app_name,
+                            base_category,
+                            depth + 1,
+                            scanned_roots,
+                        )
+                    })
+                    .collect()
+            } else {
+                subdirectories
+                    .iter()
+                    .map(|child| {
+                        self.collect_directory_entries(
+                            child,
+                            app_name,
+                            base_category,
+                            depth + 1,
+                            scanned_roots,
+                        )
+                    })
+                    .collect()
+            };
+
+        // 当前目录自身也算一个（下面累加子目录的数量）
+        let mut directory_count = 1usize;
+        for child_walk in child_walks {
+            entries.extend(child_walk.entries);
+            directory_count += child_walk.directory_count;
+        }
+
+        DirectoryWalk {
+            entries,
+            directory_count,
+        }
+    }
+
+    /// 组装单个文件条目：分类与风险等级仍走 `classify_file`，规则一条都没动
+    fn build_file_entry(
+        &self,
+        path: &Path,
+        size: u64,
+        app_name: &str,
+        base_category: FileCategory,
+    ) -> SocialFileEntry {
+        let (category, risk_level) = self.classify_file(path, base_category);
+        SocialFileEntry {
+            path: path.to_string_lossy().to_string(),
+            size,
+            app_name: app_name.to_string(),
+            category,
+            risk_level,
+            deletable: risk_level.is_deletable(),
         }
     }
 
@@ -850,7 +1085,24 @@ impl Default for SocialScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
+    /// 同一进程内并发跑用例时会重名，加序号保证每个 fixture 独占路径。
+    static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+    /// 构造一个临时目录，测试结束后由调用方清理。
+    fn fixture(name: &str) -> PathBuf {
+        let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "lightc-social-{}-{}-{}",
+            name,
+            std::process::id(),
+            sequence
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("创建测试目录失败");
+        dir
+    }
 
     #[test]
     fn test_risk_level_deletable() {
@@ -885,5 +1137,96 @@ mod tests {
         let first = SocialScanner::normalize_path_key(Path::new(r"C:/Users/Test/Cache/"));
         let second = SocialScanner::normalize_path_key(Path::new(r"c:\users\test\cache"));
         assert_eq!(first, second);
+    }
+
+    /// 并行分叉之后仍然要收全：多层、多子目录（超过分叉阈值）一个文件都不能漏。
+    #[test]
+    fn collects_every_file_of_nested_directories() {
+        let root = fixture("collect-nested");
+        for group in 0..3 {
+            for account in 0..4 {
+                // 每层 4 个子目录，确保走的是并行分支而不是单线程
+                let dir = root.join(format!("group{}/account{}", group, account));
+                std::fs::create_dir_all(&dir).expect("创建子目录失败");
+                for index in 0..5 {
+                    std::fs::write(dir.join(format!("photo{}.jpg", index)), [0u8; 16])
+                        .expect("写入测试文件失败");
+                }
+            }
+        }
+
+        let scanner = SocialScanner::new();
+        let walked =
+            scanner.collect_directory_entries(&root, "微信", FileCategory::ImageVideo, 0, &[]);
+
+        assert_eq!(walked.entries.len(), 60, "3×4×5 个文件必须全部收集到");
+        assert_eq!(
+            walked.entries.iter().map(|entry| entry.size).sum::<u64>(),
+            60 * 16,
+            "文件大小必须与原实现一致"
+        );
+        assert!(
+            walked
+                .entries
+                .iter()
+                .all(|entry| entry.category == FileCategory::ImageVideo
+                    && entry.risk_level == RiskLevel::Low),
+            "分类仍由 classify_file 决定，jpg 属于图片视频"
+        );
+        // 目录统计要能反映真实遍历量：root + 3 个 group + 12 个 account
+        assert_eq!(walked.directory_count, 16, "目录数 = 1 + 3 + 12");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// 已被更深的扫描路径完整覆盖的子树必须跳过，否则同一批文件会被遍历两遍。
+    #[test]
+    fn skips_subdirectory_covered_by_deeper_scan() {
+        let root = fixture("skip-covered");
+        let covered = root.join("msg/user_data");
+        std::fs::create_dir_all(&covered).expect("创建子目录失败");
+        std::fs::write(covered.join("cache.bin"), [0u8; 8]).expect("写入测试文件失败");
+
+        let sibling = root.join("msg/other");
+        std::fs::create_dir_all(&sibling).expect("创建子目录失败");
+        std::fs::write(sibling.join("keep.bin"), [0u8; 4]).expect("写入测试文件失败");
+
+        let scanner = SocialScanner::new();
+        let walked = scanner.collect_directory_entries(
+            &root,
+            "Telegram",
+            FileCategory::ChatDatabase,
+            0,
+            &[covered.clone()],
+        );
+
+        assert_eq!(walked.entries.len(), 1, "被覆盖的子目录不应再产出条目");
+        assert!(walked.entries[0].path.ends_with("keep.bin"));
+        // root、msg、msg/other 三个目录；被跳过的 user_data 不计入
+        assert_eq!(walked.directory_count, 3, "被跳过的子树不应计入目录数");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// 深度上限必须和原来的 walkdir max_depth(16) 一致：第 16 层之后的文件不收集。
+    #[test]
+    fn stops_collecting_beyond_sixteen_levels() {
+        let root = fixture("depth-limit");
+        let mut current = root.clone();
+        for level in 0..18 {
+            current = current.join(format!("level{}", level));
+            std::fs::create_dir_all(&current).expect("创建子目录失败");
+            std::fs::write(current.join(format!("file{}.bin", level)), [0u8; 1])
+                .expect("写入测试文件失败");
+        }
+
+        let scanner = SocialScanner::new();
+        let walked =
+            scanner.collect_directory_entries(&root, "微信", FileCategory::TempCache, 0, &[]);
+
+        // root 是第 0 层，level0 里的文件在第 2 层……第 16 层是 level14 里的文件
+        assert_eq!(walked.entries.len(), 15, "只收集深度不超过 16 层的文件");
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

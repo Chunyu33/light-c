@@ -100,11 +100,20 @@ impl SocialScanner {
     }
 
     /// 统一生成路径键，兼容 Windows 下大小写不敏感和两种分隔符。
+    ///
+    /// 这条路径每个文件都要走一次（十万级），所以正常路径只允许一次堆分配：
+    /// `to_string_lossy` 对合法 UTF-8 不分配，小写化分配一次；
+    /// 正斜杠只有兼容调用方手写路径时才会出现，命中才多做一次替换。
     pub(super) fn normalize_path_key(path: &Path) -> String {
-        path.to_string_lossy()
-            .replace('/', "\\")
-            .trim_end_matches('\\')
-            .to_lowercase()
+        let mut key = path.to_string_lossy().to_lowercase();
+        if key.contains('/') {
+            key = key.replace('/', "\\");
+        }
+        // 结尾的分隔符不影响文件路径的比较，统一去掉
+        while key.ends_with('\\') {
+            key.pop();
+        }
+        key
     }
 
     /// 判断盘符根目录下的某个目录是不是系统自带的。
