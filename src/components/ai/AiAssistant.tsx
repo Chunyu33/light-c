@@ -135,6 +135,13 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
    * 原来"面板打开时关掉模块磨砂"的规避手段已经不需要了，对应 CSS 规则也已移除。
    */
 
+  // 挂载时先读一次：否则在「打开过面板」之前，aiConfig 一直是 null，
+  // canChat 恒为 false —— 快捷提问会被误判成「没配服务商」。
+  // 关掉入口再打开会让本组件重新挂载，状态清空，这条就是那个 bug 的直接修复。
+  useEffect(() => {
+    void reloadAiConfig();
+  }, [reloadAiConfig]);
+
   // 订阅「AI 配置已变更」：设置页保存 / 切换档案 / 删除档案 / 换数据目录后都会广播。
   // 只在打开面板时刷新是不够的：刚配好服务商就直接点快捷提问，那条路径不经过面板，
   // 判断用的还是旧值，会被误拦（Evan 反馈过）。
@@ -755,6 +762,15 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const lastSkipLookupRef = useRef(false);
   useEffect(() => {
     if (!askRequest || askRequest.id === lastAskIdRef.current) return;
+
+    // aiConfig === null 表示**还不知道**（没读回来），不等于「没配服务商」。
+    // 这里不能消费这次请求：补一次加载，等配置回来这个 effect 会重跑
+    // （aiConfig 在依赖里），那时才能判断。
+    if (!aiConfig) {
+      void reloadAiConfig();
+      return;
+    }
+
     lastAskIdRef.current = askRequest.id;
 
     // ⚠️ 没配好服务商时**什么都不做**：不弹面板、不入库、不发请求。
@@ -775,7 +791,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     setIsOpen(true);
     void handleSend(askRequest.text, [], undefined, askRequest.skipLookup);
     clearAiAsk();
-  }, [askRequest, handleSend, canChat, showToast, t]);
+  }, [askRequest, aiConfig, reloadAiConfig, handleSend, canChat, showToast, t]);
 
   return (
     /* AnimatePresence 负责"离场动画"：React 卸载节点时它会把 exit 播完再移除。
