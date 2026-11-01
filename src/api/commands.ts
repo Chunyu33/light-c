@@ -599,6 +599,14 @@ export interface LeftoverScanResult {
   total_size: number;
   /** 鎵弿鑰楁椂锛堟绉掞級 */
   scan_duration_ms: number;
+  /** 实际检查过的一级目录数（含被白名单 / 体积阈值挡掉的） */
+  scanned_directories: number;
+  /** 进入评分、但低于门槛被丢弃的条数 */
+  below_threshold: number;
+  /** 参与评分的目录里的最高置信度（0~1） */
+  highest_confidence: number;
+  /** 当前判定门槛（0~1），和后端同源，前端不要另写死 */
+  confidence_threshold: number;
 }
 
 /** 娈嬬暀绫诲瀷 */
@@ -925,8 +933,17 @@ export interface PermanentDeleteResult {
  * 2. 鍙墽琛屾枃浠舵鏌?- 鎵弿 .exe/.dll/.sys 鏂囦欢锛屽彂鐜板垯璺宠繃
  * 3. 鏍稿績鐧藉悕鍗曟鏌?- 纭繚璺緞涓嶅湪绯荤粺鍏抽敭鐩綍鍐? * 
  * @param paths 瑕佹案涔呭垹闄ょ殑鏂囦欢澶硅矾寰勫垪琛? */
-export async function deleteLeftoversPermanent(paths: string[]): Promise<PermanentDeleteResult> {
-  return invoke<PermanentDeleteResult>('delete_leftovers_permanent', { paths });
+export async function deleteLeftoversPermanent(
+  paths: string[],
+  /**
+   * 是否放行「目录里含可执行文件」。默认 false。
+   *
+   * 只在用户在结果弹窗里明确点过「强制删除」时为 true：白名单与系统目录保护
+   * 始终生效，放开的只是「有 .exe/.dll/.sys 就拒绝」这一道。
+   */
+  allowExecutables = false,
+): Promise<PermanentDeleteResult> {
+  return invoke<PermanentDeleteResult>('delete_leftovers_permanent', { paths, allowExecutables });
 }
 
 /**

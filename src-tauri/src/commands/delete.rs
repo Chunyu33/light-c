@@ -194,12 +194,20 @@ pub async fn check_admin_for_path(path: String) -> Result<bool, String> {
 #[tauri::command]
 pub async fn delete_leftovers_permanent(
     paths: Vec<String>,
+    // 是否放行「目录里含可执行文件」。默认 false；
+    // 只有用户在结果弹窗里明确点过「强制删除」才会传 true（白名单与系统目录保护依然生效）。
+    allow_executables: Option<bool>,
 ) -> Result<PermanentDeleteResult, String> {
-    info!("永久删除: 开始深度清理 {} 个卸载残留文件夹", paths.len());
+    let allow_executables = allow_executables.unwrap_or(false);
+    info!(
+        "永久删除: 开始深度清理 {} 个卸载残留文件夹（放行可执行文件: {}）",
+        paths.len(),
+        allow_executables
+    );
 
     let result = tokio::task::spawn_blocking(move || {
         let engine = PermanentDeleteEngine::new();
-        engine.delete_leftovers(paths)
+        engine.delete_leftovers(paths, allow_executables)
     })
     .await
     .map_err(|e| format!("永久删除任务失败: {}", e))?;

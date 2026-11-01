@@ -28,8 +28,9 @@
 //
 // 【分类阈值】
 //   score >= 0.75 → HighConfidenceLeftover（前端默认勾选）
-//   0.40 <= score < 0.75 → Suspicious（前端不勾选，仅展示）
-//   score < 0.40 → 不输出
+//   0.30 <= score < 0.75 → Suspicious（前端不勾选，仅展示）
+//   score < 0.30 → 不输出
+//   两个阈值都定义成常量（HIGH_CONFIDENCE_SCORE / SUSPICIOUS_SCORE），分档和过滤共用同一份。
 //
 // 【扫描路径】
 // - %LOCALAPPDATA%      (C:\Users\<用户>\AppData\Local)
@@ -53,7 +54,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use walkdir::WalkDir;
 use winreg::enums::*;
@@ -122,6 +123,17 @@ pub struct LeftoverScanResult {
     pub total_size: u64,
     /// 扫描耗时（毫秒）
     pub scan_duration_ms: u64,
+    /// 实际检查过的一级目录数（含被白名单 / 体积阈值挡掉的）
+    ///
+    /// 结果为空时给用户一个「模块确实在跑」的证据：否则永远返回 0 条，
+    /// 用户没法区分「真的没有残留」和「扫描坏了」。
+    pub scanned_directories: usize,
+    /// 进入评分、但因低于阈值被丢弃的条数
+    pub below_threshold: usize,
+    /// 所有参与评分的目录里的最高置信度（0.0~1.0）
+    pub highest_confidence: f32,
+    /// 当前使用的判定门槛（0.0~1.0），前端展示时和数据同源，避免两处各写一个 0.40
+    pub confidence_threshold: f32,
 }
 
 /// 单个残留条目（前端兼容 + 新增置信度字段）
@@ -199,7 +211,7 @@ impl LeftoverSource {
 pub enum DetectionCategory {
     /// 高置信度残留（score >= 0.75）
     HighConfidenceLeftover,
-    /// 可疑（0.4 <= score < 0.75）
+    /// 可疑（0.30 <= score < 0.75）
     Suspicious,
     /// 可能是正在使用的应用数据
     LikelyAppData,
@@ -507,6 +519,26 @@ const FS_PROBE_MAX_DEPTH: usize = 4;
 /// 可执行文件扩展名（用于文件系统探测正向信号）
 const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "dll", "sys", "msi"];
 
+/// 高置信度门槛：到这个分数才算"很可能是残留"。
+const HIGH_CONFIDENCE_SCORE: f32 = 0.75;
+
+/// 最低输出门槛，同时也是"可疑"这一档的下限。
+///
+/// ⚠️ **这两个数必须相等**，改一个就要改另一个：
+/// - 门槛 > 分档下限 → 分档到了（Suspicious）却被过滤掉，白算；
+/// - 门槛 < 分档下限 → 进了结果，标签却写"可能是正在使用的应用数据"，自相矛盾。
+///
+/// 定在 0.30 而不是 0.40，是因为常见组合 `+0.20 有可执行文件` + `+0.10 很久没改`
+/// 正好等于 0.30：卸载残留里带 exe 的目录（updater、便携软件）大多只能凑到这一档。
+/// 0.40 会让这类条目全部消失，而它们恰恰是用户看得懂、也敢删的那批。
+const SUSPICIOUS_SCORE: f32 = 0.30;
+
+/// ProgramData 下低于这个分数的条目归为"系统共享"，而不是"可疑"。
+///
+/// 系统目录里一点风吹草动不足以当残留；这个分支在门槛 0.40 时是不可达的，
+/// 门槛降到 0.30 之后 `[0.30, 0.40)` 这一段才会落到这里 —— 属于预期行为。
+const SYSTEM_SHARED_SCORE_LIMIT: f32 = 0.40;
+
 // ============================================================================
 // 已安装应用映射（路径所有权推断）
 // ============================================================================
@@ -741,9 +773,9 @@ impl ScoringContext {
 
     /// 根据最终分数确定检测分类
     fn category(&self) -> DetectionCategory {
-        if self.score >= 0.75 {
+        if self.score >= HIGH_CONFIDENCE_SCORE {
             DetectionCategory::HighConfidenceLeftover
-        } else if self.score >= 0.40 {
+        } else if self.score >= SUSPICIOUS_SCORE {
             DetectionCategory::Suspicious
         } else {
             DetectionCategory::LikelyAppData
@@ -848,8 +880,9 @@ impl LeftoverScanner {
             min_size_threshold: 1024 * 1024, // 1MB
             min_days_old: 7,
             deep_scan: true,
-            // 只输出 score >= 0.40 的条目（Suspicious 阈值）
-            min_confidence_threshold: 0.40,
+            // 只输出 score >= SUSPICIOUS_SCORE（0.30）的条目：常见组合
+            // 「有可执行文件 +0.20」+「很久没改 +0.10」正好卡在这一档线
+            min_confidence_threshold: SUSPICIOUS_SCORE,
         }
     }
 
@@ -880,6 +913,10 @@ impl LeftoverScanner {
         let start_time = std::time::Instant::now();
         let mut leftovers = Vec::new();
         let mut total_size = 0u64;
+        // 空结果时用的诊断计数：让用户知道扫过多少目录、最高分差多少
+        let mut scanned_directories = 0usize;
+        let mut below_threshold = 0usize;
+        let mut highest_confidence = 0f32;
 
         for (base_path, source) in &scan_paths {
             if !base_path.exists() {
@@ -897,6 +934,8 @@ impl LeftoverScanner {
                     if !path.is_dir() {
                         continue;
                     }
+
+                    scanned_directories += 1;
 
                     // 获取文件夹名称
                     let folder_name = match path.file_name() {
@@ -1028,14 +1067,20 @@ impl LeftoverScanner {
 
                     ctx.finalize();
 
-                    // 过滤低分条目（score < 0.40 不输出）
+                    // 记录诊断：最高分是多少、有多少条卡在门槛下
+                    highest_confidence = highest_confidence.max(ctx.score);
+
+                    // 过滤低分条目（score < SUSPICIOUS_SCORE 不输出）
                     if ctx.score < self.min_confidence_threshold {
+                        below_threshold += 1;
                         continue;
                     }
 
                     let detection_category = if emulator_match.is_some() {
                         DetectionCategory::HighConfidenceLeftover
-                    } else if *source == LeftoverSource::ProgramData && ctx.score < 0.40 {
+                    } else if *source == LeftoverSource::ProgramData
+                        && ctx.score < SYSTEM_SHARED_SCORE_LIMIT
+                    {
                         DetectionCategory::SystemShared
                     } else {
                         ctx.category()
@@ -1105,6 +1150,10 @@ impl LeftoverScanner {
             leftovers,
             total_size,
             scan_duration_ms,
+            scanned_directories,
+            below_threshold,
+            highest_confidence,
+            confidence_threshold: self.min_confidence_threshold,
         }
     }
 
@@ -1348,7 +1397,7 @@ pub struct LeftoverDeleteResult {
     pub deleted_count: u32,
     /// 释放的空间大小（字节）
     pub deleted_size: u64,
-    /// 删除失败的路径
+    /// 删除失败的路径（含因包含可执行文件而被跳过的，前端按下标与 `errors` 对应）
     pub failed_paths: Vec<String>,
     /// 错误信息列表
     pub errors: Vec<String>,
@@ -1411,8 +1460,8 @@ fn has_executables_shallow(path: &Path) -> Option<String> {
 /// 删除卸载残留文件夹（含安全预检查）
 ///
 /// 【中文说明】
-/// 每个路径依次执行：路径范围检查 → 可执行文件扫描 → 删除。
-/// 包含可执行文件的文件夹不会被删除，而是标记为 skipped_executables，
+/// 每个路径依次执行：路径范围检查 → 分类（目录 / 文件）→ 可执行文件扫描 → 删除。
+/// 包含可执行文件的**目录**不会被删除，而是标记为 skipped_executables，
 /// 引导用户通过深度清理（含人工审核机制）处理。
 pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
     let whitelist_entries = match leftover_whitelist::list_entries() {
@@ -1431,13 +1480,46 @@ pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
             };
         }
     };
-    delete_folders_with_whitelist(paths, &whitelist_entries)
+    delete_folders_in(paths, &whitelist_entries, &deletion_roots())
+}
+
+/// 允许删除的根目录，必须与 `get_scan_paths()` 的扫描范围同一口径。
+///
+/// 两处一旦不一致，就会出现「扫得到、删不掉」（判定落在扫描范围外）。
+fn deletion_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Some(local) = dirs::data_local_dir() {
+        roots.push(local.clone());
+        // LocalLow 与 Local 同级，模拟器残留常落在这里
+        if let Some(parent) = local.parent() {
+            let local_low = parent.join("LocalLow");
+            if local_low.exists() {
+                roots.push(local_low);
+            }
+        }
+    }
+    if let Some(roaming) = dirs::data_dir() {
+        roots.push(roaming);
+    }
+    let program_data = PathBuf::from(r"C:\ProgramData");
+    if program_data.exists() {
+        roots.push(program_data);
+    }
+    roots
 }
 
 /// 供正常删除和测试复用，保证过期扫描结果也不能绕过用户保护规则。
 fn delete_folders_with_whitelist(
     paths: Vec<String>,
     whitelist_entries: &[leftover_whitelist::LeftoverWhitelistEntry],
+) -> LeftoverDeleteResult {
+    delete_folders_in(paths, whitelist_entries, &deletion_roots())
+}
+
+fn delete_folders_in(
+    paths: Vec<String>,
+    whitelist_entries: &[leftover_whitelist::LeftoverWhitelistEntry],
+    roots: &[PathBuf],
 ) -> LeftoverDeleteResult {
     let mut deleted_count = 0u32;
     let mut deleted_size = 0u64;
@@ -1446,7 +1528,7 @@ fn delete_folders_with_whitelist(
     let mut skipped_executables = Vec::new();
 
     for path in paths {
-        let path_buf = std::path::PathBuf::from(&path);
+        let path_buf = PathBuf::from(&path);
 
         // 删除前重新检查，避免白名单更新后仍被旧扫描结果删除。
         if leftover_whitelist::contains_path(whitelist_entries, &path_buf) {
@@ -1456,15 +1538,48 @@ fn delete_folders_with_whitelist(
         }
 
         // 安全检查 1: 路径在允许范围内
-        if !is_safe_leftover_path(&path_buf) {
+        if !is_safe_leftover_path_under(&path_buf, roots) {
             failed_paths.push(path.clone());
             errors.push(format!("路径不在允许的目录内: {}", path));
             continue;
         }
 
-        // 安全检查 2: 浅层可执行文件扫描
+        // 安全检查 2: 判类型。孤立虚拟磁盘（`ext4.vhdx` 这类）是**文件**，
+        // 走到 `remove_dir_all` 上必然报「目录名无效」，用户看到的就是
+        // 「几十 GB 的残留删不掉」，所以这里先分流。
+        // junction / 目录软链接不算 is_file，仍走目录分支 —— `remove_dir_all`
+        // 只会删掉链接本身，不会跟进去。
+        let metadata = match fs::symlink_metadata(&path_buf) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                failed_paths.push(path.clone());
+                errors.push(format!("无法读取 {}: {}", path, error));
+                continue;
+            }
+        };
+
+        if metadata.is_file() {
+            let file_size = metadata.len();
+            match fs::remove_file(&path_buf) {
+                Ok(()) => {
+                    deleted_count += 1;
+                    deleted_size += file_size;
+                }
+                Err(error) => {
+                    failed_paths.push(path.clone());
+                    errors.push(format!("删除失败 {}: {}", path, error));
+                }
+            }
+            continue;
+        }
+
+        // 安全检查 3: 浅层可执行文件扫描（只对目录有意义）
         if let Some(msg) = has_executables_shallow(&path_buf) {
             skipped_executables.push(path.clone());
+            // 跳过也算"没删掉"，一并进 failed_paths：
+            // 前端是按 failed_paths 的下标去 errors 里取错误信息的，
+            // 这里少推一条，后面所有条目的错误信息都会串位。
+            failed_paths.push(path.clone());
             errors.push(format!("{}: {}", path, msg));
             continue;
         }
@@ -1472,7 +1587,7 @@ fn delete_folders_with_whitelist(
         // 删除前计算文件夹大小
         let folder_size = calculate_dir_size(&path_buf);
 
-        match std::fs::remove_dir_all(&path_buf) {
+        match fs::remove_dir_all(&path_buf) {
             Ok(_) => {
                 deleted_count += 1;
                 deleted_size += folder_size;
@@ -1498,53 +1613,102 @@ fn calculate_dir_size(path: &std::path::Path) -> u64 {
     let mut size = 0u64;
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
-            let entry_path = entry.path();
-            if entry_path.is_file() {
+            // `file_type()` 不跟随软链接 / junction：用 `is_dir()` 会跟进去，
+            // 一是把别的盘的容量算进来，二是遇到指回上层的环会无限递归。
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_dir() {
+                size += calculate_dir_size(&entry.path());
+            } else if file_type.is_file() {
                 if let Ok(metadata) = entry.metadata() {
                     size += metadata.len();
                 }
-            } else if entry_path.is_dir() {
-                size += calculate_dir_size(&entry_path);
             }
         }
     }
     size
 }
 
-/// 检查路径是否在允许删除的目录内
+/// 检查路径是否在允许删除的范围内（可注入根目录，便于测试）。
 ///
-/// 【安全说明】使用真实用户路径的 starts_with 匹配，而非模糊 contains，
-/// 防止 C:\MyApp\fake\appdata\local 这类非 AppData 路径通过检查。
-fn is_safe_leftover_path(path: &std::path::Path) -> bool {
-    let path_lower = path.to_string_lossy().to_lowercase();
+/// 【安全说明】
+/// 三条约束缺一不可：
+/// 1. **拒绝 `.` / `..` 组件** —— `remove_dir_all` 按解析后的真实路径动手，
+///    而前缀匹配是对字面量做的。`...\Local\..\..\..\Windows` 会以
+///    「在 AppData\Local 之下」的身份通过校验，实际删的却是别的目录。
+/// 2. **按组件比较，不按字符串前缀** —— 字符串 `starts_with` 会放过
+///    `AppData\LocalBackup`（它的前 19 个字符和 `AppData\Local` 一样）。
+/// 3. **目录只能是根的直接子目录** —— 扫描只产出一级目录，更深层的目录
+///    不该由这个模块整目录删除；文件（孤立虚拟磁盘）允许更深，
+///    它的真实位置就在 `Packages\<包名>\LocalState\` 里面。
+fn is_safe_leftover_path_under(path: &Path, roots: &[PathBuf]) -> bool {
+    if path
+        .components()
+        .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return false;
+    }
 
-    // 使用真实 AppData 路径前缀进行精确匹配
-    if let Some(local) = dirs::data_local_dir() {
-        let local_str = local.to_string_lossy().to_lowercase();
-        if path_lower.starts_with(&local_str) {
+    let path_depth = path.components().count();
+    let is_file = fs::symlink_metadata(path)
+        .map(|metadata| metadata.is_file())
+        .unwrap_or(false);
+
+    roots.iter().any(|root| {
+        // 严格在根目录之下：根目录本身不能被当成残留删掉
+        if path_depth <= root.components().count() {
+            return false;
+        }
+        if !starts_with_ignore_case(path, root) {
+            return false;
+        }
+        if is_file {
             return true;
         }
-        // LocalLow（与 Local 同级，如 C:\Users\<user>\AppData\LocalLow）
-        if let Some(parent) = local.parent() {
-            let local_low = parent.join("LocalLow");
-            let low_str = local_low.to_string_lossy().to_lowercase();
-            if path_lower.starts_with(&low_str) {
-                return true;
+        path.parent()
+            .map(|parent| components_eq_ignore_case(parent, root))
+            .unwrap_or(false)
+    })
+}
+
+/// 按组件比较，忽略大小写（Windows 路径大小写不敏感）。
+fn starts_with_ignore_case(path: &Path, root: &Path) -> bool {
+    let mut path_components = path.components();
+    for root_component in root.components() {
+        let Some(path_component) = path_components.next() else {
+            return false;
+        };
+        if !path_component
+            .as_os_str()
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&root_component.as_os_str().to_string_lossy())
+        {
+            return false;
+        }
+    }
+    true
+}
+
+/// 两个路径是否完全等价（按组件、忽略大小写）。
+fn components_eq_ignore_case(left: &Path, right: &Path) -> bool {
+    let mut left_components = left.components();
+    let mut right_components = right.components();
+    loop {
+        match (left_components.next(), right_components.next()) {
+            (None, None) => return true,
+            (Some(left_component), Some(right_component)) => {
+                if !left_component
+                    .as_os_str()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(&right_component.as_os_str().to_string_lossy())
+                {
+                    return false;
+                }
             }
+            _ => return false,
         }
     }
-    if let Some(roaming) = dirs::data_dir() {
-        let roaming_str = roaming.to_string_lossy().to_lowercase();
-        if path_lower.starts_with(&roaming_str) {
-            return true;
-        }
-    }
-    // ProgramData 固定路径
-    if path_lower.starts_with(r"c:\programdata") {
-        return true;
-    }
-
-    false
 }
 
 // ============================================================================
@@ -1658,12 +1822,17 @@ mod tests {
         ctx.score = 0.75;
         assert_eq!(ctx.category(), DetectionCategory::HighConfidenceLeftover);
 
-        // 0.40 <= score < 0.75 → Suspicious
+        // 0.30 <= score < 0.75 → Suspicious
         ctx.score = 0.50;
         assert_eq!(ctx.category(), DetectionCategory::Suspicious);
 
-        // score < 0.40 → LikelyAppData
-        ctx.score = 0.30;
+        // 门槛本身就是 Suspicious 的下限：0.30 必须落进"可疑"，
+        // 否则门槛调了、分档没调，条目会以"可能是正在使用的应用数据"的身份出现在结果里
+        ctx.score = SUSPICIOUS_SCORE;
+        assert_eq!(ctx.category(), DetectionCategory::Suspicious);
+
+        // 低于门槛 → LikelyAppData（正常情况下已被过滤，纯防御）
+        ctx.score = SUSPICIOUS_SCORE - 0.01;
         assert_eq!(ctx.category(), DetectionCategory::LikelyAppData);
     }
 
@@ -1752,18 +1921,18 @@ mod tests {
             "score = 0.74 应为 Suspicious"
         );
 
-        ctx.score = 0.40;
+        ctx.score = SUSPICIOUS_SCORE;
         assert_eq!(
             ctx.category(),
             DetectionCategory::Suspicious,
-            "score = 0.40 应为 Suspicious"
+            "score = 0.30 应为 Suspicious（门槛与分档下限是同一个数）"
         );
 
-        ctx.score = 0.39;
+        ctx.score = SUSPICIOUS_SCORE - 0.01;
         assert_eq!(
             ctx.category(),
             DetectionCategory::LikelyAppData,
-            "score = 0.39 应为 LikelyAppData"
+            "score = 0.29 应为 LikelyAppData"
         );
     }
 
@@ -1873,5 +2042,174 @@ mod tests {
             !scanner.is_path_in_whitelist(real_leftover_path, &mock_local),
             "真实残留路径不应命中白名单"
         );
+    }
+
+    /// 测试用临时目录（带进程号与时间戳，避免并发用例互相踩）。
+    fn case_dir(tag: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "lightc-leftover-{}-{}-{}",
+            tag,
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("读取测试时间失败")
+                .as_nanos()
+        ))
+    }
+
+    /// 路径校验的三条底线：拒绝 `..`、按组件比较、目录只放行一级。
+    ///
+    /// 旧实现用字符串 `starts_with`，`AppData\LocalBackup` 和
+    /// `AppData\Local\..\..\..\Windows` 都能通过 —— 而 `remove_dir_all`
+    /// 是按解析后的真实路径动手的。
+    #[test]
+    fn safe_path_check_rejects_traversal_and_prefix_lookalikes() {
+        let base = case_dir("safe-path");
+        let root = base.join("Local");
+        let app_dir = root.join("SomeApp");
+        let nested_dir = app_dir.join("Config");
+        let virtual_disk = app_dir
+            .join("Packages")
+            .join("SomePackage")
+            .join("LocalState")
+            .join("ext4.vhdx");
+        fs::create_dir_all(&nested_dir).expect("创建测试目录失败");
+        fs::create_dir_all(virtual_disk.parent().expect("虚拟磁盘应有父目录"))
+            .expect("创建虚拟磁盘目录失败");
+        fs::write(&virtual_disk, vec![0u8; 64]).expect("写入虚拟磁盘夹具失败");
+
+        let roots = vec![root.clone()];
+
+        // 一级子目录：允许（扫描只会产出这一层）
+        assert!(is_safe_leftover_path_under(&app_dir, &roots));
+        // 根目录本身：不允许
+        assert!(!is_safe_leftover_path_under(&root, &roots));
+        // 兄弟前缀：字符串前缀匹配会放过，组件比较必须挡住
+        assert!(!is_safe_leftover_path_under(
+            &base.join("LocalBackup").join("x"),
+            &roots
+        ));
+        // `..` 穿越：字面量看上去在根目录下，实际删的是别的目录
+        assert!(!is_safe_leftover_path_under(
+            &app_dir.join("..").join("..").join("Windows"),
+            &roots
+        ));
+        // 二级子目录：整目录删除不在本模块职责内
+        assert!(!is_safe_leftover_path_under(&nested_dir, &roots));
+        // 深层文件（孤立虚拟磁盘）：允许，真实位置就在 Packages 里面
+        assert!(is_safe_leftover_path_under(&virtual_disk, &roots));
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// 孤立虚拟磁盘是**文件**，必须走 `remove_file`。
+    ///
+    /// 旧实现一律 `remove_dir_all`，对文件必然报「目录名无效」——
+    /// 而 WSL 的 `ext4.vhdx` 动辄几十 GB，是最值钱的一条。
+    #[test]
+    fn virtual_disk_file_is_deleted_as_file() {
+        let base = case_dir("virtual-disk");
+        let root = base.join("Local");
+        let virtual_disk = root
+            .join("Packages")
+            .join("CanonicalGroupLimited")
+            .join("LocalState")
+            .join("ext4.vhdx");
+        fs::create_dir_all(virtual_disk.parent().expect("虚拟磁盘应有父目录"))
+            .expect("创建虚拟磁盘目录失败");
+        fs::write(&virtual_disk, vec![0u8; 4096]).expect("写入虚拟磁盘夹具失败");
+
+        let result = delete_folders_in(
+            vec![virtual_disk.to_string_lossy().to_string()],
+            &[],
+            std::slice::from_ref(&root),
+        );
+
+        assert_eq!(result.deleted_count, 1, "虚拟磁盘文件应被删除");
+        assert_eq!(result.deleted_size, 4096, "大小按文件实际长度记");
+        assert!(result.errors.is_empty(), "不应产生错误: {:?}", result.errors);
+        assert!(!virtual_disk.exists(), "文件应已不存在");
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// `errors` 与 `failed_paths` 必须逐条对齐。
+    ///
+    /// 前端用 `failed_paths.indexOf(path)` 去 `errors` 里取错误信息，
+    /// 旧实现把「因可执行文件跳过」的路径只推进 errors、不推进 failed_paths，
+    /// 结果从第一条跳过项开始，后面每个条目的错误信息都串到别人头上。
+    #[test]
+    fn skipped_executables_stay_index_aligned_with_errors() {
+        let base = case_dir("aligned");
+        let root = base.join("Local");
+        let skipped = root.join("LegacyApp");
+        let plain = root.join("PlainLeftover");
+        let missing = root.join("GoneApp");
+        fs::create_dir_all(&skipped).expect("创建跳过用例目录失败");
+        fs::create_dir_all(&plain).expect("创建普通用例目录失败");
+        fs::write(skipped.join("uninstall.exe"), vec![0u8; 2048]).expect("写入卸载程序失败");
+        fs::write(plain.join("cache.bin"), vec![0u8; 1024]).expect("写入普通残留失败");
+
+        let result = delete_folders_in(
+            vec![
+                skipped.to_string_lossy().to_string(),
+                plain.to_string_lossy().to_string(),
+                missing.to_string_lossy().to_string(),
+            ],
+            &[],
+            std::slice::from_ref(&root),
+        );
+
+        assert_eq!(result.deleted_count, 1, "只有普通残留会被删掉");
+        assert_eq!(result.skipped_executables.len(), 1);
+        assert_eq!(result.failed_paths.len(), 2, "跳过项与不存在项都算没删掉");
+        assert_eq!(result.errors.len(), result.failed_paths.len(), "逐条对齐");
+        assert_eq!(result.failed_paths[0], skipped.to_string_lossy().to_string());
+        assert!(
+            result.errors[0].starts_with(skipped.to_string_lossy().as_ref()),
+            "第一条错误必须属于被跳过的目录，实际: {}",
+            result.errors[0]
+        );
+        assert!(
+            result.errors[1].contains("无法读取"),
+            "第二条错误必须属于不存在的目录，实际: {}",
+            result.errors[1]
+        );
+        assert!(skipped.exists(), "含可执行文件的目录不能被删");
+        assert!(!plain.exists(), "普通残留应已删除");
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// 空结果必须带上"为什么"，否则用户分不清「真没残留」和「扫描坏了」。
+    ///
+    /// 这条钉住三个诊断字段：检查过多少目录、有多少条卡在门槛下、最高分多少。
+    #[test]
+    fn empty_result_reports_scan_diagnostics() {
+        let base = case_dir("diagnostics");
+        let root = base.join("Local");
+        let candidate = root.join("RecentNoEvidenceApp");
+        fs::create_dir_all(&candidate).expect("创建测试目录失败");
+        fs::write(candidate.join("data.bin"), vec![0u8; 2 * 1024 * 1024])
+            .expect("写入测试文件失败");
+
+        let mut scanner = LeftoverScanner::new();
+        scanner.deep_scan = false;
+        let result = scanner.scan_with_paths(vec![(root.clone(), LeftoverSource::LocalAppData)], &[]);
+
+        assert!(result.leftovers.is_empty(), "没有正向证据不该出结果");
+        assert_eq!(result.scanned_directories, 1, "必须报告检查过几个目录");
+        assert_eq!(result.below_threshold, 1, "必须报告有多少条卡在门槛下");
+        assert!(
+            (result.confidence_threshold - scanner.min_confidence_threshold).abs() < f32::EPSILON,
+            "门槛要和扫描器同源，前端不另写死"
+        );
+        assert!(
+            result.highest_confidence <= 0.05,
+            "今天刚改过、没有任何残留证据，分数应接近 0，实际 {}",
+            result.highest_confidence
+        );
+
+        let _ = fs::remove_dir_all(&base);
     }
 }

@@ -210,6 +210,20 @@ impl PermanentDeleteEngine {
     /// 此函数依次执行三项安全检查，任何一项失败都会阻止删除操作。
     /// 这是保护用户数据安全的核心机制。
     pub fn perform_safety_checks(&self, path: &Path) -> SafetyCheckResult {
+        self.perform_safety_checks_with(path, false)
+    }
+
+    /// 同上，但可以选择**放行"含可执行文件"这一条**。
+    ///
+    /// 只有用户在结果弹窗里明确点过「强制删除」才会走到这里：
+    /// 白名单保护、系统目录保护、以及残留路径本身的校验**一条都不会跳过** ——
+    /// 放开的只是「目录里有 .exe/.dll/.sys 就拒绝」这一道，
+    /// 因为卸载残留里最常见的就是带程序的目录（模拟器、便携软件）。
+    fn perform_safety_checks_with(
+        &self,
+        path: &Path,
+        allow_executables: bool,
+    ) -> SafetyCheckResult {
         let path_str = path.to_string_lossy().to_string();
 
         // 无法加载保护规则时默认拒绝，避免配置异常削弱永久删除的安全边界。
@@ -238,9 +252,11 @@ impl PermanentDeleteEngine {
         // ====================================================================
         // Check 2: 可执行文件检查
         // ====================================================================
-        let executables = self.scan_executables(path);
-        if !executables.is_empty() {
-            return SafetyCheckResult::ContainsExecutables { files: executables };
+        if !allow_executables {
+            let executables = self.scan_executables(path);
+            if !executables.is_empty() {
+                return SafetyCheckResult::ContainsExecutables { files: executables };
+            }
         }
 
         // 注意：不再执行注册表匹配检查。
@@ -357,7 +373,11 @@ impl PermanentDeleteEngine {
     /// 【中文说明】
     /// 使用 rayon 线程池并发删除多个目录，确保 UI 保持响应。
     /// 每个目录删除前都会执行三重安全检查。
-    pub fn delete_leftovers(&self, paths: Vec<String>) -> PermanentDeleteResult {
+    pub fn delete_leftovers(
+        &self,
+        paths: Vec<String>,
+        allow_executables: bool,
+    ) -> PermanentDeleteResult {
         let start_time = std::time::Instant::now();
 
         // 使用原子计数器进行并发统计
@@ -374,7 +394,7 @@ impl PermanentDeleteEngine {
                 let path = Path::new(path_str);
 
                 // 执行三重安全检查
-                let safety_check = self.perform_safety_checks(path);
+                let safety_check = self.perform_safety_checks_with(path, allow_executables);
 
                 match &safety_check {
                     SafetyCheckResult::Safe => {
@@ -526,6 +546,16 @@ impl PermanentDeleteEngine {
         // ⚠️ 警告：此操作将永久删除磁盘数据，不可恢复！
         // ====================================================================
 
+        // 卸载残留里有一类条目是**文件**（孤立的 ext4.vhdx / vmdk 之类）。
+        // remove_dir_all 对文件必然报「目录名无效」，然后一路落到「重启后删除」——
+        // 用户以为删了，空间其实一点没释放。
+        if fs::symlink_metadata(path)
+            .map(|metadata| metadata.is_file())
+            .unwrap_or(false)
+        {
+            return fs::remove_file(path).map_err(|error| format!("{}", error));
+        }
+
         // 首先尝试直接删除
         match fs::remove_dir_all(path) {
             Ok(()) => return Ok(()),
@@ -628,6 +658,47 @@ mod tests {
 
         let result = engine.perform_safety_checks(Path::new(r"c:\fixture\app\cache"));
         assert!(matches!(result, SafetyCheckResult::InProtectedPath { .. }));
+    }
+
+    /// 「强制删除」只放开「含可执行文件」这一条：
+    /// 带 exe 的目录能过，但系统目录仍然拦得住 —— 这是那个按钮的安全边界。
+    #[test]
+    fn force_delete_only_skips_the_executable_check() {
+        let root = std::env::temp_dir().join(format!("lightc-force-delete-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let app_dir = root.join("OldUpdater");
+        fs::create_dir_all(&app_dir).expect("创建测试目录失败");
+        fs::write(app_dir.join("installer.exe"), vec![0u8; 1024]).expect("写入可执行文件失败");
+
+        let engine = PermanentDeleteEngine::new();
+
+        // 默认：含可执行文件 → 需要人工审核
+        assert!(matches!(
+            engine.perform_safety_checks(&app_dir),
+            SafetyCheckResult::ContainsExecutables { .. }
+        ));
+
+        // 放行后：这一道不再拦（白名单与系统目录检查仍在下面验证）
+        assert!(matches!(
+            engine.perform_safety_checks_with(&app_dir, true),
+            SafetyCheckResult::Safe
+        ));
+
+        // 放行可执行文件 ≠ 放行白名单：用户白名单仍然优先拦下。
+        // （系统目录那条由 test_protected_path_check 单独覆盖，这里不重复。）
+        let guarded = PermanentDeleteEngine {
+            enable_reboot_fallback: true,
+            user_whitelist: Ok(vec![LeftoverWhitelistEntry {
+                path: app_dir.to_string_lossy().to_string(),
+                added_at: "2026-01-01T00:00:00Z".to_string(),
+            }]),
+        };
+        assert!(matches!(
+            guarded.perform_safety_checks_with(&app_dir, true),
+            SafetyCheckResult::InProtectedPath { .. }
+        ));
+
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[test]
