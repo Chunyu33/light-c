@@ -4,8 +4,8 @@
 // 侧边栏爱心图标和「设置 - 意见反馈 - 支持作者」共用这一个弹窗，
 // 二维码、支付方式切换、放大预览只有这一份实现。
 //
-// 标题用「赞助」而不是设置页那个「支持作者」：侧边栏的悬停提示写的是「赞助 LightC」，
-// 点进来标题却换了个说法会让人愣一下。两者指的是同一件事。
+// 标题和设置页卡片共用 `supportTitle`（值统一为「赞助」）：侧边栏悬停写「赞助 LightC」，
+// 点进来标题是「赞助」，从设置页点开也是同一个词，不用在一件事上出现三种叫法。
 //
 // ⚠️ 不要把弹窗再抄一份到调用方：二维码图片、切换动画、ESC 关闭散在两处，
 // 改一次要改两遍，迟早对不上。
@@ -92,7 +92,7 @@ export function SupportModal({ isOpen, onClose, initialPayment = 'wechat', versi
             {...MODAL_CARD_MOTION}
             role="dialog"
             aria-modal="true"
-            aria-label={t('supportModalTitle')}
+            aria-label={t('supportTitle')}
             className="relative w-[26em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-2xl bg-[var(--glass-modal-bg,var(--bg-card))] p-[1.43em] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
@@ -106,7 +106,7 @@ export function SupportModal({ isOpen, onClose, initialPayment = 'wechat', versi
             </button>
 
             <h3 className="mb-[1em] pr-[2em] text-[1.14em] font-semibold text-[var(--text-primary)]">
-              {t('supportModalTitle')}
+              {t('supportTitle')}
             </h3>
 
             {/* 竖排：赞赏码 → 切换 → 说明。微信/支付宝的赞赏页都是这个结构，
