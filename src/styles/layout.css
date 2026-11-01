@@ -412,12 +412,10 @@
   color: var(--brand-green);
 }
 
-/* 支持作者入口：占住原来版本号的位置（靠右）。
+/* 支持作者入口。
+   ⚠️ 不要加 `margin-left: auto`：那样它会被推到最右，和前面四个图标之间空出一大块，
+   和侧边栏其他图标的间距对不上。和它们一样参与 flex gap 排布。
    hover 用暖红而不是品牌绿 —— 心形配绿色读起来像「收藏」，不像「赞助」。 */
-.sidebar-nav__footer-support {
-  margin-left: auto;
-}
-
 .sidebar-nav__footer-support:hover {
   color: var(--color-danger);
 }

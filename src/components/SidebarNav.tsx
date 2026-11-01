@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { getVersion } from '@tauri-apps/api/app';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { FONT_SIZE_CONFIGS, useFontSize, useSettings } from '../contexts';
-import { getDistributionChannel, type DistributionChannel } from '../api/commands';
 import { SupportModal } from './SupportModal';
 import { AUTHOR_HOMEPAGE_URL, LIGHTC_CHANGELOG_URL, LIGHTC_GITHUB_URL, LIGHTC_OFFICIAL_WEBSITE_URL } from '../config/officialLinks';
 
@@ -105,8 +104,6 @@ function writeSidebarWidth(width: number): void {
 
 export function SidebarNav() {
   const { t } = useTranslation('nav');
-  // 版本/渠道的文案在 settings 命名空间里（关于页已经在用），这里直接复用，不复制一份
-  const { t: settingsT } = useTranslation('settings');
   const { level, customFontSize } = useFontSize();
   const { settings, updateSettings } = useSettings();
   const [isCollapsed, setIsCollapsed] = useState(readCollapsedState);
@@ -140,7 +137,6 @@ export function SidebarNav() {
    * 日志会被轮转，数字并不等于真实累计，所以撤掉了。
    */
   const [appVersion, setAppVersion] = useState('');
-  const [channel, setChannel] = useState<DistributionChannel | null>(null);
   /** 支持作者弹窗。与设置页「意见反馈 - 支持作者」共用同一个组件 */
   const [isSupportOpen, setIsSupportOpen] = useState(false);
 
@@ -148,9 +144,6 @@ export function SidebarNav() {
     getVersion()
       .then(setAppVersion)
       .catch((error) => console.warn('读取版本号失败:', error));
-    getDistributionChannel()
-      .then(setChannel)
-      .catch((error) => console.warn('读取发行渠道失败:', error));
   }, []);
 
   useEffect(() => {
@@ -309,18 +302,16 @@ export function SidebarNav() {
             <UserRound size={15} strokeWidth={1.7} />
           </a>
         )}
-        {/* 原来这里是版本号文字，现在换成爱心：点击打开支持作者弹窗。
-            版本号没有丢 —— 悬停这里能看到（含便携版/安装版），弹窗底部也有一份。
-            排查问题时用户最常截的就是侧边栏，这个信息不能彻底消失。 */}
+        {/* 原来这里是版本号文字，现在换成爱心：点击打开赞助弹窗。
+            版本号挪到弹窗底部（「设置 - 关于」里本来就有）。
+            刻意不放进悬停提示：那里只写「赞助 LightC」，多挂一串版本/渠道反而让人看不出这是可点的入口。 */}
         {!isCollapsed && (
           <button
             type="button"
             onClick={() => setIsSupportOpen(true)}
             className="sidebar-nav__footer-icon sidebar-nav__footer-support"
             aria-label={t('footerSupport')}
-            title={[t('footerSupport'), appVersion ? `v${appVersion}` : '', channel ? settingsT(channel === 'portable' ? 'about.portable' : 'about.installer') : '']
-              .filter(Boolean)
-              .join(' · ')}
+            title={t('footerSupport')}
           >
             <Heart size={15} strokeWidth={1.7} />
           </button>
