@@ -194,6 +194,18 @@
   background: color-mix(in srgb, var(--color-danger) 16%, transparent);
 }
 
+/* 警告级操作：删除残留这类「不可恢复、但比强制删除轻一档」的按钮用橙色。
+   卸载残留同时有两个删除按钮（普通删除 / 深度清理），若都用红色，
+   用户没法一眼分出哪个更重，所以保留一档橙色来表达层级。 */
+.module-operation-toolbar__button--warning {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.module-operation-toolbar__button--warning:hover {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+}
+
 .module-operation-toolbar__button:disabled {
   cursor: not-allowed;
   color: var(--fg-faint);

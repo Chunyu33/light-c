@@ -1,4 +1,3 @@
-import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
 // 卸载残留扫描模块（支持模拟器、残留驱动深度检测）
 // 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
@@ -9,6 +8,10 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle, ShieldCheck, ShieldPlus } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
+import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
+import { AiAskButton } from '../ai/AiAskButton';
+import { useAiModuleBridge } from '../ai/useAiModuleBridge';
+import { buildItemQuestion } from '../ai/aiQuestions';
 import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
@@ -39,6 +42,15 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 // ============================================================================
 
 /**
+ * 删除类提示的停留时长。
+ *
+ * toast 默认 4 秒，但删除失败/被跳过的提示往往带一串补救办法
+ * （「2 个文件夹里有程序文件，请改用深度清理…」），4 秒读不完就消失，
+ * 用户只看到"闪了一下"，等于没提示。多给 3 秒。
+ */
+const DELETE_TOAST_DURATION_MS = 7000;
+
+/**
  * 统一路径比较口径。
  *
  * 中文说明：扫描结果与白名单返回的路径可能只差大小写或正反斜杠，用原始字符串比较会漏匹配，
@@ -63,44 +75,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
   // 本地状态
   const [scanResult, setScanResult] = useState<LeftoverScanResult | null>(null);
-  // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
-  useAiModuleBridge('leftovers', {
-    // 只读：单条详情。itemId 是 read_items 行首的完整路径。
-    readItemDetail: (itemId) => {
-      const wanted = itemId.trim();
-      const item = (scanResult?.leftovers ?? []).find(
-        (entry) => entry.path === wanted || wanted.startsWith(entry.path),
-      );
-      if (!item) return null;
-      return [
-        `路径：${item.path}`,
-        `关联应用：${item.app_name}`,
-        `大小：${formatSize(item.size)}（${item.file_count} 个文件）`,
-        `来源：${item.source}`,
-      ].join('\n');
-    },
-    // 只读读取：让助手能"往下看"到底有哪些条目（一次一页，由模型决定要不要继续）。
-    readItems: (_targetId, offset, limit) => {
-      const list = scanResult?.leftovers ?? [];
-      if (list.length === 0) return null;
-      return {
-        total: list.length,
-        lines: list.slice(offset, offset + limit).map(
-          (item) => `${item.path}  ${formatSize(item.size)}  （${item.app_name}，${item.file_count} 个文件）`,
-        ),
-      };
-    },
-    summary: () => {
-      if (!scanResult) return null;
-      return `扫描到 ${scanResult.leftovers.length} 项软件残留，合计约 ${formatSize(scanResult.total_size)}。`;
-    },
-  });
-
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<string[]>([]); // 详细错误列表
+  /**
+   * 与 `deleteErrors` **逐条对应**的路径（后端保证 `errors` 和 `failed_paths` 下标一致）。
+   *
+   * 不解析错误文本里的路径：那串中文说明随时会改，靠字符串反解迟早错位；
+   * 有这一份独立数组，才能在每条错误旁边挂「打开目录」按钮。
+   */
+  const [deleteFailedPaths, setDeleteFailedPaths] = useState<string[]>([]);
   const [showErrorDetails, setShowErrorDetails] = useState(false); // 是否显示错误详情
 
   // 深度清理（永久删除）相关状态
@@ -253,6 +239,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
     setSelectedPaths(new Set());
     setDeleteError(null);
     setDeleteErrors([]);
+    setDeleteFailedPaths([]);
     setShowErrorDetails(false);
 
     try {
@@ -284,12 +271,32 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   }, [oneClickScanTrigger, handleScan]);
 
   // 执行删除
+  /**
+   * 把成功删除的路径从列表和勾选里摘掉，并同步模块卡片上的统计。
+   *
+   * 普通删除和深度清理都要做这件事。抽一处是为了不让两份过滤逻辑漂移 ——
+   * 漏改其中一份，就会出现"已经删了、列表里还勾着"。
+   */
+  const applyDeletedPaths = useCallback(
+    (deletedPaths: string[]) => {
+      if (!scanResult || deletedPaths.length === 0) return;
+      const removed = new Set(deletedPaths);
+      const remaining = scanResult.leftovers.filter((item) => !removed.has(item.path));
+      const totalSize = remaining.reduce((sum, item) => sum + item.size, 0);
+      setScanResult({ ...scanResult, leftovers: remaining, total_size: totalSize });
+      setSelectedPaths((current) => new Set(Array.from(current).filter((path) => !removed.has(path))));
+      updateModuleState('leftovers', { fileCount: remaining.length, totalSize });
+    },
+    [scanResult, updateModuleState],
+  );
+
   const handleDelete = useCallback(async () => {
     if (selectedPaths.size === 0) return;
 
     setIsDeleting(true);
     setDeleteError(null);
     setDeleteErrors([]);
+    setDeleteFailedPaths([]);
     setShowErrorDetails(false);
 
     try {
@@ -319,6 +326,32 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
           : '';
         setDeleteError(moduleT('leftoversExtra.deleteErrorSummary', { count: result.errors.length, skipped: skippedMsg }));
         setDeleteErrors(result.errors);
+        // 后端保证 errors 与 failed_paths 下标一致，直接按位取，
+        // 不去解析错误文本里的路径（那串中文随时会改）。
+        setDeleteFailedPaths(result.failed_paths ?? []);
+      }
+
+      // 一定要给一次性反馈：跳过项只体现在列表上方的提示条里，
+      // 用户滚在列表中间时根本看不到，表现就是「点了清理什么都没发生」。
+      if (result.deleted_count === 0) {
+        const skippedCount = result.skipped_executables?.length ?? 0;
+        showToast({
+          type: 'warning',
+          title: moduleT('leftoversExtra.nothingDeleted'),
+          description:
+            skippedCount > 0
+              ? moduleT('leftoversExtra.nothingDeletedSkipped', { count: skippedCount })
+              : moduleT('leftoversExtra.nothingDeletedFailed', { count: result.failed_paths.length }),
+          duration: DELETE_TOAST_DURATION_MS,
+        });
+      } else {
+        showToast({
+          type: 'success',
+          title: moduleT('leftoversExtra.deleteSuccess', {
+            count: result.deleted_count,
+            size: formatSize(result.deleted_size),
+          }),
+        });
       }
 
       // 从结果中移除已删除的项（保留失败和因可执行文件跳过的项）
@@ -356,11 +389,66 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       console.error('删除失败:', err);
       setDeleteError(String(err));
       setDeleteErrors([String(err)]);
+      setDeleteFailedPaths([]);
+      // 命令层直接抛错时，以前只有列表上方那条内联提示 —— 用户滚在列表中间看不到，
+      // 表现成"点了没反应"。这里补一条 toast，和「被跳过」走同一套反馈。
+      showToast({
+        type: 'error',
+        title: moduleT('leftovers.deleteFailed'),
+        description: String(err),
+        duration: DELETE_TOAST_DURATION_MS,
+      });
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
-  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh, moduleT]);
+  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh, moduleT, showToast]);
+
+  /**
+   * 待强制删除的路径：来自深度清理结果里「需人工审核」那批。
+   * 非空即代表二次确认弹窗要显示。
+   */
+  const [forceTargets, setForceTargets] = useState<string[]>([]);
+
+  /**
+   * 用户确认后的强制删除。
+   *
+   * 只放行「目录里含可执行文件」这一条检查，白名单与系统目录保护仍然生效 ——
+   * 这正是「深度清理遇到带 exe 的目录就停住」的那个出口。
+   */
+  const handleForceDelete = useCallback(async () => {
+    if (forceTargets.length === 0) return;
+    const paths = forceTargets;
+    setForceTargets([]);
+    try {
+      const result = await deleteLeftoversPermanent(paths, true);
+      applyDeletedPaths(result.details.filter((item) => item.success).map((item) => item.path));
+      setShowDeepCleanResult(false);
+      if (result.success_count === 0) {
+        showToast({
+          type: 'error',
+          title: moduleT('leftoversExtra.nothingDeleted'),
+          description: result.details.find((item) => item.failure_reason)?.failure_reason ?? '',
+          duration: DELETE_TOAST_DURATION_MS,
+        });
+      } else {
+        showToast({
+          type: 'success',
+          title: moduleT('leftoversExtra.forceDeleted', {
+            count: result.success_count,
+            size: formatSize(result.freed_size),
+          }),
+        });
+      }
+    } catch (error) {
+      showToast({
+        type: 'error',
+        title: moduleT('leftoversExtra.nothingDeleted'),
+        description: String(error),
+        duration: DELETE_TOAST_DURATION_MS,
+      });
+    }
+  }, [forceTargets, applyDeletedPaths, moduleT, showToast]);
 
   // 深度清理（永久删除）- 首次点击显示警告
   const handleDeepCleanClick = useCallback(() => {
@@ -382,6 +470,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
     setIsDeleting(true);
     setDeleteError(null);
     setDeleteErrors([]);
+    setDeleteFailedPaths([]);
     setShowErrorDetails(false);
     setShowDeepCleanConfirm(false);
 
@@ -392,36 +481,10 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       setDeepCleanResult(result);
       setShowDeepCleanResult(true);
 
-      // 从结果中移除已删除的项
-      if (scanResult) {
-        const deletedPaths = new Set(
-          result.details
-            .filter(d => d.success)
-            .map(d => d.path)
-        );
-
-        const remainingLeftovers = scanResult.leftovers.filter(
-          l => !deletedPaths.has(l.path)
-        );
-        const newTotalSize = remainingLeftovers.reduce((sum, l) => sum + l.size, 0);
-
-        setScanResult({
-          ...scanResult,
-          leftovers: remainingLeftovers,
-          total_size: newTotalSize,
-        });
-
-        // 更新选中状态 - 只保留未成功删除的
-        const newSelected = new Set(
-          Array.from(selectedPaths).filter(p => !deletedPaths.has(p))
-        );
-        setSelectedPaths(newSelected);
-
-        updateModuleState('leftovers', {
-          fileCount: remainingLeftovers.length,
-          totalSize: newTotalSize,
-        });
-      }
+      // 从列表与勾选里摘掉成功的：与普通删除共用同一段逻辑，避免两处过滤条件漂移
+      applyDeletedPaths(
+        result.details.filter((item) => item.success).map((item) => item.path),
+      );
 
       // 显示错误信息
       if (result.failed_count > 0 || result.manual_review_count > 0) {
@@ -444,10 +507,17 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       console.error('深度清理失败:', err);
       setDeleteError(String(err));
       setDeleteErrors([String(err)]);
+      setDeleteFailedPaths([]);
+      showToast({
+        type: 'error',
+        title: moduleT('leftovers.deleteFailed'),
+        description: String(err),
+        duration: DELETE_TOAST_DURATION_MS,
+      });
     } finally {
       setIsDeleting(false);
     }
-  }, [selectedPaths, scanResult, updateModuleState, triggerHealthRefresh]);
+  }, [selectedPaths, applyDeletedPaths, triggerHealthRefresh, showToast, moduleT]);
 
   // 切换选择
   const toggleSelect = useCallback((path: string) => {
@@ -528,6 +598,78 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
     }
   };
 
+  /**
+   * 接入 AI 助手（只读）。
+   *
+   * **故意不登记 onSelect / onDelete**：这里的删除是不可恢复的整目录删除，
+   * 必须由用户看着名字和体积逐项确认 —— 助手只负责解释"这个目录是什么、能不能删"。
+   *
+   * 放在这一段的理由：`getSourceName` / `getCategoryLabel` / `suspiciousCount` 都已在上面定义，
+   * 摘要里直接用它们，不必在闭包里再写一份中文映射（两份映射迟早会不一致）。
+   */
+  useAiModuleBridge('leftovers', {
+    // 只读：单条详情。itemId 是 read_items 行首的完整路径。
+    readItemDetail: (itemId) => {
+      const wanted = itemId.trim();
+      const item = (scanResult?.leftovers ?? []).find(
+        (entry) => entry.path === wanted || wanted.startsWith(entry.path),
+      );
+      if (!item) return null;
+      return [
+        `路径：${item.path}`,
+        `关联应用：${item.app_name}`,
+        `大小：${formatSize(item.size)}（${item.file_count} 个文件）`,
+        `来源：${getSourceName(item.source)}`,
+        `置信度：${Math.round(item.confidence * 100)}%（${getCategoryLabel(item.detection_category)}）`,
+        `判定依据：${item.reasons.length > 0 ? item.reasons.join('；') : '无'}`,
+      ].join('\n');
+    },
+    // 只读读取：一次一页，让助手能"往下看"到底有哪些条目。
+    readItems: (_targetId, offset, limit) => {
+      const list = scanResult?.leftovers ?? [];
+      if (list.length === 0) {
+        // ⚠️ 不返回 null：公共层只会说"没有读到内容"，而"还没扫描"和"扫了但没命中"
+        // 是两件完全不同的排查方向，这里要把原因直接写清楚。
+        return {
+          total: 0,
+          lines: [
+            scanResult
+              ? `（本次扫描没有发现残留：检查了 ${scanResult.scanned_directories} 个一级目录，最高置信度 ${Math.round(scanResult.highest_confidence * 100)}%，未达到 ${Math.round(scanResult.confidence_threshold * 100)}% 的判定门槛）`
+              : '（当前还没有扫描结果 —— 请先点一次「重新扫描」，再问这个问题）',
+          ],
+        };
+      }
+      return {
+        total: list.length,
+        lines: list.slice(offset, offset + limit).map(
+          (item) =>
+            `${item.path}  ${formatSize(item.size)}  置信度 ${Math.round(item.confidence * 100)}%  （${item.file_count} 个文件；${item.reasons[0] ?? '无判定依据'}）`,
+        ),
+      };
+    },
+    summary: () => {
+      if (!scanResult) return null;
+      if (scanResult.leftovers.length === 0) {
+        return [
+          `刚扫描完，没有发现可信度足够的残留：检查了 ${scanResult.scanned_directories} 个一级目录，`,
+          `最高置信度 ${Math.round(scanResult.highest_confidence * 100)}%，判定门槛 ${Math.round(scanResult.confidence_threshold * 100)}%。`,
+        ].join('');
+      }
+      const topThree = [...scanResult.leftovers]
+        .sort((left, right) => right.size - left.size)
+        .slice(0, 3)
+        .map((item) => `${item.app_name} ${formatSize(item.size)}`)
+        .join('、');
+      return [
+        `扫描到 ${scanResult.leftovers.length} 项疑似残留，合计 ${formatSize(scanResult.total_size)}`,
+        `（高置信度 ${highConfidenceCount} 项、可疑 ${suspiciousCount} 项），当前勾选 ${selectedPaths.size} 项。`,
+        `最大的三个：${topThree}。`,
+        `口径：只判断 AppData / ProgramData 的一级目录，子目录不单独统计；置信度是启发式评分，不保证准确。`,
+        `含 .exe/.dll/.sys 的目录用「删除选中」会被跳过，只能用「深度清理」；删除不可恢复。`,
+      ].join('');
+    },
+  });
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case 'HighConfidenceLeftover': return 'text-[var(--color-danger)] bg-[var(--color-danger)]/10';
@@ -539,6 +681,13 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
   };
 
   const isExpanded = expandedModule === 'leftovers';
+  /**
+   * 底部操作条是否可见。
+   *
+   * ⚠️ 不能省：`ModuleOperationToolbar` 是 portal 到 body 的 fixed 浮层，
+   * 不受模块容器约束 —— 少了这个开关，切到别的模块时它还浮在人家页面上。
+   */
+  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
 
   if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeletingAnimating) {
     return null;
@@ -620,7 +769,8 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
         {/* 扫描结果内容 */}
         {scanResult && scanResult.leftovers.length > 0 && (
-          <div className="p-5 space-y-4">
+          // pb-20：底部操作条是 fixed 悬浮层、不占文档流，末端留白免得压住最后一条
+          <div className="p-5 space-y-4 pb-20">
             {/* 风险提示 + 置信度统计 */}
             <div className="flex items-start gap-3 p-4 bg-[var(--color-warning)]/10 rounded-xl border border-[var(--color-warning)]/20">
               <AlertTriangle className="w-5 h-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
@@ -636,69 +786,53 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
               </div>
             </div>
 
-            {/* 操作栏 */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            {/* 操作条复用公共组件：全选 / 选择可疑 / 删除 / 深度清理 全在这里。
+                它 portal 到 body、固定在视口底部，滚列表时也一直在 ——
+                原来这一行放在滚动区域里，往下翻两屏就找不到了。 */}
+            {!isDeleting && shouldShowOperationToolbar && (
+              <ModuleOperationToolbar moduleId="leftovers">
                 <button
+                  type="button"
                   onClick={toggleSelectAll}
-                  className="text-sm text-[var(--brand-green)] hover:underline"
+                  className="module-operation-toolbar__button module-operation-toolbar__button--muted"
                 >
                   {selectedPaths.size === scanResult.leftovers.length ? t('deselectAll') : t('selectAll')}
                 </button>
                 {suspiciousCount > 0 && (
                   <button
+                    type="button"
                     onClick={selectAllSuspicious}
-                    className="text-sm text-[var(--color-warning)] hover:underline"
+                    className="module-operation-toolbar__button module-operation-toolbar__button--muted"
                   >
                     {moduleT('leftovers.selectSuspicious')}
                   </button>
                 )}
-                <span className="text-sm text-[var(--text-muted)]">
+                <span className="whitespace-nowrap px-1 text-xs tabular-nums text-[var(--text-muted)]">
                   {moduleT('leftovers.selected', { count: selectedPaths.size, size: formatSize(selectedSize) })}
                 </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* 普通删除按钮 */}
+                {/* 普通删除会跳过含可执行文件的目录，用橙色：不可恢复，但不是最重的一档 */}
                 <button
+                  type="button"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={selectedPaths.size === 0 || isDeleting}
-                  className={`
-                      flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
-                    ${selectedPaths.size === 0 || isDeleting
-                      ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
-                      : 'bg-[var(--color-warning)] text-white hover:opacity-90'
-                    }
-                  `}
+                  className="module-operation-toolbar__button module-operation-toolbar__button--warning"
                 >
-                  {isDeleting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
+                  <Trash2 className="h-3.5 w-3.5" />
                   {moduleT('leftovers.deleteSelected')}
                 </button>
-                {/* 深度清理按钮 */}
+                {/* 深度清理是永久删除，红色保留在最重的一档 */}
                 <button
+                  type="button"
                   onClick={handleDeepCleanClick}
                   disabled={selectedPaths.size === 0 || isDeleting}
-                  className={`
-                      flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors
-                    ${selectedPaths.size === 0 || isDeleting
-                      ? 'bg-[var(--bg-hover)] text-[var(--text-faint)] cursor-not-allowed'
-                      : 'bg-[var(--color-danger)] text-white hover:opacity-90'
-                    }
-                  `}
-                title={t('permanentDeleteWarning')}
+                  title={t('permanentDeleteWarning')}
+                  className="module-operation-toolbar__button module-operation-toolbar__button--danger"
                 >
-                  {isDeleting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
+                  <Trash2 className="h-3.5 w-3.5" />
                   {moduleT('leftovers.deepClean')}
                 </button>
-              </div>
-            </div>
+              </ModuleOperationToolbar>
+            )}
 
             {/* 错误提示 */}
             {deleteError && (
@@ -717,9 +851,23 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                 {showErrorDetails && deleteErrors.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-[var(--color-danger)]/20 space-y-1 max-h-32 overflow-auto">
                     {deleteErrors.map((err, idx) => (
-                      <p key={idx} className="text-xs text-[var(--color-danger)]/80 break-all">
-                        • {err}
-                      </p>
+                      <div key={`${idx}-${err}`} className="flex items-start gap-2">
+                        <p className="min-w-0 flex-1 text-xs text-[var(--color-danger)]/80 break-all">
+                          • {err}
+                        </p>
+                        {/* 失败的多半是「含可执行文件被跳过」那批：必须能一键打开目录，
+                            否则用户只能照着错误文本里的路径自己去资源管理器里翻。 */}
+                        {deleteFailedPaths[idx] && (
+                          <button
+                            type="button"
+                            onClick={() => openInFolder(deleteFailedPaths[idx])}
+                            title={t('openInFolder')}
+                            className="shrink-0 rounded p-0.5 text-[var(--color-danger)]/70 transition-colors hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                          >
+                            <FolderOpen className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -836,6 +984,13 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                     </p>
                   </div>
 
+                  {/* 快捷提问：问句是完整的一句话，不是搜索引擎关键字（见 aiQuestions 的说明）。
+                      不置 skipLookup —— 助手要先读一次本模块数据，才知道这目录多大、置信度多少。 */}
+                  <AiAskButton
+                    question={buildItemQuestion(leftover.path, 'folder')}
+                    className="inline-flex h-8 w-8 items-center justify-center"
+                  />
+
                   {/* 打开文件夹按钮 */}
                   <button
                     onClick={(e) => {
@@ -869,7 +1024,18 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
             <EmptyState
               icon={CheckCircle2}
               title={t('noLeftovers')}
-              description={moduleT('leftovers.noResultDesc')}
+              // 这个模块常年返回 0 条，用户没法区分「真的没有残留」和「扫描坏了」。
+              // 把检查过的目录数、最高分和门槛报出来，等于给「它在跑」一个证据。
+              description={
+                scanResult.scanned_directories > 0
+                  ? moduleT('leftovers.noResultDiagnostic', {
+                      scanned: scanResult.scanned_directories,
+                      scored: scanResult.below_threshold,
+                      score: Math.round(scanResult.highest_confidence * 100),
+                      threshold: Math.round(scanResult.confidence_threshold * 100),
+                    })
+                  : moduleT('leftovers.noResultDesc')
+              }
               tone="success"
             />
           </div>
@@ -978,6 +1144,19 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         isDanger={true}
       />
 
+      {/* 强制删除确认：从结果弹窗里的「需人工审核」发起，只在用户明确选择后才走这里 */}
+      <ConfirmDialog
+        isOpen={forceTargets.length > 0}
+        onCancel={() => setForceTargets([])}
+        onConfirm={handleForceDelete}
+        title={moduleT('leftoversExtra.forceDeleteTitle')}
+        description={moduleT('leftoversExtra.forceDeleteDesc')}
+        warning={moduleT('leftoversExtra.forceDeleteWarning')}
+        confirmText={t('permanentDelete')}
+        cancelText={t('cancel')}
+        isDanger={true}
+      />
+
       {/* 深度清理结果弹窗 */}
       {isResultAnimating && deepCleanResult && createPortal(
         <DeepCleanResultModal
@@ -985,6 +1164,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
           isVisible={isResultVisible}
           hasEntered={resultEnteredRef.current}
           onClose={() => setShowDeepCleanResult(false)}
+          onForceDelete={setForceTargets}
         />,
         document.body
       )}
@@ -1003,9 +1183,17 @@ interface DeepCleanResultModalProps {
   isVisible: boolean;
   hasEntered: boolean;
   onClose: () => void;
+  /** 用户选择对「需人工审核」那批强制删除时调用；确认弹窗由父组件负责 */
+  onForceDelete?: (paths: string[]) => void;
 }
 
-function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCleanResultModalProps) {
+function DeepCleanResultModal({
+  result,
+  isVisible,
+  hasEntered,
+  onClose,
+  onForceDelete,
+}: DeepCleanResultModalProps) {
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
   const [expandedSection, setExpandedSection] = useState<'review' | 'failed' | null>(null);
@@ -1014,6 +1202,9 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
   const reviewItems = result.details.filter(d => d.needs_manual_review);
   // 获取失败的项目
   const failedItems = result.details.filter(d => !d.success && !d.needs_manual_review && !d.marked_for_reboot);
+
+  // 底部是否要出「强制删除」：有审核项、且父组件提供了处理入口
+  const canForceDelete = Boolean(onForceDelete) && reviewItems.length > 0;
 
   // 获取失败原因的友好描述
   const getFailureReason = (detail: typeof result.details[0]): string => {
@@ -1184,13 +1375,27 @@ function DeepCleanResultModal({ result, isVisible, hasEntered, onClose }: DeepCl
           )}
         </div>
 
-        {/* 关闭按钮 */}
-        <button
-          onClick={onClose}
-          className="w-full px-[1.14em] py-[0.86em] rounded-xl text-[1em] font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors shrink-0"
-        >
-          {moduleT('leftoversExtra.confirm')}
-        </button>
+        {/* 底部操作区。
+            强制删除必须和「确定」并排：它原来挂在「需人工审核」的展开列表末尾，
+            用户不滚动到那里就永远看不到 —— 而没滚动的人恰恰是最需要这个出口的那部分。
+            用危险色描边而不是实心红：确定才是这里的主操作，强制删除是补救路径。 */}
+        <div className="flex shrink-0 items-stretch gap-[0.57em]">
+          {canForceDelete && (
+            <button
+              type="button"
+              onClick={() => onForceDelete?.(reviewItems.map((item) => item.path))}
+              className="min-w-0 flex-1 rounded-xl border border-[var(--color-danger)]/40 bg-[var(--color-danger)]/10 px-[1.14em] py-[0.86em] text-[1em] font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger)]/20"
+            >
+              {moduleT('leftoversExtra.forceDelete', { count: reviewItems.length })}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className={`min-w-0 rounded-xl px-[1.14em] py-[0.86em] text-[1em] font-medium bg-[var(--brand-green)] text-white hover:opacity-90 transition-colors ${canForceDelete ? 'flex-1' : 'w-full'}`}
+          >
+            {moduleT('leftoversExtra.confirm')}
+          </button>
+        </div>
       </div>
     </div>
   );
