@@ -110,6 +110,18 @@ static RE_PACKAGE_NAME: Lazy<Regex> =
 /// 纯版本号格式：1.2.3.4、v2.0 等
 static RE_VERSION_FOLDER: Lazy<Regex> = Lazy::new(|| Regex::new(r"^v?\d+(\.\d+){1,3}$").unwrap());
 
+/// 更新器目录：名字里带 updater / update，或直接以 Updater 结尾。
+///
+/// 命中 `kimi-desktop-updater`、`comfyui-desktop-2-updater`、`QuarkCloudDriveUpdater`、
+/// `@genie\workbuddy-desktop-updater` 这些形态。
+///
+/// 这类目录装的是"下载/解包好的新版本"，程序更新完就不再需要。删掉最坏的结果是
+/// 下次更新重新下载一遍 —— 这是本模块里唯一能对用户明确说"后果是什么"的一类，
+/// 所以值得单独标出来（`DetectionCategory::UpdaterCache`），而不是混进"高置信度"。
+static RE_UPDATER_DIR: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(^|[-_. ])(updater|update)([-_. ]|$)|updater$").unwrap()
+});
+
 // ============================================================================
 // 数据模型
 // ============================================================================
@@ -176,6 +188,8 @@ pub enum LeftoverType {
     VirtualDisk,
     /// 注册表关联残留
     RegistryOrphan,
+    /// 直接躺在 AppData / ProgramData 根目录下的孤立可执行文件
+    LooseFile,
 }
 
 /// 残留来源类型
@@ -217,6 +231,13 @@ pub enum DetectionCategory {
     LikelyAppData,
     /// 系统共享目录
     SystemShared,
+    /// 更新器下载/解包的旧版本目录。
+    ///
+    /// 单独一类而不是并进"高置信度"：这两件事的可信度不是一回事。
+    /// 高置信度是"大概率是残留，但我不敢打包票"；这一类是**后果明确**——
+    /// 删掉之后更新器下次会重新下载，不会影响已经装好的程序。
+    /// 用户看到这个标签时可以不用逐个猜。
+    UpdaterCache,
 }
 
 // ============================================================================
@@ -519,6 +540,12 @@ const FS_PROBE_MAX_DEPTH: usize = 4;
 /// 可执行文件扩展名（用于文件系统探测正向信号）
 const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "dll", "sys", "msi"];
 
+/// 根目录孤立文件的最小体积。
+///
+/// 低于这个数的可执行文件基本都是占位标记（安装器的 stub），
+/// 删掉既省不了空间，也可能影响某个仍在用的工具自检。
+const LOOSE_FILE_MIN_SIZE: u64 = 64 * 1024;
+
 /// 高置信度门槛：到这个分数才算"很可能是残留"。
 const HIGH_CONFIDENCE_SCORE: f32 = 0.75;
 
@@ -566,6 +593,19 @@ struct InstalledAppMap {
     display_names: HashSet<String>,
     /// 疑似残留候选：历史 InstallLocation 中出现过但当前注册表中找不到的文件夹名
     leftover_candidates: HashSet<String>,
+    /// 已安装应用名的词元 → 应用索引。
+    ///
+    /// 为什么需要它：目录名和 DisplayName 很少逐字相同。
+    /// 装了 Playwright 的用户，目录叫 `ms-playwright`；装了 VS Code 的，目录叫 `Code`。
+    /// 精确匹配全部落空，结果就是"还在用的工具"和"真的卸载了"混在同一档里，
+    /// 用户没有任何依据判断该删哪个（0.30 一档 20 多条全是同一个分数）。
+    /// 拆成词元后 `ms-playwright` 能对上 `playwright`。
+    token_to_app: HashMap<String, Vec<usize>>,
+    /// 已卸载应用的词元 → 历史里出现过的原始名字。
+    ///
+    /// 反向证据：目录词元能对上"曾经装过、现在注册表里没有"的应用，
+    /// 这才是"卸载残留"的定义，比"有 exe + 很久没改"两个弱信号可靠得多。
+    uninstalled_tokens: HashMap<String, String>,
 }
 
 /// 规范化 DisplayName：转小写，去除版本号、括号内容、多余空格
@@ -589,6 +629,101 @@ const EXCLUDED_PARENT_DIRS: &[&str] = &[
     "programdata",
     "users",
 ];
+
+/// 目录名拆词后不参与匹配的词元。
+///
+/// 这些词出现在几乎所有软件的目录名里（`xxx-desktop`、`xxx-updater`），
+/// 拿它们去比对"这是哪个软件的目录"只会制造噪音：
+/// 只要装了任意一个 Electron 应用，所有带 `desktop` 的目录都会被当成它的数据。
+const TOKEN_STOPWORDS: &[&str] = &[
+    "app",
+    "apps",
+    "application",
+    "applications",
+    "desktop",
+    "client",
+    "service",
+    "services",
+    "updater",
+    "update",
+    "updates",
+    "setup",
+    "installer",
+    "install",
+    "uninstall",
+    "helper",
+    "launcher",
+    "runtime",
+    "editor",
+    "viewer",
+    "player",
+    "manager",
+    "studio",
+    "suite",
+    "tools",
+    "tool",
+    "utils",
+    "utility",
+    "common",
+    "shared",
+    "system",
+    "program",
+    "programs",
+    "files",
+    "folder",
+    "cache",
+    "data",
+    "config",
+    "settings",
+    "user",
+    "current",
+    "version",
+    "bin",
+    "lib",
+    "node",
+    "electron",
+    "chromium",
+    "portable",
+    "windows",
+    "x64",
+    "x86",
+    "win32",
+    "win64",
+    "preview",
+    "beta",
+    "alpha",
+    "nightly",
+];
+
+/// 把目录名拆成可用于比较的词元。
+///
+/// `ms-playwright` → [`playwright`]（`ms` 太短）
+/// `kimi-desktop-updater` → [`kimi`]（后两个是停用词）
+/// `ollama app` → [`ollama`]
+///
+/// 只保留长度 ≥ 4、不是停用词、不是纯数字的词元。
+/// 阈值定在 4 是因为 `ms`、`ai`、`vr` 这类两三个字母的词元几乎必然误撞。
+fn name_tokens(name_lower: &str) -> impl Iterator<Item = &str> {
+    name_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|token| token.len() >= 4)
+        .filter(|token| !TOKEN_STOPWORDS.contains(token))
+        .filter(|token| !token.chars().all(|c| c.is_ascii_digit()))
+}
+
+/// 从已安装应用列表构建「词元 → 应用索引」索引。
+///
+/// 单独抽出来是为了让测试能自己指定"装了哪些应用"，不必依赖这台机器的注册表。
+fn build_token_index(apps: &[InstalledAppInfo]) -> HashMap<String, Vec<usize>> {
+    let mut token_to_app: HashMap<String, Vec<usize>> = HashMap::new();
+    for (idx, app) in apps.iter().enumerate() {
+        let normalized = normalize_display_name(&app.display_name);
+        for token in name_tokens(&normalized) {
+            token_to_app.entry(token.to_string()).or_default().push(idx);
+        }
+    }
+    token_to_app
+}
 
 impl InstalledAppMap {
     /// 从注册表构建已安装应用映射
@@ -690,16 +825,32 @@ impl InstalledAppMap {
         let leftover_candidates: HashSet<String> =
             historical.difference(&known_folders).cloned().collect();
 
+        // 当前装着的应用：DisplayName 拆词 → 应用索引
+        let token_to_app = build_token_index(&apps);
+
+        // 已卸载的应用：历史名的词元 → 原始历史名。
+        // 名字里带泛指词（豆包的 InstallLocation 曾被记成 `application`）时，
+        // 拆出来的词元全是停用词，自然进不了这张表 —— 不会因为一条垃圾历史误判一片目录。
+        let mut uninstalled_tokens: HashMap<String, String> = HashMap::new();
+        for candidate in &leftover_candidates {
+            for token in name_tokens(candidate) {
+                uninstalled_tokens
+                    .entry(token.to_string())
+                    .or_insert_with(|| candidate.clone());
+            }
+        }
+
         // 将当前已知文件夹合并到历史记录中并持久化
         historical.extend(known_folders.iter().cloned());
         save_install_history(&historical);
 
         log::info!(
-            "已安装应用映射构建完成: {} 个应用, {} 个已知文件夹名, {} 个 DisplayName, {} 个历史残留候选",
+            "已安装应用映射构建完成: {} 个应用, {} 个已知文件夹名, {} 个 DisplayName, {} 个历史残留候选, {} 个已卸载词元",
             apps.len(),
             known_folders.len(),
             display_names.len(),
-            leftover_candidates.len()
+            leftover_candidates.len(),
+            uninstalled_tokens.len()
         );
 
         InstalledAppMap {
@@ -708,6 +859,8 @@ impl InstalledAppMap {
             known_folders,
             display_names,
             leftover_candidates,
+            token_to_app,
+            uninstalled_tokens,
         }
     }
 
@@ -729,6 +882,52 @@ impl InstalledAppMap {
     /// 检查文件夹名是否匹配某个已知应用的规范化 DisplayName
     fn matches_display_name(&self, folder_name_lower: &str) -> bool {
         self.display_names.contains(folder_name_lower)
+    }
+
+    /// 目录名是否属于某个**仍安装着**的应用（词元匹配 + 子串兜底）。
+    ///
+    /// 与 `matches_display_name` 的区别是"宽松"：那边要求整个名字逐字相同，
+    /// 这边只要有一个词元对上就算。目录 `ms-playwright` 对 `Playwright` 这种
+    /// 命名差异只能靠词元识别 —— 否则"还在用的工具"会被当成残留推荐给用户删。
+    fn installed_app_for_name(&self, folder_name_lower: &str) -> Option<&str> {
+        if let Some(owner) = name_tokens(folder_name_lower).find_map(|token| {
+            self.token_to_app
+                .get(token)
+                .and_then(|indices| indices.first())
+                .map(|&idx| self.apps[idx].display_name.as_str())
+        }) {
+            return Some(owner);
+        }
+
+        // 子串兜底：真实目录名经常把两个词拼在一起，拆不出来
+        // （`@genieworkbuddy-desktop-updater` → `genieworkbuddy`），
+        // 或者应用名只是目录名的一部分（`Comfy` vs `comfyui-desktop-2-updater`）。
+        // 长度门槛 5：`uv`、`code` 这种短名字的子串几乎必然撞上别的东西。
+        self.token_to_app
+            .iter()
+            .filter(|(token, _)| token.len() >= 5 && folder_name_lower.contains(token.as_str()))
+            .max_by_key(|(token, _)| token.len())
+            .and_then(|(_, indices)| indices.first())
+            .map(|&idx| self.apps[idx].display_name.as_str())
+    }
+
+    /// 目录名是否对应一个**已经卸载**的应用（词元匹配 + 子串兜底，返回历史里出现过的名字）。
+    ///
+    /// 这是"卸载残留"最直接的证据：这个应用曾经装过，现在注册表里已经没有它了。
+    fn uninstalled_app_for_name(&self, folder_name_lower: &str) -> Option<&str> {
+        if let Some(name) = name_tokens(folder_name_lower).find_map(|token| {
+            self.uninstalled_tokens
+                .get(token)
+                .map(|name| name.as_str())
+        }) {
+            return Some(name);
+        }
+
+        self.uninstalled_tokens
+            .iter()
+            .filter(|(token, _)| token.len() >= 5 && folder_name_lower.contains(token.as_str()))
+            .max_by_key(|(token, _)| token.len())
+            .map(|(_, name)| name.as_str())
     }
 
     /// 结构化路径所有权推断：检查文件夹名是否映射到某个已安装应用的 InstallLocation
@@ -968,18 +1167,26 @@ impl LeftoverScanner {
                     // 文件系统探测（有限深度）
                     let probe = probe_directory(&path, FS_PROBE_MAX_DEPTH);
 
-                    // 大小阈值过滤
+                    // 空壳目录：一个文件都没有。
+                    // 真实的卸载残留经常正是这个形态 —— 卸载程序清掉了内容、只剩目录，
+                    // 但它永远过不了 1MB 的体积门槛，所以先认出来，交给历史证据定分。
+                    let is_empty_shell = probe.file_count == 0;
+
+                    // 大小阈值过滤（空壳不参与：它是不是残留由历史证据决定，不由体积决定）
                     let threshold = if emulator_match.is_some() {
                         100 * 1024 // 模拟器残留降低阈值到 100KB
                     } else {
                         self.min_size_threshold
                     };
-                    if probe.total_size < threshold {
+                    if !is_empty_shell && probe.total_size < threshold {
                         continue;
                     }
 
                     // 获取最后修改时间
                     let last_modified = Self::get_last_modified(&path);
+
+                    // 更新器目录：名字就能说明它是什么，与装没装、改没改无关
+                    let is_updater_dir = RE_UPDATER_DIR.is_match(&folder_lower);
 
                     // ============ 评分（基线 0.0） ============
                     let mut ctx = ScoringContext::new();
@@ -996,6 +1203,17 @@ impl LeftoverScanner {
                             ctx.add(0.35, "包含卸载程序残留 (uninstall*.exe)".into());
                         }
 
+                        // +0.45 更新器目录。
+                        // 这一条是给"后果"打的分，不是给"可能性"打分：程序更新完，
+                        // 这些解包出来的旧版本就没用了，删掉只是让更新器下次重新下载。
+                        if is_updater_dir {
+                            ctx.add(
+                                0.45,
+                                "更新器下载目录（删除后下次更新会重新下载，不影响已安装的程序）"
+                                    .into(),
+                            );
+                        }
+
                         // +0.25 文件夹名匹配历史 InstallLocation 且应用已不在注册表
                         // （历史缓存中记录了过去所有 InstallLocation 文件夹，
                         //   若某文件夹曾在历史中出现但当前注册表中找不到，说明已卸载）
@@ -1004,6 +1222,22 @@ impl LeftoverScanner {
                                 0.25,
                                 format!("匹配已知安装路径但应用已卸载: {}", folder_name),
                             );
+                        } else if let Some(uninstalled) = self
+                            .app_map
+                            .uninstalled_app_for_name(&folder_lower)
+                        {
+                            // 词元级的历史命中：目录名和安装记录不会逐字相同
+                            // （`Comfy Desktop` vs `comfyui-desktop-2-updater`），
+                            // 逐字匹配基本失效，这条才是历史证据真正生效的路径。
+                            ctx.add(
+                                0.20,
+                                format!("目录名与该应用的历史安装记录吻合（已卸载）: {}", uninstalled),
+                            );
+                        }
+
+                        // +0.10 空壳目录：配合上面的历史命中，才构成"卸载后留下的空目录"
+                        if is_empty_shell {
+                            ctx.add(0.10, "目录已空（只剩目录本身）".into());
                         }
 
                         // +0.20 包含 .exe 或 .dll 文件
@@ -1031,6 +1265,16 @@ impl LeftoverScanner {
                                 -0.45,
                                 format!("匹配当前已安装应用 DisplayName: {}", folder_name),
                             );
+                        } else if let Some(owner) = self.app_map.installed_app_for_name(&folder_lower)
+                        {
+                            // -0.35 词元匹配到仍安装着的应用。
+                            // 精确匹配漏掉的正是最常见的形态：`ms-playwright` / `Code` /
+                            // `comfyui-desktop-2-updater` —— 它们和 DisplayName 从来不一致，
+                            // 不扣分就会以 0.30 的身份出现在结果里，被用户当成"可以删"。
+                            ctx.add(
+                                -0.35,
+                                format!("目录名与仍在安装的应用吻合: {}", owner),
+                            );
                         }
 
                         // -0.60 文件夹名精确匹配已安装应用的 InstallLocation 末级目录
@@ -1048,8 +1292,11 @@ impl LeftoverScanner {
                             ctx.add(-0.30, "位于 ProgramData（系统共享目录）".into());
                         }
 
-                        // -0.20 7 天内有修改记录
-                        if days_old < 7 {
+                        // -0.20 7 天内有修改记录。
+                        //
+                        // 空壳目录不参与：它的修改时间几乎必然等于"内容被删掉的那一刻"，
+                        // 拿它当"最近还在用"的证据是反的 —— 那恰恰是卸载刚发生。
+                        if days_old < 7 && !is_empty_shell {
                             ctx.add(-0.20, format!("最近 {} 天内有修改", days_old));
                         }
 
@@ -1078,6 +1325,9 @@ impl LeftoverScanner {
 
                     let detection_category = if emulator_match.is_some() {
                         DetectionCategory::HighConfidenceLeftover
+                    } else if is_updater_dir {
+                        // 比"高置信度"更具体：这一类连删掉的后果都能说清
+                        DetectionCategory::UpdaterCache
                     } else if *source == LeftoverSource::ProgramData
                         && ctx.score < SYSTEM_SHARED_SCORE_LIMIT
                     {
@@ -1120,6 +1370,12 @@ impl LeftoverScanner {
                 total_size += entry.size;
                 leftovers.push(entry);
             }
+        }
+
+        // 根目录下的孤立可执行文件（`Roaming\ollama app.exe` 这类）
+        for entry in self.scan_loose_files(&scan_paths, user_whitelist) {
+            total_size += entry.size;
+            leftovers.push(entry);
         }
 
         // 按置信度降序排列（同分则按大小降序）
@@ -1215,6 +1471,132 @@ impl LeftoverScanner {
     }
 
     /// 【深度扫描】扫描孤立虚拟磁盘文件
+    /// 扫描 AppData / ProgramData 根目录下的**孤立文件**。
+    ///
+    /// 卸载残留不只有目录。安装器把启动器直接丢在 `AppData\Roaming` 根下是常见做法，
+    /// 卸载时又只删自己登记过的那几项 —— `Roaming\ollama app.exe` 就是这种：
+    /// 一个可执行文件独自躺在根目录里，而主流程只遍历目录（`if !path.is_dir() continue`），
+    /// 完全看不见它。
+    ///
+    /// 只收可执行文件：根目录下其余文件是配置或缓存标志（`obs-virtualcam.txt`、
+    /// `viap.json`、`IconCache.db`），删了要么无害、要么是系统在管，报出来只是噪音。
+    ///
+    /// 基础分给 0.25 而不是 0.30：根目录下出现 exe 本身可疑，但一条弱信号不该单独定罪。
+    /// 要过 0.30 的门槛，必须再有一条 —— 「很久没改」（+0.10）或「对得上已卸载的应用」（+0.25）。
+    fn scan_loose_files(
+        &self,
+        scan_paths: &[(PathBuf, LeftoverSource)],
+        user_whitelist: &[leftover_whitelist::LeftoverWhitelistEntry],
+    ) -> Vec<LeftoverEntry> {
+        let mut results = Vec::new();
+
+        for (base_path, source) in scan_paths {
+            let Ok(entries) = fs::read_dir(base_path) else {
+                continue;
+            };
+
+            for entry in entries.filter_map(|e| e.ok()) {
+                // 只要文件：目录由主流程按残留规则处理
+                let Ok(file_type) = entry.file_type() else {
+                    continue;
+                };
+                if !file_type.is_file() {
+                    continue;
+                }
+
+                let path = entry.path();
+                let Some(extension) = path.extension() else {
+                    continue;
+                };
+                if !EXECUTABLE_EXTENSIONS.contains(&extension.to_string_lossy().to_lowercase().as_str())
+                {
+                    continue;
+                }
+
+                if leftover_whitelist::contains_path(user_whitelist, &path) {
+                    continue;
+                }
+
+                let Some(file_name) = path.file_name().map(|n| n.to_string_lossy().to_string())
+                else {
+                    continue;
+                };
+                if self.is_whitelisted(&file_name) {
+                    continue;
+                }
+
+                let size = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+                // 几百字节的 exe 通常只是占位标记，删不删都没有意义
+                if size < LOOSE_FILE_MIN_SIZE {
+                    continue;
+                }
+
+                let name_lower = file_name.to_lowercase();
+                let days_old = Self::get_days_since_modified(&path);
+
+                let mut ctx = ScoringContext::new();
+                ctx.add(
+                    0.25,
+                    "直接位于 AppData / ProgramData 根目录下的可执行文件".into(),
+                );
+
+                if let Some(owner) = self.app_map.installed_app_for_name(&name_lower) {
+                    // 同名应用还装着：这大概是它自己放的启动器，不能动
+                    ctx.add(
+                        -0.45,
+                        format!("文件名与仍在安装的应用吻合: {}", owner),
+                    );
+                } else if let Some(uninstalled) = self.app_map.uninstalled_app_for_name(&name_lower)
+                {
+                    ctx.add(
+                        0.25,
+                        format!(
+                            "文件名与该应用的历史安装记录吻合（已卸载）: {}",
+                            uninstalled
+                        ),
+                    );
+                }
+
+                if days_old > self.min_days_old {
+                    ctx.add(0.10, format!("已 {} 天未修改", days_old));
+                }
+
+                // ProgramData 是系统共享目录，同样的证据不足以说明问题
+                if *source == LeftoverSource::ProgramData {
+                    ctx.add(-0.20, "位于 ProgramData（系统共享目录）".into());
+                }
+
+                ctx.finalize();
+                if ctx.score < self.min_confidence_threshold {
+                    continue;
+                }
+
+                log::info!(
+                    "发现根目录下的孤立文件: {} ({} KB)",
+                    path.display(),
+                    size / 1024
+                );
+
+                results.push(LeftoverEntry {
+                    path: path.to_string_lossy().to_string(),
+                    size,
+                    app_name: file_name,
+                    source: source.clone(),
+                    last_modified: Self::get_last_modified(&path),
+                    file_count: 1,
+                    is_emulator: false,
+                    is_virtual_disk: false,
+                    leftover_type: LeftoverType::LooseFile,
+                    confidence: ctx.score,
+                    detection_category: ctx.category(),
+                    reasons: ctx.reasons,
+                });
+            }
+        }
+
+        results
+    }
+
     fn scan_virtual_disk_files(
         &self,
         user_whitelist: &[leftover_whitelist::LeftoverWhitelistEntry],
@@ -1480,7 +1862,7 @@ pub fn delete_folders(paths: Vec<String>) -> LeftoverDeleteResult {
             };
         }
     };
-    delete_folders_in(paths, &whitelist_entries, &deletion_roots())
+    delete_folders_with_whitelist(paths, &whitelist_entries)
 }
 
 /// 允许删除的根目录，必须与 `get_scan_paths()` 的扫描范围同一口径。
@@ -2208,6 +2590,184 @@ mod tests {
             result.highest_confidence <= 0.05,
             "今天刚改过、没有任何残留证据，分数应接近 0，实际 {}",
             result.highest_confidence
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// 构造一个"装了什么、卸载了什么"完全可控的扫描器。
+    ///
+    /// 真实注册表不可预期：这台机器装着 Playwright，换台机器可能没有。
+    /// 评分规则要能脱离机器环境验证，否则只能在"我这台是这结果"的层面打转。
+    fn scanner_with_apps(installed: &[&str], uninstalled: &[&str]) -> LeftoverScanner {
+        let apps: Vec<InstalledAppInfo> = installed
+            .iter()
+            .map(|name| InstalledAppInfo {
+                display_name: (*name).to_string(),
+                install_location: None,
+                inferred_folder_names: Vec::new(),
+            })
+            .collect();
+
+        let mut uninstalled_tokens: HashMap<String, String> = HashMap::new();
+        for name in uninstalled {
+            let lower = name.to_lowercase();
+            for token in name_tokens(&lower) {
+                uninstalled_tokens
+                    .entry(token.to_string())
+                    .or_insert_with(|| lower.clone());
+            }
+        }
+
+        LeftoverScanner {
+            app_map: InstalledAppMap {
+                token_to_app: build_token_index(&apps),
+                apps,
+                folder_to_app: HashMap::new(),
+                known_folders: HashSet::new(),
+                display_names: HashSet::new(),
+                leftover_candidates: HashSet::new(),
+                uninstalled_tokens,
+            },
+            // 内置白名单会挡住 `code`、`nvidia` 这类真实目录名；测试只关心评分，传空最可控
+            whitelist: Vec::new(),
+            min_size_threshold: 1024 * 1024,
+            min_days_old: 7,
+            deep_scan: false,
+            min_confidence_threshold: SUSPICIOUS_SCORE,
+        }
+    }
+
+    /// 拆词的唯一目的：让"目录名"和"应用名"能对上，同时不被泛指词带偏。
+    #[test]
+    fn name_tokens_keep_only_meaningful_words() {
+        // 写成带显式生命周期的函数而不是闭包：闭包推断不出返回引用指向入参，
+        // 编译器会报 lifetime may not live long enough
+        fn tokens(name: &str) -> Vec<&str> {
+            name_tokens(name).collect()
+        }
+
+        assert_eq!(tokens("ms-playwright"), vec!["playwright"]);
+        assert_eq!(tokens("kimi-desktop-updater"), vec!["kimi"]);
+        assert_eq!(tokens("ollama app"), vec!["ollama"]);
+        assert_eq!(tokens("comfyui-desktop-2-updater"), vec!["comfyui"]);
+
+        // 泛指词 / 太短 / 纯数字都不参与匹配 —— 否则装了任意一个 Electron 应用，
+        // 所有带 desktop 的目录都会被当成它的数据
+        assert!(tokens("application").is_empty());
+        assert!(tokens("desktop").is_empty());
+        assert!(tokens("app").is_empty());
+        assert!(tokens("2022").is_empty());
+    }
+
+    /// 同一个目录名，应用还装着是负向证据，已卸载才是正向证据。
+    #[test]
+    fn token_match_tells_installed_apart_from_uninstalled() {
+        let installed = scanner_with_apps(&["ms-playwright"], &[]);
+        assert_eq!(
+            installed.app_map.installed_app_for_name("ms-playwright"),
+            Some("ms-playwright"),
+            "装了 Playwright 时，ms-playwright 目录必须被认为是它在用"
+        );
+        assert_eq!(
+            installed.app_map.installed_app_for_name("kimi-desktop-updater"),
+            None
+        );
+
+        let uninstalled = scanner_with_apps(&[], &["Kimi"]);
+        assert_eq!(
+            uninstalled.app_map.uninstalled_app_for_name("kimi-desktop-updater"),
+            Some("kimi"),
+            "Kimi 卸载后，kimi-* 目录应能对上历史安装记录"
+        );
+        assert_eq!(
+            uninstalled.app_map.uninstalled_app_for_name("desktop-app"),
+            None,
+            "全是停用词的名字不能被判成历史命中"
+        );
+    }
+
+    /// 空壳目录：删空之后留下的目录，只有"历史里出现过"才够格输出。
+    ///
+    /// 这一条钉的是真实卸载残留的主要形态（豆包卸载后 Local\Doubao 剩 0 字节），
+    /// 它以前连评分都进不了 —— 体积门槛在评分之前就把它过滤了。
+    #[test]
+    fn empty_shell_needs_history_evidence() {
+        let base = case_dir("empty-shell");
+        let root = base.join("Local");
+        let ghost = root.join("GhostApp");
+        let stranger = root.join("StrangerApp");
+        fs::create_dir_all(&ghost).expect("创建空壳目录失败");
+        fs::create_dir_all(&stranger).expect("创建空壳目录失败");
+
+        let scanner = scanner_with_apps(&[], &["GhostApp"]);
+        let result =
+            scanner.scan_with_paths(vec![(root.clone(), LeftoverSource::LocalAppData)], &[]);
+
+        let paths: Vec<&str> = result
+            .leftovers
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect();
+        assert_eq!(
+            paths.len(),
+            1,
+            "只有能对上历史的空目录才该输出，实际: {:?}",
+            paths
+        );
+        assert!(paths[0].ends_with("GhostApp"));
+        assert!(
+            result.leftovers[0].reasons.iter().any(|r| r.contains("已空")),
+            "理由里要说明它是空目录"
+        );
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// 根目录孤立文件：只认可执行文件，且太小的不报。
+    ///
+    /// `Roaming\ollama app.exe` 是这类残留的典型：安装器把启动器丢在根目录，
+    /// 卸载时没删。主流程只遍历目录，永远看不见它。
+    #[test]
+    fn loose_file_needs_executable_type_and_real_size() {
+        let base = case_dir("loose");
+        let root = base.join("Roaming");
+        fs::create_dir_all(root.join("SomeDir")).expect("创建目录失败");
+        fs::write(root.join("stray.exe"), vec![0u8; 128 * 1024]).expect("写入 exe 失败");
+        fs::write(root.join("tiny.exe"), vec![0u8; 1024]).expect("写入小 exe 失败");
+        fs::write(root.join("settings.json"), vec![0u8; 128 * 1024]).expect("写入配置文件失败");
+
+        // 让 stray.exe 对上一条"已卸载"的历史，否则单凭"根目录有个 exe"不足以定罪
+        let scanner = scanner_with_apps(&[], &["stray"]);
+        let entries =
+            scanner.scan_loose_files(&[(root.clone(), LeftoverSource::RoamingAppData)], &[]);
+
+        let names: Vec<&str> = entries.iter().map(|entry| entry.app_name.as_str()).collect();
+        assert_eq!(names, vec!["stray.exe"], "只有够大的 exe 该被报出来");
+        assert_eq!(entries[0].leftover_type, LeftoverType::LooseFile);
+        assert_eq!(entries[0].file_count, 1, "文件条目按 1 个文件计");
+        assert_eq!(entries[0].size, 128 * 1024);
+
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    /// 同名应用还装着时，根目录的 exe 不能被当成残留。
+    #[test]
+    fn loose_file_ignored_while_its_app_is_still_installed() {
+        let base = case_dir("loose-installed");
+        let root = base.join("Roaming");
+        fs::create_dir_all(&root).expect("创建目录失败");
+        fs::write(root.join("ollama app.exe"), vec![0u8; 256 * 1024])
+            .expect("写入 exe 失败");
+
+        let scanner = scanner_with_apps(&["Ollama"], &[]);
+        let entries =
+            scanner.scan_loose_files(&[(root.clone(), LeftoverSource::RoamingAppData)], &[]);
+
+        assert!(
+            entries.is_empty(),
+            "Ollama 还装着时，ollama app.exe 可能是它自己在用，不能报: {:?}",
+            entries.iter().map(|e| e.app_name.as_str()).collect::<Vec<_>>()
         );
 
         let _ = fs::remove_dir_all(&base);

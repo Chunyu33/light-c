@@ -587,6 +587,35 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
     return scanResult.leftovers.filter(l => l.detection_category === 'Suspicious').length;
   }, [scanResult]);
 
+  /**
+   * 更新器缓存条目数。
+   *
+   * 与其他两档的区别是"后果已知"：删了只会让更新器下次重新下载，
+   * 不影响已安装的程序。所以它在提示条里单独显示、用信息色而不是警示色。
+   */
+  const updaterCacheCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.leftovers.filter(l => l.detection_category === 'UpdaterCache').length;
+  }, [scanResult]);
+
+  // 提示条里的分类摘要。写成数组而不是三个相邻的三元表达式：
+  // 加一档就要重算一次"谁和谁之间要加分隔符"，那种写法第三次改就乱了。
+  // 不套 useMemo：三个整数比较，比 memo 的依赖比较还便宜。
+  const confidenceSummary = [
+    updaterCacheCount > 0 && {
+      label: moduleT('leftovers.updaterCache', { count: updaterCacheCount }),
+      className: 'text-[var(--color-info)]',
+    },
+    highConfidenceCount > 0 && {
+      label: moduleT('leftovers.highConfidence', { count: highConfidenceCount }),
+      className: 'text-[var(--color-danger)]',
+    },
+    suspiciousCount > 0 && {
+      label: moduleT('leftovers.suspicious', { count: suspiciousCount }),
+      className: 'text-[var(--color-warning)]',
+    },
+  ].filter((item): item is { label: string; className: string } => Boolean(item));
+
   // 置信度分类标签
   const getCategoryLabel = (category: string) => {
     switch (category) {
@@ -594,6 +623,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       case 'Suspicious': return moduleT('leftovers.category.suspicious');
       case 'LikelyAppData': return moduleT('leftovers.category.possibly_in_use');
       case 'SystemShared': return moduleT('leftovers.category.system_shared');
+      case 'UpdaterCache': return moduleT('leftovers.category.updater_cache');
       default: return category;
     }
   };
@@ -660,11 +690,21 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         .slice(0, 3)
         .map((item) => `${item.app_name} ${formatSize(item.size)}`)
         .join('、');
+      // 摘要里要带分布：助手判断"该不该建议删除"靠的就是这个，
+      // 只说总数会让它把所有条目都当成同一可信度
+      const distribution = [
+        updaterCacheCount > 0 ? `更新缓存 ${updaterCacheCount} 项` : '',
+        highConfidenceCount > 0 ? `高置信度 ${highConfidenceCount} 项` : '',
+        suspiciousCount > 0 ? `可疑 ${suspiciousCount} 项` : '',
+      ]
+        .filter(Boolean)
+        .join('、');
       return [
         `扫描到 ${scanResult.leftovers.length} 项疑似残留，合计 ${formatSize(scanResult.total_size)}`,
-        `（高置信度 ${highConfidenceCount} 项、可疑 ${suspiciousCount} 项），当前勾选 ${selectedPaths.size} 项。`,
+        `（${distribution}），当前勾选 ${selectedPaths.size} 项。`,
         `最大的三个：${topThree}。`,
         `口径：只判断 AppData / ProgramData 的一级目录，子目录不单独统计；置信度是启发式评分，不保证准确。`,
+        `「更新缓存」这一类删掉只会让更新器下次重新下载，不影响已安装的程序；其余条目没有这个保证。`,
         `含 .exe/.dll/.sys 的目录用「删除选中」会被跳过，只能用「深度清理」；删除不可恢复。`,
       ].join('');
     },
@@ -676,6 +716,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       case 'Suspicious': return 'text-[var(--color-warning)] bg-[var(--color-warning)]/10';
       case 'LikelyAppData': return 'text-[var(--brand-green)] bg-[var(--brand-green-10)]';
       case 'SystemShared': return 'text-[var(--text-muted)] bg-[var(--bg-hover)]';
+      case 'UpdaterCache': return 'text-[var(--color-info)] bg-[var(--color-info)]/10';
       default: return 'text-[var(--text-muted)] bg-[var(--bg-hover)]';
     }
   };
@@ -778,9 +819,12 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                 <p className="text-sm font-medium text-[var(--text-primary)]">{moduleT('leftovers.confidenceTitle')}</p>
                 <p className="text-xs text-[var(--text-muted)] mt-1">
                   {moduleT('leftovers.confidenceDesc')}
-                  {highConfidenceCount > 0 && <span className="text-[var(--color-danger)] font-medium">{moduleT('leftovers.highConfidence', { count: highConfidenceCount })}</span>}
-                  {highConfidenceCount > 0 && suspiciousCount > 0 && ' · '}
-                  {suspiciousCount > 0 && <span className="text-[var(--color-warning)] font-medium">{moduleT('leftovers.suspicious', { count: suspiciousCount })}</span>}
+                  {confidenceSummary.map((item, index) => (
+                    <span key={item.label}>
+                      <span className={`font-medium ${item.className}`}>{item.label}</span>
+                      {index < confidenceSummary.length - 1 && ' · '}
+                    </span>
+                  ))}
                   {` ${moduleT('leftovers.accuracy')}`}
                 </p>
               </div>
@@ -968,7 +1012,12 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                     <div className="flex items-center gap-3 mt-1 text-xs text-[var(--text-faint)]">
                       <span>{getSourceName(leftover.source)}</span>
                       <span>{leftover.file_count} {moduleT('leftovers.files')}</span>
-                      <span title={leftover.reasons.join('\n')}>{moduleT('leftovers.confidence', { percent: Math.round(leftover.confidence * 100) })}</span>
+                      {/* 更新缓存这一档不显示百分比：
+                          它的分数只用来排序（删掉的后果跟"多久没改"无关），
+                          同一个标签下出现 40% 和 75% 两种数字只会让人以为可信度差一截。 */}
+                      {leftover.detection_category !== 'UpdaterCache' && (
+                        <span title={leftover.reasons.join('\n')}>{moduleT('leftovers.confidence', { percent: Math.round(leftover.confidence * 100) })}</span>
+                      )}
                     </div>
                   </div>
 

@@ -75,6 +75,7 @@
     "confidenceTitle": "置信度检测结果",
     "confidenceDesc": "基于评分模型分析：",
     "highConfidence": "{{count}} 个高置信度残留",
+    "updaterCache": "{{count}} 个更新缓存",
     "suspicious": "{{count}} 个可疑项",
     "accuracy": "事后扫描无法 100% 准确，结果默认不勾选，请结合路径、大小和软件使用情况自行验证。",
     "selectSuspicious": "选择可疑项",
@@ -116,7 +117,8 @@
       "high_confidence": "高置信度",
       "suspicious": "可疑",
       "possibly_in_use": "可能在用",
-      "system_shared": "系统共享"
+      "system_shared": "系统共享",
+      "updater_cache": "更新缓存"
     },
     "whitelistManage": "白名单管理",
     "whitelistDesc": "受保护路径及其子项不会再出现在扫描结果中，也无法通过本模块删除。",
