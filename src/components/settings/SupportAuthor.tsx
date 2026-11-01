@@ -1,31 +1,23 @@
 // ============================================================================
-// 支持作者组件
-// 赞赏码切换和放大预览独立维护，避免反馈页与关于页形成组件耦合。
+// 支持作者组件（设置 - 意见反馈 里的卡片）
+//
+// 卡片本身只负责"摆出赞赏码 + 切换"，点开后的放大视图由 `SupportModal` 提供。
+// 侧边栏的爱心图标用的是同一个弹窗，二维码与切换逻辑只有一份。
 // ============================================================================
 
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Coffee, X } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Coffee } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import wechatQr from '../../assets/r_wechat_qr.jpg';
 import alipayQr from '../../assets/r_alipay_qr.jpg';
-import { MODAL_BACKDROP_MOTION, MODAL_CARD_MOTION } from '../../utils/modalMotion';
-import { useTranslation } from 'react-i18next';
-
-type PaymentType = 'wechat' | 'alipay';
+import { PAYMENT_OPTIONS, SupportModal, type PaymentType } from '../SupportModal';
 
 /**
- * 赞赏码展示尺寸（像素）。
+ * 卡片里赞赏码的展示尺寸（像素）。
  * 项目根字号被字号设置改成 14px，Tailwind 的 rem 尺寸会等比缩小（w-32 实际只有 112px），
  * 二维码缩到 96px 后将无法识别，因此这里用不随字号变化的像素值固定尺寸。
  */
 const QR_DISPLAY_SIZE = 176;
-
-/** 支付方式元数据：颜色与文案只在这里定义，普通视图和放大视图共用，避免两处写法不一致 */
-const PAYMENT_OPTIONS: { type: PaymentType; activeClass: string; labelKey: string }[] = [
-  { type: 'wechat', activeClass: 'bg-[#07C160]', labelKey: 'wechat' },
-  { type: 'alipay', activeClass: 'bg-[#1677FF]', labelKey: 'alipay' },
-];
 
 export function SupportAuthor() {
   const { t } = useTranslation('common');
@@ -42,15 +34,6 @@ export function SupportAuthor() {
       setIsTransitioning(false);
     }, 150);
   };
-
-  // ESC 键关闭放大视图
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsModalOpen(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const qrAlt = paymentType === 'wechat' ? t('wechatQr') : t('alipayQr');
   const qrSrc = paymentType === 'wechat' ? wechatQr : alipayQr;
@@ -128,55 +111,13 @@ export function SupportAuthor() {
         </div>
       </div>
 
-      {/* 放大视图 - 与项目其他弹窗共用同一套动效预设 */}
-      {createPortal(
-        <AnimatePresence>
-          {isModalOpen && (
-            <motion.div
-              {...MODAL_BACKDROP_MOTION}
-              className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-              onClick={() => setIsModalOpen(false)}
-            >
-              <motion.div
-                {...MODAL_CARD_MOTION}
-                className="relative bg-white rounded-2xl shadow-2xl p-4"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {/* 关闭按钮 */}
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="glass-overlay absolute -top-2 -right-2 w-8 h-8 bg-[var(--bg-card)] rounded-full shadow-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors z-10"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-                {/* 高清大图 */}
-                <img src={qrSrc} alt={qrAlt} className="w-72 h-72 object-contain" />
-
-                {/* 底部切换 */}
-                <div className="flex justify-center mt-4">
-                  <div className="inline-flex bg-[var(--bg-hover)] rounded-xl p-1">
-                    {PAYMENT_OPTIONS.map((option) => (
-                      <button
-                        key={option.type}
-                        onClick={() => handlePaymentChange(option.type)}
-                        className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                          paymentType === option.type
-                            ? `${option.activeClass} text-white shadow-sm`
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        {t(option.labelKey)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+      {/* 放大视图：与侧边栏爱心图标共用同一个弹窗组件。
+          把卡片上当前选中的支付方式带过去，否则弹窗会停在微信，让人以为切换没生效。 */}
+      <SupportModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        initialPayment={paymentType}
+      />
     </>
   );
 }

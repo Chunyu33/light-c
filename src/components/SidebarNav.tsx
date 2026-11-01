@@ -3,12 +3,13 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Github, Globe, ScrollText, UserRound } from 'lucide-react';
+import { Github, Globe, Heart, ScrollText, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getVersion } from '@tauri-apps/api/app';
 import { APP_MODULE_META, type AppModuleId } from '../config/moduleMeta';
 import { FONT_SIZE_CONFIGS, useFontSize, useSettings } from '../contexts';
 import { getDistributionChannel, type DistributionChannel } from '../api/commands';
+import { SupportModal } from './SupportModal';
 import { AUTHOR_HOMEPAGE_URL, LIGHTC_CHANGELOG_URL, LIGHTC_GITHUB_URL, LIGHTC_OFFICIAL_WEBSITE_URL } from '../config/officialLinks';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'c-cleanup-sidebar-collapsed';
@@ -140,6 +141,8 @@ export function SidebarNav() {
    */
   const [appVersion, setAppVersion] = useState('');
   const [channel, setChannel] = useState<DistributionChannel | null>(null);
+  /** 支持作者弹窗。与设置页「意见反馈 - 支持作者」共用同一个组件 */
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
 
   useEffect(() => {
     getVersion()
@@ -306,14 +309,22 @@ export function SidebarNav() {
             <UserRound size={15} strokeWidth={1.7} />
           </a>
         )}
-        {!isCollapsed && appVersion ? (
-          <span
-            className="sidebar-nav__footer-version"
-            title={channel ? settingsT(channel === 'portable' ? 'about.portable' : 'about.installer') : undefined}
+        {/* 原来这里是版本号文字，现在换成爱心：点击打开支持作者弹窗。
+            版本号没有丢 —— 悬停这里能看到（含便携版/安装版），弹窗底部也有一份。
+            排查问题时用户最常截的就是侧边栏，这个信息不能彻底消失。 */}
+        {!isCollapsed && (
+          <button
+            type="button"
+            onClick={() => setIsSupportOpen(true)}
+            className="sidebar-nav__footer-icon sidebar-nav__footer-support"
+            aria-label={t('footerSupport')}
+            title={[t('footerSupport'), appVersion ? `v${appVersion}` : '', channel ? settingsT(channel === 'portable' ? 'about.portable' : 'about.installer') : '']
+              .filter(Boolean)
+              .join(' · ')}
           >
-            v{appVersion}
-          </span>
-        ) : null}
+            <Heart size={15} strokeWidth={1.7} />
+          </button>
+        )}
       </div>
 
       {!isCollapsed && (
@@ -349,6 +360,9 @@ export function SidebarNav() {
         </div>,
         document.body,
       )}
+
+      {/* 支持作者弹窗：与设置页共用，自己不维护二维码和支付切换 */}
+      <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} version={appVersion} />
     </aside>
   );
 }

@@ -412,11 +412,14 @@
   color: var(--brand-green);
 }
 
-.sidebar-nav__footer-version {
+/* 支持作者入口：占住原来版本号的位置（靠右）。
+   hover 用暖红而不是品牌绿 —— 心形配绿色读起来像「收藏」，不像「赞助」。 */
+.sidebar-nav__footer-support {
   margin-left: auto;
-  color: var(--fg-muted);
-  font-size: 0.72em;
-  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-nav__footer-support:hover {
+  color: var(--color-danger);
 }
 
 /* 折叠态：只剩地球图标，居中 */
