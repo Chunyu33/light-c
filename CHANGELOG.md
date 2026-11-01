@@ -2,6 +2,16 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Uninstall leftovers could barely find anything: not because nothing was left behind, but because the threshold rejected the common cases. An empty result now says how many folders were checked and the highest confidence it saw; found items can be asked about through the AI assistant or opened in Explorer in one click; folders containing programs are no longer stuck at "needs review" - the result dialog offers a force delete, with one more confirmation. A failed delete always reports back.
+- Modules that need administrator rights no longer send you hunting for the exe: disk change analysis, old driver cleanup, system slimming, hotspot analysis, large-file cleanup, and the deep scans in junk clean and AI model space all offer "Restart with administrator rights" in the UI, with the usual system prompt. AI model space used to quietly fall back to a normal scan while still claiming deep discovery; it now explains why and reports what actually ran.
+- "Clear local data" in settings no longer gives up halfway: when one item is locked, the rest still run, and the result separates what was cleared from what failed and why.
+- The AI assistant entry can be turned off in settings: the floating button and the inline icons disappear together, saved providers and keys stay, and switching it off and on no longer claims no provider is configured.
+- AI tool cleanup now covers Doubao, including its browser caches and the sandbox runtime installers; a rescan clears the previous result instead of letting you tick rows that are about to be replaced.
+- The batch action bar moved from a floating panel on the right to a centered bar at the bottom, so it no longer covers the numbers at the end of a row and timings are readable without collapsing it first.
+- Social clean is faster: scanning 100,000 files on the same machine drops from about 1.4s to 0.5s, and the meter in the result area shows how long each folder took.
+
 ## v2.18.0
 
 - New "AI tool cleanup": counts the cache folders left behind by WorkBuddy, Claude Code, Codex, DeepSeek and similar tools, so you can review each one before deleting, with a confirmation step. Anything that could not be removed, such as a folder locked by a running tool, is reported back.
