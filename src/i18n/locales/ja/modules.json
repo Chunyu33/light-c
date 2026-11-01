@@ -57,11 +57,11 @@
     }
   },
   "leftovers": {
-    "deleting": "アンインストール残留を整理中",
+    "deleting": "残留とキャッシュをクリーンアップ中",
     "deletingFolder": "フォルダーを削除中",
     "doNotClose": "ウィンドウを閉じないでください",
-    "idleDesc": "スキャンを開始して、AppData、ProgramData などに残った可能性のあるフォルダーを検出します。",
-    "scanning": "アンインストール残留をスキャン中...",
+    "idleDesc": "クリックしてスキャン開始。AppData、ProgramData などにある残存フォルダーとキャッシュを検索します。",
+    "scanning": "残留とキャッシュをスキャン中...",
     "scanningDesc": "AppData、ProgramData、LocalLow などを検索し、インストール履歴・フォルダー特性・信頼度を照合しています。",
     "confidenceTitle": "信頼度の判定結果",
     "confidenceDesc": "スコアモデルによる分析：",

@@ -215,8 +215,8 @@
   "clearDataItems": {
     "installHistory": {
       "label": "Installation history cache",
-      "description": "Used to improve uninstall-leftover detection. Deleting it makes the module relearn installation paths.",
-      "warning": "Safe to clear, but uninstall-leftover detection signals will be rebuilt."
+      "description": "Used to recognise leftovers. Deleting it makes the module relearn installation paths.",
+      "warning": "Safe to clear, but the leftovers & caches history has to be rebuilt."
     },
     "logs": {
       "label": "Cleanup logs",
@@ -414,8 +414,8 @@
         "desc": "Drivers in use cannot be selected. Packages are backed up before deletion and can be restored from the module header."
       },
       "leftovers": {
-        "title": "Uninstall leftovers",
-        "desc": "Uses confidence signals to identify possible leftovers in AppData and ProgramData. Verify paths, sizes and usage before deleting."
+        "title": "Leftovers & caches",
+        "desc": "Finds folders left behind by uninstalled software and old versions kept by updaters. Results still need checking against the path, size and whether the software is still in use."
       },
       "registry": {
         "title": "Registry redundancy",

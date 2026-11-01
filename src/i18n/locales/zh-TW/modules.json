@@ -81,11 +81,11 @@
     }
   },
   "leftovers": {
-    "deleting": "正在清理解除安裝殘留",
+    "deleting": "正在清理殘留與快取",
     "deletingFolder": "正在刪除資料夾",
     "doNotClose": "請勿關閉視窗",
-    "idleDesc": "點選開始掃描，檢索 AppData、ProgramData 等位置中可能遺留的軟體目錄。",
-    "scanning": "正在掃描解除安裝殘留...",
+    "idleDesc": "點擊開始掃描，檢索 AppData、ProgramData 等位置中可能遺留的軟體目錄與快取。",
+    "scanning": "正在掃描殘留與快取...",
     "scanningDesc": "正在檢索 AppData、ProgramData、LocalLow 等常見殘留位置，並結合安裝記錄、目錄特徵和置信度模型識別可疑目錄。",
     "confidenceTitle": "置信度檢測結果",
     "confidenceDesc": "基於評分模型分析：",

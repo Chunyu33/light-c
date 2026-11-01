@@ -57,11 +57,11 @@
     }
   },
   "leftovers": {
-    "deleting": "Cleaning uninstall leftovers",
+    "deleting": "Cleaning leftovers and caches",
     "deletingFolder": "Deleting folders",
     "doNotClose": "Do not close the window",
-    "idleDesc": "Start a scan to find possible leftover app folders in AppData, ProgramData and other locations.",
-    "scanning": "Scanning uninstall leftovers...",
+    "idleDesc": "Click to scan AppData and ProgramData for folders left behind and for caches.",
+    "scanning": "Scanning leftovers and caches...",
     "scanningDesc": "Searching AppData, ProgramData and LocalLow, then matching install records, folder traits and confidence signals.",
     "confidenceTitle": "Confidence results",
     "confidenceDesc": "Based on the scoring model: ",

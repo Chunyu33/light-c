@@ -66,11 +66,11 @@
     }
   },
   "leftovers": {
-    "deleting": "正在清理卸载残留",
+    "deleting": "正在清理残留和缓存",
     "deletingFolder": "正在删除文件夹",
     "doNotClose": "请勿关闭窗口",
-    "idleDesc": "点击开始扫描，检索 AppData、ProgramData 等位置中可能遗留的软件目录。",
-    "scanning": "正在扫描卸载残留...",
+    "idleDesc": "点击开始扫描，检索 AppData、ProgramData 等位置中可能遗留的软件目录和缓存。",
+    "scanning": "正在扫描残留和缓存...",
     "scanningDesc": "正在检索 AppData、ProgramData、LocalLow 等常见残留位置，并结合安装记录、目录特征和置信度模型识别可疑目录。",
     "confidenceTitle": "置信度检测结果",
     "confidenceDesc": "基于评分模型分析：",

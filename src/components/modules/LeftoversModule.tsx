@@ -1,5 +1,5 @@
 // ============================================================================
-// 卸载残留扫描模块（支持模拟器、残留驱动深度检测）
+// 残留&缓存扫描模块（原名「卸载残留」，支持模拟器、残留驱动深度检测）
 // 扫描 AppData 和 ProgramData 中已卸载软件遗留的孤立文件夹
 // ============================================================================
 
@@ -246,7 +246,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       const result = await scanUninstallLeftovers();
       setScanResult(result);
 
-      // 卸载残留属于事后推断，即使高置信也可能误伤仍在使用的数据，因此首版结果全部交给用户主动确认。
+      // 这类判定属于事后推断，即使高置信也可能误伤仍在使用的数据，因此首版结果全部交给用户主动确认。
       setSelectedPaths(new Set());
 
       updateModuleState('leftovers', {
@@ -257,7 +257,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
 
       setExpandedModule('leftovers');
     } catch (err) {
-      console.error('卸载残留扫描失败:', err);
+      console.error('残留&缓存扫描失败:', err);
       updateModuleState('leftovers', { status: 'error', error: String(err) });
     }
   }, [updateModuleState, setExpandedModule]);
@@ -309,7 +309,8 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         const entry = scanResult?.leftovers.find((l) => l.path === path);
         const errorIndex = result.failed_paths?.indexOf(path);
         return {
-          category: '卸载残留',
+          // 写进清理日志的分类名，会显示在日志列表里，必须和模块名一致
+          category: '残留&缓存',
           path,
           size: entry?.size || 0,
           success: !failedPathSet.has(path),
@@ -664,7 +665,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
           total: 0,
           lines: [
             scanResult
-              ? `（本次扫描没有发现残留：检查了 ${scanResult.scanned_directories} 个一级目录，最高置信度 ${Math.round(scanResult.highest_confidence * 100)}%，未达到 ${Math.round(scanResult.confidence_threshold * 100)}% 的判定门槛）`
+              ? `（本次扫描没有发现残留或缓存：检查了 ${scanResult.scanned_directories} 个一级目录，最高置信度 ${Math.round(scanResult.highest_confidence * 100)}%，未达到 ${Math.round(scanResult.confidence_threshold * 100)}% 的判定门槛）`
               : '（当前还没有扫描结果 —— 请先点一次「重新扫描」，再问这个问题）',
           ],
         };
@@ -700,7 +701,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         .filter(Boolean)
         .join('、');
       return [
-        `扫描到 ${scanResult.leftovers.length} 项疑似残留，合计 ${formatSize(scanResult.total_size)}`,
+        `扫描到 ${scanResult.leftovers.length} 项残留或缓存，合计 ${formatSize(scanResult.total_size)}`,
         `（${distribution}），当前勾选 ${selectedPaths.size} 项。`,
         `最大的三个：${topThree}。`,
         `口径：只判断 AppData / ProgramData 的一级目录，子目录不单独统计；置信度是启发式评分，不保证准确。`,
