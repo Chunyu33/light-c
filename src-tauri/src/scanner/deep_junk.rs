@@ -1619,6 +1619,9 @@ fn is_user_profile_cache(path: &str) -> bool {
         // 包管理器缓存：npm / pnpm 的缓存动辄数 GB，且 100% 可重建（重新安装时重新下载）。
         // 这两个名字此前没收录 —— "npm-cache" 不等于 "cache"，不会命中上面的精确段匹配。
         "npm-cache",
+        // pnpm 的缓存目录叫 `pnpm-cache`（不带点），此前只收录了 `.pnpm-store`，
+        // 导致按默认位置安装的用户清不到这几百 MB。
+        "pnpm-cache",
         "cacheddata",
         ".pnpm-store",
         // VS Code 的 CachedData 存放编译后的 JS，重启即重建，同样是明确的缓存名。
