@@ -122,6 +122,17 @@ static RE_UPDATER_DIR: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(^|[-_. ])(updater|update)([-_. ]|$)|updater$").unwrap()
 });
 
+/// 应用自己的缓存/日志目录。
+///
+/// 命中 `AviraWebView2Cache`、`SquirrelTemp`、`TSVNCache`、`PLogs`、`xxxCrashRpt` 这类。
+///
+/// ⚠️ 纯粹的 `Cache` / `Temp` / `CrashDumps` 不会走到这里 —— 它们在 `build_whitelist_rules()`
+/// 里已经被排除了，那是垃圾清理模块的地盘，两边都报会让用户以为"删了没删掉"。
+/// 这条规则只负责"名字里带缓存特征的应用目录"。
+static RE_CACHE_DIR: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"cache|caches|crashpad|crashrpt|crashdumps|crashreports|logs?$|temp$|tmp$").unwrap()
+});
+
 // ============================================================================
 // 数据模型
 // ============================================================================
@@ -238,6 +249,12 @@ pub enum DetectionCategory {
     /// 删掉之后更新器下次会重新下载，不会影响已经装好的程序。
     /// 用户看到这个标签时可以不用逐个猜。
     UpdaterCache,
+    /// 应用自己的缓存/日志目录（`AviraWebView2Cache`、`SquirrelTemp`、`PLogs`）。
+    ///
+    /// 和 `UpdaterCache` 的差别是代价：那是"下次更新重新下载几百 MB"，
+    /// 这是"程序下次运行重新生成"，通常无感。所以两者分开标，
+    /// 用户按"我愿不愿意等它重建"来选。
+    CacheDir,
 }
 
 // ============================================================================
@@ -351,6 +368,13 @@ fn build_whitelist_rules() -> Vec<WhitelistRule> {
         WhitelistRule::Exact("logs".into()),
         WhitelistRule::Exact("crash reports".into()),
         WhitelistRule::Exact("crashdumps".into()),
+        // 包管理器缓存归「垃圾清理」。
+        //
+        // 这两个目录属于"系统级/工具级可重建数据"，不是某个应用自己的缓存：
+        // 垃圾清理按路径段精确匹配它们（`deep_junk::cache_names`），扫得比这里更全。
+        // 两边都报的后果是用户在 A 删完、去 B 还看到同一条，以为没删掉。
+        WhitelistRule::Exact("npm-cache".into()),
+        WhitelistRule::Exact("pnpm-cache".into()),
         // ==================== 常见应用（精确匹配） ====================
         WhitelistRule::Exact("google".into()),
         WhitelistRule::Exact("chrome".into()),
@@ -546,6 +570,57 @@ const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "dll", "sys", "msi"];
 /// 删掉既省不了空间，也可能影响某个仍在用的工具自检。
 const LOOSE_FILE_MIN_SIZE: u64 = 64 * 1024;
 
+/// 找虚拟磁盘时整枝跳过的目录名。
+///
+/// 虚拟磁盘只出现在 WSL / Docker / 模拟器这类位置的 `LocalState`、`wsl` 子目录里，
+/// 而 `node_modules`、`Temp`、各种 `*Cache` 底下不可能有 —— 它们的目录数量却是全树的大头。
+/// 改前实测：遍历 AppData 三个根一次要 5.9 秒、命中 0 条，绝大部分时间都花在这批目录上。
+const DISK_SCAN_SKIP_DIRS: &[&str] = &[
+    "node_modules",
+    "temp",
+    "tmp",
+    "cache",
+    "caches",
+    "code cache",
+    "gpucache",
+    "shadercache",
+    "graphitedawncache",
+    "logs",
+    "log",
+    "crashpad",
+    "crashdumps",
+    ".git",
+    "site-packages",
+    "__pycache__",
+    "dist",
+    "build",
+    "obj",
+    // ⚠️ 不要加 `packages`：`Local\Packages\<发行版>\LocalState\ext4.vhdx` 正是 WSL 磁盘的位置，
+    // 跳过它等于让这个功能对 WSL 用户彻底失效。
+];
+
+/// 虚拟磁盘**可能**所在的目录名。第三层及以下只进这些目录。
+///
+/// 前两层是应用名（`Docker`、`Packages\<发行版>`），从第三层开始就不再是"谁"，
+/// 而是"放在哪个子目录里"——这一层只有少数几种叫法。不在名单里的目录
+/// （UWP 包下的 `AC\Temp`、各种 `Settings`、`LocalCache`）不可能有磁盘，
+/// 但它们贡献了绝大多数目录数。
+const DISK_SCAN_DIR_HINTS: &[&str] = &[
+    "localstate",
+    "wsl",
+    "data",
+    "disks",
+    "disk",
+    "distro",
+    "distros",
+    "vm-data",
+    "machines",
+    "virtual machines",
+    "vmware",
+    "virtualbox vms",
+    "docker",
+];
+
 /// 高置信度门槛：到这个分数才算"很可能是残留"。
 const HIGH_CONFIDENCE_SCORE: f32 = 0.75;
 
@@ -723,6 +798,25 @@ fn build_token_index(apps: &[InstalledAppInfo]) -> HashMap<String, Vec<usize>> {
         }
     }
     token_to_app
+}
+
+/// 虚拟磁盘搜索时，是否要进入这个目录。
+///
+/// 单独抽成函数是为了能单测：`WalkDir::filter_entry` 的闭包拿不到可构造的 `DirEntry`，
+/// 而这条规则一旦写错，WSL 用户的 `ext4.vhdx` 就再也扫不出来了 —— 必须钉住。
+///
+/// 规则：
+/// - 命中 `DISK_SCAN_SKIP_DIRS` 的直接不进；
+/// - 前两层（应用名）全进；
+/// - 第三层起只进 `DISK_SCAN_DIR_HINTS`（`LocalState` / `wsl\data` 这类）。
+fn should_descend_for_disks(name_lower: &str, depth: usize) -> bool {
+    if DISK_SCAN_SKIP_DIRS.contains(&name_lower) {
+        return false;
+    }
+    if depth >= 3 {
+        return DISK_SCAN_DIR_HINTS.contains(&name_lower);
+    }
+    true
 }
 
 impl InstalledAppMap {
@@ -1185,8 +1279,9 @@ impl LeftoverScanner {
                     // 获取最后修改时间
                     let last_modified = Self::get_last_modified(&path);
 
-                    // 更新器目录：名字就能说明它是什么，与装没装、改没改无关
+                    // 更新器目录 / 缓存目录：名字就能说明它是什么，与装没装、改没改无关
                     let is_updater_dir = RE_UPDATER_DIR.is_match(&folder_lower);
+                    let is_cache_dir = !is_updater_dir && RE_CACHE_DIR.is_match(&folder_lower);
 
                     // ============ 评分（基线 0.0） ============
                     let mut ctx = ScoringContext::new();
@@ -1211,6 +1306,14 @@ impl LeftoverScanner {
                                 0.45,
                                 "更新器下载目录（删除后下次更新会重新下载，不影响已安装的程序）"
                                     .into(),
+                            );
+                        }
+
+                        // +0.35 应用自己的缓存/日志目录：删掉程序下次运行会重新生成
+                        if is_cache_dir {
+                            ctx.add(
+                                0.35,
+                                "缓存或日志目录（删除后程序会自行重新生成）".into(),
                             );
                         }
 
@@ -1328,6 +1431,8 @@ impl LeftoverScanner {
                     } else if is_updater_dir {
                         // 比"高置信度"更具体：这一类连删掉的后果都能说清
                         DetectionCategory::UpdaterCache
+                    } else if is_cache_dir {
+                        DetectionCategory::CacheDir
                     } else if *source == LeftoverSource::ProgramData
                         && ctx.score < SYSTEM_SHARED_SCORE_LIMIT
                     {
@@ -1365,7 +1470,7 @@ impl LeftoverScanner {
         // 【深度扫描】扫描虚拟磁盘文件
         if self.deep_scan {
             log::info!("执行深度扫描: 搜索孤立虚拟磁盘文件...");
-            let virtual_disks = self.scan_virtual_disk_files(user_whitelist);
+            let virtual_disks = self.scan_virtual_disk_files(&scan_paths, user_whitelist);
             for entry in virtual_disks {
                 total_size += entry.size;
                 leftovers.push(entry);
@@ -1599,107 +1704,122 @@ impl LeftoverScanner {
 
     fn scan_virtual_disk_files(
         &self,
+        scan_paths: &[(PathBuf, LeftoverSource)],
         user_whitelist: &[leftover_whitelist::LeftoverWhitelistEntry],
     ) -> Vec<LeftoverEntry> {
         let mut results = Vec::new();
 
-        // 扫描路径：用户目录下的常见位置
-        let scan_dirs = [
-            dirs::data_local_dir(),
-            dirs::data_dir(),
-            Some(PathBuf::from(r"C:\ProgramData")),
-        ];
+        // 与主流程共用同一份扫描根：这里原来自己写了一份三元素数组，
+        // get_scan_paths() 一旦增减位置，两处就会不一致（目录扫得到、磁盘却查不到）。
+        // 参数化之后测试也能用临时目录验证剪枝规则，不必碰真实 AppData。
+        for (base_dir, _source) in scan_paths {
+            if !base_dir.exists() {
+                continue;
+            }
 
-        for dir_opt in scan_dirs.iter() {
-            if let Some(base_dir) = dir_opt {
-                if !base_dir.exists() {
+            // 递归搜索虚拟磁盘文件。
+            //
+            // 深度 4 够用：WSL 的 `Local\Packages\<发行版>\LocalState\ext4.vhdx` 和
+            // Docker 的 `Local\Docker\wsl\data\ext4.vhdx` 都落在这一层。
+            // 原来是 5，多那一层换不来任何命中，只是多遍历一层目录。
+            //
+            // 剪枝才是关键：全树扫一次要 5.9 秒，而目录数几乎全由 node_modules、
+            // Temp、包缓存这类目录贡献 —— 它们底下不可能有虚拟磁盘。
+            //
+            // 两道剪枝：
+            //   ① 按目录名排除明显的碎目录；
+            //   ② 第三层起只进 `DISK_SCAN_DIR_HINTS` 里的目录 ——
+            //      前两层是应用名，第三层开始只剩 `LocalState` / `wsl\data` 这几种叫法。
+            for entry in WalkDir::new(base_dir)
+                .max_depth(6)
+                .into_iter()
+                    .filter_entry(|entry| {
+                        if !entry.file_type().is_dir() {
+                            return true;
+                        }
+                        let name = entry.file_name().to_string_lossy().to_lowercase();
+                        should_descend_for_disks(&name, entry.depth())
+                    })
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+
+                // 只处理文件
+                if !path.is_file() {
                     continue;
                 }
 
-                // 递归搜索虚拟磁盘文件（限制深度为 5）
-                for entry in WalkDir::new(base_dir)
-                    .max_depth(5)
-                    .into_iter()
-                    .filter_map(|e| e.ok())
-                {
-                    let path = entry.path();
-
-                    // 只处理文件
-                    if !path.is_file() {
-                        continue;
-                    }
-
-                    // 用户白名单可以保护虚拟磁盘文件本身或其上级目录。
-                    if leftover_whitelist::contains_path(user_whitelist, path) {
-                        continue;
-                    }
-
-                    // 检查扩展名
-                    let ext = path
-                        .extension()
-                        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
-                        .unwrap_or_default();
-
-                    if !VIRTUAL_DISK_EXTENSIONS.contains(&ext.as_str()) {
-                        continue;
-                    }
-
-                    // 获取文件大小
-                    let size = path.metadata().map(|m| m.len()).unwrap_or(0);
-
-                    // 虚拟磁盘文件通常很大，忽略小于 100MB 的
-                    if size < 100 * 1024 * 1024 {
-                        continue;
-                    }
-
-                    // 检查路径中是否有上级目录在白名单内
-                    // WSL2 等场景：文件在 \wsl\<GUID>\ext4.vhdx，直接父目录是 GUID，
-                    // 但上级目录 "wsl" 在白名单中，应跳过
-                    if self.is_path_in_whitelist(path, base_dir) {
-                        log::info!("虚拟磁盘文件路径命中白名单，跳过: {}", path.display());
-                        continue;
-                    }
-
-                    // 检查父目录是否对应已安装应用
-                    let parent_folder = path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .map(|n| n.to_string_lossy().to_lowercase())
-                        .unwrap_or_default();
-
-                    if self.app_map.has_inferred_ownership(&parent_folder) {
-                        continue;
-                    }
-
-                    let file_name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default();
-
-                    let last_modified = Self::get_last_modified(path);
-
-                    log::info!(
-                        "发现孤立虚拟磁盘文件: {} ({} MB)",
-                        path.display(),
-                        size / 1024 / 1024
-                    );
-
-                    results.push(LeftoverEntry {
-                        path: path.to_string_lossy().to_string(),
-                        size,
-                        app_name: file_name,
-                        source: LeftoverSource::VirtualDiskFile,
-                        last_modified,
-                        file_count: 1,
-                        is_emulator: false,
-                        is_virtual_disk: true,
-                        leftover_type: LeftoverType::VirtualDisk,
-                        confidence: 0.85,
-                        detection_category: DetectionCategory::HighConfidenceLeftover,
-                        reasons: vec!["孤立虚拟磁盘文件，未关联已安装应用".into()],
-                    });
+                // 用户白名单可以保护虚拟磁盘文件本身或其上级目录。
+                if leftover_whitelist::contains_path(user_whitelist, path) {
+                    continue;
                 }
+
+                // 检查扩展名
+                let ext = path
+                    .extension()
+                    .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+                    .unwrap_or_default();
+
+                if !VIRTUAL_DISK_EXTENSIONS.contains(&ext.as_str()) {
+                    continue;
+                }
+
+                // 获取文件大小
+                let size = path.metadata().map(|m| m.len()).unwrap_or(0);
+
+                // 虚拟磁盘文件通常很大，忽略小于 100MB 的
+                if size < 100 * 1024 * 1024 {
+                    continue;
+                }
+
+                // 检查路径中是否有上级目录在白名单内
+                // WSL2 等场景：文件在 \wsl\<GUID>\ext4.vhdx，直接父目录是 GUID，
+                // 但上级目录 "wsl" 在白名单中，应跳过
+                if self.is_path_in_whitelist(path, base_dir) {
+                    log::info!("虚拟磁盘文件路径命中白名单，跳过: {}", path.display());
+                    continue;
+                }
+
+                // 检查父目录是否对应已安装应用
+                let parent_folder = path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .map(|n| n.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+
+                if self.app_map.has_inferred_ownership(&parent_folder) {
+                    continue;
+                }
+
+                let file_name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                let last_modified = Self::get_last_modified(path);
+
+                log::info!(
+                    "发现孤立虚拟磁盘文件: {} ({} MB)",
+                    path.display(),
+                    size / 1024 / 1024
+                );
+
+                results.push(LeftoverEntry {
+                    path: path.to_string_lossy().to_string(),
+                    size,
+                    app_name: file_name,
+                    source: LeftoverSource::VirtualDiskFile,
+                    last_modified,
+                    file_count: 1,
+                    is_emulator: false,
+                    is_virtual_disk: true,
+                    leftover_type: LeftoverType::VirtualDisk,
+                    confidence: 0.85,
+                    detection_category: DetectionCategory::HighConfidenceLeftover,
+                    reasons: vec!["孤立虚拟磁盘文件，未关联已安装应用".into()],
+                });
             }
+
         }
 
         results
@@ -2771,5 +2891,39 @@ mod tests {
         );
 
         let _ = fs::remove_dir_all(&base);
+    }
+
+    /// 虚拟磁盘搜索的剪枝规则。
+    ///
+    /// 写错这条不会有任何报错，只会表现为"WSL 用户的 ext4.vhdx 永远扫不出来"——
+    /// 所以两头都要钉：噪音目录必须剪掉，WSL / Docker 的真实路径必须留住。
+    #[test]
+    fn disk_scan_prunes_noise_but_keeps_wsl_and_docker() {
+        // 前两层是应用名，一律进入
+        assert!(should_descend_for_disks("packages", 1));
+        assert!(should_descend_for_disks("docker", 1));
+        assert!(should_descend_for_disks("ubuntu", 2));
+
+        // 第三层起只认已知容器：WSL 的 LocalState、Docker 的 wsl/data
+        assert!(
+            should_descend_for_disks("localstate", 3),
+            "WSL 的 ext4.vhdx 就在 LocalState 下，剪掉等于功能失效"
+        );
+        assert!(
+            should_descend_for_disks("data", 3),
+            "Docker 的磁盘在 wsl/data 下"
+        );
+        assert!(!should_descend_for_disks("ac", 3), "UWP 包里的噪音目录");
+        assert!(!should_descend_for_disks("settings", 3));
+
+        // 碎目录任何时候都不进
+        assert!(!should_descend_for_disks("node_modules", 1));
+        assert!(!should_descend_for_disks("cache", 2));
+
+        // 这条防的是以后"顺手"把 packages 加进剪枝名单
+        assert!(
+            !DISK_SCAN_SKIP_DIRS.contains(&"packages"),
+            "Local/Packages 正是 WSL 磁盘所在，任何情况下都不能整体跳过"
+        );
     }
 }

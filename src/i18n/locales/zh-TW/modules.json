@@ -91,6 +91,7 @@
     "confidenceDesc": "基於評分模型分析：",
     "highConfidence": "{{count}} 個高置信度殘留",
     "updaterCache": "{{count}} 個更新快取",
+    "cacheDir": "{{count}} 個快取",
     "suspicious": "{{count}} 個可疑項",
     "accuracy": "事後掃描無法 100% 準確，結果預設不勾選，請結合路徑、大小和軟體使用情況自行驗證。",
     "selectSuspicious": "選擇可疑項",
@@ -133,7 +134,8 @@
       "suspicious": "可疑",
       "possibly_in_use": "可能在用",
       "system_shared": "系統共享",
-      "updater_cache": "更新快取"
+      "updater_cache": "更新快取",
+      "cache_dir": "快取"
     },
     "whitelistManage": "白名單管理",
     "whitelistDesc": "受保護路徑及其子項不會再出現在掃描結果中，也無法透過此模組刪除。",

@@ -599,13 +599,28 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
     return scanResult.leftovers.filter(l => l.detection_category === 'UpdaterCache').length;
   }, [scanResult]);
 
+  /**
+   * 普通缓存/日志目录数。
+   *
+   * 和上面那个分开统计：删更新缓存要重新下载几百 MB，删这个是程序自己重建，
+   * 用户对两者的容忍度完全不同，混在一个数字里没法判断。
+   */
+  const cacheDirCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.leftovers.filter(l => l.detection_category === 'CacheDir').length;
+  }, [scanResult]);
+
   // 提示条里的分类摘要。写成数组而不是三个相邻的三元表达式：
   // 加一档就要重算一次"谁和谁之间要加分隔符"，那种写法第三次改就乱了。
-  // 不套 useMemo：三个整数比较，比 memo 的依赖比较还便宜。
+  // 不套 useMemo：几个整数比较，比 memo 的依赖比较还便宜。
   const confidenceSummary = [
     updaterCacheCount > 0 && {
       label: moduleT('leftovers.updaterCache', { count: updaterCacheCount }),
       className: 'text-[var(--color-info)]',
+    },
+    cacheDirCount > 0 && {
+      label: moduleT('leftovers.cacheDir', { count: cacheDirCount }),
+      className: 'text-[var(--color-success)]',
     },
     highConfidenceCount > 0 && {
       label: moduleT('leftovers.highConfidence', { count: highConfidenceCount }),
@@ -625,6 +640,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       case 'LikelyAppData': return moduleT('leftovers.category.possibly_in_use');
       case 'SystemShared': return moduleT('leftovers.category.system_shared');
       case 'UpdaterCache': return moduleT('leftovers.category.updater_cache');
+      case 'CacheDir': return moduleT('leftovers.category.cache_dir');
       default: return category;
     }
   };
@@ -695,6 +711,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       // 只说总数会让它把所有条目都当成同一可信度
       const distribution = [
         updaterCacheCount > 0 ? `更新缓存 ${updaterCacheCount} 项` : '',
+        cacheDirCount > 0 ? `缓存/日志 ${cacheDirCount} 项` : '',
         highConfidenceCount > 0 ? `高置信度 ${highConfidenceCount} 项` : '',
         suspiciousCount > 0 ? `可疑 ${suspiciousCount} 项` : '',
       ]
@@ -711,14 +728,30 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
     },
   });
 
+  /**
+   * 分类标签的配色。
+   *
+   * 全部走主题变量（`--color-*` / `--brand-green`），**不要用 `dark:`**
+   * ——本项目的 `dark:` 绑的是系统深浅色，不是应用主题。
+   * 每个标签是"同色描边 + 15% 底色 + 同色文字"的胶囊，比原来只有淡底色更醒目：
+   * 原来「更新缓存」用的 `--color-info` 根本没定义，标签拿到的是继承色，看着和普通文字一样。
+   */
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case 'HighConfidenceLeftover': return 'text-[var(--color-danger)] bg-[var(--color-danger)]/10';
-      case 'Suspicious': return 'text-[var(--color-warning)] bg-[var(--color-warning)]/10';
-      case 'LikelyAppData': return 'text-[var(--brand-green)] bg-[var(--brand-green-10)]';
-      case 'SystemShared': return 'text-[var(--text-muted)] bg-[var(--bg-hover)]';
-      case 'UpdaterCache': return 'text-[var(--color-info)] bg-[var(--color-info)]/10';
-      default: return 'text-[var(--text-muted)] bg-[var(--bg-hover)]';
+      case 'HighConfidenceLeftover':
+        return 'border-[var(--color-danger)]/35 bg-[var(--color-danger)]/15 text-[var(--color-danger)]';
+      case 'Suspicious':
+        return 'border-[var(--color-warning)]/35 bg-[var(--color-warning)]/15 text-[var(--color-warning)]';
+      // 可重建，但代价不同：更新缓存要重新下载，普通缓存程序自己重建
+      case 'UpdaterCache':
+        return 'border-[var(--color-info)]/35 bg-[var(--color-info)]/15 text-[var(--color-info)]';
+      case 'CacheDir':
+        return 'border-[var(--color-success)]/35 bg-[var(--color-success)]/15 text-[var(--color-success)]';
+      case 'LikelyAppData':
+        return 'border-[var(--brand-green)]/35 bg-[var(--brand-green-10)] text-[var(--brand-green)]';
+      case 'SystemShared':
+      default:
+        return 'border-[var(--border-default)] bg-[var(--bg-hover)] text-[var(--text-muted)]';
     }
   };
 
@@ -992,7 +1025,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                         {leftover.app_name}
                       </p>
                       {/* 置信度分类标签 */}
-                      <span className={`flex-shrink-0 text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${getCategoryColor(leftover.detection_category)}`}>
+                      <span className={`flex-shrink-0 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[0.71rem] font-medium ${getCategoryColor(leftover.detection_category)}`}>
                         {getCategoryLabel(leftover.detection_category)}
                       </span>
                       {/* 模拟器/虚拟磁盘标签 */}

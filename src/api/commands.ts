@@ -613,7 +613,7 @@ export interface LeftoverScanResult {
 export type LeftoverType = 'Normal' | 'Emulator' | 'VirtualDisk' | 'RegistryOrphan';
 
 /** 妫€娴嬪垎绫伙紙缃俊搴﹀垎绾э級 */
-export type DetectionCategory = 'HighConfidenceLeftover' | 'Suspicious' | 'LikelyAppData' | 'SystemShared' | 'UpdaterCache';
+export type DetectionCategory = 'HighConfidenceLeftover' | 'Suspicious' | 'LikelyAppData' | 'SystemShared' | 'UpdaterCache' | 'CacheDir';
 
 /** 鍗曚釜娈嬬暀鏉＄洰 */
 export interface LeftoverEntry {
