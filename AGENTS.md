@@ -59,6 +59,11 @@ If output contains unreadable characters, inspect the exit code first.
 - 禁止“堆逻辑”式写法（屎山代码）
 - 单函数职责单一（建议 ≤ 50 行）
 - 避免重复代码（必要时抽取复用）
+- **扩展功能前先判断“这段逻辑该归谁”**（项目越大，这一条越重要）：
+  - 已经抽成公共层的东西（`ModuleOperationToolbar` / `AdminRequiredHint` / `useAiModuleBridge` / `ScanTimingPopover` / `ModuleDeleteProgress`）只能调用，**不许在模块里再复制一份**“看起来差不多”的实现
+  - 新增的判断、映射、文案，先搜一遍仓库里有没有现成的；同一条规则写两处，两处迟早不一致
+  - 视图层不拼业务规则，业务规则不写进组件；数据从哪来、能不能删、怎么校验，都归模块自己的那一层
+- **改完自问三句**：半年后别人看得懂吗？改一个需求要动几处？删掉它会不会连带别的东西坏？
 
 ---
 
