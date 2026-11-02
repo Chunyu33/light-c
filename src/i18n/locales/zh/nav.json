@@ -3,7 +3,7 @@
   "junkCleanDesc": "清理系统缓存、临时文件、日志等垃圾文件",
   "bigFiles": "大文件清理",
   "bigFilesDesc": "扫描磁盘中体积较大的文件，快速释放存储空间",
-  "socialClean": "社交软件专清",
+  "socialClean": "社交软件清理",
   "aiToolCleanup": "AI 工具清理",
   "aiToolCleanupDesc": "统计 AI 客户端和编程助手留下的缓存目录。",
   "socialCleanDesc": "清理微信、QQ、钉钉、飞书等软件的缓存文件",

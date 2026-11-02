@@ -43,7 +43,7 @@ export interface ModulesState {
   junk: ModuleState;
   /** 大文件清理模块 */
   bigFiles: ModuleState;
-  /** 社交软件专清模块 */
+  /** 社交软件清理模块 */
   social: ModuleState;
   /** 系统瘦身模块 */
   system: ModuleState;

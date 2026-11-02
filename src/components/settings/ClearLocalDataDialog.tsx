@@ -80,7 +80,7 @@ export function ClearLocalDataDialog({
           />
           {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，37.14em ≈ 520px。
               高度必须叠加视口约束：此前只有列表自身的 41.43em 上限，窗口偏矮时整个弹窗会溢出上下边缘。
-              与「社交软件专清」的文件列表弹窗保持同一套写法：外壳限高 + 列表 flex-1 自己滚。 */}
+              与「社交软件清理」的文件列表弹窗保持同一套写法：外壳限高 + 列表 flex-1 自己滚。 */}
           <motion.div
             className="relative flex w-[37.14em] max-w-[calc(100vw-2em)] max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] glass-dialog shadow-2xl"
             {...MODAL_CARD_MOTION}

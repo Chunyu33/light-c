@@ -1,6 +1,6 @@
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 // ============================================================================
-// 社交软件专清模块组件 - 带风险分级
+// 社交软件清理模块组件 - 带风险分级
 // 支持智能路径溯源和文件类型深度分类
 // ============================================================================
 
@@ -400,7 +400,7 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       const logEntries: CleanupLogEntryInput[] = paths.map((path) => {
         const file = allFilesByPath.get(path);
         return {
-          category: '社交软件专清',
+          category: '社交软件清理',
           path,
           size: file?.size || 0,
           success: !failedPathIndex.has(path),

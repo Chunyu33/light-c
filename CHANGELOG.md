@@ -4,10 +4,10 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 ## v2.18.1
 
-- "Uninstall leftovers" is now "Leftovers & Caches": besides folders left by removed software, it now counts the old versions updaters pile up, and every row carries a label. The threshold that used to reject most cases is lower, an empty result says how many folders were checked, and a scan of the same machine drops from 6.6s to 1.3s.
-- The glass look is rebuilt: the background is no longer green or blue but only light and shadow, and the header, sidebar and dialogs now share one frosted material. Tables inside a dialog no longer let the content behind them show through, and nothing dims when the pointer moves over it.
-- Modules that need administrator rights (disk change analysis, old driver cleanup, system slimming, hotspot analysis, large-file cleanup, and the deep scans in junk clean and AI model space) offer "Restart with administrator rights" in the UI.
-- Other improvements: one locked item no longer stops "Clear local data"; turning the AI assistant entry off and on no longer claims no provider is configured; AI tool cleanup covers Doubao and clears the previous result on rescan; the batch bar sits at the bottom centre; social clean is about 3x faster.
+- "Uninstall leftovers" is now "Leftovers & Caches": it also counts the old versions that updaters pile up, every row carries a label, and scanning is about 5x faster.
+- The glass look is rebuilt: a neutral background, plus one frosted material shared by the header, sidebar and dialogs. Tables no longer show the app behind them.
+- Modules that need administrator rights offer "Restart with administrator rights" in the UI.
+- Other improvements: "Clear local data" no longer stops when one item fails, AI tool cleanup covers Doubao, and social clean is about 3x faster.
 
 ## v2.18.0
 
