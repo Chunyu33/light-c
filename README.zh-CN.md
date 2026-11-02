@@ -23,7 +23,7 @@ LightC 是一款 Windows 桌面工具，提供安全垃圾清理、磁盘分析�
 ## 运行截图
 
 <p align="center">
-  <img src="public/assets/show1.png" alt="LightC 运行截图" width="900">
+  <img src="src/assets/show1.png" alt="LightC 运行截图" width="900">
 </p>
 
 ## 环境要求

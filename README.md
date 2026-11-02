@@ -22,7 +22,7 @@ LightC is a Windows desktop utility for safe junk cleanup, disk analysis, and sy
 ## Screenshots
 
 <p align="center">
-  <img src="public/assets/show1.png" alt="LightC screenshot" width="900">
+  <img src="src/assets/show1.png" alt="LightC screenshot" width="900">
 </p>
 
 ## Requirements
