@@ -27,7 +27,14 @@ import { notifyAiConfigChanged } from '../ai/aiConfigSignal';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { AiProviderPreset, AiPublicConfig } from '../../types/ai';
 
-/** 统一的设置行：左侧标题与描述，右侧控件。 */
+/** 统一的设置行：左侧标题与描述，右侧控件。
+ *
+ *  ⚠️ 窄窗口下右侧控件整体换到下一行，而不是把左侧文字压成一条竖线。
+ *  之前是「左 min-w-0（可无限压缩）+ 右 shrink-0（不可压缩）」的硬两列：
+ *  AI 数据目录这一行右侧是「长路径 + 打开/更改/恢复三个按钮」，宽度不够时
+ *  左侧描述被挤成 4~5 行（issue 截图）。
+ *  现在容器允许 wrap、左侧给一个 em 基准宽度：够宽仍是左右两列，
+ *  不够时右侧整块落到下一行，描述保持可读。 */
 function SettingRow({
   title,
   description,
@@ -38,12 +45,12 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div className="min-w-0 flex-1 basis-[10em]">
         <p className="text-sm font-medium text-[var(--text-primary)]">{title}</p>
         {description ? <div className="text-xs text-[var(--text-muted)] mt-1">{description}</div> : null}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="shrink-0 max-w-full">{children}</div>
     </div>
   );
 }
@@ -666,11 +673,13 @@ export function AiSettings() {
           厂商卡片回答"用哪家模型"，这张回答"东西存在哪"，是两件事。 */}
       <div className="glass-block bg-[var(--bg-main)] rounded-2xl p-5">
         <SettingRow title={t('aiAssistant.dataDir')} description={t('aiAssistant.dataDirDesc')}>
-          <div className="flex items-center gap-2">
+          {/* 路径 + 按钮本身也允许换行：窄窗口下三个按钮排到路径下一行，
+              而不是让整块溢出卡片。路径给了 min-w-0 才能正常截断。 */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {/* 直接显示解析后的**真实路径**：用户问的就是"到底存在哪"，
                 只写一句"数据目录下的 ai 文件夹"等于没回答。 */}
             <span
-              className="max-w-[20em] truncate text-xs text-[var(--text-muted)]"
+              className="min-w-0 max-w-[20em] truncate text-xs text-[var(--text-muted)]"
               title={saved?.resolvedDataDir || ''}
             >
               {saved?.resolvedDataDir || t('aiAssistant.dataDirDefault')}
@@ -678,14 +687,14 @@ export function AiSettings() {
             <button
               type="button"
               onClick={() => void handleOpenDataDir()}
-              className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+              className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
             >
               {t('aiAssistant.dataDirOpen')}
             </button>
             <button
               type="button"
               onClick={() => void handlePickDataDir(false)}
-              className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
+              className="shrink-0 rounded-xl border border-[var(--border-color)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-hover)]"
             >
               {t('aiAssistant.dataDirPick')}
             </button>
