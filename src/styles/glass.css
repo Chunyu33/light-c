@@ -107,7 +107,13 @@ html.glass:not(.dark) {
      iOS 的浅色玻璃本身就很实（0.7 上下），"通"是 blur 给的，不是靠低透明度。
      ⚠️ 别再用透明度换通透感 —— 那是拿可读性和颜色准确性做交换。 */
   --glass-surface-bg: rgba(255, 255, 255, 0.72);
-  --glass-chrome-bg: rgba(255, 255, 255, 0.5);
+  /* 顶栏 / 标题栏的不透明度。
+     ⚠️ 0.5 → 0.32：0.5 时它是一块"白板"，背后什么都透不出来，读起来像实心条而不是玻璃。
+     液态玻璃的"薄"就来自这个透过量 —— 面板越薄，背后的明暗越明显。
+     顶栏背后是背景的上半部分（亮区），0.32 时能隐约看到主光的方向，
+     再配合下面那条底部亮线和顶部内高光，才有"一片薄玻璃压在背景上"的读感。
+     ⚠️ 注意这里**没有 backdrop-filter**（见下方注释），所以透过量要自己给足。 */
+  --glass-chrome-bg: rgba(255, 255, 255, 0.32);
   /* 侧栏面板单独一档：它比卡片需要更"透"（卡片是内容载体要白，侧栏是导航层要透），
      但又不能直接用 --glass-chrome-bg（顶栏 0.4 太白，侧栏面积大会抢注意力）。 */
   --glass-sidebar-bg: rgba(255, 255, 255, 0.5);
@@ -135,7 +141,7 @@ html.glass:not(.dark) {
          而且换颜色值怎么改都还在，因为根本不是颜色的问题）。
         弹窗是"悬停在上面操作"的界面，稳定性比那点磨砂重要。
      透明感由 --glass-modal-bg 的不透明度控制，边缘高光负责"玻璃"的读感。 */
-  --glass-modal-bg: rgba(255, 255, 255, 0.9);
+  --glass-modal-bg: rgba(255, 255, 255, 0.86);
   --glass-panel-border: rgba(255, 255, 255, 0.72);
 }
 
@@ -186,7 +192,7 @@ html.dark.glass {
      0.07 → 0.055 → 0.075 → 0.085：卡片越透，背景色相越容易透上来把卡片染色，
      深色里 1% 的差别都很明显。宁可让卡片实一点，通透感交给 blur 和背景明度。 */
   --glass-surface-bg: rgba(255, 255, 255, 0.12);
-  --glass-chrome-bg: rgba(255, 255, 255, 0.07);
+  --glass-chrome-bg: rgba(255, 255, 255, 0.1);
   /* 深色侧栏比顶栏略实：深底上 0.07 的侧栏会和背景糊成一片，导航项就没有依托了 */
   --glass-sidebar-bg: rgba(255, 255, 255, 0.09);
   /* 深色下顶栏的顶部高光只能给 0.1：深底上白色反光非常显眼 */
@@ -200,7 +206,7 @@ html.dark.glass {
   --glass-panel-bg: rgba(38, 38, 38, 0.85);
   /* 暗色同理：0.72 → 0.86。同样是因为弹窗不再自带 backdrop-filter，
      透过量要由这个值兜底，否则背景会直接透上来。 */
-  --glass-modal-bg: rgba(42, 42, 42, 0.88);
+  --glass-modal-bg: rgba(32, 32, 32, 0.8);
   /* 暗色下遮罩要更浓一点：背景本来就暗，遮罩太淡会让弹窗和背景糊成一片。
      但因为弹窗自己有模糊层，这里仍不需要 backdrop-filter。 */
   --glass-backdrop-bg: rgba(0, 0, 0, 0.42);
@@ -586,11 +592,10 @@ html.glass .glass-dialog {
      透明感由 --glass-modal-bg 的不透明度控制，玻璃读感由边缘高光和描边负责。 */
   box-shadow:
     0 0 0 1px var(--glass-panel-border),
-    inset 0 1px 0 var(--glass-header-highlight),
-    /* ⚠️ 投影从 60px/0.35 收到 30px/0.25：弹窗外面已经有一层压暗的遮罩，
-       再叠一层大半径投影就是"暗上加暗"，在弹窗四周形成一圈黑边 ——
-       设置弹窗那么大一块，左侧那条黑带尤其明显（Evan："后面有个阴影"）。
-       遮罩负责分离，投影只负责"贴边一点点"。 */
+    /* 上沿反光比顶栏更明确：弹窗是浮在遮罩上的玻璃板，边缘是唯一能表达"厚度"的地方。
+       再加一道下沿暗边，上下都有交代，读起来才不是一张白纸。 */
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.06),
     0 10px 30px -14px rgba(30, 41, 59, 0.25);
 }
 
@@ -604,7 +609,8 @@ html.dark.glass .glass-dialog {
   --bg-active: #3f3f3f;
   box-shadow:
     0 0 0 1px var(--glass-panel-border),
-    inset 0 1px 0 var(--glass-header-highlight),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
     0 10px 30px -14px rgba(0, 0, 0, 0.5);
 }
 
@@ -733,7 +739,7 @@ html.glass .sidebar-nav__item--active .sidebar-nav__item-icon {
   color: var(--brand-green);
 }
 
-/* ===== 设置弹窗里的选中项：实色模拟的"玻璃片" =====
+/* ===== 选中项（侧栏 / 设置弹窗共用）：实色模拟的"玻璃片" =====
    上面那套「半透明白渐变 + blur + 内高光」是给**侧边栏**的 —— 侧栏压在应用背景上，
    那层半透明是它"浮起"的来源。
    设置弹窗内部是实色体系（.glass-dialog / .glass-backdrop 重定义了 --bg-*），
@@ -746,6 +752,13 @@ html.glass .sidebar-nav__item--active .sidebar-nav__item-icon {
      ④ 贴边柔影：贴边的一圈，不是大扩散。
    所以这里用**实色渐变**（不半透明）模拟同样的四件事，和侧栏的观感对齐，
    又不会把背后的东西透上来。 */
+/* 侧栏和设置弹窗**共用同一套**选中值。
+   ⚠️ 之前侧栏走「半透明白渐变叠在玻璃面板上」、设置走实色渐变，两边最终明度不同：
+   侧栏底本身是 0.09 白（≈#363636）、弹窗底是 0.88 实色（≈#2a2a2a），
+   同一个叠色值上去，呈现出来的深度差一截（Evan："侧边栏和设置的激活样式深度还是不一致"）。
+   既然弹窗内部已经统一成实色体系，侧栏也跟同一组值，两边绝对亮度才一致。 */
+html.glass .sidebar-nav__item--active,
+html.glass .sidebar-nav__item--active:hover,
 html.glass .settings-tab--active,
 html.glass .settings-tab--active:hover {
   background: linear-gradient(to bottom, #ffffff 0%, #f1f3f3 100%);
@@ -759,6 +772,8 @@ html.glass .settings-tab--active:hover {
     inset 0 -1px 0 rgba(15, 23, 42, 0.05);
 }
 
+html.dark.glass .sidebar-nav__item--active,
+html.dark.glass .sidebar-nav__item--active:hover,
 html.dark.glass .settings-tab--active,
 html.dark.glass .settings-tab--active:hover {
   background: linear-gradient(to bottom, #474747 0%, #3a3a3a 100%);
