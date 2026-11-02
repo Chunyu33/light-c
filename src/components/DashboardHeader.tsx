@@ -3,11 +3,14 @@
 // 显示 C 盘健康评分、磁盘使用情况和一键扫描按钮
 // ============================================================================
 
-import { useEffect, useState, useRef } from 'react';
-import { HardDrive, Moon, Trash2, Zap, Square } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { HardDrive, Moon, RefreshCw, Trash2, Zap, Square } from 'lucide-react';
 import { useDashboardActions, useDashboardSummary } from '../contexts/DashboardContext';
 import { formatSize } from '../utils/format';
 import { useTranslation } from 'react-i18next';
+import { defaultDriveLetter, driveOptionLabel, driveOptionTitle, useLocalDrives } from './ui/DriveSelect';
+import { Select } from './ui/Select';
+import { useToast } from './Toast';
 
 // ============================================================================
 // 数字跳动动画 Hook
@@ -105,6 +108,54 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
   const { diskInfo, healthData, isLoadingHealth, isAnyScanning } = useDashboardSummary();
   const { stopAllScans } = useDashboardActions();
   const { t } = useTranslation('common');
+  const { showToast } = useToast();
+
+  /**
+   * 顶栏的磁盘条支持切换盘符并手动刷新。
+   *
+   * 数据源用 `useLocalDrives`（它本来就返回每个盘的容量、可用空间、使用率），
+   * 而不是 context 里的 `diskInfo` —— 后者只有系统盘一条，切不了盘。
+   * `diskInfo` 保留为兜底：磁盘列表还没读回来时先用它撑住，避免首帧空白。
+   */
+  const { drives, loading: drivesLoading, refresh: refreshDrives } = useLocalDrives();
+  const [selectedDrive, setSelectedDrive] = useState('');
+
+  /** 手动刷新：读完弹一条轻提示，成功失败都要说，否则用户不知道按钮有没有生效。 */
+  const handleRefreshDrives = useCallback(async () => {
+    const succeeded = await refreshDrives();
+    showToast(
+      succeeded
+        ? { type: 'success', title: t('refreshDiskInfoDone') }
+        : { type: 'error', title: t('refreshDiskInfoFailed') },
+    );
+  }, [refreshDrives, showToast, t]);
+
+  // 首次拿到列表时默认选中系统盘（后端标了 is_system 的那块，找不到就退 C:）。
+  useEffect(() => {
+    if (!selectedDrive && drives.length > 0) {
+      setSelectedDrive(defaultDriveLetter(drives));
+    }
+  }, [drives, selectedDrive]);
+
+  const activeDrive = useMemo(
+    () => drives.find((drive) => drive.drive_letter === selectedDrive) ?? null,
+    [drives, selectedDrive],
+  );
+  /** 展示用的一条数据：选中的盘优先，没有就退回 context 的系统盘。 */
+  const disk = activeDrive
+    ? { drive_letter: activeDrive.drive_letter, free_space: activeDrive.free_space, total_space: activeDrive.total_space, usage_percent: activeDrive.usage_percent }
+    : diskInfo;
+
+  /** 盘符下拉项：直接复用 DriveSelect 的 label / title 构造函数，
+      避免顶栏和设置页各拼一份（之前少了 ` · ` 分隔符，同一个下拉两处长不一样）。 */
+  const driveOptions = useMemo(
+    () => drives.map((drive) => ({
+      value: drive.drive_letter,
+      label: driveOptionLabel(drive),
+      title: driveOptionTitle(drive),
+    })),
+    [drives],
+  );
   
   // 动画数字
   const animatedScore = useAnimatedNumber(healthData?.score ?? 0);
@@ -193,26 +244,47 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
         {/* 分隔线 */}
         <div className="w-px h-9 bg-[var(--border-color)]" />
 
-        {/* 磁盘使用情况 */}
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-1.5">
-            {/* 磁盘使用情况（盘符取后端返回的系统盘，兼容非 C 盘场景） */}
-            <span className="text-[1rem] font-bold text-[var(--text-primary)]">{t('diskSpace', { drive: diskInfo?.drive_letter ?? 'C' })}</span>
-            {diskInfo && (
-              <span className="text-[0.86rem] text-[var(--text-muted)] tabular-nums">
-                {t('freeOfTotal', { free: formatSize(diskInfo.free_space), total: formatSize(diskInfo.total_space) })}
+        {/* 磁盘使用情况：盘符改成下拉（多盘机器上默认系统盘），旁边是手动刷新。
+            刷新后各盘剩余空间会重新读取 —— 清理完一个盘不用重启就能看到新的数字。 */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <div className="flex min-w-0 items-center gap-1.5 text-[0.9rem]">
+              <Select
+                value={disk?.drive_letter ?? 'C:'}
+                options={driveOptions}
+                onChange={setSelectedDrive}
+                size="sm"
+                variant="bare"
+                widthClass="w-auto"
+                disabled={drivesLoading && driveOptions.length === 0}
+              />
+              <button
+                type="button"
+                onClick={handleRefreshDrives}
+                disabled={drivesLoading}
+                title={t('refreshDiskInfo')}
+                aria-label={t('refreshDiskInfo')}
+                className="shrink-0 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {/* 读取中转一圈，让"按钮生效了"这件事可见 */}
+                <RefreshCw className={`h-4 w-4 ${drivesLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+            {disk && (
+              <span className="truncate text-[0.86rem] tabular-nums text-[var(--text-muted)]">
+                {t('freeOfTotal', { free: formatSize(disk.free_space), total: formatSize(disk.total_space) })}
               </span>
             )}
           </div>
           {/* 进度条 - 使用柔和灰色轨道 */}
           <div className="h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
-            {diskInfo && (
-              <div 
+            {disk && (
+              <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  diskInfo.usage_percent > 90 ? 'bg-[var(--color-danger)]' :
-                  diskInfo.usage_percent > 75 ? 'bg-[var(--color-warning)]' : 'bg-[var(--brand-green)]'
+                  disk.usage_percent > 90 ? 'bg-[var(--color-danger)]' :
+                  disk.usage_percent > 75 ? 'bg-[var(--color-warning)]' : 'bg-[var(--brand-green)]'
                 }`}
-                style={{ width: `${diskInfo.usage_percent}%` }}
+                style={{ width: `${disk.usage_percent}%` }}
               />
             )}
           </div>

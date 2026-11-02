@@ -27,6 +27,14 @@ interface SelectProps<T extends string = string> {
   menuMaxHeightClass?: string;
   /** 是否禁用 */
   disabled?: boolean;
+  /**
+   * 触发器的视觉形态。
+   * - `default`：带底色和描边，用于设置页、筛选条这类独立控件；
+   * - `bare`：去掉底色和描边，只在悬停时浮现一层淡底。
+   *   用于顶栏这类**本身已经有材质**的容器 —— 在上面再压一个白底带边框的小方块，
+   *   会读成"贴在玻璃上的另一样东西"，而不是同一层。
+   */
+  variant?: 'default' | 'bare';
 }
 
 export function Select<T extends string = string>({
@@ -37,6 +45,7 @@ export function Select<T extends string = string>({
   size = 'md',
   menuMaxHeightClass = 'max-h-64',
   disabled = false,
+  variant = 'default',
 }: SelectProps<T>) {
   const [open, setOpen] = useState(false);
   /**
@@ -85,8 +94,20 @@ export function Select<T extends string = string>({
   }, [open]);
 
   const selectedOption = options.find(o => o.value === value);
-  const triggerSizeClass = size === 'sm' ? 'px-2.5 py-1.5 rounded-lg text-xs' : 'px-3 py-2 rounded-xl text-sm';
-  const optionSizeClass = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm';
+  // 尺寸只管内边距和圆角，**字号不跟尺寸走**。
+  // 之前 sm=12px、md=14px，同一个控件在筛选条和设置页里差一档，看着像两个组件。
+  // 现在统一 text-sm（0.875rem，跟随全局字号设置）；
+  // 只有 bare 变体（顶栏）用 inherit —— 那处要跟顶栏自己的字号节奏，属于特调。
+  const triggerSizeClass = size === 'sm' ? 'px-2.5 py-1.5 rounded-lg' : 'px-3 py-2 rounded-xl';
+  const textClass = variant === 'bare' ? 'text-[inherit]' : 'text-sm';
+  const optionSizeClass = size === 'sm' ? 'px-2.5 py-1.5' : 'px-3 py-2';
+  // bare：没有底色和描边，靠悬停时的一层淡底表达可点；打开时也不画绿色描边，
+  // 否则在玻璃顶栏上会突然冒出一个绿框。
+  const triggerVariantClass = variant === 'bare'
+    ? 'bg-transparent border border-transparent hover:bg-[var(--bg-hover)]'
+    : `bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-[var(--brand-green)]/50 hover:bg-[var(--bg-hover)] ${
+      open ? 'border-[var(--brand-green)] ring-2 ring-[var(--brand-green)]/20' : ''
+    }`;
 
   return (
     <div ref={containerRef} className={`relative ${widthClass}`}>
@@ -99,14 +120,12 @@ export function Select<T extends string = string>({
           if (!open) updateDirection();
           setOpen(!open);
         }}
-        className={`w-full flex items-center justify-between gap-2 ${triggerSizeClass}
-          bg-[var(--bg-card)] border border-[var(--border-color)]
+        className={`w-full flex items-center ${variant === 'bare' ? 'justify-start gap-1' : 'justify-between gap-2'} ${triggerSizeClass} ${textClass}
+          ${triggerVariantClass}
           text-[var(--text-primary)] font-medium
-          hover:border-[var(--brand-green)]/50 hover:bg-[var(--bg-hover)]
           focus:outline-none focus:ring-2 focus:ring-[var(--brand-green)]/20
           transition-all duration-200
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          ${open ? 'border-[var(--brand-green)] ring-2 ring-[var(--brand-green)]/20' : ''}`}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <span className="min-w-0 truncate" title={selectedOption?.title ?? selectedOption?.label ?? value}>
           {selectedOption?.label ?? value}
@@ -121,9 +140,16 @@ export function Select<T extends string = string>({
       {/* 下拉列表 */}
       {open && (
         <div
-          className={`glass-overlay absolute left-0 w-full py-1 rounded-xl
+          /* ⚠️ 宽度不能是 w-full：那是"跟着触发器宽度走"，
+             触发器一旦是自适应（w-auto，比如顶栏那个盘符选择器只有 "C: ⌄" 那么宽），
+             菜单项就会被截成 "D: o..."。这里改成「至少和触发器一样宽，
+             内容更多时按最长的那一项撑开」—— 两侧都照顾到。 */
+          className={`glass-overlay absolute left-0 min-w-full w-max py-1 rounded-xl
             ${openUpward ? 'bottom-full mb-1.5 slide-in-from-bottom-1' : 'top-full mt-1.5 slide-in-from-top-1'}
-            bg-[var(--bg-card)] border border-[var(--border-color)]
+            /* 底色用浮层专用的 --glass-overlay-bg：.glass-overlay 的默认值会被
+               bg-[var(--bg-card)]（玻璃态只有 0.42 白）覆盖，菜单会透出背后的列表文字，
+               读选项时很干扰。非玻璃主题下该变量未定义，回退到 --bg-card。 */
+            bg-[var(--glass-overlay-bg,var(--bg-card))] border border-[var(--border-color)]
             shadow-lg shadow-black/5 z-50 overflow-y-auto ${menuMaxHeightClass}
             animate-in fade-in duration-150`}
         >
@@ -138,7 +164,7 @@ export function Select<T extends string = string>({
                   onChange(option.value);
                   setOpen(false);
                 }}
-                className={`w-full flex items-center justify-between gap-2 ${optionSizeClass}
+                className={`w-full flex items-center justify-between gap-2 ${optionSizeClass} ${textClass}
                   transition-colors duration-100
                   ${isSelected
                     ? 'bg-[var(--brand-green)]/10 text-[var(--brand-green)] font-medium'

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getLocalDrives, type LocalDriveInfo } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { Select, type SelectOption } from './Select';
@@ -17,28 +17,43 @@ export function useLocalDrives() {
   const [drives, setDrives] = useState<LocalDriveInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** 组件卸载后不再 setState，避免刷新请求回来时报警告。 */
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    getLocalDrives()
-      .then((result) => {
-        if (cancelled) return;
-        setDrives(result);
-        setError(null);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+  /**
+   * 读取磁盘列表（含各盘剩余空间）。
+   * 返回是否成功 —— 调用方要用它决定弹"已更新"还是"更新失败"。
+   */
+  const loadDrives = useCallback(async (): Promise<boolean> => {
+    setLoading(true);
+    try {
+      const result = await getLocalDrives();
+      if (!mountedRef.current) return true;
+      setDrives(result);
+      setError(null);
+      return true;
+    } catch (err) {
+      if (!mountedRef.current) return false;
+      setError(String(err));
+      return false;
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
   }, []);
 
-  return { drives, error, loading };
+  useEffect(() => {
+    // ⚠️「置 true」必须和「置 false」写在同一个 effect 里。
+    // 之前只在 cleanup 里置 false，React 严格模式下 effect 会 mount → unmount → mount，
+    // 第二次挂载时 mountedRef 已经是 false，loadDrives 一进门就提前返回，
+    // setLoading(false) 永远执行不到 —— 表现就是顶栏一直 loading、控件 disabled 点不动。
+    mountedRef.current = true;
+    void loadDrives();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [loadDrives]);
+
+  return { drives, error, loading, refresh: loadDrives };
 }
 
 export function defaultDriveLetter(drives: LocalDriveInfo[]): string {
@@ -60,7 +75,12 @@ export function driveOptionTitle(drive: LocalDriveInfo): string {
   return parts.join(' · ');
 }
 
-function driveOptionLabel(drive: LocalDriveInfo): string {
+/**
+ * 盘符下拉项的短标签。
+ * ⚠️ 必须 export 给顶栏复用 —— 之前顶栏自己拼了一份 `${letter} ${volume}`，
+ * 少了中间的 ` · `，同一个下拉在设置页和顶栏里长得不一样。
+ */
+export function driveOptionLabel(drive: LocalDriveInfo): string {
   // 下拉触发器空间有限，只显示盘符和卷标；容量、文件系统等完整信息放进 title。
   return drive.volume_name ? `${drive.drive_letter} · ${drive.volume_name}` : drive.drive_letter;
 }
