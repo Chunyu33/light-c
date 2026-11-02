@@ -66,6 +66,7 @@
     }
   },
   "leftovers": {
+    "searchQuery": "Windows 文件夹 {{path}} 可以删除吗",
     "deleting": "正在清理残留和缓存",
     "deletingFolder": "正在删除文件夹",
     "doNotClose": "请勿关闭窗口",

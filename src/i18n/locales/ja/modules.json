@@ -57,6 +57,7 @@
     }
   },
   "leftovers": {
+    "searchQuery": "Windows フォルダー {{path}} は削除できますか？",
     "deleting": "残留とキャッシュをクリーンアップ中",
     "deletingFolder": "フォルダーを削除中",
     "doNotClose": "ウィンドウを閉じないでください",

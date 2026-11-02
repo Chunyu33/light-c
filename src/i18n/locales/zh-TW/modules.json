@@ -81,6 +81,7 @@
     }
   },
   "leftovers": {
+    "searchQuery": "Windows 資料夾 {{path}} 可以刪除嗎",
     "deleting": "正在清理殘留與快取",
     "deletingFolder": "正在刪除資料夾",
     "doNotClose": "請勿關閉視窗",

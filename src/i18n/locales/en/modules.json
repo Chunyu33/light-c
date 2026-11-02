@@ -57,6 +57,7 @@
     }
   },
   "leftovers": {
+    "searchQuery": "Can the Windows folder {{path}} be deleted?",
     "deleting": "Cleaning leftovers and caches",
     "deletingFolder": "Deleting folders",
     "doNotClose": "Do not close the window",

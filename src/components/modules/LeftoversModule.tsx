@@ -6,7 +6,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
-import { Package, Loader2, Trash2, FolderOpen, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle, ShieldCheck, ShieldPlus } from 'lucide-react';
+import { Package, Loader2, Trash2, FolderOpen, Search, AlertTriangle, CheckCircle2, Smartphone, HardDrive, ChevronDown, ChevronUp, XCircle, ShieldCheck, ShieldPlus } from 'lucide-react';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { AiAskButton } from '../ai/AiAskButton';
@@ -35,6 +35,7 @@ import {
   getSafetyCheckMessage,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
+import { openSearchUrl } from '../../utils/searchEngine';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
@@ -216,6 +217,24 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       setIsUpdatingWhitelist(false);
     }
   }, [moduleT, showToast, updateModuleState, whitelistCandidate]);
+
+  /**
+   * 一键搜索：把完整路径交给默认搜索引擎，让用户自己确认这个目录的用途。
+   * 与大文件清理、磁盘变化分析保持同一套交互（`openSearchUrl` + 失败提示）。
+   * 问句里必须带完整路径 —— 用户要确认的是"这一串目录能不能删"，不是目录名。
+   */
+  const handleSearchLeftover = useCallback(async (path: string) => {
+    try {
+      await openSearchUrl(moduleT('leftovers.searchQuery', { path }));
+    } catch (error) {
+      console.error('搜索残留目录用途失败:', error);
+      showToast({
+        type: 'error',
+        title: t('openSearchFailed'),
+        description: String(error),
+      });
+    }
+  }, [moduleT, showToast, t]);
 
   const handleRemoveWhitelist = useCallback(async (path: string) => {
     setIsUpdatingWhitelist(true);
@@ -1073,6 +1092,19 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
                     question={buildItemQuestion(leftover.path, 'folder')}
                     className="inline-flex h-8 w-8 items-center justify-center"
                   />
+
+                  {/* 一键搜索：按大文件清理的做法放在「打开文件夹」前面 ——
+                      先确认这个目录是什么、能不能删，再决定要不要打开看。 */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSearchLeftover(leftover.path);
+                    }}
+                    className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--brand-green)] hover:bg-[var(--bg-hover)] transition-colors"
+                    title={t('searchDeletionAdvice')}
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
 
                   {/* 打开文件夹按钮 */}
                   <button
