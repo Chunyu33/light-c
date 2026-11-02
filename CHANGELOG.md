@@ -2,19 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.18.1
 
-- "Uninstall leftovers" is now "Leftovers & Caches": it no longer looks only for folders left by removed software, but also counts the old versions updaters pile up - which is where most of the space actually goes. Every row carries a label: "Update cache" means deleting it only makes the next update download again and the installed program keeps working, while "Suspicious" needs your own judgement. Items sitting directly in the AppData root, such as `Roaming\ollama app.exe`, were not scanned at all before and now show up.
-- This module could barely find anything: not because nothing was left behind, but because the threshold rejected the common cases, and an empty folder never even reached scoring. An empty result now says how many folders were checked and the highest confidence it saw; found items can be asked about through the AI assistant or opened in Explorer in one click; folders containing programs are no longer stuck at "needs review" - the result dialog offers a force delete, with one more confirmation. A failed delete always reports back.
-- This module scans much faster: 6.6s down to 1.3s on the same machine. Most of it was a full walk of AppData to find WSL and Docker virtual disks, descending into every subfolder even though the vast majority (dependencies, temp files, caches) cannot hold one. Caches are now split into two labels: plain "Cache" rebuilds itself on next launch, "Update cache" means a re-download.
-- The glass desktop background is now neutral white-grey (dark grey in dark mode) instead of a green gradient: the logo, icons and buttons were already green, so a green backdrop left the whole window in one hue. The background now only carries light and shadow, and green goes back to meaning something.
-- The version number at the bottom of the sidebar is now a heart: click it to open the support dialog (WeChat or Alipay, switchable). The entry in settings stays. The version number moved to the bottom of that dialog and is still on the About page in settings.
-- Modules that need administrator rights no longer send you hunting for the exe: disk change analysis, old driver cleanup, system slimming, hotspot analysis, large-file cleanup, and the deep scans in junk clean and AI model space all offer "Restart with administrator rights" in the UI, with the usual system prompt. AI model space used to quietly fall back to a normal scan while still claiming deep discovery; it now explains why and reports what actually ran.
-- "Clear local data" in settings no longer gives up halfway: when one item is locked, the rest still run, and the result separates what was cleared from what failed and why.
-- The AI assistant entry can be turned off in settings: the floating button and the inline icons disappear together, saved providers and keys stay, and switching it off and on no longer claims no provider is configured.
-- AI tool cleanup now covers Doubao, including its browser caches and the sandbox runtime installers; a rescan clears the previous result instead of letting you tick rows that are about to be replaced.
-- The batch action bar moved from a floating panel on the right to a centered bar at the bottom, so it no longer covers the numbers at the end of a row and timings are readable without collapsing it first.
-- Social clean is faster: scanning 100,000 files on the same machine drops from about 1.4s to 0.5s, and the meter in the result area shows how long each folder took.
+- "Uninstall leftovers" is now "Leftovers & Caches": besides folders left by removed software, it now counts the old versions updaters pile up, and every row carries a label. The threshold that used to reject most cases is lower, an empty result says how many folders were checked, and a scan of the same machine drops from 6.6s to 1.3s.
+- The glass look is rebuilt: the background is no longer green or blue but only light and shadow, and the header, sidebar and dialogs now share one frosted material. Tables inside a dialog no longer let the content behind them show through, and nothing dims when the pointer moves over it.
+- Modules that need administrator rights (disk change analysis, old driver cleanup, system slimming, hotspot analysis, large-file cleanup, and the deep scans in junk clean and AI model space) offer "Restart with administrator rights" in the UI.
+- Other improvements: one locked item no longer stops "Clear local data"; turning the AI assistant entry off and on no longer claims no provider is configured; AI tool cleanup covers Doubao and clears the previous result on rescan; the batch bar sits at the bottom centre; social clean is about 3x faster.
 
 ## v2.18.0
 
