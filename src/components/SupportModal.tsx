@@ -85,7 +85,7 @@ export function SupportModal({ isOpen, onClose, initialPayment = 'wechat', versi
       {isOpen && (
         <motion.div
           {...MODAL_BACKDROP_MOTION}
-          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm glass-backdrop"
           onClick={onClose}
         >
           <motion.div
@@ -93,7 +93,7 @@ export function SupportModal({ isOpen, onClose, initialPayment = 'wechat', versi
             role="dialog"
             aria-modal="true"
             aria-label={t('supportTitle')}
-            className="relative w-[26em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-2xl bg-[var(--glass-modal-bg,var(--bg-card))] p-[1.43em] shadow-2xl"
+            className="glass-dialog relative w-[26em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-2xl bg-[var(--glass-modal-bg,var(--bg-card))] p-[1.43em] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <button

@@ -50,12 +50,12 @@ export function LeftoverWhitelistModal({
           transition={{ duration: 0.16, ease: 'easeOut' }}
         >
           <motion.div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop"
             onClick={onClose}
             {...MODAL_BACKDROP_MOTION}
           />
           <motion.div
-            className="relative flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-[var(--bg-card)] shadow-2xl"
+            className="relative flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-[var(--bg-card)] glass-dialog shadow-2xl"
             {...MODAL_CARD_MOTION}
           >
             <div className="flex items-center gap-3 border-b border-[var(--border-color)] p-5">
@@ -102,7 +102,7 @@ export function LeftoverWhitelistModal({
             </div>
 
             <div className="border-t border-[var(--border-color)] p-4">
-              <button onClick={onClose} className="w-full rounded-lg bg-[var(--bg-hover)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-main)]">
+              <button onClick={onClose} className="w-full rounded-lg bg-[var(--bg-hover)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-active)]">
                 {commonT('close')}
               </button>
             </div>

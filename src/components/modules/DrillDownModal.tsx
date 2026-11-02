@@ -499,7 +499,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4">
       {/* 遮罩层 - 半透明磨砂 */}
       <div
-        className={`absolute inset-0 bg-black/40 backdrop-blur-md ${
+        className={`absolute inset-0 bg-black/40 backdrop-blur-md glass-backdrop ${
           isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'
         }`}
         onClick={handleClose}
@@ -507,7 +507,7 @@ export function DrillDownModal({ initialPath, onClose, onCleanupDone }: DrillDow
 
       {/* 模态框主体 */}
       <div
-        className={`relative flex flex-col bg-[var(--bg-elevated)] rounded-2xl shadow-2xl border border-[var(--border-default)]
+        className={`glass-dialog relative flex flex-col bg-[var(--bg-elevated)] rounded-2xl shadow-2xl border border-[var(--border-default)]
           w-[51.43em] max-w-[calc(100vw-2em)] max-h-[min(57.14em,calc(100vh_-_2em))] overflow-hidden ${
           isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'
         }`}

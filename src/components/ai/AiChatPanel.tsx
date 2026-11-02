@@ -258,7 +258,7 @@ export function AiChatPanel({
         一旦有 transform，内部 position:fixed 的元素会被它的 overflow-hidden 裁掉。 */}
     {previewUrl ? (
       <div
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6"
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 glass-backdrop p-6"
         onClick={() => setPreviewUrl('')}
         role="button"
         tabIndex={-1}

@@ -97,9 +97,9 @@ export function AiCacheFileModal({ isOpen, dirPath, dirName, onClose }: AiCacheF
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      <motion.div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div className="absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop" onClick={onClose} />
       <motion.div
-        className="ai-cache-modal relative flex max-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-2xl"
+        className="ai-cache-modal glass-dialog relative flex max-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-elevated)] shadow-2xl"
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}

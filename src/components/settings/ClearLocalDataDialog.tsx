@@ -74,7 +74,7 @@ export function ClearLocalDataDialog({
           transition={{ duration: 0.18 }}
         >
           <motion.div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop"
             onClick={onCancel}
             {...MODAL_BACKDROP_MOTION}
           />
@@ -82,7 +82,7 @@ export function ClearLocalDataDialog({
               高度必须叠加视口约束：此前只有列表自身的 41.43em 上限，窗口偏矮时整个弹窗会溢出上下边缘。
               与「社交软件专清」的文件列表弹窗保持同一套写法：外壳限高 + 列表 flex-1 自己滚。 */}
           <motion.div
-            className="relative flex w-[37.14em] max-w-[calc(100vw-2em)] max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl"
+            className="relative flex w-[37.14em] max-w-[calc(100vw-2em)] max-h-[80vh] flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] glass-dialog shadow-2xl"
             {...MODAL_CARD_MOTION}
           >
             <div className="flex items-center justify-between border-b border-[var(--border-color)] px-[1.43em] py-[1.14em] shrink-0">

@@ -362,14 +362,14 @@ export function UpdateModal({ autoCheck = true }: UpdateModalProps) {
     <div className="fixed inset-0 z-[10000] flex items-center justify-center">
       {/* 遮罩 */}
       <div
-        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={status !== 'downloading' ? handleClose : undefined}
       />
 
       {/* 弹窗主体：宽高与圆角都随全局字号缩放，1.86em ≈ 26px。
           高度必须叠加视口约束，否则窗口偏矮时顶部内容与底部按钮会被顶出可视区；
           overflow-hidden 改为 overflow-y-auto，让内容在弹窗内滚动。 */}
-      <div className={`relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+      <div className={`glass-dialog relative mx-[1em] w-[28.5em] max-w-[calc(100vw-2em)] max-h-[calc(100vh-2em)] overflow-y-auto rounded-[0.86em] border border-[var(--border-default)] bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 关闭按钮：下载中不允许中断，故不渲染 */}
         {status !== 'downloading' && (
           <button

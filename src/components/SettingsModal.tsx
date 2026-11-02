@@ -189,14 +189,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div
-        className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm glass-backdrop ${isVisible ? 'modal-overlay-in' : enteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onClose}
       />
 
-      <div className={`relative h-[80vh] w-[76vw] min-h-0 min-w-0 max-h-[calc(100vh-24px)] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+      <div className={`glass-dialog relative h-[80vh] w-[76vw] min-h-0 min-w-0 max-h-[calc(100vh-24px)] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-2xl ${isVisible ? 'modal-content-in' : enteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
         <div className={`flex h-full${isResizingNav ? ' settings-modal--resizing' : ''}`}>
           <aside
-            className="relative shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-main)] py-4"
+            className="glass-nav-pane relative shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-main)] py-4"
             style={{ width: renderedNavWidth }}
           >
             <div className="mb-4 px-4">

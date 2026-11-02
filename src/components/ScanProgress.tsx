@@ -214,12 +214,12 @@ export function ScanProgress({
       `}
     >
       {/* 半透明遮罩 */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm glass-backdrop" />
       
       {/* 弹窗内容 */}
       <div 
         className={`
-          glass-overlay relative bg-[var(--bg-elevated)] rounded-2xl shadow-2xl 
+          glass-overlay relative bg-[var(--bg-elevated)] rounded-2xl glass-dialog shadow-2xl 
           border border-[var(--border-default)] p-6 w-80
           transition-all duration-300 ease-out
           ${isVisible ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}

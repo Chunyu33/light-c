@@ -615,7 +615,7 @@ function DiskGrowthDetailsModal({
   // 弹窗必须挂到 body 下，避免被页面模式外层 motion transform 改写 fixed 定位的参照物。
   return createPortal(
     <motion.div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm glass-backdrop"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -623,7 +623,7 @@ function DiskGrowthDetailsModal({
       onClick={onClose}
     >
       <motion.div
-        className="w-[74.29rem] max-w-[calc(100vw-32px)] h-[90vh] max-h-[calc(100vh-32px)] rounded-2xl bg-[var(--bg-card)] shadow-2xl border border-[var(--border-color)] overflow-hidden flex flex-col"
+        className="w-[74.29rem] max-w-[calc(100vw-32px)] h-[90vh] max-h-[calc(100vh-32px)] rounded-2xl bg-[var(--bg-card)] glass-dialog shadow-2xl border border-[var(--border-color)] overflow-hidden flex flex-col"
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}

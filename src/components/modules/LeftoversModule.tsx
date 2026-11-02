@@ -773,10 +773,10 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       {/* 删除进度遮罩 - 使用 Portal 渲染到 body 确保覆盖全屏 */}
       {isDeletingAnimating && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop ${isDeletingVisible ? 'modal-overlay-in' : deletingEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} />
           {/* 尺寸用 em 跟随全局字号，20em 的上限对应原来的 max-w-sm。
               内容虽短，也一并加上视口约束，避免字号调大后在矮窗口溢出。 */}
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[2.29em] shadow-2xl flex flex-col items-center gap-[1.14em] max-w-[20em] mx-[1em] max-h-[calc(100vh-2em)] overflow-y-auto ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[2.29em] glass-dialog shadow-2xl flex flex-col items-center gap-[1.14em] max-w-[20em] mx-[1em] max-h-[calc(100vh-2em)] overflow-y-auto ${isDeletingVisible ? 'modal-content-in' : deletingEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             <div className="w-[4.57em] h-[4.57em] rounded-full bg-[var(--color-warning)]/10 flex items-center justify-center">
               <Loader2 className="w-[2.29em] h-[2.29em] text-[var(--color-warning)] animate-spin" />
             </div>
@@ -1165,10 +1165,10 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       {/* 深度清理警告弹窗 - 微信风格 */}
       {isWarningAnimating && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isWarningVisible ? 'modal-overlay-in' : warningEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanWarning(false)} />
+          <div className={`absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop ${isWarningVisible ? 'modal-overlay-in' : warningEnteredRef.current ? 'modal-overlay-out' : 'opacity-0'}`} onClick={() => setShowDeepCleanWarning(false)} />
           {/* 尺寸用 em 跟随全局字号，25em 的上限对应原来的 max-w-md。
               高度叠加视口约束，避免矮窗口下标题与按钮被顶出可视区。 */}
-          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl max-w-[25em] mx-[1em] max-h-[calc(100vh-2em)] overflow-y-auto ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
+          <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] glass-dialog shadow-2xl max-w-[25em] mx-[1em] max-h-[calc(100vh-2em)] overflow-y-auto ${isWarningVisible ? 'modal-content-in' : warningEnteredRef.current ? 'modal-content-out' : 'opacity-0'}`}>
             {/* 警告图标 */}
             <div className="flex justify-center mb-[1.14em]">
               <div className="w-[4.57em] h-[4.57em] rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center">
@@ -1198,7 +1198,7 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
             <div className="flex gap-[0.86em]">
               <button
                 onClick={() => setShowDeepCleanWarning(false)}
-                className="flex-1 px-[1.14em] py-[0.86em] rounded-xl text-[1em] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-colors"
+                className="flex-1 px-[1.14em] py-[0.86em] rounded-xl text-[1em] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)] hover:bg-[var(--bg-active)] transition-colors"
               >
                 {t('cancel')}
               </button>
@@ -1316,12 +1316,12 @@ function DeepCleanResultModal({
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div
-        className={`absolute inset-0 bg-black/50 backdrop-blur-sm ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop ${isVisible ? 'modal-overlay-in' : hasEntered ? 'modal-overlay-out' : 'opacity-0'}`}
         onClick={onClose}
       />
       {/* 尺寸统一用 em：body 继承 :root 字号，弹窗随全局字号设置缩放，30em ≈ 420px。
           高度叠加视口约束：只写 57.14em 时窗口高度低于 832px 就会上下溢出，头部与底栏被切掉。 */}
-      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] shadow-2xl w-[30em] max-h-[min(57.14em,calc(100vh_-_2em))] overflow-hidden flex flex-col mx-[1em] ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
+      <div className={`relative bg-[var(--bg-card)] rounded-2xl p-[1.43em] glass-dialog shadow-2xl w-[30em] max-h-[min(57.14em,calc(100vh_-_2em))] overflow-hidden flex flex-col mx-[1em] ${isVisible ? 'modal-content-in' : hasEntered ? 'modal-content-out' : 'opacity-0'}`}>
         {/* 结果图标 */}
         <div className="flex justify-center mb-[1.14em]">
           <div className={`w-[4.57em] h-[4.57em] rounded-full flex items-center justify-center ${result.success_count > 0

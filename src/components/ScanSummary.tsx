@@ -56,14 +56,14 @@ function FailedFilesModal({
         >
           {/* 遮罩层 */}
           <motion.div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm glass-backdrop"
             onClick={onClose}
             {...MODAL_BACKDROP_MOTION}
           />
           
           {/* 弹窗 */}
           <motion.div
-            className="relative bg-[var(--bg-elevated)] rounded-xl shadow-2xl border border-[var(--border-default)] w-[42.86rem] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden"
+            className="relative bg-[var(--bg-elevated)] rounded-xl glass-dialog shadow-2xl border border-[var(--border-default)] w-[42.86rem] max-w-[90vw] max-h-[80vh] flex flex-col overflow-hidden"
             {...MODAL_CARD_MOTION}
           >
             {/* 头部 */}
