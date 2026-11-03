@@ -388,15 +388,10 @@ impl SocialScanner {
                 if !search_base.is_dir() {
                     continue;
                 }
-                let Ok(entries) = std::fs::read_dir(&search_base) else {
-                    continue;
-                };
+                // 走缓存：微信侧的兜底搜索已经把这批目录读过一遍，这里直接命中。
+                let subdirectories = self.read_subdirectories_cached(&search_base);
 
-                for entry in entries.filter_map(|e| e.ok()) {
-                    let path = entry.path();
-                    if !path.is_dir() {
-                        continue;
-                    }
+                for path in subdirectories {
                     // 盘符根下的系统目录不下钻：里面不可能放聊天数据，只会白花时间。
                     if location.is_empty() && Self::is_system_top_level_dir(&path) {
                         continue;
@@ -420,7 +415,7 @@ impl SocialScanner {
                     // 例如 issue #97 的 `D:\聊天记录\QQ\Tencent Files` ——
                     // 从盘符根算起是"分类 → 软件 → 数据"三层，只下钻一层永远够不到。
                     // 只多一层 readdir，且有 20000 目录上限兜底，大目录不会卡住。
-                    if let Some(found) = Self::find_directory_by_name(&path, "Tencent Files", 2) {
+                    if let Some(found) = self.find_directory_by_name(&path, "Tencent Files", 2) {
                         info!("全盘搜索发现QQ目录: {}", found.display());
                         found_paths.push(found);
                     }

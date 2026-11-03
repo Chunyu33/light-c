@@ -349,6 +349,14 @@ pub struct SocialScanner {
     pub(super) default_documents: String,
     /// 所有可用盘符（用于全盘搜索）
     pub(super) available_drives: Vec<String>,
+    /// 盘面目录缓存：目录路径 → 它的直接子目录列表。
+    ///
+    /// 微信和 QQ 的兜底搜索会把**同一批目录各 read_dir 一遍**，第二遍是纯重复 IO：
+    /// 实测探测阶段 2.3s 里大头就在这两次遍历。
+    /// 缓存只在 scanner 实例的生命周期内有效，每次重新扫描都是新实例 ——
+    /// 不影响"实时"，只是同一次扫描内不重复读盘。
+    pub(super) dir_cache:
+        std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Vec<std::path::PathBuf>>>,
 }
 
 impl SocialScanner {
@@ -384,7 +392,35 @@ impl SocialScanner {
             documents_dir,
             default_documents,
             available_drives,
+            dir_cache: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
+    }
+
+    /// 读一个目录的**直接子目录**，同一次扫描内只读一次盘。
+    ///
+    /// 见 `dir_cache` 的说明：微信和 QQ 的兜底搜索范围完全重叠，
+    /// 第二个搜索命中缓存后基本不产生 IO。
+    pub(super) fn read_subdirectories_cached(&self, dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+        if let Ok(cache) = self.dir_cache.lock() {
+            if let Some(hit) = cache.get(dir) {
+                return hit.clone();
+            }
+        }
+
+        let subdirectories: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok())
+                    .map(|entry| entry.path())
+                    .filter(|path| path.is_dir())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if let Ok(mut cache) = self.dir_cache.lock() {
+            cache.insert(dir.to_path_buf(), subdirectories.clone());
+        }
+        subdirectories
     }
 
     // ========================================================================
