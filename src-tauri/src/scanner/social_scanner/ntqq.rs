@@ -168,12 +168,28 @@ impl SocialScanner {
             }
 
             // 只处理账号目录特征明确的子目录，避免把 global 下的杂项目录当成账号
-            if !Self::looks_like_ntqq_account(&sub_dir) {
+            if Self::looks_like_ntqq_account(&sub_dir) {
+                info!("  NTQQ用户目录: {}", dir_name);
+                self.scan_ntqq_account_directory(&sub_dir, paths);
                 continue;
             }
 
-            info!("  NTQQ用户目录: {}", dir_name);
-            self.scan_ntqq_account_directory(&sub_dir, paths);
+            // 子目录里还嵌着 nt_qq：两种常见形态都要认
+            //   ① 数据根本身被当作 base（`<数据根>\nt_qq\...`）
+            //   ② 老架构账号目录里塞了新版数据（`<数据根>\<账号>\nt_qq\nt_data\Pic`）
+            // 这两种目录都没有 nt_data 特征，会被上面的判断漏掉 ——
+            // 用户反馈"默认路径扫不到任何内容"主要就是这一条。
+            let nested = if dir_name.eq_ignore_ascii_case("nt_qq") {
+                Some(sub_dir.clone())
+            } else {
+                let candidate = sub_dir.join("nt_qq");
+                candidate.is_dir().then_some(candidate)
+            };
+            if let Some(nested_dir) = nested {
+                info!("  NTQQ嵌套数据: {}", nested_dir.display());
+                // 走 collect 而不是 scan：嵌套目录下可能直接就是 nt_data
+                self.collect_ntqq_paths(&nested_dir, paths);
+            }
         }
     }
 
@@ -229,7 +245,18 @@ impl SocialScanner {
             for relative in ["nt_qq", "data\\nt_qq"] {
                 let candidate = base.join(relative);
                 if candidate.is_dir() && !found.contains(&candidate) {
-                    found.push(candidate);
+                    found.push(candidate.clone());
+                    // `data\nt_qq` 命中说明 data 就是 QQ 的数据根，
+                    // 老架构的账号目录（`<账号>\nt_qq\nt_data\...`）挂在它下面，
+                    // 只扫 data\nt_qq 永远够不到那些账号目录，所以把根也纳入。
+                    if relative == "data\\nt_qq" {
+                        if let Some(root) = candidate.parent() {
+                            let root = root.to_path_buf();
+                            if !found.contains(&root) {
+                                found.push(root);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -337,6 +364,54 @@ mod tests {
         assert!(found("nt_temp", FileCategory::TempCache), "global/nt_temp 应被收录");
         assert!(found("nt_db", FileCategory::ChatDatabase), "global/nt_db 应为聊天记录");
         assert!(found("Pic", FileCategory::ImageVideo), "账号目录媒体仍应被收录");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scans_nt_qq_nested_inside_legacy_account() {
+        // 实测结构（D:\software\qq\data）：
+        //   <账号>\Image\...                  老架构
+        //   <账号>\nt_qq\nt_data\Pic\...      ← 新版数据写在老账号目录里
+        //   nt_qq\global\nt_data\Emoji\...    新版全局
+        // `nt_qq` 下面**直接是 nt_data**，不是账号目录；
+        // 旧实现把扫描根定在 `data\nt_qq`、账号目录却挂在 `data` 下，
+        // 两边都够不到这棵树 —— 表现就是新版 QQ 只能扫到 global 的少量临时缓存。
+        let root = fixture("legacy-account-nested");
+        let account = root.join("1378813463");
+        std::fs::create_dir_all(account.join("Image")).unwrap();
+        std::fs::create_dir_all(account.join("nt_qq/nt_data/Pic")).unwrap();
+        std::fs::create_dir_all(account.join("nt_qq/nt_data/Video")).unwrap();
+        std::fs::create_dir_all(root.join("nt_qq/global/nt_data/Emoji")).unwrap();
+
+        let scanner = SocialScanner::new();
+
+        // 入口一：数据根被当作 base（安装目录旁推出 data）
+        let mut from_root = Vec::new();
+        scanner.scan_ntqq_directory(&root, &mut from_root);
+        let found = |paths: &Vec<SocialAppPath>, suffix: &str, category: FileCategory| {
+            paths.iter().any(|p| p.path.ends_with(suffix) && p.category == category)
+        };
+        assert!(
+            found(&from_root, "Pic", FileCategory::ImageVideo),
+            "账号内 nt_qq/nt_data/Pic 应被收录"
+        );
+        assert!(
+            found(&from_root, "Video", FileCategory::ImageVideo),
+            "账号内 nt_qq/nt_data/Video 应被收录"
+        );
+        assert!(
+            found(&from_root, "Emoji", FileCategory::TempCache),
+            "数据根下 nt_qq/global 应被收录"
+        );
+
+        // 入口二：老扫描器把 `<账号>\nt_qq` 直接交给 collect（账号目录里嵌新版数据）
+        let mut from_nested = Vec::new();
+        scanner.collect_ntqq_paths(&account.join("nt_qq"), &mut from_nested);
+        assert!(
+            found(&from_nested, "Pic", FileCategory::ImageVideo),
+            "collect 直接指向 <账号>\\nt_qq 时也要认出 nt_data"
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }

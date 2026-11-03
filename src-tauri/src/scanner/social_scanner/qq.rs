@@ -311,15 +311,23 @@ impl SocialScanner {
 
         // 新旧架构混装的机器上，老账号目录里也会出现 nt_qq（新版数据落在老路径下），
         // 这里顺带解析，避免同一份数据只因为所在位置不同而漏扫。
+        // ⚠️ 必须走 collect_ntqq_paths 而不是 scan_ntqq_directory：
+        // 这类 nt_qq 目录下面**直接就是 nt_data**（`<账号>\nt_qq\nt_data\Pic`），
+        // 而 scan_ntqq_directory 只遍历子目录、不会把"自己"当账号目录 ——
+        // 于是整棵子树的图片视频全被跳过（用户反馈新版 QQ 只能扫到少量临时缓存）。
         let nested_ntqq = account_path.join("nt_qq");
         if nested_ntqq.is_dir() {
             info!("  QQ账号内 NTQQ 数据: {}", nested_ntqq.display());
-            self.scan_ntqq_directory(&nested_ntqq, paths);
+            self.collect_ntqq_paths(&nested_ntqq, paths);
         }
     }
 
     fn looks_like_qq_account(path: &Path) -> bool {
-        ["Msg", "Msg2", "FileRecv", "Image", "Database"]
+        // 🚨 必须带上 nt_qq：装在默认路径（Documents\Tencent Files）或自定义 data 目录的
+        // 新版 QQ，账号目录下只有 `nt_qq`，没有 Msg / Image / FileRecv 这些老标记。
+        // 少了这一项，整棵 `<账号>\nt_qq\nt_data\Pic` 连"是不是账号目录"这一关都过不了，
+        // 后面的嵌套解析根本不会被执行 —— 用户反馈"默认路径扫不到任何内容"就是这里。
+        ["Msg", "Msg2", "FileRecv", "Image", "Database", "nt_qq"]
             .iter()
             .any(|name| path.join(name).is_dir())
     }
@@ -437,6 +445,28 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+    /// 新版 QQ 装在默认路径（Documents\Tencent Files）或自定义 data 目录时，
+    /// 账号目录下只有 nt_qq，没有 Msg / Image 这些老标记。
+    /// 旧特征会把这类目录判成"不是账号"，整棵 `<账号>\nt_qq\nt_data\Pic` 被跳过。
+    #[test]
+    fn recognizes_account_that_only_contains_nt_qq() {
+        let root = std::env::temp_dir().join(format!(
+            "lightc-qq-only-ntqq-{}-{}",
+            std::process::id(),
+            FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let account = root.join("123456789");
+        std::fs::create_dir_all(account.join("nt_qq/nt_data/Pic")).unwrap();
+
+        assert!(
+            SocialScanner::looks_like_qq_account(&account),
+            "只有 nt_qq 的账号目录也必须被认出来"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     /// Issue #87 的守卫：盘符根下的系统目录必须跳过，其余目录不能跳过。
     /// 用户的自建目录（`D:\QQ`、`D:\weixin`）就在"其余"里 ——
