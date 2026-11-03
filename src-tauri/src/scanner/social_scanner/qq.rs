@@ -446,6 +446,32 @@ mod tests {
 
     static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
 
+    /// 默认路径（Documents\Tencent Files）下只装新版 QQ 的机器：
+    /// 账号目录里除了 nt_qq 什么都没有，整条链路必须能把 Pic 挖出来。
+    #[test]
+    fn scans_account_holding_only_ntqq_data() {
+        let root = std::env::temp_dir().join(format!(
+            "lightc-qq-default-path-{}-{}",
+            std::process::id(),
+            FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let account = root.join("123456789");
+        std::fs::create_dir_all(account.join("nt_qq/nt_data/Pic")).unwrap();
+        std::fs::create_dir_all(account.join("nt_qq/nt_data/Video")).unwrap();
+
+        let scanner = SocialScanner::new();
+        let mut paths = Vec::new();
+        // detect_qq_paths 对 Tencent Files 下每个账号调的就是这个函数
+        scanner.scan_qq_account_directory(&account, false, &mut paths);
+
+        let found = |suffix: &str| paths.iter().any(|p| p.path.ends_with(suffix));
+        assert!(found("Pic"), "默认路径下只有 nt_qq 的账号也要扫到图片");
+        assert!(found("Video"), "默认路径下只有 nt_qq 的账号也要扫到视频");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// 新版 QQ 装在默认路径（Documents\Tencent Files）或自定义 data 目录时，
     /// 账号目录下只有 nt_qq，没有 Msg / Image 这些老标记。
     /// 旧特征会把这类目录判成"不是账号"，整棵 `<账号>\nt_qq\nt_data\Pic` 被跳过。
