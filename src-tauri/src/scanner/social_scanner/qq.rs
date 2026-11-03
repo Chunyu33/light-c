@@ -416,10 +416,11 @@ impl SocialScanner {
                     // 情况二：目录下面还有一层才到 Tencent Files。
                     // 复用微信那边的有界查找（内部带目录检查次数上限）。
                     //
-                    // 深度取 1：搜索现在**无条件**执行（每个盘符根下每个非系统目录都要过一遍），
-                    // 一层下钻 = 该目录一次 readdir，足以覆盖「自建目录 / 数据目录」这种最常见的结构
-                    //（D:\QQ\Tencent Files），再深就交给注册表值兜底，避免在大目录上白花时间。
-                    if let Some(found) = Self::find_directory_by_name(&path, "Tencent Files", 1) {
+                    // 深度取 2 而不是 1：不少用户把聊天数据放在**自己建的分类目录**里，
+                    // 例如 issue #97 的 `D:\聊天记录\QQ\Tencent Files` ——
+                    // 从盘符根算起是"分类 → 软件 → 数据"三层，只下钻一层永远够不到。
+                    // 只多一层 readdir，且有 20000 目录上限兜底，大目录不会卡住。
+                    if let Some(found) = Self::find_directory_by_name(&path, "Tencent Files", 2) {
                         info!("全盘搜索发现QQ目录: {}", found.display());
                         found_paths.push(found);
                     }

@@ -567,11 +567,11 @@ impl SocialScanner {
                     }
                     enumerated_roots.insert(SocialScanner::normalize_path_key(&path));
                     for data_dir_name in WECHAT_DATA_DIR_NAMES {
-                        // 深度取 1（与 QQ 侧一致）。搜索现在**无条件**执行（见步骤 3 的说明），
-                        // 所以必须把每个非系统顶层目录的成本压到最低：一层下钻 =
-                        // 该目录的一次 readdir，够覆盖「自建目录 / 数据目录」这种最常见的结构
-                        //（D:\weixin\xwechat_files）；更深的自定义布局交给注册表值兜底。
-                        if let Some(found) = Self::find_directory_by_name(&path, data_dir_name, 1) {
+                        // 深度取 2（与 QQ 侧一致）：用户常把数据放进自己建的分类目录，
+                        // 例如 issue #97 的 `D:\聊天记录\微信\xwechat_files` ——
+                        // 从盘符根算是"分类 → 软件 → 数据"，只下钻一层够不到。
+                        // 多一层 readdir，内部有 20000 目录上限，不会在超大目录里卡住。
+                        if let Some(found) = Self::find_directory_by_name(&path, data_dir_name, 2) {
                             info!("全盘搜索发现: {}", found.display());
                             found_paths.push(found);
                         }
@@ -823,6 +823,33 @@ mod tests {
 
         let found = SocialScanner::find_directory_by_name(&root, "xwechat_files", 4);
         assert_eq!(found, Some(target.join("xwechat_files")));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Issue #97：用户把聊天数据放进自己建的分类目录，
+    /// 从盘符根算是「分类 → 软件 → 数据」三层（D://聊天记录//QQ//Tencent Files）。
+    /// 全盘搜索只下钻 1 层时永远够不到，改成 2 层才覆盖得住。
+    #[test]
+    fn finds_data_dir_under_a_named_category_folder() {
+        let root = fixture("categorized-data");
+        std::fs::create_dir_all(root.join("聊天记录/QQ/Tencent Files")).unwrap();
+        std::fs::create_dir_all(root.join("聊天记录/微信/xwechat_files")).unwrap();
+        let category = root.join("聊天记录");
+
+        assert!(
+            SocialScanner::find_directory_by_name(&category, "Tencent Files", 2).is_some(),
+            "分类目录下的 Tencent Files 应能找到"
+        );
+        assert!(
+            SocialScanner::find_directory_by_name(&category, "xwechat_files", 2).is_some(),
+            "分类目录下的 xwechat_files 应能找到"
+        );
+        // 只下钻 1 层确实找不到 —— 证明这条用例真的在守深度，而不是碰巧通过
+        assert!(
+            SocialScanner::find_directory_by_name(&category, "Tencent Files", 1).is_none(),
+            "深度 1 不应命中，否则用例失去意义"
+        );
 
         let _ = std::fs::remove_dir_all(&root);
     }
