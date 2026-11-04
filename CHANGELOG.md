@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.18.2
+
+- Fixes new-style QQ showing only a handful of temp caches: pictures, videos and voice messages now show up whether QQ sits in its default location or keeps its data in the old folder.
+- Fixes chat data being missed entirely when it lives inside a folder the user created themselves, for both WeChat and QQ.
+- Social clean scans faster: locating the data folders now takes about half the time.
+
 ## v2.18.1
 
 - "Uninstall leftovers" is now "Leftovers & Caches": it also counts the old versions that updaters pile up, every row carries a label, and scanning is about 5x faster.
