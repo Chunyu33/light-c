@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- Switching drives from the top bar now opens a dialog where each drive shows its free space and usage.
+
 ## v2.18.2
 
 - Fixes new-style QQ showing only a handful of temp caches: pictures, videos and voice messages now show up whether QQ sits in its default location or keeps its data in the old folder.

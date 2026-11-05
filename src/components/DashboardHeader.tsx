@@ -4,12 +4,12 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { HardDrive, Moon, RefreshCw, Trash2, Zap, Square } from 'lucide-react';
+import { HardDrive, Moon, RefreshCw, ArrowLeftRight, Trash2, Zap, Square } from 'lucide-react';
 import { useDashboardActions, useDashboardSummary } from '../contexts/DashboardContext';
 import { formatSize } from '../utils/format';
 import { useTranslation } from 'react-i18next';
-import { defaultDriveLetter, driveOptionLabel, driveOptionTitle, useLocalDrives } from './ui/DriveSelect';
-import { Select } from './ui/Select';
+import { defaultDriveLetter, useLocalDrives } from './ui/DriveSelect';
+import { DiskSwitchModal } from './DiskSwitchModal';
 import { useToast } from './Toast';
 
 // ============================================================================
@@ -146,16 +146,8 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
     ? { drive_letter: activeDrive.drive_letter, free_space: activeDrive.free_space, total_space: activeDrive.total_space, usage_percent: activeDrive.usage_percent }
     : diskInfo;
 
-  /** 盘符下拉项：直接复用 DriveSelect 的 label / title 构造函数，
-      避免顶栏和设置页各拼一份（之前少了 ` · ` 分隔符，同一个下拉两处长不一样）。 */
-  const driveOptions = useMemo(
-    () => drives.map((drive) => ({
-      value: drive.drive_letter,
-      label: driveOptionLabel(drive),
-      title: driveOptionTitle(drive),
-    })),
-    [drives],
-  );
+  // 切换分区用弹窗，不在顶栏塞下拉：顶栏只有几十像素高，下拉的字号和宽度反复对不齐。
+  const [isDiskSwitchOpen, setIsDiskSwitchOpen] = useState(false);
   
   // 动画数字
   const animatedScore = useAnimatedNumber(healthData?.score ?? 0);
@@ -244,20 +236,15 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
         {/* 分隔线 */}
         <div className="w-px h-9 bg-[var(--border-color)]" />
 
-        {/* 磁盘使用情况：盘符改成下拉（多盘机器上默认系统盘），旁边是手动刷新。
-            刷新后各盘剩余空间会重新读取 —— 清理完一个盘不用重启就能看到新的数字。 */}
+        {/* 磁盘使用情况：左侧是当前盘标签 + 手动刷新，右侧是切换图标 + 容量。
+            切换分区走弹窗而不是下拉 —— 顶栏只有几十像素高，下拉的字号/宽度/选项截断
+            反复对不齐；弹窗里每个盘能完整显示卷标、可用量和占用率。 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-3 mb-1.5">
             <div className="flex min-w-0 items-center gap-1.5 text-[0.9rem]">
-              <Select
-                value={disk?.drive_letter ?? 'C:'}
-                options={driveOptions}
-                onChange={setSelectedDrive}
-                size="sm"
-                variant="bare"
-                widthClass="w-auto"
-                disabled={drivesLoading && driveOptions.length === 0}
-              />
+              <span className="shrink-0 font-medium text-[var(--text-primary)]">
+                {t('diskSpace', { drive: disk?.drive_letter ?? 'C:' })}
+              </span>
               <button
                 type="button"
                 onClick={handleRefreshDrives}
@@ -270,11 +257,23 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
                 <RefreshCw className={`h-4 w-4 ${drivesLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
-            {disk && (
-              <span className="truncate text-[0.86rem] tabular-nums text-[var(--text-muted)]">
-                {t('freeOfTotal', { free: formatSize(disk.free_space), total: formatSize(disk.total_space) })}
-              </span>
-            )}
+            <div className="flex min-w-0 items-center gap-2">
+              {/* 切换分区：点击弹窗，不在这一行里展开下拉 */}
+              <button
+                type="button"
+                onClick={() => setIsDiskSwitchOpen(true)}
+                title={t('switchDrive')}
+                aria-label={t('switchDrive')}
+                className="shrink-0 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+              </button>
+              {disk && (
+                <span className="truncate text-[0.86rem] tabular-nums text-[var(--text-muted)]">
+                  {t('freeOfTotal', { free: formatSize(disk.free_space), total: formatSize(disk.total_space) })}
+                </span>
+              )}
+            </div>
           </div>
           {/* 进度条 - 使用柔和灰色轨道 */}
           <div className="h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
@@ -289,6 +288,14 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
             )}
           </div>
         </div>
+
+        <DiskSwitchModal
+          isOpen={isDiskSwitchOpen}
+          onClose={() => setIsDiskSwitchOpen(false)}
+          drives={drives}
+          selectedDrive={disk?.drive_letter ?? 'C:'}
+          onSelect={setSelectedDrive}
+        />
 
         {!hideOneClickScan && (
           <>
