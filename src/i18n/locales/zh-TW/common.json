@@ -97,6 +97,7 @@
   "diskSwitchTitle": "選擇磁碟",
   "diskSwitchEmpty": "找不到可用的磁碟",
   "freeOfTotal": "{{free}} 可用 / {{total}}",
+  "freeSpace": "{{size}} 可用",
   "oneClickScan": "一鍵掃描",
   "driveLabel": "{{drive}} 盤",
   "systemDrive": "系統盤",

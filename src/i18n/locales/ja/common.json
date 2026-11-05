@@ -83,6 +83,7 @@
   "diskSwitchTitle": "ディスクを選択",
   "diskSwitchEmpty": "利用可能なディスクが見つかりません",
   "freeOfTotal": "空き {{free}} / {{total}}",
+  "freeSpace": "空き {{size}}",
   "oneClickScan": "一括スキャン",
   "driveLabel": "{{drive}} ドライブ",
   "systemDrive": "システムドライブ",

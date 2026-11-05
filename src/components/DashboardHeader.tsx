@@ -101,6 +101,34 @@ interface DashboardHeaderProps {
 }
 
 // ============================================================================
+// 磁盘占用档位
+//
+// 进度条和「可用」数字必须用同一组阈值：以前只在进度条里内联写了 90/75，
+// 现在文字也要按占用率变色，两处各写一份迟早对不上。
+// ============================================================================
+
+type DiskUsageTone = 'normal' | 'warning' | 'danger';
+
+/** 占用率 → 档位。充足用主题绿，不足用橙，紧张用红。 */
+function getDiskUsageTone(usagePercent: number): DiskUsageTone {
+  if (usagePercent > 90) return 'danger';
+  if (usagePercent > 75) return 'warning';
+  return 'normal';
+}
+
+const DISK_BAR_CLASS: Record<DiskUsageTone, string> = {
+  normal: 'bg-[var(--brand-green)]',
+  warning: 'bg-[var(--color-warning)]',
+  danger: 'bg-[var(--color-danger)]',
+};
+
+const DISK_TEXT_CLASS: Record<DiskUsageTone, string> = {
+  normal: 'text-[var(--brand-green)]',
+  warning: 'text-[var(--color-warning)]',
+  danger: 'text-[var(--color-danger)]',
+};
+
+// ============================================================================
 // 组件实现
 // ============================================================================
 
@@ -148,6 +176,9 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
 
   // 切换分区用弹窗，不在顶栏塞下拉：顶栏只有几十像素高，下拉的字号和宽度反复对不齐。
   const [isDiskSwitchOpen, setIsDiskSwitchOpen] = useState(false);
+
+  /** 进度条与「可用」数字共用这一个档位，保证颜色和阈值始终一致。 */
+  const usageTone = getDiskUsageTone(disk?.usage_percent ?? 0);
   
   // 动画数字
   const animatedScore = useAnimatedNumber(healthData?.score ?? 0);
@@ -271,22 +302,26 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               >
                 <ArrowLeftRight className="h-4 w-4" />
               </button>
-              {/* 容量同样继承根字号；层级靠颜色区分，不靠把字调小 */}
+              {/* 「可用」按占用率变色（充足绿 / 不足橙 / 紧张红），总容量加粗。
+                  拆成两段而不是用 freeOfTotal 整句：日语的语序是「空き 78 GB」，
+                  标签在数字前面，只有各语言自己的文案能决定顺序。 */}
               {disk && (
-                <span className="truncate tabular-nums text-[var(--text-muted)]">
-                  {t('freeOfTotal', { free: formatSize(disk.free_space), total: formatSize(disk.total_space) })}
+                <span className="truncate tabular-nums">
+                  <span className={DISK_TEXT_CLASS[usageTone]}>
+                    {t('freeSpace', { size: formatSize(disk.free_space) })}
+                  </span>
+                  <span className="text-[var(--text-muted)]"> / </span>
+                  <span className="font-semibold text-[var(--text-primary)]">
+                    {formatSize(disk.total_space)}
+                  </span>
                 </span>
               )}
             </div>
           </div>
-          {/* 进度条 - 使用柔和灰色轨道 */}
           <div className="h-2 bg-[var(--bg-hover)] rounded-full overflow-hidden">
             {disk && (
               <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  disk.usage_percent > 90 ? 'bg-[var(--color-danger)]' :
-                  disk.usage_percent > 75 ? 'bg-[var(--color-warning)]' : 'bg-[var(--brand-green)]'
-                }`}
+                className={`h-full rounded-full transition-all duration-500 ${DISK_BAR_CLASS[usageTone]}`}
                 style={{ width: `${disk.usage_percent}%` }}
               />
             )}

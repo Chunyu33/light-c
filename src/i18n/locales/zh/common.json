@@ -83,6 +83,7 @@
   "diskSwitchTitle": "选择磁盘",
   "diskSwitchEmpty": "没有检测到可用磁盘",
   "freeOfTotal": "{{free}} 可用 / {{total}}",
+  "freeSpace": "{{size}} 可用",
   "oneClickScan": "一键扫描",
   "driveLabel": "{{drive}} 盘",
   "systemDrive": "系统盘",
