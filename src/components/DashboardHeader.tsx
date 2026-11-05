@@ -241,7 +241,10 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
             反复对不齐；弹窗里每个盘能完整显示卷标、可用量和占用率。 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-3 mb-1.5">
-            <div className="flex min-w-0 items-center gap-1.5 text-[0.9rem]">
+            <div className="flex min-w-0 items-center gap-1.5">
+              {/* 不写自定义字号：html 的根字号是 calc(14px + --font-size-offset)，
+                  继承它才会跟着「设置 - 字号」变化。之前写 text-[0.9rem] 在标准档只有 12.6px，
+                  比正文小一档，而且把比例写死了。 */}
               <span className="shrink-0 font-medium text-[var(--text-primary)]">
                 {t('diskSpace', { drive: disk?.drive_letter ?? 'C:' })}
               </span>
@@ -268,8 +271,9 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               >
                 <ArrowLeftRight className="h-4 w-4" />
               </button>
+              {/* 容量同样继承根字号；层级靠颜色区分，不靠把字调小 */}
               {disk && (
-                <span className="truncate text-[0.86rem] tabular-nums text-[var(--text-muted)]">
+                <span className="truncate tabular-nums text-[var(--text-muted)]">
                   {t('freeOfTotal', { free: formatSize(disk.free_space), total: formatSize(disk.total_space) })}
                 </span>
               )}
