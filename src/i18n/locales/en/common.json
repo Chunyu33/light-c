@@ -83,7 +83,6 @@
   "diskSwitchTitle": "Select a drive",
   "diskSwitchEmpty": "No drives found",
   "freeOfTotal": "{{free}} free / {{total}}",
-  "freeSpace": "{{size}} free",
   "oneClickScan": "Scan all",
   "driveLabel": "{{drive}} drive",
   "systemDrive": "System drive",

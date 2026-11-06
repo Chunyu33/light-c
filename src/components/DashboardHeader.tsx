@@ -267,7 +267,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
         {/* 分隔线 */}
         <div className="w-px h-9 bg-[var(--border-color)]" />
 
-        {/* 磁盘使用情况：左侧是当前盘标签 + 手动刷新，右侧是切换图标 + 容量。
+        {/* 磁盘使用情况：左侧是当前盘标签，右侧是切换 + 刷新图标和容量。
             切换分区走弹窗而不是下拉 —— 顶栏只有几十像素高，下拉的字号/宽度/选项截断
             反复对不齐；弹窗里每个盘能完整显示卷标、可用量和占用率。 */}
         <div className="flex-1 min-w-0">
@@ -279,17 +279,6 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               <span className="shrink-0 font-medium text-[var(--text-primary)]">
                 {t('diskSpace', { drive: disk?.drive_letter ?? 'C:' })}
               </span>
-              <button
-                type="button"
-                onClick={handleRefreshDrives}
-                disabled={drivesLoading}
-                title={t('refreshDiskInfo')}
-                aria-label={t('refreshDiskInfo')}
-                className="shrink-0 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {/* 读取中转一圈，让"按钮生效了"这件事可见 */}
-                <RefreshCw className={`h-4 w-4 ${drivesLoading ? 'animate-spin' : ''}`} />
-              </button>
             </div>
             <div className="flex min-w-0 items-center gap-2">
               {/* 切换分区：点击弹窗，不在这一行里展开下拉 */}
@@ -302,13 +291,25 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               >
                 <ArrowLeftRight className="h-4 w-4" />
               </button>
-              {/* 「可用」按占用率变色（充足绿 / 不足橙 / 紧张红），总容量加粗。
-                  拆成两段而不是用 freeOfTotal 整句：日语的语序是「空き 78 GB」，
-                  标签在数字前面，只有各语言自己的文案能决定顺序。 */}
+              {/* 手动刷新放在右侧操作区：左侧只留盘符标签，两个图标挨在一起更好扫视 */}
+              <button
+                type="button"
+                onClick={handleRefreshDrives}
+                disabled={drivesLoading}
+                title={t('refreshDiskInfo')}
+                aria-label={t('refreshDiskInfo')}
+                className="shrink-0 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {/* 读取中转一圈，让"按钮生效了"这件事可见 */}
+                <RefreshCw className={`h-4 w-4 ${drivesLoading ? 'animate-spin' : ''}`} />
+              </button>
+              {/* 彩色数字就是可用量，不再加「可用」二字：盘符标签已经说明这一行是什么，
+                  多两个字反而把数字挤小。总容量加粗。 */}
               {disk && (
                 <span className="truncate tabular-nums">
-                  <span className={DISK_TEXT_CLASS[usageTone]}>
-                    {t('freeSpace', { size: formatSize(disk.free_space) })}
+                  {/* 可用与总量同字重：两段数字都是主体信息，只加粗总量会让前半句发虚 */}
+                  <span className={`font-semibold ${DISK_TEXT_CLASS[usageTone]}`}>
+                    {formatSize(disk.free_space)}
                   </span>
                   <span className="text-[var(--text-muted)]"> / </span>
                   <span className="font-semibold text-[var(--text-primary)]">
