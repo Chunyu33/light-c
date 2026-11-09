@@ -286,6 +286,19 @@ impl SocialScanner {
             paths,
         );
 
+        // 4.x 的 `temp\RWTemp` 不是运行缓存，而是聊天里刚收发内容的明文副本
+        // （`temp\RWTemp\2026-11\xxx.jpg`、用户转存的文档都在这里）。
+        // 归到「图片视频」，用户才能在对应分类里看到；文档类由 classify_file 的
+        // 扩展名规则认领到「传输文件」。必须在父目录 `temp` 之前登记成更深路径，
+        // 扫描时按层级从深到浅，子路径先拿到自己的分类，父路径再跳过重复文件。
+        Self::add_scan_path(
+            paths,
+            "微信",
+            account_dir.join("temp").join("RWTemp"),
+            FileCategory::ImageVideo,
+            is_custom,
+        );
+
         // 临时缓存 (NONE)
         self.add_named_subdirectories(
             account_dir,
@@ -795,6 +808,8 @@ mod tests {
         std::fs::create_dir_all(account.join("msg/file")).unwrap();
         std::fs::create_dir_all(account.join("msg/video")).unwrap();
         std::fs::create_dir_all(account.join("cache")).unwrap();
+        // 4.x 的 temp\RWTemp 是聊天收发明文副本，按内容归类而不是当缓存
+        std::fs::create_dir_all(account.join("temp/RWTemp/2026-11")).unwrap();
         std::fs::create_dir_all(account.join("business/sns")).unwrap();
         // 备份目录不应被当成账号目录扫描
         std::fs::create_dir_all(root.join("Backup/wxid_abc123")).unwrap();
@@ -813,6 +828,7 @@ mod tests {
         assert!(found("file", FileCategory::FileTransfer));
         assert!(found("video", FileCategory::ImageVideo));
         assert!(found("cache", FileCategory::TempCache));
+        assert!(found("RWTemp", FileCategory::ImageVideo));
         assert!(found("sns", FileCategory::MomentsCache));
         assert!(!paths.iter().any(|p| p.path.to_string_lossy().contains("Backup")));
 

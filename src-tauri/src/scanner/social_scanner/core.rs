@@ -948,6 +948,33 @@ impl SocialScanner {
         }
 
         // ================================================================
+        // 规则 1.5: 文档类扩展名 → 传输文件 (MEDIUM)
+        //
+        // 放在缓存规则之前，是因为「文档」的语义比「它躺在哪个目录」更强：
+        // 微信 4.x 收到的文档不一定落到 msg\file，用户自己转存、截图工具导出、
+        // 聊天窗口临时落盘的文件都可能出现在 temp\RWTemp 等缓存目录里。
+        // 这些是真文件，被规则 2 当缓存一键清掉就是丢用户数据。
+        //
+        // 刻意不收 txt / log / json / xml：它们在缓存目录里绝大多数是日志与配置，
+        // 收进来会把「可安全清理」的量整体降下去，收益是负的。
+        //
+        // 还要排除程序自带的资源包（QQ 的表情 zip、皮肤、WebView 内核…）：
+        // 它们扩展名和用户文档一样，但删掉只会让客户端重新下载资源，
+        // 本机实测这一条会把 QQ 表情的 130 MB 从「可清理」里抢走。
+        // ================================================================
+
+        const DOCUMENT_EXTENSIONS: [&str; 16] = [
+            "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf", "csv", "zip", "rar", "7z", "psd",
+            "ai", "apk", "exe", "msi",
+        ];
+
+        if DOCUMENT_EXTENSIONS.contains(&ext.as_str())
+            && !Self::is_program_resource_path(&path_str)
+        {
+            return (FileCategory::FileTransfer, RiskLevel::Medium);
+        }
+
+        // ================================================================
         // 规则 2: 临时缓存 (NONE)
         // 仅当 base_category 本身是 TempCache 时，才允许 cache 路径匹配生效；
         // 若 base_category 是 ImageVideo / FileTransfer / MomentsCache，
@@ -1095,6 +1122,31 @@ impl SocialScanner {
         (base_category, base_category.default_risk_level())
     }
 
+    /// 路径是否属于「程序自带资源」，而不是用户文件。
+    ///
+    /// 只看扩展名会把 QQ 表情包、皮肤、WebView 内核这些 zip/apk 也算成「传输文件」，
+    /// 既误导用户（以为是收到的文件），又把它们从可清理项里挪走。这里用关键词兜底：
+    /// 客户端把这类资源放在固定命名的目录下，扩展名不参与判断。
+    fn is_program_resource_path(path_str: &str) -> bool {
+        const RESOURCE_KEYWORDS: [&str; 12] = [
+            "\\emoji",
+            "\\face",
+            "\\expression",
+            "\\sticker",
+            "\\skin",
+            "\\theme",
+            "\\lottie",
+            "\\webview",
+            "\\sdk_storage",
+            "\\nt_temp",
+            "\\avatar",
+            "\\resource",
+        ];
+        RESOURCE_KEYWORDS
+            .iter()
+            .any(|keyword| path_str.contains(keyword))
+    }
+
     /// 分类ID转风险等级（用于排序）
     fn category_to_risk(&self, id: &str) -> u8 {
         match id {
@@ -1166,6 +1218,46 @@ mod tests {
             FileCategory::TempCache.default_risk_level(),
             RiskLevel::None
         );
+    }
+
+    /// 文档类文件不管落在哪个目录（含缓存目录）都要归「传输文件」。
+    ///
+    /// 微信 4.x 把收到的图片放 `msg/attach`、文档放 `msg/file`，但用户转存、
+    /// 导出、临时落盘的文件常常出现在 `temp/RWTemp` 里；按缓存一键清掉就是丢用户文件。
+    /// 反例同样要守：这才是「不误伤可清理量」的边界。
+    #[test]
+    fn classifies_documents_in_cache_dirs_as_file_transfer() {
+        let root = fixture("doc-in-cache");
+        let cache = root.join("temp/RWTemp/2026-11");
+        std::fs::create_dir_all(&cache).expect("创建缓存目录失败");
+        for name in ["report.docx", "photo.png", "debug.log"] {
+            std::fs::write(cache.join(name), [0u8; 8]).expect("写入测试文件失败");
+        }
+        // 程序自带资源同样是 zip，但它是客户端下载的表情包资源，不该进「传输文件」
+        let emoji = root.join("nt_qq/nt_data/Emoji/emoji-resource");
+        std::fs::create_dir_all(&emoji).expect("创建表情资源目录失败");
+        std::fs::write(emoji.join("emoji_res.zip"), [0u8; 8]).expect("写入测试文件失败");
+
+        let scanner = SocialScanner::new();
+        let walked =
+            scanner.collect_directory_entries(&root, "微信", FileCategory::TempCache, 0, &[]);
+        let find = |name: &str| {
+            walked
+                .entries
+                .iter()
+                .find(|entry| entry.path.ends_with(name))
+                .unwrap_or_else(|| panic!("{} 未被收集", name))
+        };
+
+        assert_eq!(find("report.docx").category, FileCategory::FileTransfer);
+        assert_eq!(find("report.docx").risk_level, RiskLevel::Medium);
+        // 图片在缓存目录里仍算缓存（规则 2 优先），只有文档类才被认领出来
+        assert_eq!(find("photo.png").category, FileCategory::TempCache);
+        // 日志留在缓存里，否则「可安全清理」的量会被这类文件吃掉
+        assert_eq!(find("debug.log").category, FileCategory::TempCache);
+        assert_eq!(find("emoji_res.zip").category, FileCategory::TempCache);
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
