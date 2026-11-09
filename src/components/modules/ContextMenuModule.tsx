@@ -22,12 +22,14 @@ import { ModuleCard } from '../ModuleCard';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
 import { ModuleScanProgress } from '../ModuleScanProgress';
+import { AdminRequiredHint, useAdminPrivilege } from '../AdminRequiredHint';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import {
   scanContextMenu,
   deleteContextMenuEntries,
+  openContextMenuBackupDir,
   recordCleanupAction,
   type ContextMenuScanResult,
   type ContextMenuEntry,
@@ -41,23 +43,40 @@ import { shouldSkipInactivePageRender, type ModuleRenderProps } from './modulePr
 // ============================================================================
 
 /**
- * 根据 scope 字段返回对应的中文描述和颜色样式
+ * scope id → 颜色。id 由后端给（file / folder / background / drive / library），
+ * 文案一律走 i18n —— 后端不再决定界面上显示什么字。
  */
+const SCOPE_STYLE: Record<string, string> = {
+  file: 'status-chip text-blue-600',
+  folder: 'status-chip text-yellow-600',
+  background: 'status-chip text-purple-600',
+  drive: 'status-chip text-orange-600',
+  library: 'status-chip text-teal-600',
+};
+
 function getScopeStyle(scope: string, translate: (key: string) => string): { label: string; className: string } {
-  switch (scope) {
-    case '任意文件': return { label: translate('contextMenu.scope.file'), className: 'status-chip text-blue-600' };
-    case '文件夹': return { label: translate('contextMenu.scope.folder'), className: 'status-chip text-yellow-600' };
-    case '桌面背景': return { label: translate('contextMenu.scope.desktop'), className: 'status-chip text-purple-600' };
-    case '磁盘驱动器': return { label: translate('contextMenu.scope.drive'), className: 'status-chip text-orange-600' };
-    case '库文件夹': return { label: translate('contextMenu.scope.library'), className: 'status-chip text-teal-600' };
-    default:
-      return { label: scope, className: 'bg-[var(--bg-hover)] text-[var(--text-muted)]' };
-  }
+  const key = `contextMenu.scope.${scope}`;
+  const label = translate(key);
+  return {
+    // i18n 缺键时会把 key 原样返回，这时至少显示 id，别让界面冒出 "contextMenu.scope.xxx"
+    label: label === key ? scope : label,
+    className: SCOPE_STYLE[scope] ?? 'bg-[var(--bg-hover)] text-[var(--text-muted)]',
+  };
 }
 
-/** 与后端保持同一失效判定，避免统计数量和结果列表使用不同条件。 */
-function isInvalidContextMenuEntry(entry: Pick<ContextMenuEntry, 'exe_exists'>): boolean {
-  return !entry.exe_exists;
+/** 与后端保持同一失效判定：只有"说了路径、文件却不在"才算失效。 */
+function isInvalidContextMenuEntry(entry: Pick<ContextMenuEntry, 'exe_status'>): boolean {
+  return entry.exe_status === 'missing';
+}
+
+/**
+ * 提不出路径、无法判定的条目。
+ *
+ * 这类（COM 处理器、rundll32 代理、级联菜单）不该标红，也不该被当垃圾清掉 ——
+ * 界面给它一个中性徽章，说明"程序判断不了"，而不是暗示它坏了。
+ */
+function isUnknownContextMenuEntry(entry: Pick<ContextMenuEntry, 'exe_status'>): boolean {
+  return entry.exe_status === 'unknown';
 }
 
 // ============================================================================
@@ -76,6 +95,7 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
   const [expanded, setExpanded] = useState(false);
   const scope = getScopeStyle(entry.scope, moduleT);
   const isInvalid = isInvalidContextMenuEntry(entry);
+  const isUnknown = isUnknownContextMenuEntry(entry);
   const isProtected = entry.is_system_protected;
 
   return (
@@ -123,7 +143,9 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
               ? 'bg-[var(--color-danger)]/15'
               : isInvalid
                 ? 'bg-[var(--color-danger)]/10'
-                : 'bg-[var(--brand-green-10)]'
+                : isUnknown
+                  ? 'bg-[var(--bg-hover)]'
+                  : 'bg-[var(--brand-green-10)]'
             }
           `}
         >
@@ -131,7 +153,10 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             ? <Shield className="w-4 h-4 text-[var(--color-danger)]" />
             : isInvalid
               ? <AlertTriangle className="w-4 h-4 text-[var(--color-danger)]" />
-              : <MousePointerClick className="w-4 h-4 text-[var(--brand-green)]" />
+              : isUnknown
+                // 判不了就用中性图标：给问号/警告会让人以为它坏了
+                ? <MousePointerClick className="w-4 h-4 text-[var(--text-muted)]" />
+                : <MousePointerClick className="w-4 h-4 text-[var(--brand-green)]" />
           }
         </div>
 
@@ -168,6 +193,13 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
             {isInvalid && (
               <span className="px-1.5 py-0.5 rounded text-[0.71rem] font-medium bg-[var(--color-danger)]/10 text-[var(--color-danger)] shrink-0">
                 {moduleT('contextMenu.missing')}
+              </span>
+            )}
+
+            {/* 无法判定：中性色，别让用户以为这条也坏了 */}
+            {isUnknown && (
+              <span className="px-1.5 py-0.5 rounded text-[0.71rem] font-medium bg-[var(--bg-hover)] text-[var(--text-muted)] shrink-0">
+                {moduleT('contextMenu.unknown')}
               </span>
             )}
 
@@ -294,24 +326,32 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
       };
     },
     // 只读：单条详情。itemId 用 read_items 行首那个显示名 —— 该模块每行开头就是它，
-    // 模型照着抄回来的自然也是它；名字对不上再按键名兜一次。
+    // 模型照着抄回来的自然也是它。显示名会重复（同一软件在"文件夹"和"任意文件"各有一条），
+    // 所以先按 id / 注册表路径精确匹配，再退回显示名、键名。
     readItemDetail: (itemId) => {
       const wanted = itemId.trim();
       if (!wanted) return null;
       const list = scanResult?.entries ?? [];
       const item =
+        list.find((entry) => entry.id === wanted) ??
+        list.find((entry) => entry.registry_path === wanted) ??
         list.find((entry) => entry.display_name.trim() === wanted) ??
         list.find((entry) => entry.key_name.trim() === wanted);
       if (!item) return null;
       // 只给事实："能不能删"由模块自己的判定（系统保护 / 目标程序是否存在）说话，
       // 不让模型凭菜单名字猜。
       const target = item.exe_path
-        ? `${item.exe_path}（${item.exe_exists ? '文件存在' : '**文件已不存在** —— 这个入口很可能已经失效'}）`
+        ? `${item.exe_path}（${
+            item.exe_status === 'missing'
+              ? '**文件已不存在** —— 这个入口很可能已经失效'
+              : '文件存在'
+          }）`
         : '（命令里没有绝对路径，无法判断）';
       return [
         `名称：${item.display_name}`,
         `注册表位置：${item.registry_path}`,
-        `作用范围：${item.scope || '未标注'}`,
+        // scope 现在是英文 id，给模型看的是翻译后的中文标签
+        `作用范围：${item.scope ? getScopeStyle(item.scope, moduleT).label : '未标注'}`,
         `命令：${item.command || '（未读取到）'}`,
         `目标程序：${target}`,
         `图标来源：${item.icon_path || '（未设置）'}`,
@@ -335,8 +375,8 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
   const [showErrorDetails, setShowErrorDetails] = useState(false);
   /** 按 scope 分组折叠状态 */
   const [collapsedScopes, setCollapsedScopes] = useState<Set<string>>(new Set());
-  /** 筛选：仅显示无效条目 */
-  const [showInvalidOnly, setShowInvalidOnly] = useState(true);
+  /** 筛选：仅显示无效条目（默认关闭 —— 后端刻意返回全部条目，用户也可能想关掉某条不用的菜单） */
+  const [showInvalidOnly, setShowInvalidOnly] = useState(false);
 
   // ── 派生数据 ──────────────────────────────────────────────────────────────
 
@@ -362,6 +402,23 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
   /** 当前选中的数量 */
   const selectedCount = selectedIds.size;
 
+  /**
+   * 是否以管理员身份运行。
+   *
+   * HKLM 下的条目要写注册表，非管理员下 `KEY_WRITE` 直接拒绝访问 —— 实测一台普通
+   * 机器上 34 条里 30 条在 HKLM，不提权等于整个模块删不动。所以这里提前把话说清楚，
+   * 而不是等用户点完删除看一屏"拒绝访问"。
+   */
+  const isAdmin = useAdminPrivilege();
+
+  /** 选中项里有多少条在 HKLM（非管理员下会全部失败） */
+  const selectedAdminCount = useMemo(() => {
+    if (!scanResult || isAdmin !== false) return 0;
+    return scanResult.entries.filter(
+      (entry) => selectedIds.has(entry.id) && entry.needs_admin,
+    ).length;
+  }, [scanResult, selectedIds, isAdmin]);
+
   // ── 事件处理 ─────────────────────────────────────────────────────────────
 
   /** 开始扫描 */
@@ -377,15 +434,11 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
       const result = await scanContextMenu();
       setScanResult(result);
 
-      // 默认仅自动勾选 exe 不存在的无效条目（排除系统保护条目）
+      // 默认只勾选"确实失效"的条目（排除系统保护项）。
+      // 三态判定之后这里不用再判 exe_path：能进 missing 的一定提得出路径。
       const defaultSelected = new Set(
         result.entries
-          .filter(
-            (e) =>
-              isInvalidContextMenuEntry(e) &&
-              e.exe_path !== null &&
-              !e.is_system_protected
-          )
+          .filter((e) => isInvalidContextMenuEntry(e) && !e.is_system_protected)
           .map((e) => e.id)
       );
       setSelectedIds(defaultSelected);
@@ -457,6 +510,15 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
       }
       return next;
     });
+  }, []);
+
+  /** 打开注册表备份目录（误删后手动双击 .reg 恢复） */
+  const handleOpenBackupDir = useCallback(async () => {
+    try {
+      await openContextMenuBackupDir();
+    } catch (error) {
+      console.error('打开备份目录失败:', error);
+    }
   }, []);
 
   /** 执行删除 */
@@ -609,6 +671,9 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
           // pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一行被它压住
           <div className="p-5 space-y-4 pb-20">
 
+            {/* 未提权时先说清楚：HKLM 条目删不动，别等点完删除再看一屏拒绝访问 */}
+            <AdminRequiredHint description={moduleT('contextMenu.adminHint')} />
+
             {/* 安全提示横幅 */}
             <div className="flex items-start gap-3 p-4 bg-[var(--brand-green-10)] rounded-xl border border-[var(--brand-green-20)]">
               <Shield className="w-5 h-5 text-[var(--brand-green)] shrink-0 mt-0.5" />
@@ -662,6 +727,16 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
               <span className="text-sm text-[var(--text-muted)]">
                 {moduleT('contextMenu.selected', { count: selectedCount })}
               </span>
+
+              {/* 误删后唯一的恢复手段是备份目录里的 .reg，入口放在这里而不是藏进设置页 */}
+              <button
+                type="button"
+                onClick={handleOpenBackupDir}
+                className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                {moduleT('contextMenu.openBackupDir')}
+              </button>
             </div>
 
             {/* 操作按钮区：固定在视口底部，下拉列表再长也不用滚回去找删除按钮 */}
@@ -798,7 +873,12 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         onConfirm={handleDelete}
         title={t('confirmDeleteContextMenu')}
         description={moduleT('contextMenu.confirmDesc', { count: selectedCount })}
-        warning={t('contextMenuDeleteWarning')}
+        // 选中有 HKLM 条目又没提权时，把"会失败"提前写进警告；这比删完再报错有用
+        warning={
+          selectedAdminCount > 0
+            ? moduleT('contextMenu.adminBlockedWarning', { count: selectedAdminCount })
+            : t('contextMenuDeleteWarning')
+        }
         confirmText={t('delete')}
         cancelText={t('cancel')}
         isDanger={true}

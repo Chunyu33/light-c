@@ -1258,8 +1258,8 @@ export interface ContextMenuEntry {
   command: string | null;
   /** 浠庡懡浠や腑鎻愬彇鐨?exe 璺緞 */
   exe_path: string | null;
-  /** exe 鏂囦欢鏄惁瀛樺湪浜庣鐩?*/
-  exe_exists: boolean;
+  /** 目标程序三态：ok 文件在 / missing 文件已不在（唯一算"失效"的）/ unknown 提不出路径无法判定 */
+  exe_status: 'ok' | 'missing' | 'unknown';
   /** 鏄惁闇€瑕佺鐞嗗憳鏉冮檺鎵嶈兘鍒犻櫎 */
   needs_admin: boolean;
   /** 鏄惁涓虹郴缁熶繚鎶ゆ潯鐩紙涓嶅彲閫変腑鍒犻櫎锛?*/
@@ -1324,6 +1324,11 @@ export async function deleteContextMenuEntries(
   entries: ContextMenuDeleteRequest[]
 ): Promise<ContextMenuDeleteResult> {
   return invoke<ContextMenuDeleteResult>('delete_context_menu_entries', { entries });
+}
+
+/** 打开右键菜单条目的 .reg 备份目录（误删后手动恢复用） */
+export async function openContextMenuBackupDir(): Promise<void> {
+  return invoke<void>('open_context_menu_backup_dir');
 }
 
 // ============================================================================

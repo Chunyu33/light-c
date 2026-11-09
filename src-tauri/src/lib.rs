@@ -136,6 +136,7 @@ pub fn run() {
             // 右键菜单清理
             scan_context_menu,
             delete_context_menu_entries,
+            open_context_menu_backup_dir,
             // 系统快捷工具
             open_startup_manager,
             open_storage_settings,

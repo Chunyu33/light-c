@@ -151,6 +151,9 @@
     "systemProtected": "系統保護",
     "caution": "需謹慎",
     "missing": "檔案不存在",
+    "unknown": "無法判定",
+    "adminHint": "HKLM 下的選單項目需要管理員權限。目前不是管理員，這些項目刪除會失敗。",
+    "adminBlockedWarning": "選取的項目中有 {{count}} 項在 HKLM 下，目前不是管理員，這些項目會刪除失敗。可以只刪目前使用者的項目，或先重新啟動為管理員。",
     "admin": "需管理員",
     "comWarning": "此條目為系統 COM 處理器，不建議清理",
     "registryPath": "登錄檔路徑",
@@ -161,11 +164,12 @@
     "cleaningDesc": "正在刪除 {{count}} 個登錄檔條目，請稍候...",
     "idleDesc": "點選開始掃描，檢查登錄檔中失效或指向不存在檔案的右鍵選單項。",
     "safetyTitle": "操作安全提示",
-    "safetyDesc": "預設僅勾選“檔案不存在”的無效選單項。標記為“系統保護”的 COM 處理器條目無法選中刪除。HKLM 條目需要管理員許可權，刪除前會自動匯出 .reg 備份檔案。",
+    "safetyDesc": "預設僅勾選“檔案不存在”的無效選單項。處理器程式仍然存在的 COM 項目以系統保護處理，無法選中刪除；處理器程式已經不在的以殘留處理。HKLM 條目需要管理員許可權，刪除前會自動匯出 .reg 備份檔案。",
     "scanned": "掃描到的條目",
     "invalid": "無效條目",
     "duration": "掃描耗時",
     "invalidOnly": "僅顯示無效",
+    "openBackupDir": "備份目錄",
     "selected": "已選 {{count}} 項",
     "deleteSelected": "刪除選中",
     "noInvalid": "當前沒有無效的右鍵選單項",
@@ -177,7 +181,7 @@
     "scope": {
       "file": "任意檔案",
       "folder": "資料夾",
-      "desktop": "桌面背景",
+      "background": "資料夾空白處",
       "drive": "磁碟",
       "library": "庫資料夾"
     }

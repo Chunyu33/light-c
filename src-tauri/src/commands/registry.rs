@@ -143,3 +143,23 @@ pub async fn delete_context_menu_entries(
 
     Ok(result)
 }
+
+/// 打开右键菜单的注册表备份目录。
+///
+/// 误删之后唯一的恢复手段就是这里面的 `.reg` 文件 —— 用户得能找得到它，
+/// 而不是听一句"已备份"然后自己去 AppData 里翻。
+#[tauri::command]
+pub async fn open_context_menu_backup_dir() -> Result<(), String> {
+    let backup_dir = crate::scanner::context_menu_backup_dir();
+    std::fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&backup_dir)
+            .spawn()
+            .map_err(|e| format!("打开目录失败: {}", e))?;
+    }
+
+    Ok(())
+}

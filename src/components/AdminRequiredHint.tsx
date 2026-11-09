@@ -2,8 +2,8 @@
 // 管理员权限提示条
 //
 // 需要管理员权限的模块共用这一条：已经提权时自己消失，没提权时给一个「重新启动」按钮，走系统 UAC。
-// 目前接入 5 个 —— 磁盘变化分析 / 旧驱动清理 / 系统瘦身（没权限就做不了），
-// 垃圾清理深度发现 / AI 模型空间深度发现（没权限只是退回慢路径，用 variant="performance"）。
+// 目前接入 8 个 —— 磁盘变化分析 / 旧驱动清理 / 系统瘦身 / 右键菜单清理（没权限就做不了），
+// 垃圾清理深度发现 / AI 模型空间深度发现 / 大文件 / 热点分析（没权限只是退回慢路径，用 variant="performance"）。
 //
 // 为什么不做成浮层：它是状态提示，不是常驻操作 —— 用户看一眼、要么点按钮、要么滚过去。
 // 做成 fixed 会一直压在内容上（底部操作条那边已经踩过一次，还要给每个模块补 padding），
@@ -52,17 +52,16 @@ function probeAdminOnce(): Promise<boolean> {
   return adminProbe;
 }
 
-export function AdminRequiredHint({
-  variant = 'permission',
-  description,
-  dismissible = false,
-  onDismiss,
-  className = '',
-}: AdminRequiredHintProps) {
-  const { t } = useTranslation('common');
+/**
+ * 读取当前是否以管理员运行。
+ *
+ * 查询中返回 `null` —— 调用方要区分"还不知道"和"确实没有权限"，
+ * 把 `null` 当成 `false` 会先闪一条提示再消失。
+ *
+ * 缓存与 `AdminRequiredHint` 共用，多个模块同时挂载也只发一次 IPC。
+ */
+export function useAdminPrivilege(): boolean | null {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  /** 已发出提权请求、正在等 UAC。成功时窗口会被关掉，所以不解除忙碌态 */
-  const [relaunching, setRelaunching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +72,21 @@ export function AdminRequiredHint({
       cancelled = true;
     };
   }, []);
+
+  return isAdmin;
+}
+
+export function AdminRequiredHint({
+  variant = 'permission',
+  description,
+  dismissible = false,
+  onDismiss,
+  className = '',
+}: AdminRequiredHintProps) {
+  const { t } = useTranslation('common');
+  const isAdmin = useAdminPrivilege();
+  /** 已发出提权请求、正在等 UAC。成功时窗口会被关掉，所以不解除忙碌态 */
+  const [relaunching, setRelaunching] = useState(false);
 
   const handleRelaunch = useCallback(async () => {
     setRelaunching(true);

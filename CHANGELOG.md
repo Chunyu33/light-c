@@ -5,6 +5,9 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 ## Unreleased
 
 - Switching drives from the top bar now opens a dialog where each drive shows its free space and usage.
+- Social app cleanup: documents, sheets, archives and installers saved from chats now show up under transfer files, and pictures that just came through are listed under pictures & videos instead of temp cache.
+- Context menu cleanup no longer treats entries whose command lacks a full path as broken; entries added by cloud drives, archivers and similar apps are now found, and empty shells left by uninstalled apps can be cleaned.
+- Context menu cleanup: without administrator rights you are told up front and can restart with one click; the desktop refreshes right after a cleanup, and a Backups button opens where deleted entries are saved.
 
 ## v2.18.2
 
