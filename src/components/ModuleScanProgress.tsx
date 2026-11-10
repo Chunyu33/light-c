@@ -46,6 +46,27 @@ const SKELETON_ROWS: [number, number][] = [
   [34, 8],
 ];
 
+/**
+ * 骨架行本体。
+ *
+ * 形状按真实结果行摆：左侧方形图标位 + 主标题条 + 右侧数值条。
+ * （删除态曾经也用它，后来去掉了 —— 删除不是"结果还没出来"，摆一排假列表反而像卡住。）
+ */
+function ScanSkeletonRows() {
+  // 骨架列表只是形态暗示，读屏用户不需要，整块 aria-hidden
+  return (
+    <div className="scan-state__skeleton" aria-hidden="true">
+      {SKELETON_ROWS.map(([titleWidth, metaWidth]) => (
+        <div key={titleWidth} className="scan-state__skeleton-row">
+          <i className="scan-state__skeleton-icon" />
+          <i className="scan-state__skeleton-title" style={{ width: `${titleWidth}%` }} />
+          <i className="scan-state__skeleton-meta" style={{ width: `${metaWidth}%` }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ModuleScanProgress({
   title,
   description,
@@ -72,16 +93,7 @@ export function ModuleScanProgress({
           </div>
         </div>
 
-        {/* 骨架列表只是形态暗示，读屏用户不需要，整块 aria-hidden */}
-        <div className="scan-state__skeleton" aria-hidden="true">
-          {SKELETON_ROWS.map(([titleWidth, metaWidth]) => (
-            <div key={titleWidth} className="scan-state__skeleton-row">
-              <i className="scan-state__skeleton-icon" />
-              <i className="scan-state__skeleton-title" style={{ width: `${titleWidth}%` }} />
-              <i className="scan-state__skeleton-meta" style={{ width: `${metaWidth}%` }} />
-            </div>
-          ))}
-        </div>
+        <ScanSkeletonRows />
       </div>
 
       {footer && <div className="scan-state__footer">{footer}</div>}

@@ -12,6 +12,7 @@ import type { ScanResult } from '../types';
 import type { EnhancedDeleteResult, FileDeleteResult } from '../api/commands';
 import { getFailureReasonMessage, getFailureReasonTooltip } from '../api/commands';
 import { formatSize, formatDuration } from '../utils/format';
+import { StatePanel } from './StatePanel';
 import { MODAL_BACKDROP_MOTION, MODAL_CARD_MOTION } from '../utils/modalMotion';
 import { useTranslation } from 'react-i18next';
 
@@ -176,7 +177,10 @@ export function ScanSummary({
   if (!scanResult && !deleteResult) return null;
 
   return (
-    <div className="space-y-3">
+    // 没有扫描数据时这一层只剩结果面板，必须自己撑满并把空间传下去：
+    // `.module-card__body > :has(.module-scan-progress-area)` 只能让上一层变 flex，
+    // 中间再夹一个普通 div，`flex-1` 就断了 —— 面板会退化成 220px 高、贴在正文顶部。
+    <div className={scanResult ? 'space-y-3' : 'flex flex-1 flex-col'}>
       {/* 统计卡片（仅扫描数据存在时显示） */}
       {scanResult && (
         <div className="grid grid-cols-4 gap-3">
@@ -228,57 +232,54 @@ export function ScanSummary({
       </div>
       )}
 
-      {/* 删除结果提示 - 成功色主题，主体表达"成功释放"语义；
-          未完成的记录（失败/待重启）仅在各自明细区使用警告色/蓝色 */}
+      {/* 清理结果：与「删除中」共用 StatePanel（块居中、字靠左）。
+          这两个是同一件事的前后两步，几何必须一模一样，只换图标与文案。
+          曾经是 emerald 底 + 65vh 的整块色带（同一屏两种绿打架、底部提示悬在色块内外不定），
+          也试过公共 EmptyState —— 它的文字是居中的，三四行长句每行都要重新找中轴，读起来费劲。 */}
       {deleteResult && (
-        <div
-          className="flex flex-col rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-5"
-          style={scanResult ? undefined : { minHeight: '65vh' }}
-        >
-          {/* 主信息区：清理完成后（无扫描数据）撑满卡片居中展示，避免底部留白 */}
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-            <div className="w-14 h-14 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+        <StatePanel>
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--brand-green-10)]">
+              <CheckCircle2 className="h-5 w-5 text-[var(--brand-green)]" />
             </div>
-            <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
-              {deleteResult.summary_message || t('cleanCompleted')}
-            </span>
-            {/* 详细统计 */}
-            <div className="text-sm text-[var(--fg-muted)]">
-              {t('deleteStats', { success: deleteResult.success_count, size: formatSize(deleteResult.freed_physical_size) })}
-              {deleteResult.skipped_size > 0 && (
-                <>{t('skippedSize', { size: formatSize(deleteResult.skipped_size) })}</>
-              )}
-              {deleteResult.reboot_pending_count > 0 && (
-                <>{t('rebootPending', { count: deleteResult.reboot_pending_count })}</>
-              )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-relaxed text-[var(--text-primary)]">
+                {deleteResult.summary_message || t('cleanCompleted')}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)] tabular-nums">
+                {[
+                  t('deleteStats', {
+                    success: deleteResult.success_count,
+                    size: formatSize(deleteResult.freed_physical_size),
+                  }),
+                  deleteResult.skipped_size > 0 ? t('skippedSize', { size: formatSize(deleteResult.skipped_size) }) : '',
+                  deleteResult.reboot_pending_count > 0 ? t('rebootPending', { count: deleteResult.reboot_pending_count }) : '',
+                ].filter(Boolean).join('')}
+              </p>
             </div>
           </div>
 
-          {/* 需要重启提示（待完成记录，使用蓝色区分） */}
-          {deleteResult.needs_reboot && (
-            <div className="mt-4 pt-4 border-t border-blue-500/20 flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 text-blue-500" />
-              <span className="text-xs text-blue-500">
-                {t('rebootPendingDesc')}
-              </span>
+          {(deleteResult.needs_reboot || failedFiles.length > 0) && (
+            <div className="mt-6 space-y-2 border-t border-[var(--border-muted)] pt-4">
+              {/* 待重启是"已经安排好了"，用弱化色；删不掉才是需要用户看一眼的，用警告色 */}
+              {deleteResult.needs_reboot && (
+                <p className="flex items-center gap-1.5 text-xs text-[var(--fg-muted)]">
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+                  {t('rebootPendingDesc')}
+                </p>
+              )}
+              {failedFiles.length > 0 && (
+                <button
+                  onClick={() => setShowFailedModal(true)}
+                  className="flex items-center gap-1.5 text-left text-xs text-[var(--color-warning)] transition-colors hover:underline"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {t('incompleteSummary', { count: failedFiles.length })}
+                </button>
+              )}
             </div>
           )}
-
-          {/* 失败原因详情：默认折叠为一行聚合提示，点击展开明细，
-              避免冗长的系统错误（如 os error 5）逐条铺满结果卡打扰用户 */}
-          {failedFiles.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-amber-500/20">
-              <button
-                onClick={() => setShowFailedModal(true)}
-                className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors"
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>{t('incompleteSummary', { count: failedFiles.length })}</span>
-              </button>
-            </div>
-          )}
-        </div>
+        </StatePanel>
       )}
 
       {/* 失败明细弹窗 */}

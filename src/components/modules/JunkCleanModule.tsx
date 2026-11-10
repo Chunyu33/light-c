@@ -717,6 +717,12 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const isExpanded = expandedModule === 'junk';
   // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，避免跨模块共用显示条件。
   const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
+  // 底部操作条只在"有可删结果"时出现；删除中、以及清理完只剩结果卡时都没有它。
+  // 正文底部那 80px 留白必须跟着同一个判断走，否则条子不在了还白留一块。
+  const showOperations = !isDeleting
+    && shouldShowOperationToolbar
+    && !!scanResult
+    && scanResult.total_file_count > 0;
   const deleteTotalCount = deleteProgress?.total_count || selectedFileCount;
   const deleteProcessedCount = Math.min(deleteProgress?.processed_count ?? 0, deleteTotalCount);
   const deleteProgressPercent = deleteTotalCount > 0
@@ -833,8 +839,9 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         allowStickyContent
       >
         {/* 展开内容 */}
-        {/* pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一条分类被它压住 */}
-        <div className="p-4 space-y-3 pb-20">
+        {/* pb-20：底部操作条是 fixed 悬浮层，末端留白免得最后一条分类被它压住。
+            条子不显示时（删除中 / 清理完）不留这块空档。 */}
+        <div className={`p-4 space-y-3 ${showOperations ? 'pb-20' : ''}`}>
           {/* 深度发现靠直读各盘 $MFT，打开原始卷需要管理员权限；非管理员会退回逐目录遍历，
               耗时差一个量级。只在用户开了深度发现时提示 —— 用快速扫描的人不需要这条噪音。 */}
           {!isDeleting && deepScanEnabled && (
@@ -858,7 +865,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             />
           )}
 
-          {!isDeleting && shouldShowOperationToolbar && scanResult && scanResult.total_file_count > 0 && (
+          {showOperations && (
             // 公共操作条统一处理底部定位，按钮内容仍由垃圾清理模块维护。
             <ModuleOperationToolbar moduleId="junk">
               <button

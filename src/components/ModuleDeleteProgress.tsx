@@ -9,8 +9,15 @@
 //
 //    · variant="block"（垃圾清理）
 //      "放心全删"的模块 —— 默认预选风险 ≤ 2，删的时候用户不需要看着列表。
-//      于是把内容整体换成这个块，并复用 ModuleScanProgress 的 module-scan-progress-area
-//      尺寸规则（pages / sidebar 布局下按视口撑到 280~640px），与扫描中的等待区同尺寸。
+//      于是把内容整体换成一个"正在干活"的面板：环形进度 + 阶段名与已处理数 +
+//      一条分隔线 + 已释放/失败/速度/剩余。块居中、字靠左（见 StatePanel）。
+//
+//      ⚠️ 历史上这里翻过两次车，都别再犯：
+//      ① 自绘「红框 + 玫红底 + 居中块」：和全站绿/白玻璃不是一套语言，而且没吃到
+//         flex 撑高，页面模式下 100 多像素就收尾、下面整片空白；
+//      ② 改成"和扫描中一模一样的骨架行"：删除不是"结果还没出来"，
+//         摆一排假列表反而像界面卡住了 —— 删除态要有自己的样子（别的软件也都是
+//         转圈/环形进度 + 数字，没人拿骨架屏表达删除）。
 //
 //    · variant="floating"（社交专清 / 大文件 / 右键菜单 / 注册表）
 //      "用户自己挑子集删除"的模块 —— 删的过程中必须保留"我在删哪几条"的参照，
@@ -21,6 +28,7 @@
 // ============================================================================
 
 import { Loader2 } from 'lucide-react';
+import { StatePanel } from './StatePanel';
 
 interface ModuleDeleteProgressProps {
   /** 已本地化的阶段名（如「正在清理垃圾文件」） */
@@ -49,17 +57,20 @@ export function ModuleDeleteProgress({
   variant = 'block',
 }: ModuleDeleteProgressProps) {
   const hasPercent = typeof percent === 'number';
+  // 悬浮形态（删自己挑的那几条）保留危险色 —— 那个位置要的是"注意，正在永久删除"；
+  // 块形态（垃圾清理整块换成状态区）跟扫描态同一套语言，用品牌绿。
+  const barColorClass = variant === 'floating' ? 'bg-[var(--color-danger)]' : 'bg-[var(--brand-green)]';
 
   /** 进度条本体：有确定进度按比例填充，否则整条脉冲表示"进行中" */
   const progressBar = (
     <div className={`w-full rounded-full bg-[var(--bg-hover)] overflow-hidden ${variant === 'floating' ? 'h-1' : 'h-1.5'}`}>
       {hasPercent ? (
         <div
-          className="h-full rounded-full bg-[var(--color-danger)] transition-all duration-300"
+          className={`h-full rounded-full transition-all duration-300 ${barColorClass}`}
           style={{ width: `${percent}%` }}
         />
       ) : (
-        <div className="h-full w-full rounded-full bg-[var(--color-danger)] animate-pulse" />
+        <div className={`h-full w-full rounded-full animate-pulse ${barColorClass}`} />
       )}
     </div>
   );
@@ -83,39 +94,67 @@ export function ModuleDeleteProgress({
     );
   }
 
-  // 块形态：骨架与 ModuleScanProgress 一致（图标块 + 标题 + 状态徽标 + 说明，整体居中），
-  // 只是把品牌绿换成危险色 —— 删除态不该长得像"正在扫描"。
+  // 块形态：环形进度 + 阶段名 + 统计。不画线性进度条 —— 环里已经有百分比了，
+  // 再放一条就是"两条进度线"（扫描态那条在卡片头部，这里也不该重复）。
   return (
-    <div className="module-scan-progress-area flex flex-col items-center justify-center rounded-2xl border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/5 p-5 text-center sm:p-6">
-      <div className="flex w-fit max-w-full items-start justify-center gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--bg-card)] shadow-sm">
-          <Loader2 className="h-7 w-7 animate-spin text-[var(--color-danger)]" />
-        </div>
+    <StatePanel>
+      <div className="flex items-center gap-4">
+        <ProgressRing percent={percent} indeterminate={!hasPercent} />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm font-semibold text-[var(--text-primary)]">{phaseLabel}</h4>
-            {/* 百分比做成徽标而不是大字：与扫描态的状态徽标同一位置、同一量级 */}
-            {hasPercent && (
-              <span className="rounded-full bg-[var(--bg-card)] px-2 py-0.5 text-[0.71rem] font-medium text-[var(--color-danger)] tabular-nums">
-                {percent}%
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{progressLabel}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">{phaseLabel}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)] tabular-nums">{progressLabel}</p>
         </div>
       </div>
 
-      <div className="mt-4 w-full max-w-lg">
-        {progressBar}
-        {details.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-[var(--text-muted)] tabular-nums">
-            {details.map((item) => (
-              <span key={item}>{item}</span>
-            ))}
-          </div>
-        )}
-        {hint && <p className="mt-2 text-[0.79rem] text-[var(--fg-faint)]">{hint}</p>}
-      </div>
+      {details.length > 0 && (
+        <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-[var(--border-muted)] pt-4 text-xs text-[var(--text-muted)] tabular-nums sm:grid-cols-4">
+          {details.map((item) => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      )}
+
+      {hint && <p className="mt-4 text-[0.79rem] text-[var(--fg-faint)]">{hint}</p>}
+    </StatePanel>
+  );
+}
+
+/**
+ * 环形进度。
+ *
+ * 用环比用条的原因：扫描态的进度条固定在**卡片头部**（那条流光），
+ * 正文里再来一条同形状的绿条，用户分不清哪个是这次操作的进度。
+ * 环把百分比收在圆心，信息密度更高，也是"删除进行中"最普遍的样子。
+ */
+function ProgressRing({ percent, indeterminate }: { percent?: number; indeterminate: boolean }) {
+  const size = 56;
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, percent ?? 0));
+  const filled = (circumference * clamped) / 100;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {/* 旋转 -90° 让进度从 12 点方向开始画 */}
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--bg-hover)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--brand-green)"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${filled} ${circumference - filled}`}
+          className="transition-all duration-500"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[0.79rem] font-semibold text-[var(--text-primary)] tabular-nums">
+        {/* 拿不到百分比（有的删除命令只回"正在删除 N 项"）就转圈，别硬凑一个 0% */}
+        {indeterminate ? <Loader2 className="h-4 w-4 animate-spin text-[var(--brand-green)]" /> : `${clamped}%`}
+      </span>
     </div>
   );
 }
