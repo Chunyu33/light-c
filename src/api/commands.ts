@@ -278,6 +278,8 @@ export interface SlimItemStatus {
   size: number;
   actionable: boolean;
   action_text: string;
+  /** 该项仍在后台分析（目前只有 WinSxS 两项会为 true），分析结束后由事件补推 */
+  analyzing: boolean;
 }
 
 /** 绯荤粺鐦﹁韩鐘舵€佹眹鎬?*/
@@ -305,8 +307,9 @@ export async function relaunchAsAdmin(): Promise<boolean> {
 
 /**
  * 鑾峰彇绯荤粺鐦﹁韩鐘舵€? */
-export async function getSystemSlimStatus(): Promise<SystemSlimStatus> {
-  return invoke<SystemSlimStatus>('get_system_slim_status');
+export async function getSystemSlimStatus(forceRefresh = false): Promise<SystemSlimStatus> {
+  // forceRefresh：手动"重新检测"时跳过组件存储分析的 10 分钟缓存，否则点了也像没反应
+  return invoke<SystemSlimStatus>('get_system_slim_status', { forceRefresh });
 }
 
 /**

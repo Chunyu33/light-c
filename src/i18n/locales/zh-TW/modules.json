@@ -204,6 +204,7 @@
     "done": "操作已完成，請重新檢測重新整理當前狀態",
     "adminRequired": "此操作需要管理員許可權",
     "checking": "正在檢測系統狀態",
+    "analyzingComponents": "正在分析元件儲存",
     "emptyDesc": "點選開始檢測系統功能狀態。",
     "rescan": "重新檢測",
     "check": "檢測狀態",
@@ -217,14 +218,15 @@
     "resetBaseCompletedTitle": "元件基線壓縮完成",
     "settingsOpened": "已開啟設定",
     "pagefileOpened": "請手動配置虛擬記憶體位置。",
-    "estimatedReclaim": "本次檢測估算可回收 {{size}}。可重新檢測重新整理狀態。", "actualReclaim": "實際釋放 {{size}}。",
-    "resetBaseCompleted": "已執行 ResetBase，已處理被替代的元件版本和系統更新基線；完成後當前已安裝的 Windows 更新無法解除安裝。",
-    "componentCleanupCompleted": "已執行 StartComponentCleanup，已處理被替代的元件版本、元件儲存快取和臨時元件資料。",
+    "actualReclaim": "實際釋放 {{size}}。",
+    "cleanupStartedReprobe": "清理命令已完成，正在重新分析元件儲存；分析結束後會給出實際結果。",
+    "cleanupNoRemaining": "清理完成，元件儲存已沒有可回收的舊版本。",
+    "cleanupReprobeFailed": "清理命令已完成，但重新分析沒有取得結果，暫時無法確認釋放了多少。",
+    "cleanupNoSpaceFreed": "清理命令已執行，但沒有釋放空間：剩下的 {{size}} 屬於必須用「深度清理」才會移除的舊版本。",
     "administrator": "管理員",
     "permissionRequired": "需要許可權",
     "adminHint": "請關閉程式，右鍵點選程式圖示選擇“以管理員身份執行”。",
     "disabled": "已關閉",
-    "itemStatus": "操作已完成，請重新檢測重新整理當前狀態",
     "executing": "執行中", "busyTitle": "正在執行其他操作", "busyDesc": "請等待目前系統操作完成後再執行下一個。", "waitForCurrent": "請等待目前操作完成", "progressPreparing": "正在準備…", "progressElapsed": "已用 {{time}}", "progressDoNotClose": "請勿關閉程式或關機", "confirmResetBaseTitle": "壓縮元件儲存基線", "confirmResetBaseDesc": "此操作會移除 Windows 更新的回溯基線以回收空間，且無法復原：完成後已安裝的更新將無法解除安裝。確定繼續嗎？", "confirmResetBaseConfirm": "確定壓縮",
     "searchIndexServiceRunning": "搜尋服務執行中",
     "searchIndexDbSize": "索引資料庫 {{size}}",
@@ -246,10 +248,10 @@
         "action": "清理元件"
       },
       "winsxs_resetbase": {
-        "name": "元件儲存基線壓縮",
-        "description": "壓縮元件儲存並移除更新回滾基線。",
-        "warning": "ResetBase 完成後，當前已安裝的 Windows 更新無法解除安裝。",
-        "action": "壓縮基線"
+        "name": "深度清理（ResetBase）",
+        "description": "移除所有被取代的舊元件版本，包括一般清理為了保留回溯能力而沒有刪除的部分。",
+        "warning": "會一併刪除系統更新的回溯版本：執行後，目前安裝的 Windows 更新將無法解除安裝。",
+        "action": "深度清理"
       },
       "pagefile": {
         "name": "虛擬記憶體",

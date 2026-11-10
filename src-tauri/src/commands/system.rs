@@ -97,10 +97,19 @@ pub fn relaunch_as_admin(app: tauri::AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
-/// 获取系统瘦身状态（异步：避免 DISM 阻塞主线程）
+/// 获取系统瘦身状态。
+///
+/// WinSxS 的 DISM 分析走后台任务，本命令只返回当前已知结果 + `analyzing` 标记，
+/// 分析完成后通过 `system-slim:winsxs-ready` 事件补推，所以需要 window 来发事件。
+///
+/// `force_refresh`：用户手动点"重新检测"时传 true，跳过 10 分钟缓存、真的重跑一次 DISM。
+/// 不传（或 false）时走缓存，供自动刷新等场景使用。
 #[tauri::command]
-pub async fn get_system_slim_status() -> SystemSlimStatus {
-    crate::system_slim::get_status().await
+pub async fn get_system_slim_status(
+    window: Window,
+    force_refresh: Option<bool>,
+) -> SystemSlimStatus {
+    crate::system_slim::get_status(window, force_refresh.unwrap_or(false)).await
 }
 
 /// 关闭休眠功能（异步 + 进度推送）
@@ -135,8 +144,12 @@ pub fn open_virtual_memory_settings() -> Result<(), String> {
 
 /// 重建 Windows 搜索索引
 #[tauri::command]
-pub fn rebuild_search_index() -> Result<String, String> {
-    crate::system_slim::rebuild_search_index()
+pub async fn rebuild_search_index() -> Result<String, String> {
+    // COM 调用放阻塞线程里：搜索服务异常时 CoCreateInstance 可能卡住，
+    // 同步命令会连带把这条 IPC 线程占死。
+    tokio::task::spawn_blocking(crate::system_slim::rebuild_search_index)
+        .await
+        .map_err(|e| format!("任务执行失败: {}", e))?
 }
 
 // ============================================================================
