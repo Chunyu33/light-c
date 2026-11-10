@@ -2,12 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.18.3
 
-- Switching drives from the top bar now opens a dialog where each drive shows its free space and usage.
-- Social app cleanup: documents, sheets, archives and installers saved from chats now show up under transfer files, and pictures that just came through are listed under pictures & videos instead of temp cache.
-- Context menu cleanup no longer treats entries whose command lacks a full path as broken; entries added by cloud drives, archivers and similar apps are now found, and empty shells left by uninstalled apps can be cleaned.
-- Context menu cleanup: without administrator rights you are told up front and can restart with one click; the desktop refreshes right after a cleanup, and a Backups button opens where deleted entries are saved.
+- Switching drives from the top bar opens a dialog where each drive shows its free space and usage.
+- Social app cleanup lists documents, archives and installers saved from chats as transfer files instead of mixing them into temp cache.
+- Context menu cleanup finds entries added by cloud drives and archivers, and can remove the empty shells uninstalled apps leave behind; without administrator rights you are told up front and can restart with one click, and deleted entries can be restored from the backups folder.
+- System slimming: component store analysis runs in the background with visible progress, the reclaimable amount is no longer misread as nothing to clean, and a cleanup now tells you how much was freed — or why nothing was. The scanning placeholder is now shared across modules.
 
 ## v2.18.2
 
