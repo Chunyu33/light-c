@@ -160,7 +160,11 @@ export function ModuleCard({
       className={`
         /* 微信风格卡片：纯白背景 + 极淡阴影 + 大圆角 */
         glass-surface bg-[var(--bg-card)] rounded-2xl ${allowStickyContent ? 'overflow-visible' : 'overflow-hidden'}
-        ${isPageVariant ? 'module-card--page flex min-h-full flex-col' : ''}
+        /* 页面模式用 flex-1 而不是 min-h-full：父级是 flex 列容器时，
+           flex-1 能稳定吃掉剩余高度（min-height: auto 保证内容更长时不被压缩）；
+           min-h-full 依赖父级有确定高度，一旦哪一层忘了传就退化成内容高度，
+           模块之间的底部落点就会不齐。 */
+        ${isPageVariant ? 'module-card--page flex flex-1 flex-col' : ''}
         transition-all duration-300 ease-out
         ${isPageVariant
           ? 'shadow-sm ring-1 ring-[var(--border-color)]'

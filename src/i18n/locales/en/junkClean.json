@@ -27,14 +27,8 @@
   "scanning": {
     "quickTitle": "Checking system junk",
     "deepTitle": "Running full disk deep discovery",
-    "quickBadge": "Quick Scan",
-    "deepBadge": "MFT / Multi-partition",
-    "starting": "Starting scan",
-    "partition": "Current Partition",
-    "processedRecords": "Records Processed",
-    "candidateFiles": "Candidate Files",
-    "elapsed": "Elapsed",
-    "preparing": "Preparing",
+    "quickDesc": "Checking system caches and temporary files",
+    "deepDesc": "Looking for caches and temp files that are safe to clean",
     "safetyNote": "Only matches known cache, temp and error report directories. System files and persistent user data are skipped automatically."
   },
   "drives": {

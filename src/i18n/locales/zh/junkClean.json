@@ -27,14 +27,8 @@
   "scanning": {
     "quickTitle": "正在检查系统垃圾",
     "deepTitle": "正在进行全盘深度发现",
-    "quickBadge": "快速扫描",
-    "deepBadge": "MFT / 多分区",
-    "starting": "正在启动扫描",
-    "partition": "当前分区",
-    "processedRecords": "已处理记录",
-    "candidateFiles": "候选文件",
-    "elapsed": "扫描耗时",
-    "preparing": "准备中",
+    "quickDesc": "正在检查系统缓存和临时文件",
+    "deepDesc": "正在查找可以安全清理的缓存和临时文件",
     "safetyNote": "仅匹配明确的缓存、临时文件和错误报告目录，系统文件与持久化用户数据会自动跳过"
   },
   "drives": {

@@ -7,19 +7,13 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import i18n from '../../i18n';
 import { useSettings } from '../../contexts';
 import { useTranslation } from 'react-i18next';
-import {
-  Activity,
-  Database,
-  FileSearch,
-  HardDrive,
-  ShieldCheck,
-  StopCircle,
-  Trash2,
-} from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
+import { ModuleScanProgress } from '../ModuleScanProgress';
+import { StopScanButton } from '../ui/StopScanButton';
 import { CategoryCard } from '../CategoryCard';
 import { AdminRequiredHint } from '../AdminRequiredHint';
 import { ScanSummary } from '../ScanSummary';
@@ -44,7 +38,6 @@ import { formatSize } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
 import type {
   CategoryScanResult,
-  DeepJunkScanProgress,
   DeepJunkScanResult,
   EnhancedDeleteProgress,
   FileInfo,
@@ -193,7 +186,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   const [selectedCategoryNames, setSelectedCategoryNames] = useState<Set<string>>(new Set());
   const [deepScanEnabled, setDeepScanEnabled] = useState(loadDeepScanPreference);
   const [deepScanResult, setDeepScanResult] = useState<DeepJunkScanResult | null>(null);
-  const [scanProgress, setScanProgress] = useState<DeepJunkScanProgress | null>(null);
   const [scanMode, setScanMode] = useState<'quick' | 'deep' | null>(null);
 
   // 接入 AI 助手：模块侧只写这一处。
@@ -372,26 +364,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     localStorage.setItem(DEEP_SCAN_STORAGE_KEY, JSON.stringify(deepScanEnabled));
   }, [deepScanEnabled]);
 
-  // 深度扫描阶段通过事件推送，避免前端轮询后端状态。
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    let disposed = false;
-
-    listen<DeepJunkScanProgress>('junk-clean:progress', (event) => {
-      if (!disposed) setScanProgress(event.payload);
-    }).then((dispose) => {
-      if (disposed) dispose();
-      else unlisten = dispose;
-    }).catch((error) => {
-      if (!disposed) showToast({ type: 'warning', title: t('toast.listenProgressFailed'), description: String(error) });
-    });
-
-    return () => {
-      disposed = true;
-      if (unlisten) unlisten();
-    };
-  }, [showToast, t]);
-
   // 删除进度只传递批量统计，避免大批量文件逐条更新前端造成额外渲染压力。
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -424,7 +396,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     updateModuleState('junk', { status: 'scanning', error: null });
     setScanResult(null);
     setDeepScanResult(null);
-    setScanProgress(null);
     setDeleteResult(null);
     setDeleteProgress(null);
     setSelectedPaths(new Set());
@@ -466,7 +437,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       }
     } finally {
       scanningRef.current = false;
-      setScanProgress(null);
     }
   }, [deepScanEnabled, updateModuleState, setExpandedModule, settings.junkDeepScanDepth]);
 
@@ -562,7 +532,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       setDeepScanResult(null);
       setSelectedPaths(new Set());
       setSelectedCategoryNames(new Set());
-      setScanProgress(null);
       setDeleteProgress(null);
       updateModuleState('junk', { status: 'done', fileCount: 0, totalSize: 0, error: null });
       triggerHealthRefresh();
@@ -857,13 +826,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
               />
             </label>
             {moduleState.status === 'scanning' && deepScanEnabled && (
-              <button
-                onClick={handleStopScan}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg text-xs font-medium text-amber-600 transition"
-              >
-                <StopCircle className="w-3.5 h-3.5" />
-                {i18n.t('stop', { ns: 'common' })}
-              </button>
+              <StopScanButton onClick={handleStopScan} />
             )}
           </div>
         }
@@ -934,64 +897,22 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
             />
           )}
 
+          {/* 扫描中状态：统一走公共组件。
+              阶段名（枚举 NTFS 文件记录）、已处理记录数、候选文件数都是实现细节，
+              用户看结果时不需要；要排查耗时点 ScanTimingPopover。这里只留"在查什么"。 */}
           {moduleState.status === 'scanning' && (
-            <div className="module-scan-progress-area rounded-2xl border border-[var(--brand-green-20)] bg-[var(--brand-green-10)] p-5 space-y-4 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--bg-card)] flex items-center justify-center shrink-0">
-                    <Activity className="w-5 h-5 text-[var(--brand-green)] animate-pulse" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-[var(--fg-primary)]">
-                        {scanMode === 'deep' ? t('scanning.deepTitle') : t('scanning.quickTitle')}
-                      </h4>
-                      <span className="px-1.5 py-0.5 rounded text-[0.71rem] font-medium bg-[var(--bg-card)] text-[var(--brand-green)]">
-                        {scanMode === 'deep' ? t('scanning.deepBadge') : t('scanning.quickBadge')}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[var(--fg-muted)] truncate">
-                      {scanProgress ? getScanStageLabel(scanProgress.stage, scanMode === 'deep') : getScanStageLabel('', scanMode === 'deep')}
+            <div className="p-4">
+              <ModuleScanProgress
+                title={scanMode === 'deep' ? t('scanning.deepTitle') : t('scanning.quickTitle')}
+                description={scanMode === 'deep' ? t('scanning.deepDesc') : t('scanning.quickDesc')}
+                footer={
+                  scanMode === 'deep' ? (
+                    <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+                      {t('scanning.safetyNote')}
                     </p>
-                  </div>
-                </div>
-                {/* 原先这里放按阶段估算的百分比，会在阶段切换时往回跳。
-                    改成只显示已用时间：不撒谎，也比假进度更有参考价值。 */}
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold text-[var(--brand-green)] tabular-nums">
-                    {formatScanDuration(scanProgress?.elapsed_ms ?? 0)}
-                  </p>
-                  <p className="text-[0.71rem] text-[var(--fg-muted)]">{t('scanning.elapsed')}</p>
-                </div>
-              </div>
-
-              {/* 不确定进度：整条脉冲表示"正在进行"。
-                  不画按比例填充的进度条 —— 没有真实的分子分母，画出来就是在编。 */}
-              <div className="h-2 rounded-full bg-[var(--bg-card)] overflow-hidden">
-                <div className="h-full w-full rounded-full bg-[var(--brand-green)] animate-pulse" />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[0.79rem] text-[var(--fg-muted)]"><HardDrive className="w-3.5 h-3.5" />{t('scanning.partition')}</div>
-                  <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)]">{scanProgress?.drive_letter || t('scanning.preparing')}</p>
-                </div>
-                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[0.79rem] text-[var(--fg-muted)]"><Database className="w-3.5 h-3.5" />{t('scanning.processedRecords')}</div>
-                  <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.processed ?? 0).toLocaleString()}</p>
-                </div>
-                <div className="glass-block rounded-xl bg-[var(--bg-card)] px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[0.79rem] text-[var(--fg-muted)]"><FileSearch className="w-3.5 h-3.5" />{t('scanning.candidateFiles')}</div>
-                  <p className="mt-1 text-sm font-semibold text-[var(--fg-primary)] tabular-nums">{(scanProgress?.matched_count ?? 0).toLocaleString()}</p>
-                </div>
-              </div>
-
-              {scanMode === 'deep' && (
-                <div className="flex items-center gap-2 text-[0.79rem] text-[var(--fg-muted)] border-t border-[var(--brand-green-20)] pt-3">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[var(--brand-green)] shrink-0" />
-                  <span>{t('scanning.safetyNote')}</span>
-                </div>
-              )}
+                  ) : undefined
+                }
+              />
             </div>
           )}
 

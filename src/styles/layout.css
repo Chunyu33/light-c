@@ -12,17 +12,11 @@
   margin-inline: 0;
 }
 
-/* 页面模式的空状态填充可用高度，避免窗口变高后模块卡片提前结束。 */
-[data-layout-mode="pages"] .empty-state,
-[data-layout-mode="sidebar"] .empty-state {
-  min-height: clamp(320px, calc(100vh - 360px), 640px);
-}
-
-/* 紧凑空状态保留更低的下限，避免结果页的小提示占据过多空间。 */
-[data-layout-mode="pages"] .empty-state--compact,
-[data-layout-mode="sidebar"] .empty-state--compact {
-  min-height: clamp(260px, calc(100vh - 420px), 520px);
-}
+/* 页面模式的纵向高度全部交给 flex 链决定（App.tsx 内容层 → 模块层 → 卡片 → 卡片 body），
+   这里不再用 `calc(100vh - N)` 给空状态凑高度。
+   原因：那个魔法数字对每个模块都不一样（头部行数不同），凑出来的底部落点也就各不相同 ——
+   Evan 反馈的"有的太高有的又太低"就是这么来的。现在卡片 flex-1 吃满剩余高度，
+   空状态只要跟着 flex 伸展即可，短内容也不会提前结束。 */
 
 /* 页面模式下单个内容根节点需要参与纵向伸缩，长结果仍由外层滚动区承载。 */
 [data-layout-mode="pages"] .module-card__body > :has(.empty-state),
@@ -45,14 +39,164 @@
   flex: 1 1 auto;
 }
 
-/* 统一扫描中的内容高度，页面模式下随窗口高度增长，卡片模式保持紧凑。 */
+/* ----------------------------------------------------------------------------
+   模块内联扫描状态（ModuleScanProgress）
+
+   旧版是"整块淡绿底 + 转圈"，高度写死 220px：窗口一高就剩一条矮绿带悬在卡片顶部，
+   下面一大片空白；大面积品牌色又比内容还抢眼，还和"已清理"的绿色成功态撞色。
+
+   现在：极淡描边的占位区（透明底，不抢眼）+ 页面模式铺满正文 + 顶部一条扫动进度条。
+   进度条是唯一在动的元素，信息居中，留白交给卡片自己。
+
+   ⚠️ `.module-scan-progress-area` 这个**通用**类还有 5 个模块在自己的扫描/删除布局里
+   直接用（大文件、垃圾清理、热点、磁盘变化、删除进度），它们各自带 Tailwind 的底色与
+   内边距。所以外观一律写在新增的 `.scan-state` 上，通用类只保留"最小高度"兜底，
+   不要往通用类里加 border/background —— 会连带改掉那五处。
+   ---------------------------------------------------------------------------- */
 .module-scan-progress-area {
   min-height: 220px;
 }
 
-[data-layout-mode="pages"] .module-scan-progress-area,
-[data-layout-mode="sidebar"] .module-scan-progress-area {
-  min-height: clamp(280px, calc(100vh - 360px), 640px);
+.scan-state {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* 阶段行 + 骨架整体居中；不写死内容高度，靠下面 skeleton 的 flex 把空间吃掉 */
+  justify-content: center;
+  min-height: 11em;
+  padding: 1.25em 1.5em;
+  border-radius: 1em;
+}
+
+.scan-state__stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.15em;
+  width: 100%;
+  /* 从内容区左边缘起排：限宽+居中会让左边空出一块，看着像"浮在中间" */
+  flex: 1 1 auto;
+}
+
+.scan-state__head {
+  display: flex;
+  align-items: center;
+  gap: 0.85em;
+}
+
+.scan-state__head > :last-child {
+  flex: 1 1 auto;
+}
+
+.scan-state__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5em;
+  height: 2.5em;
+  border-radius: 0.8em;
+  background: var(--brand-green-10);
+}
+
+/* 骨架列表占满剩余高度：行距随空间拉开，而不是缩成中间一小撮再上下各留一大片空 */
+.scan-state__skeleton {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 0.4em;
+  flex: 1 1 auto;
+}
+
+/* 一行 = 图标位 + 主标题 + 右侧数值，对应真实结果行的形状 */
+.scan-state__skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9em;
+  flex: 0 0 auto;
+  min-height: 2.9em;
+}
+
+.scan-state__skeleton-row > i {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 0.35em;
+  /* --bg-hover 在白卡上几乎看不见，用文字色的低透明度混合，深浅主题都吃得到 */
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.scan-state__skeleton-icon {
+  flex: none;
+  width: 1.75em;
+  height: 1.75em;
+  border-radius: 0.45em;
+}
+
+.scan-state__skeleton-title {
+  flex: none;
+  height: 0.8em;
+}
+
+.scan-state__skeleton-meta {
+  flex: none;
+  height: 0.8em;
+  margin-left: auto;
+}
+
+.scan-state__skeleton-row > i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--text-primary) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* 逐行错开，避免六行同时闪 */
+.scan-state__skeleton-row:nth-child(2) > i::after {
+  animation-delay: 0.1s;
+}
+.scan-state__skeleton-row:nth-child(3) > i::after {
+  animation-delay: 0.2s;
+}
+.scan-state__skeleton-row:nth-child(4) > i::after {
+  animation-delay: 0.3s;
+}
+.scan-state__skeleton-row:nth-child(5) > i::after {
+  animation-delay: 0.4s;
+}
+.scan-state__skeleton-row:nth-child(6) > i::after {
+  animation-delay: 0.5s;
+}
+
+.scan-state__footer {
+  width: 100%;
+}
+
+/* 系统开了"减少动态效果"：流光直接关掉，静态骨架已经够表达"还没内容" */
+@media (prefers-reduced-motion: reduce) {
+  .scan-state__skeleton-row > i::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* 页面模式：扫描态也要铺满卡片正文，和空状态、结果态保持同一个底部落点 */
+[data-layout-mode="pages"] .module-card__body > :has(.module-scan-progress-area),
+[data-layout-mode="sidebar"] .module-card__body > :has(.module-scan-progress-area) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+[data-layout-mode="pages"] .scan-state,
+[data-layout-mode="sidebar"] .scan-state {
+  flex: 1 1 auto;
 }
 
 /* 侧边栏模式把导航从悬浮层移入主内容布局，右侧内容继续独立滚动。 */

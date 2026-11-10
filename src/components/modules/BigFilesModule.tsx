@@ -8,13 +8,14 @@ import { buildItemQuestion } from '../ai/aiQuestions';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileBox, Trash2, Loader2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
+import { FileBox, Trash2, FileWarning, FolderOpen, Copy, StopCircle, Search } from 'lucide-react';
 import { ScanTimingPopover } from '../ScanTimingPopover';
 import { AdminRequiredHint } from '../AdminRequiredHint';
 import { listen } from '@tauri-apps/api/event';
 import { ModuleCard } from '../ModuleCard';
 import { ModuleDeleteProgress } from '../ModuleDeleteProgress';
 import { ModuleOperationToolbar } from '../ModuleOperationToolbar';
+import { ModuleScanProgress } from '../ModuleScanProgress';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { useToast } from '../Toast';
@@ -551,31 +552,22 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
             </div>
           )}
 
-          {/* 扫描中状态 */}
+          {/* 扫描中状态：统一走公共组件。
+              引擎名（MFT / 常规遍历）、当前阶段、正在扫描的路径都属于实现细节，
+              用户看结果时不需要；阶段耗时要看有 ScanTimingPopover。
+              这里只留"在扫什么"和"结果大概长什么样"。 */}
           {isScanning && files.length === 0 && (
-            <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-center sm:p-6">
-              <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-3">
-                <Loader2 className="w-7 h-7 text-emerald-500 animate-spin" />
-              </div>
-              {/* 扫描引擎模式 — 居中醒目展示 */}
-              {scanBackend === 'mft' && (
-                <span className="mb-2 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--brand-green-10)] text-[var(--brand-green)] border border-[var(--brand-green-20)]">
-                  {t('bigFiles.mftFullScan')}
-                </span>
-              )}
-              <p className="text-sm font-medium text-[var(--fg-secondary)]">
-                {scanBackend === 'mft' ? t('bigFiles.mftScanning', { drive: selectedDriveLabel })
-                  : scanBackend === 'walkdir' ? t('bigFiles.walkdirScanning', { drive: selectedDriveLabel })
-                  : t('scanningShort')}
-              </p>
-              <p className="text-xs text-[var(--fg-muted)] mt-1">
-                {t('bigFiles.engineLabel')}: {scanBackend === 'mft' ? t('bigFiles.mft') : scanBackend === 'walkdir' ? t('bigFiles.walkdir') : t('bigFiles.detecting')}
-              </p>
-              {(localizedScanStage || displayScanPath) && (
-                <p className="text-xs text-[var(--fg-faint)] mt-1 max-w-md truncate">
-                  {localizedScanStage}{displayScanPath ? ` · ${displayScanPath}` : ''}
-                </p>
-              )}
+            <div className="p-4">
+              <ModuleScanProgress
+                title={
+                  scanBackend === 'mft'
+                    ? t('bigFiles.mftScanning', { drive: selectedDriveLabel })
+                    : scanBackend === 'walkdir'
+                      ? t('bigFiles.walkdirScanning', { drive: selectedDriveLabel })
+                      : t('scanningShort')
+                }
+                description={t('bigFiles.scanningDesc')}
+              />
             </div>
           )}
 

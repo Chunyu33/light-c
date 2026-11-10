@@ -10,9 +10,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
-import { Flame, Loader2, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2, XCircle } from 'lucide-react';
+import { Flame, FolderOpen, Clock, HardDrive, ChevronDown, ChevronRight, Search, ShieldAlert, Shield, Eye, Trash2 } from 'lucide-react';
 import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
 import { AdminRequiredHint } from '../AdminRequiredHint';
+import { ModuleScanProgress } from '../ModuleScanProgress';
+import { StopScanButton } from '../ui/StopScanButton';
 import { listen } from '@tauri-apps/api/event';
 import { AccordionContent, ModuleCard } from '../ModuleCard';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -92,65 +94,6 @@ function getProgressStageLabel(stage?: string): string {
     drive: '',
     defaultValue: i18n.t('scanStages.scanning', { ns: 'common' }),
   });
-}
-
-// 诊断面板同时服务“扫描中”和“扫描完成”状态，避免两套指标重复展示。
-function HotspotDiagnostics({
-  logs,
-  totalElapsedMs,
-  currentProgress,
-  compact = false,
-}: {
-  logs: HotspotScanProgress[];
-  totalElapsedMs?: number;
-  currentProgress?: HotspotScanProgress | null;
-  compact?: boolean;
-}) {
-  if (logs.length === 0 && !totalElapsedMs && !currentProgress) return null;
-
-  const latestLog = currentProgress || logs[logs.length - 1];
-  // 相同阶段在监听器里已经合并，这里只负责过滤无效阶段，保持布局稳定。
-  const visibleLogs = logs.filter((log) => log.stage && log.stage_elapsed_ms !== undefined);
-  const processedCount = latestLog?.scanned_dirs || latestLog?.found_entries || 0;
-  const stageLabel = getProgressStageLabel(latestLog?.stage);
-
-  return (
-    <div className={`glass-block rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)] px-4 py-3 text-xs ${compact ? 'space-y-2' : 'space-y-3'}`}>
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 md:gap-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="shrink-0 px-2 py-0.5 rounded-md bg-[var(--brand-green)] text-white font-medium">
-            {getProgressStageLabel(latestLog?.stage)}
-          </span>
-          <span className="truncate text-[var(--text-primary)]" title={stageLabel}>
-            {stageLabel}
-          </span>
-        </div>
-        <div className="flex items-center justify-start md:justify-end gap-4 text-[var(--text-muted)] tabular-nums">
-          {processedCount > 0 && <span>{i18n.t('scanStages.processed', { ns: 'common', count: processedCount.toLocaleString() })}</span>}
-          {totalElapsedMs !== undefined && <span>{i18n.t('scanStages.elapsed', { ns: 'common', time: formatDuration(totalElapsedMs) })}</span>}
-        </div>
-      </div>
-      {visibleLogs.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          {visibleLogs.map((log, index) => (
-            <div
-              key={`${log.stage}-${index}`}
-              className="glass-block min-w-0 rounded-lg bg-[var(--bg-card)] border border-[var(--border-color)] px-2.5 py-2"
-            >
-              <div className="truncate text-[var(--text-muted)]">{getProgressStageLabel(log.stage)}</div>
-              <div className="mt-0.5 text-[var(--text-primary)] font-semibold tabular-nums">
-                {formatDuration(log.stage_elapsed_ms)}
-              </div>
-              {/* 阶段关键数字（后端给的原文）：一眼看出慢在读盘、解析还是聚合 */}
-              {log.detail && (
-                <div className="mt-0.5 text-[var(--text-faint)] leading-snug">{log.detail}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 /**
@@ -628,9 +571,7 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   const [isCleaning, setIsCleaning] = useState(false);
 
   // ====== 扫描进度状态（仅深度扫描时有效） ======
-  const [scanProgress, setScanProgress] = useState<HotspotScanProgress | null>(null);
   const [progressLogs, setProgressLogs] = useState<HotspotScanProgress[]>([]);
-  const [scanElapsed, setScanElapsed] = useState(0);
 
   // ====== 下钻模态框状态 ======
   /** 选中的路径：非空时弹出 DrillDownModal */
@@ -676,7 +617,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     const setupListeners = async () => {
       unlistenProgress = await listen<HotspotScanProgress>('hotspot-scan:progress', (event) => {
         const progress = event.payload;
-        setScanProgress(progress);
         setProgressLogs((prev) => {
           const last = prev[prev.length - 1];
           // 相同阶段只保留最新一条，避免 MFT 每 10k 条刷屏导致前端日志噪音过大。
@@ -699,14 +639,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     };
   }, []);
 
-  // 扫描计时器（仅在全盘扫描时显示）
-  useEffect(() => {
-    if (moduleState.status !== 'scanning') { setScanElapsed(0); return; }
-    const t0 = performance.now();
-    const interval = setInterval(() => setScanElapsed(Math.floor((performance.now() - t0) / 1000)), 500);
-    return () => clearInterval(interval);
-  }, [moduleState.status]);
-
   // 执行扫描
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
@@ -725,7 +657,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     setScanResult(null);
     setShowAll(false);
     setSelectedPath(null);
-    setScanProgress(null);
     setProgressLogs([]);
 
     try {
@@ -762,7 +693,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     } finally {
       if (scanRunId === scanRunIdRef.current) {
         scanningRef.current = false;
-        setScanProgress(null);
       }
     }
   }, [updateModuleState, fullScanEnabled, settings, selectedDriveLetter, selectedDrive, selectedDriveLabel, moduleT]);
@@ -772,7 +702,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     setError(null);
     setShowAll(false);
     setSelectedPath(null);
-    setScanProgress(null);
     setProgressLogs([]);
     updateModuleState('hotspot', { status: 'idle', error: null, fileCount: 0, totalSize: 0, progress: 0 });
   }, [updateModuleState]);
@@ -789,7 +718,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     scanRunIdRef.current += 1;
     scanningRef.current = false;
     updateModuleState('hotspot', { status: 'idle', progress: 0 });
-    setScanProgress(null);
     try {
       await cancelHotspotScan();
       showToast({ type: 'info', title: moduleT('hotspot.scanStopped'), description: moduleT('hotspot.scanStoppedDesc') });
@@ -815,7 +743,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       cancelRequestedRef.current = true;
       scanRunIdRef.current += 1;
       scanningRef.current = false;
-      setScanProgress(null);
     }
   }, [stopScanTrigger]);
 
@@ -940,7 +867,8 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       error={error}
       titleExtra={fullScanEnabled ? driveSelector : null}
       headerExtra={
-        // 深度扫描开关 - 参考卸载残留模块样式
+        // 深度扫描开关 + 停止按钮。停止按钮和"扫描中…"按钮同一行：
+        // 用户要中断时视线在右上角，不该去正文里找。
         <div className="flex items-center gap-2">
           <button
             onClick={() => setFullScanEnabled(!fullScanEnabled)}
@@ -954,6 +882,9 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
             <Eye className="w-3.5 h-3.5" />
             {moduleT('hotspot.deepScan')}
           </button>
+          {moduleState.status === 'scanning' && fullScanEnabled && (
+            <StopScanButton onClick={handleStopScan} />
+          )}
         </div>
       }
     >
@@ -962,55 +893,34 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
           左右留白跟本模块其他状态块的 p-5 对齐。 */}
       <AdminRequiredHint className="mx-5 mt-4" variant="performance" />
 
-      {/* 扫描中状态 */}
+      {/* 扫描中状态：统一走公共组件。
+          引擎模式（MFT / 常规遍历）、逐阶段诊断面板都属于实现细节 ——
+          排查耗时有结果的 ScanTimingPopover，扫描中只留"在扫什么"和用户该知道的提示。 */}
       {moduleState.status === 'scanning' && (
-        <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-[var(--text-muted)] sm:p-6">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
-          <p className="text-sm flex items-center gap-2">
-            {fullScanEnabled ? moduleT('hotspot.deepScanning', { drive: selectedDriveLabel }) : moduleT('hotspot.scanningAppData')}
-            {/* 扫描引擎模式标签 — MFT 直读 vs 常规遍历 */}
-            {fullScanEnabled && scanProgress && (
-              <span className={`text-[0.71rem] px-1.5 py-0.5 rounded font-medium ${
-                scanProgress.backend === 'mft'
-                  ? 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
-                  : 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
-              }`}>
-                {scanProgress.backend === 'mft' ? moduleT('hotspot.mft') : moduleT('hotspot.walkdir')}
-              </span>
-            )}
-          </p>
-          <p className="text-xs mt-1">
-            {fullScanEnabled ? moduleT('hotspot.deepScanWait') : moduleT('hotspot.quickScanWait')}
-          </p>
-          {fullScanEnabled && !settings.hotspotIgnoreSystemDirs && (
-            <p className="text-xs mt-1 text-amber-500">⚠ {moduleT('hotspot.systemFilterOff')}</p>
-          )}
-          {fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs && (
-            <p className="text-xs mt-1 text-amber-500">{moduleT('hotspot.notNtfs')}</p>
-          )}
-
-          {/* 深度扫描进度：展示关键阶段和耗时，用于判断瓶颈在枚举、读大小还是聚合。 */}
-          {fullScanEnabled && scanProgress && (
-            <div className="mt-3 w-full max-w-2xl">
-              <HotspotDiagnostics
-                logs={progressLogs}
-                totalElapsedMs={scanProgress.elapsed_ms || scanElapsed * 1000}
-                currentProgress={scanProgress}
-              />
-            </div>
-          )}
-
-          {/* 取消按钮（仅深度扫描时显示） */}
-          {fullScanEnabled && (
-            <button
-              onClick={handleStopScan}
-              className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                soft-danger border transition-colors"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              {moduleT('hotspot.stop')}
-            </button>
-          )}
+        <div className="p-4">
+          <ModuleScanProgress
+            title={
+              fullScanEnabled
+                ? moduleT('hotspot.deepScanning', { drive: selectedDriveLabel })
+                : moduleT('hotspot.scanningAppData')
+            }
+            description={
+              fullScanEnabled ? moduleT('hotspot.deepScanWait') : moduleT('hotspot.quickScanWait')
+            }
+            footer={
+              fullScanEnabled &&
+              (!settings.hotspotIgnoreSystemDirs || (selectedDrive && !selectedDrive.is_ntfs)) ? (
+                <div className="space-y-1 text-xs text-[var(--color-warning)]">
+                  {!settings.hotspotIgnoreSystemDirs && (
+                    <p>⚠ {moduleT('hotspot.systemFilterOff')}</p>
+                  )}
+                  {selectedDrive && !selectedDrive.is_ntfs && (
+                    <p>{moduleT('hotspot.notNtfs')}</p>
+                  )}
+                </div>
+              ) : undefined
+            }
+          />
         </div>
       )}
 

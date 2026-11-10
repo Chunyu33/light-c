@@ -1,5 +1,5 @@
 import { ScanTimingPopover, type TimingGroup } from '../ScanTimingPopover';
-import { AdminRequiredHint } from '../AdminRequiredHint';
+import { AdminRequiredHint, useAdminPrivilege } from '../AdminRequiredHint';
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import { AiAskButton } from '../ai/AiAskButton';
 import { buildItemQuestion } from '../ai/aiQuestions';
@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { createPortal } from 'react-dom';
-import { listen } from '@tauri-apps/api/event';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -24,7 +23,6 @@ import {
   Loader2,
   Minus,
   Search,
-  XCircle,
   X,
   ChevronRight,
   Sparkles,
@@ -32,6 +30,8 @@ import {
   TrendingUp,
   Download,
 } from 'lucide-react';
+import { ModuleScanProgress } from '../ModuleScanProgress';
+import { StopScanButton } from '../ui/StopScanButton';
 import { ModuleCard } from '../ModuleCard';
 import { EmptyState } from '../EmptyState';
 import {
@@ -47,7 +47,6 @@ import { useSettings } from '../../contexts';
 import { openSearchUrl } from '../../utils/searchEngine';
 import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import {
-  checkAdminPrivilege,
   cancelDiskGrowthScan,
   getDiskGrowthDirectoryDetails,
   getDiskGrowthExportTree,
@@ -62,7 +61,6 @@ import {
   type DiskGrowthFileDetailEntry,
   type DiskGrowthFileDetailsResponse,
   type DiskGrowthReport,
-  type DiskGrowthScanProgress,
   type DiskGrowthScanResponse,
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -81,14 +79,6 @@ function formatDiff(diff: number): string {
   return `${sign}${formatSize(Math.abs(diff))}`;
 }
 
-function formatProgressCount(progress: DiskGrowthScanProgress | null): string {
-  if (!progress) return '';
-  const processed = progress.processed.toLocaleString();
-  if (typeof progress.total === 'number' && progress.total > 0) {
-    return `${processed} / ${progress.total.toLocaleString()}`;
-  }
-  return processed;
-}
 
 function getPhaseLabel(stage: string): string {
   return i18n.t(`scanStages.${stage}`, {
@@ -898,11 +888,10 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   });
 
   const [growthReport, setGrowthReport] = useState<DiskGrowthReport | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  // 管理员状态走共享 hook：AdminRequiredHint 里已经探过一次，这里复用同一份缓存
+  const isAdmin = useAdminPrivilege();
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [scanElapsed, setScanElapsed] = useState(0);
-  const [scanProgress, setScanProgress] = useState<DiskGrowthScanProgress | null>(null);
   const [detailEntry, setDetailEntry] = useState<DiskGrowthEntry | null>(null);
   const { drives, error: drivesError } = useLocalDrives();
   const [selectedDriveLetter, setSelectedDriveLetter] = useState('C:');
@@ -914,26 +903,11 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const resetCurrentDriveResult = useCallback(() => {
     setScanSummary(null);
     setGrowthReport(null);
-    setScanProgress(null);
     setShowAll(false);
     setDetailEntry(null);
     setError(null);
     updateModuleState('diskGrowth', { status: 'idle', error: null, fileCount: 0, totalSize: 0, progress: 0 });
   }, [updateModuleState]);
-
-  useEffect(() => {
-    let cancelled = false;
-    checkAdminPrivilege()
-      .then((result) => {
-        if (!cancelled) setIsAdmin(result);
-      })
-      .catch(() => {
-        if (!cancelled) setIsAdmin(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (drives.length > 0) {
@@ -945,40 +919,6 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       });
     }
   }, [drives]);
-
-  useEffect(() => {
-    if (moduleState.status !== 'scanning') {
-      setScanElapsed(0);
-      return;
-    }
-
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      setScanElapsed(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [moduleState.status]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let unlisten: (() => void) | null = null;
-
-    listen<DiskGrowthScanProgress>('disk-growth:progress', (event) => {
-      if (!cancelled) setScanProgress(event.payload);
-    }).then((handler) => {
-      if (cancelled) {
-        handler();
-      } else {
-        unlisten = handler;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
 
   const handleScan = useCallback(async () => {
     if (scanningRef.current) return;
@@ -1002,7 +942,6 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
     setError(null);
     setScanSummary(null);
     setGrowthReport(null);
-    setScanProgress(null);
     setShowAll(false);
     setDetailEntry(null);
 
@@ -1039,7 +978,6 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
     scanRunIdRef.current += 1;
     scanningRef.current = false;
     updateModuleState('diskGrowth', { status: 'idle', progress: 0 });
-    setScanProgress(null);
     try {
       await cancelDiskGrowthScan();
     } catch (err) {
@@ -1066,7 +1004,6 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       cancelRequestedRef.current = true;
       scanRunIdRef.current += 1;
       scanningRef.current = false;
-      setScanProgress(null);
     }
   }, [stopScanTrigger]);
 
@@ -1224,6 +1161,12 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       scanDisabled={isAdmin === false || Boolean(selectedDrive && !selectedDrive.is_ntfs)}
       titleExtra={driveSelector}
       error={error}
+      headerExtra={
+        // 停止按钮放头部：扫描可能跑几十秒，用户要中断时不该去正文里找
+        moduleState.status === 'scanning' ? (
+          <StopScanButton onClick={handleStopScan} label={moduleT('diskGrowth.stop')} />
+        ) : null
+      }
     >
       <div className="glass-block mx-4 mt-4 flex flex-col gap-2 rounded-xl bg-[var(--bg-main)] px-4 py-3 text-[0.86rem] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
         <span title={selectedDrive ? driveOptionTitle(selectedDrive) : selectedDriveLabel}>
@@ -1263,29 +1206,15 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
         </div>
       )}
 
+      {/* 扫描中状态：统一走公共组件。
+          阶段名和已处理条数都是实现细节（排查耗时有结果的耗时浮层），
+          扫描中只留"在分析哪个盘"和一句首次扫描的说明。 */}
       {moduleState.status === 'scanning' && (
-        <div className="module-scan-progress-area flex flex-col items-center justify-center p-5 text-[var(--text-muted)] sm:p-6">
-          <Loader2 className="w-8 h-8 animate-spin text-[var(--brand-green)] mb-3" />
-          <p className="text-sm">{scanProgress ? getPhaseLabel(scanProgress.stage) : i18n.t('scanStages.mftEnumerate', { ns: 'common', drive: selectedDriveLabel })}</p>
-          <p className="text-xs text-[var(--text-muted)] mt-1 tabular-nums">
-            {i18n.t('scanStages.elapsed', { ns: 'common', time: `${scanElapsed}s` })}
-          </p>
-          {scanProgress && (
-            <p className="text-xs text-[var(--text-faint)] mt-1 tabular-nums">
-              {getPhaseLabel(scanProgress.stage)} {formatProgressCount(scanProgress)}
-            </p>
-          )}
-          <p className="text-xs text-[var(--text-faint)] mt-1">
-            {moduleT('diskGrowth.firstScanHint')}
-          </p>
-          <button
-            onClick={handleStopScan}
-            className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-              soft-danger border transition-colors"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            {moduleT('diskGrowth.stop')}
-          </button>
+        <div className="p-4">
+          <ModuleScanProgress
+            title={moduleT('diskGrowth.scanningTitle', { drive: selectedDriveLabel })}
+            description={moduleT('diskGrowth.firstScanHint')}
+          />
         </div>
       )}
 

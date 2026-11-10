@@ -144,7 +144,11 @@ function DashboardContent() {
         {isSidebarLayout && <SidebarNav />}
         <div className="h-full min-h-0 min-w-0 flex flex-1 flex-col">
           <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-            <div className={`${isSinglePageLayout ? 'min-h-full box-border' : 'space-y-5'} relative p-6 dashboard-container module-stage`}>
+            {/* 页面模式这一层必须自己是 flex 容器：卡片靠 flex-1 铺满可用高度，
+                父级不是 flex 的话卡片高度只能由内容决定 —— 各模块头部行数不同，
+                底部落点就会各不相同（Evan 反馈"有的太高有的又太低"）。
+                min-h-full 保证短内容时至少占满滚动区，长内容仍由外层滚动承载。 */}
+            <div className={`${isSinglePageLayout ? 'min-h-full box-border flex flex-col' : 'space-y-5'} relative p-6 dashboard-container module-stage`}>
               {APP_MODULES.map((moduleConfig) => {
                 const ModuleComponent = moduleConfig.component;
                 const isActivePage = visibleModuleId === moduleConfig.id;
@@ -161,7 +165,9 @@ function DashboardContent() {
                     className={
                       isSinglePageLayout
                         ? isActivePage
-                          ? `relative z-10 overflow-visible ${pageEnterClass}`
+                          // flex-1 + flex-col：把"铺满剩下的高度"继续往下传，
+                          // 卡片才能吃满；min-height: auto 保证长结果不被压缩。
+                          ? `relative z-10 overflow-visible flex flex-1 flex-col ${pageEnterClass}`
                           : 'hidden'
                         : 'relative'
                     }

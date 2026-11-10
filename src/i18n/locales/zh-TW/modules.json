@@ -361,6 +361,7 @@
     "noHistory": "暫無歷史快照",
     "noChange": "暫無變化",
     "scanning": "正在掃描",
+    "scanningTitle": "正在分析 {{drive}} 的空間變化",
     "completed": "掃描完成",
     "indexed": "已索引佔用",
     "netChange": "與上次淨變化",

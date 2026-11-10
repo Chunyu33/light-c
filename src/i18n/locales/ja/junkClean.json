@@ -27,14 +27,8 @@
   "scanning": {
     "quickTitle": "システムのジャンクを確認中",
     "deepTitle": "全ディスクのディープスキャンを実行中",
-    "quickBadge": "クイックスキャン",
-    "deepBadge": "MFT / 複数パーティション",
-    "starting": "スキャンを開始中",
-    "partition": "現在のパーティション",
-    "processedRecords": "処理済みレコード",
-    "candidateFiles": "候補ファイル",
-    "elapsed": "経過時間",
-    "preparing": "準備中",
+    "quickDesc": "システムのキャッシュと一時ファイルを確認しています",
+    "deepDesc": "安全に削除できるキャッシュと一時ファイルを探しています",
     "safetyNote": "既知のキャッシュ・一時ファイル・エラーレポートディレクトリのみを照合。システムファイルと永続的なユーザーデータは自動的にスキップされます。"
   },
   "drives": {

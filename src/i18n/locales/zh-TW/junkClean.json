@@ -27,14 +27,8 @@
   "scanning": {
     "quickTitle": "正在檢查系統垃圾",
     "deepTitle": "正在進行全盤深度發現",
-    "quickBadge": "快速掃描",
-    "deepBadge": "MFT / 多分割槽",
-    "starting": "正在啟動掃描",
-    "partition": "當前分割槽",
-    "processedRecords": "已處理記錄",
-    "candidateFiles": "候選檔案",
-    "elapsed": "掃描耗時",
-    "preparing": "準備中",
+    "quickDesc": "正在檢查系統暫存與臨時檔案",
+    "deepDesc": "正在尋找可以安全清理的暫存與臨時檔案",
     "safetyNote": "僅匹配明確的快取、臨時檔案和錯誤報告目錄，系統檔案與持久化使用者資料會自動跳過"
   },
   "drives": {
