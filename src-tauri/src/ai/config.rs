@@ -492,21 +492,47 @@ fn next_profile_id(config: &AiStoredConfig) -> String {
     }
 }
 
+/// 把前端提交的档案合并进已有档案：只让表单能表达的字段生效。
+///
+/// `models` / `models_fetched_at` 是后端「测试连接」时缓存的元数据，前端表单里
+/// 根本没有这两项（`AiProfileInput` 不含它们，反序列化后就是空值）。整份替换会把
+/// 缓存清空 —— 面板的下拉随即退化成纯文本、用户再也切不了模型，只能重开设置页
+/// 等自动重拉。所以这两个字段必须原样带过来。
+/// 但换了服务商 / 接口地址 / 密钥时，旧列表已经不可信，留空让设置页重新拉取。
+fn merge_profile_update(existing: &mut AiProfile, incoming: AiProfile) {
+    // 密钥留空 = 不改动已保存的密钥（前端只拿得到掩码，回传不了明文）
+    let keep_key = incoming.api_key.trim().is_empty();
+    let previous_key = existing.api_key.clone();
+    let same_endpoint = existing.provider_id == incoming.provider_id
+        && existing.base_url == incoming.base_url
+        && (keep_key || existing.api_key == incoming.api_key);
+    let cached_models =
+        same_endpoint.then(|| (existing.models.clone(), existing.models_fetched_at));
+
+    *existing = incoming;
+    if keep_key {
+        existing.api_key = previous_key;
+    }
+    match cached_models {
+        Some((models, fetched_at)) => {
+            existing.models = models;
+            existing.models_fetched_at = fetched_at;
+        }
+        // 端点变了就显式作废：不能指望调用方"恰好没夹带"旧列表
+        None => {
+            existing.models.clear();
+            existing.models_fetched_at = 0;
+        }
+    }
+}
+
 /// 新增或更新一份档案（按 id 匹配）。返回更新后的整体配置。
 pub fn upsert_profile(profile: AiProfile) -> Result<AiStoredConfig, String> {
     let _guard = lock_config();
     let profile = validate_profile(profile)?;
     let mut config = read_config();
     match config.profiles.iter_mut().find(|item| item.id == profile.id) {
-        Some(existing) => {
-            // 密钥留空 = 不改动已保存的密钥（前端只拿得到掩码，回传不了明文）
-            let previous_key = existing.api_key.clone();
-            let keep_key = profile.api_key.trim().is_empty();
-            *existing = profile;
-            if keep_key {
-                existing.api_key = previous_key;
-            }
-        }
+        Some(existing) => merge_profile_update(existing, profile),
         None => {
             let mut created = profile;
             if created.id.trim().is_empty() {
@@ -682,6 +708,85 @@ mod tests {
         let second = next_profile_id(&config);
         assert_ne!(first, second, "同一秒内第二份档案拿到了相同 id");
         assert!(second.starts_with(&first), "冲突时应带后缀，实际 {}", second);
+    }
+
+    /// 面板里就地切模型会再存一次档案；前端表单不带 models，
+    /// 合并时不能把已缓存的列表冲掉（否则下拉消失、切不了第二次）。
+    #[test]
+    fn updating_model_keeps_cached_model_list_and_api_key() {
+        let mut existing = AiProfile {
+            id: "p_1".into(),
+            provider_id: "deepseek".into(),
+            base_url: "https://api.deepseek.com".into(),
+            model: "deepseek-flash".into(),
+            api_key: "sk-secret".into(),
+            models: vec!["deepseek-flash".into(), "deepseek-v4-pro".into()],
+            models_fetched_at: 1_760_000_000,
+            ..Default::default()
+        };
+        // 模拟面板提交：只有 model 变了，密钥留空，且没有 models / modelsFetchedAt
+        let incoming = AiProfile {
+            id: "p_1".into(),
+            provider_id: "deepseek".into(),
+            base_url: "https://api.deepseek.com".into(),
+            model: "deepseek-v4-pro".into(),
+            ..Default::default()
+        };
+        merge_profile_update(&mut existing, incoming);
+
+        assert_eq!(existing.model, "deepseek-v4-pro");
+        assert_eq!(existing.api_key, "sk-secret");
+        assert_eq!(
+            existing.models,
+            vec![String::from("deepseek-flash"), String::from("deepseek-v4-pro")]
+        );
+        assert_eq!(existing.models_fetched_at, 1_760_000_000);
+    }
+
+    /// 换了地址或密钥后旧列表已不可信，必须清掉让设置页重新拉取。
+    #[test]
+    fn changing_endpoint_or_key_invalidates_cached_model_list() {
+        let base = AiProfile {
+            provider_id: "deepseek".into(),
+            base_url: "https://api.deepseek.com".into(),
+            api_key: "sk-old".into(),
+            models: vec!["deepseek-flash".into()],
+            models_fetched_at: 1_760_000_000,
+            ..Default::default()
+        };
+
+        // 换地址：模拟前端提交（表单不带 models 字段），密钥留空 = 沿用旧密钥
+        let mut existing = base.clone();
+        merge_profile_update(
+            &mut existing,
+            AiProfile {
+                provider_id: base.provider_id.clone(),
+                base_url: "https://api.openai.com".into(),
+                model: base.model.clone(),
+                ..Default::default()
+            },
+        );
+        assert!(existing.models.is_empty(), "换地址后不该还留着旧模型列表");
+        assert_eq!(existing.models_fetched_at, 0);
+        assert_eq!(existing.api_key, "sk-old", "密钥留空时仍要沿用旧密钥");
+
+        // 换密钥：即使调用方夹带了旧列表，也必须作废
+        let mut existing = base.clone();
+        merge_profile_update(
+            &mut existing,
+            AiProfile {
+                provider_id: base.provider_id.clone(),
+                base_url: base.base_url.clone(),
+                model: base.model.clone(),
+                api_key: "sk-new".into(),
+                models: base.models.clone(),
+                models_fetched_at: base.models_fetched_at,
+                ..Default::default()
+            },
+        );
+        assert!(existing.models.is_empty(), "换密钥后不该还留着旧模型列表");
+        assert_eq!(existing.models_fetched_at, 0);
+        assert_eq!(existing.api_key, "sk-new");
     }
 
     /// 档案校验：未知服务商与非法地址要挡住；显示名留空回落到服务商名。
