@@ -464,8 +464,12 @@ export interface HealthScoreResult {
 /**
  * 鑾峰彇绯荤粺鍋ュ悍璇勫垎
  */
-export async function getHealthScore(): Promise<HealthScoreResult> {
-  return invoke<HealthScoreResult>('get_health_score');
+export async function getHealthScore(driveLetter?: string): Promise<HealthScoreResult> {
+  // 不传盘符时后端按系统盘算；切盘后带上选中的盘符，
+  // 让磁盘空间这一维跟着顶栏走（休眠 / 垃圾仍是系统级指标）。
+  return driveLetter
+    ? invoke<HealthScoreResult>('get_health_score', { driveLetter })
+    : invoke<HealthScoreResult>('get_health_score');
 }
 
 // ============================================================================

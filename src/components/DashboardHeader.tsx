@@ -134,7 +134,7 @@ const DISK_TEXT_CLASS: Record<DiskUsageTone, string> = {
 
 export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickScan = false }: DashboardHeaderProps) {
   const { diskInfo, healthData, isLoadingHealth, isAnyScanning } = useDashboardSummary();
-  const { stopAllScans } = useDashboardActions();
+  const { stopAllScans, refreshHealthScore } = useDashboardActions();
   const { t } = useTranslation('common');
   const { showToast } = useToast();
 
@@ -169,6 +169,15 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
     () => drives.find((drive) => drive.drive_letter === selectedDrive) ?? null,
     [drives, selectedDrive],
   );
+
+  // 选中的盘被拔掉或刷新后消失：容量条会退回系统盘，评分也必须一起退回，
+  // 否则会出现「显示 C 盘容量、却按 D 盘打分」的错位。
+  useEffect(() => {
+    if (!selectedDrive || drives.length === 0 || activeDrive) return;
+    const fallback = defaultDriveLetter(drives);
+    setSelectedDrive(fallback);
+    void refreshHealthScore(fallback);
+  }, [selectedDrive, drives, activeDrive, refreshHealthScore]);
   /** 展示用的一条数据：选中的盘优先，没有就退回 context 的系统盘。 */
   const disk = activeDrive
     ? { drive_letter: activeDrive.drive_letter, free_space: activeDrive.free_space, total_space: activeDrive.total_space, usage_percent: activeDrive.usage_percent }
@@ -240,7 +249,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               <div className="flex items-center gap-3 mt-1 text-[0.79rem] text-[var(--text-muted)] tabular-nums">
                 <span 
                   className="flex items-center gap-1 cursor-help"
-                  title={t('scoreDetails.diskSpace')}
+                  title={t('scoreDetails.diskSpace', { drive: disk?.drive_letter ?? 'C:' })}
                 >
                   <HardDrive className="w-3.5 h-3.5" />
                   {healthData.disk_score}/40
@@ -334,7 +343,11 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
           onClose={() => setIsDiskSwitchOpen(false)}
           drives={drives}
           selectedDrive={disk?.drive_letter ?? 'C:'}
-          onSelect={setSelectedDrive}
+          onSelect={(driveLetter) => {
+            setSelectedDrive(driveLetter);
+            // 磁盘空间是评分里的 40 分那一维：切盘必须让后端按新盘重算
+            void refreshHealthScore(driveLetter);
+          }}
         />
 
         {!hideOneClickScan && (

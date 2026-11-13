@@ -3,7 +3,7 @@
 // 管理所有清理模块的扫描状态，支持并发扫描和实时进度更新
 // ============================================================================
 
-import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef, ReactNode } from 'react';
 import {
   cancelDiskGrowthScan,
   cancelHotspotScan,
@@ -82,8 +82,8 @@ export interface DashboardContextValue {
   updateModuleState: (moduleId: keyof ModulesState, state: Partial<ModuleState>) => void;
   /** 刷新磁盘信息 */
   refreshDiskInfo: () => Promise<void>;
-  /** 刷新健康评分 */
-  refreshHealthScore: () => Promise<void>;
+  /** 刷新健康评分；传入盘符即按该盘重算，不传沿用上一次的盘 */
+  refreshHealthScore: (driveLetter?: string) => Promise<void>;
   /** 是否有任何模块正在扫描 */
   isAnyScanning: boolean;
   /** 健康评分刷新触发器 */
@@ -104,7 +104,7 @@ interface DashboardActionsValue {
   setExpandedModule: (moduleId: string | null) => void;
   updateModuleState: (moduleId: keyof ModulesState, state: Partial<ModuleState>) => void;
   refreshDiskInfo: () => Promise<void>;
-  refreshHealthScore: () => Promise<void>;
+  refreshHealthScore: (driveLetter?: string) => Promise<void>;
   triggerHealthRefresh: () => void;
   triggerOneClickScan: () => void;
   stopAllScans: () => void;
@@ -212,16 +212,28 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     }
   }, []);
 
-  // 刷新健康评分
-  const refreshHealthScore = useCallback(async () => {
+  /**
+   * 健康评分按哪个分区算。用 ref 而不是 state：它只决定请求参数，
+   * 界面看的是 healthData；清理完成后的自动刷新也要沿用用户最后选中的盘。
+   */
+  const healthDriveRef = useRef('');
+  /** 连续切盘时只认最后一次请求，避免旧结果晚到把新结果盖掉。 */
+  const healthRequestIdRef = useRef(0);
+
+  // 刷新健康评分（传入盘符即按该盘重算；不传沿用上一次的盘）
+  const refreshHealthScore = useCallback(async (driveLetter?: string) => {
+    if (driveLetter !== undefined) healthDriveRef.current = driveLetter;
+    const requestId = ++healthRequestIdRef.current;
     setIsLoadingHealth(true);
     try {
-      const result = await getHealthScore();
+      const result = await getHealthScore(healthDriveRef.current || undefined);
+      if (requestId !== healthRequestIdRef.current) return;
       setHealthData(result);
     } catch (error) {
+      if (requestId !== healthRequestIdRef.current) return;
       console.error('获取健康评分失败:', error);
     } finally {
-      setIsLoadingHealth(false);
+      if (requestId === healthRequestIdRef.current) setIsLoadingHealth(false);
     }
   }, []);
 

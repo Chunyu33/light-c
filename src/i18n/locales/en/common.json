@@ -67,7 +67,7 @@
   "fileCountLabel": "Files",
   "categoryCountLabel": "Categories",
   "healthScore": "Health score",
-  "scoreDetails": { "diskSpace": "Disk-space score (maximum 40)\n• Free space ≥30%: 40\n• Free space 20-30%: 30\n• Free space 10-20%: 20\n• Free space <10%: 10", "hibernation": "Hibernation-file score (maximum 30)\n• Hibernation disabled: 30\n• Hibernation file present: 0\nHibernation files commonly use 8-32 GB", "junk": "Junk-file score (maximum 30)\n• Junk <500 MB: 30\n• Junk 500 MB-2 GB: 20\n• Junk 2-5 GB: 10\n• Junk >5 GB: 0" },
+  "scoreDetails": { "diskSpace": "Disk-space score for {{drive}} (maximum 40)\nFollows the drive selected in the top bar\n• Free space ≥30%: 40\n• Free space 20-30%: 30\n• Free space 10-20%: 20\n• Free space <10%: 10", "hibernation": "Hibernation-file score (maximum 30)\nSystem-drive metric; unchanged when switching drives\n• Hibernation disabled: 30\n• Hibernation file present: 0\nHibernation files commonly use 8-32 GB", "junk": "Junk-file score (maximum 30)\nSystem-drive metric; unchanged when switching drives\n• Junk <500 MB: 30\n• Junk 500 MB-2 GB: 20\n• Junk 2-5 GB: 10\n• Junk >5 GB: 0" },
   "backToTop": "Back to top",
   "dragMove": "Drag to move",
   "theme": { "light": "Light", "dark": "Dark", "system": "System" },

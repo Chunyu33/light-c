@@ -156,10 +156,11 @@ pub async fn rebuild_search_index() -> Result<String, String> {
 // 健康评分
 // ============================================================================
 
-/// 计算系统健康评分
+/// 计算系统健康评分。
+/// `drive_letter` 是顶栏选中的分区；不传时按系统盘算，保持旧调用方行为不变。
 #[tauri::command]
-pub fn get_health_score() -> HealthScoreResult {
-    crate::health_score::calculate()
+pub fn get_health_score(drive_letter: Option<String>) -> HealthScoreResult {
+    crate::health_score::calculate(drive_letter.as_deref())
 }
 
 // ============================================================================

@@ -1,6 +1,7 @@
 // ============================================================================
 // 系统健康评分模块
-// 根据磁盘空间、休眠文件、垃圾文件三维度计算 C 盘健康评分
+// 根据磁盘空间、休眠文件、垃圾文件三维度计算健康评分。
+// 磁盘空间维度跟随顶栏选中的分区；休眠文件与系统垃圾都在系统盘上，始终按系统盘算。
 // ============================================================================
 
 use log::info;
@@ -11,13 +12,13 @@ use serde::Serialize;
 pub struct HealthScoreResult {
     /// 总分 (0-100)
     pub score: u32,
-    /// C盘剩余空间评分 (0-40)
+    /// 当前选中分区剩余空间评分 (0-40)
     pub disk_score: u32,
     /// 休眠文件评分 (0-30)
     pub hibernation_score: u32,
     /// 垃圾文件评分 (0-30)
     pub junk_score: u32,
-    /// C盘剩余百分比
+    /// 当前选中分区剩余百分比
     pub disk_free_percent: f64,
     /// 是否存在休眠文件
     pub has_hibernation: bool,
@@ -29,14 +30,18 @@ pub struct HealthScoreResult {
 
 /// 计算系统健康评分
 ///
+/// `drive_letter` 是顶栏选中的分区；传 None 时按系统盘算（保持旧行为）。
+/// 只有「磁盘空间」这一维跟随分区：休眠文件和系统垃圾都在系统盘上，
+/// 换到 D: 不会让 hiberfil.sys 或 %TEMP% 跟着搬走，所以那两项始终按系统盘算。
+///
 /// 评分算法：
-/// - C盘剩余百分比 (40%权重)：剩余空间越多分数越高
+/// - 选中分区剩余百分比 (40%权重)：剩余空间越多分数越高
 /// - 休眠文件 (30%权重)：无休眠文件得满分，有则根据大小扣分
 /// - 垃圾文件 (30%权重)：垃圾越少分数越高
-pub fn calculate() -> HealthScoreResult {
+pub fn calculate(drive_letter: Option<&str>) -> HealthScoreResult {
     info!("计算系统健康评分...");
 
-    let (disk_free_percent, disk_score) = calculate_disk_score();
+    let (disk_free_percent, disk_score) = calculate_disk_score(drive_letter);
     let (has_hibernation, hibernation_size, hibernation_score) = calculate_hibernation_score();
     let (junk_size, junk_score) = calculate_junk_score();
 
@@ -59,8 +64,26 @@ pub fn calculate() -> HealthScoreResult {
     }
 }
 
+/// 把前端传来的盘符规整成该盘根目录（如 C 盘根目录）。
+///
+/// 只取第一个 ASCII 字母重新拼装，不把用户字符串直接拼进 Win32 API 路径 ——
+/// 命令层是外部可调用的，带子目录的伪路径不该被当成合法盘符。
+/// 没传或非法时回退系统盘（%SYSTEMDRIVE%，兼容系统盘不叫 C 的机器）。
+#[cfg(target_os = "windows")]
+fn disk_score_root(drive_letter: Option<&str>) -> String {
+    let letter = drive_letter
+        .and_then(|value| value.chars().find(|ch| ch.is_ascii_alphabetic()))
+        .map(|ch| ch.to_ascii_uppercase())
+        .unwrap_or_else(crate::system_info::system_drive_letter);
+    let mut root = String::with_capacity(3);
+    root.push(letter);
+    root.push(':');
+    root.push(std::path::MAIN_SEPARATOR);
+    root
+}
+
 /// 计算磁盘空间评分 (满分40)
-fn calculate_disk_score() -> (f64, u32) {
+fn calculate_disk_score(drive_letter: Option<&str>) -> (f64, u32) {
     #[cfg(target_os = "windows")]
     {
         use std::ffi::OsStr;
@@ -76,8 +99,8 @@ fn calculate_disk_score() -> (f64, u32) {
             ) -> i32;
         }
 
-        // 评分针对系统盘（%SYSTEMDRIVE%），兼容系统盘不叫 C 的机器
-        let drive_root = format!("{}:\\", crate::system_info::system_drive_letter());
+        // 默认按系统盘；顶栏切盘后按选中的分区，盘符已在 disk_score_root 里规整
+        let drive_root = disk_score_root(drive_letter);
         let path: Vec<u16> = OsStr::new(&drive_root)
             .encode_wide()
             .chain(std::iter::once(0))
@@ -201,4 +224,24 @@ fn calculate_junk_score() -> (u64, u32) {
     };
 
     (total_junk_size, score)
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::*;
+
+    /// 顶栏切盘传来的值必须先规整成单个盘符根目录：
+    /// 既保证 "d" / "D:" 等价，也保证带子目录的伪路径不会进 Win32 API。
+    #[test]
+    fn disk_score_root_normalizes_drive_letter() {
+        let separator = std::path::MAIN_SEPARATOR;
+        let system_root = format!("{}:{}", crate::system_info::system_drive_letter(), separator);
+
+        assert_eq!(disk_score_root(None), system_root);
+        assert_eq!(disk_score_root(Some("")), system_root);
+        assert_eq!(disk_score_root(Some("123")), system_root);
+        assert_eq!(disk_score_root(Some("D:")), format!("D:{}", separator));
+        assert_eq!(disk_score_root(Some("d")), format!("D:{}", separator));
+        assert_eq!(disk_score_root(Some("E:/Users")), format!("E:{}", separator));
+    }
 }
