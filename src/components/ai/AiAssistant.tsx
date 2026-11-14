@@ -108,6 +108,20 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   // 已经向磁盘要过历史的模块，避免来回切换时反复读文件
   const loadedModulesRef = useRef<Set<string>>(new Set());
 
+  /**
+   * 每个模块一份会话 id：同一对话的多轮请求共用一个值，「清空对话」后换新。
+   * 只活在内存里 —— 它不是密钥，也不该跨重启沿用（重启本来就是新会话）。
+   */
+  const sessionIdByModuleRef = useRef<Record<string, string>>({});
+  const getSessionId = useCallback((moduleId: string) => {
+    const existing = sessionIdByModuleRef.current[moduleId];
+    if (existing) return existing;
+    // 官方示例用 ses_ 前缀；uuid 用 Webview 原生能力，不引新依赖
+    const generated = `ses_${crypto.randomUUID()}`;
+    sessionIdByModuleRef.current[moduleId] = generated;
+    return generated;
+  }, []);
+
   const moduleName = useMemo(() => getModuleDisplayName(activeModuleId), [activeModuleId]);
 
   /**
@@ -494,6 +508,8 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
       // 抓一份"发送时"的模块与历史：用户可能在生成过程中切模块，
       // 这一轮的结果必须落回发起时那个模块，而不是"当前"模块（否则又串台了）。
       const moduleId = activeModuleId ?? '';
+      // 整轮工具循环共用同一个会话 id：中途换值会把同一段对话拆成两个会话
+      const sessionId = getSessionId(moduleId);
       // 重试会显式传进截断后的历史：setState 还没生效，同步读闭包拿到的仍是**截断前**的旧值，
       // 那样被"重试掉"的那条提问会跟着再发一次（界面已截断、请求没截断）。
       const history = historyOverride ?? historyByModule[moduleId] ?? [];
@@ -567,6 +583,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
               streamId: `${streamId}-r${round}-${attemptTools.length}`,
               messages: turnMessages,
               tools: attemptTools,
+              sessionId,
               timeoutMessage: t('streamTimeout'),
               onDelta,
             });
@@ -657,7 +674,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         setIsSending(false);
       }
     },
-    [activeModuleId, activeProfile, historyByModule, pushMessage, pushAndPersist, runToolCalls, t],
+    [activeModuleId, activeProfile, historyByModule, pushMessage, pushAndPersist, runToolCalls, getSessionId, t],
   );
 
   /**
@@ -745,6 +762,8 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
   const handleClearConfirmed = useCallback(() => {
     const moduleId = activeModuleId ?? '';
     setShowClearConfirm(false);
+    // 清空对话 = 开一段新会话：会话 id 必须换，否则新对话还粘着上一段的路由/缓存
+    delete sessionIdByModuleRef.current[moduleId];
     setHistoryByModule((previous) => ({ ...previous, [moduleId]: [] }));
     setHasEarlierByModule((previous) => ({ ...previous, [moduleId]: false }));
     setErrorMessage('');
@@ -1030,11 +1049,13 @@ async function requestStreamReply(options: {
   /** 已经是完整请求消息（含 system） */
   messages: AiChatMessage[];
   tools: string[];
+  /** 本次对话的会话 id，整轮工具循环复用同一个值 */
+  sessionId: string;
   /** 看门狗触发时的提示语；由调用方传入，好跟着界面语言走 */
   timeoutMessage: string;
   onDelta: (text: string) => void;
 }): Promise<AiChatReply> {
-  const { streamId, messages, tools, timeoutMessage, onDelta } = options;
+  const { streamId, messages, tools, sessionId, timeoutMessage, onDelta } = options;
   let unlisten: (() => void) | null = null;
   let watchdogHandle: number | undefined;
   let resetWatchdog: () => void = () => {};
@@ -1049,7 +1070,7 @@ async function requestStreamReply(options: {
 
     // 与看门狗赛跑：卡住时后者先 reject，把这一轮结束掉并把按钮放开
     return await Promise.race([
-      aiChatStream({ messages: trimHistory(messages), tools }, streamId),
+      aiChatStream({ messages: trimHistory(messages), tools, sessionId }, streamId),
       new Promise<never>((_, reject) => {
         const arm = () => {
           watchdogHandle = window.setTimeout(

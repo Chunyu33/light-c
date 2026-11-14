@@ -2,6 +2,12 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## Unreleased
+
+- The health score now follows the drive you pick, and its details show which drive it is based on.
+- Switching models in the AI assistant is more reliable: you can switch again afterwards, Settings no longer reverts your choice, and each reply shows the model that produced it. Compatibility with some AI services has also improved.
+- Clicking the disk refresh button repeatedly no longer stacks up a pile of notifications.
+
 ## v2.18.3
 
 - Switching drives from the top bar opens a dialog where each drive shows its free space and usage.

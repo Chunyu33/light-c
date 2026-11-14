@@ -129,6 +129,11 @@ export interface AiChatRequest {
    * propose_delete，模型也就看不到这个工具，无从提议删除。
    */
   tools?: string[];
+  /**
+   * 本次对话的会话 id。由前端按模块生成、「清空对话」时更换，
+   * 只在需要会话亲和的服务商那里变成请求头；不是配置项，也不落盘。
+   */
+  sessionId?: string;
 }
 
 export interface AiChatReply {

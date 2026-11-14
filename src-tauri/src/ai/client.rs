@@ -122,6 +122,9 @@ pub struct AiChatRequest {
     /// propose_delete，于是模型连这个工具都看不到，也就无从提议删除。
     #[serde(default)]
     pub tools: Vec<String>,
+    /// 本次对话的会话 id。前端按模块生成，只在需要会话亲和的服务商那里变成请求头。
+    #[serde(default)]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -148,6 +151,9 @@ fn join_url(base_url: &str, path: &str) -> String {
 fn http_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
+        // 用自身客户端名而不是 reqwest 默认 UA：部分网关按 UA 校验客户端身份，
+        // 通用 HTTP 库名容易被当成脚本流量（OpenCode Console 的文档也明确要求这一点）。
+        .user_agent(format!("LightC/{}", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|error| format!("创建网络请求客户端失败: {}", error))
 }
@@ -438,34 +444,60 @@ fn build_request_body(
     body
 }
 
+/// 是否给这次请求带上 OpenCode Console 的会话头。
+///
+/// 只认 `opencode.ai` 及其子域：给别的服务商发陌生头没有意义，还可能被严格网关拒掉。
+/// host 只取 scheme 之后、第一个路径分隔符之前的部分，避免 `opencode.ai.evil.com`
+/// 这类后缀骗进白名单。
+fn opencode_session_header<'a>(
+    base_url: &str,
+    session_id: Option<&'a str>,
+) -> Option<(&'static str, &'a str)> {
+    let id = session_id?.trim();
+    if id.is_empty() {
+        return None;
+    }
+    let host = base_url
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(base_url)
+        .split('/')
+        .next()?
+        .split(':')
+        .next()?
+        .to_ascii_lowercase();
+    (host == "opencode.ai" || host.ends_with(".opencode.ai"))
+        .then_some(("x-opencode-session", id))
+}
+
 /// 按协议发对话请求：两种协议只有路径与鉴权头不同。
 async fn send_chat_request(
     client: &reqwest::Client,
     protocol: AiProtocol,
     base_url: &str,
     api_key: &str,
+    session_id: Option<&str>,
     body: &serde_json::Value,
 ) -> Result<reqwest::Response, String> {
-    let sent = match protocol {
-        AiProtocol::OpenAi => {
-            client
-                .post(join_url(base_url, "/chat/completions"))
-                .bearer_auth(api_key)
-                .json(body)
-                .send()
-                .await
-        }
-        AiProtocol::Anthropic => {
-            client
-                .post(join_url(base_url, "/v1/messages"))
-                .header("x-api-key", api_key)
-                .header("anthropic-version", "2023-06-01")
-                .json(body)
-                .send()
-                .await
-        }
+    // match 只产 builder：会话头与请求体在两个协议上完全一样，没必要各写一份 .send()
+    let request = match protocol {
+        AiProtocol::OpenAi => client
+            .post(join_url(base_url, "/chat/completions"))
+            .bearer_auth(api_key),
+        AiProtocol::Anthropic => client
+            .post(join_url(base_url, "/v1/messages"))
+            .header("x-api-key", api_key)
+            .header("anthropic-version", "2023-06-01"),
     };
-    sent.map_err(describe_request_error)
+    let request = match opencode_session_header(base_url, session_id) {
+        Some((name, value)) => request.header(name, value),
+        None => request,
+    };
+    request
+        .json(body)
+        .send()
+        .await
+        .map_err(describe_request_error)
 }
 
 /// 错误信息里是否点名了 `reasoning_effort`。
@@ -500,13 +532,15 @@ async fn send_chat_request_with_retry(
     protocol: AiProtocol,
     base_url: &str,
     api_key: &str,
+    session_id: Option<&str>,
     body: &serde_json::Value,
 ) -> Result<reqwest::Response, String> {
-    match send_chat_request(client, protocol, base_url, api_key, body).await {
+    match send_chat_request(client, protocol, base_url, api_key, session_id, body).await {
         Ok(response) => Ok(response),
         Err(first_error) => {
             log::info!("首次发送失败，重试一次：{}", first_error);
-            send_chat_request(client, protocol, base_url, api_key, body).await
+            // 重试必须用同一个会话 id：换值会把一次对话拆成两段
+            send_chat_request(client, protocol, base_url, api_key, session_id, body).await
         }
     }
 }
@@ -521,9 +555,11 @@ async fn send_with_reasoning_fallback(
     protocol: AiProtocol,
     base_url: &str,
     api_key: &str,
+    session_id: Option<&str>,
     body: &serde_json::Value,
 ) -> Result<reqwest::Response, String> {
-    let response = send_chat_request_with_retry(client, protocol, base_url, api_key, body).await?;
+    let response =
+        send_chat_request_with_retry(client, protocol, base_url, api_key, session_id, body).await?;
     let status = response.status().as_u16();
     if (200..300).contains(&status) {
         return Ok(response);
@@ -540,7 +576,9 @@ async fn send_with_reasoning_fallback(
         object.remove("reasoning_effort");
     }
 
-    let retry = send_chat_request_with_retry(client, protocol, base_url, api_key, &retry_body).await?;
+    let retry =
+        send_chat_request_with_retry(client, protocol, base_url, api_key, session_id, &retry_body)
+            .await?;
     let retry_status = retry.status().as_u16();
     if (200..300).contains(&retry_status) {
         return Ok(retry);
@@ -670,7 +708,9 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
     let client = http_client(CHAT_TIMEOUT_SECS)?;
     let body = build_request_body(&request, protocol, &model, false);
     // 发送与非 2xx 处理都在这里面（含"不认 reasoning_effort 就去掉重试一次"）
-    let response = send_with_reasoning_fallback(&client, protocol, &base_url, &api_key, &body).await?;
+    let response =
+        send_with_reasoning_fallback(&client, protocol, &base_url, &api_key, request.session_id.as_deref(), &body)
+            .await?;
 
     let text = response
         .text()
@@ -770,8 +810,15 @@ where
     let client = http_client(STREAM_TIMEOUT_SECS)?;
     let body = build_request_body(&request, protocol, &model, true);
     // 发送、重试与非 2xx 处理都在这里面（见 send_with_reasoning_fallback）
-    let mut response =
-        send_with_reasoning_fallback(&client, protocol, &base_url, &api_key, &body).await?;
+    let mut response = send_with_reasoning_fallback(
+        &client,
+        protocol,
+        &base_url,
+        &api_key,
+        request.session_id.as_deref(),
+        &body,
+    )
+    .await?;
 
     // 边收边发：用户能立刻看到字出来，而不是等整段返回
     let outcome = consume_stream(&mut response, protocol, &mut on_delta).await?;
@@ -799,6 +846,32 @@ where
 mod tests {
     use super::*;
 
+    /// 会话头只发给 OpenCode Console，不能被形近域名骗过去；
+    /// 没带会话 id 或空串时一律不发，其它服务商的请求保持原样。
+    #[test]
+    fn opencode_session_header_only_targets_console_hosts() {
+        let session = Some("ses_abc123");
+        assert_eq!(
+            opencode_session_header("https://opencode.ai/inference/go", session),
+            Some(("x-opencode-session", "ses_abc123"))
+        );
+        assert_eq!(
+            opencode_session_header("https://zen.opencode.ai/inference", session),
+            Some(("x-opencode-session", "ses_abc123"))
+        );
+        assert!(opencode_session_header("https://opencode.ai:8443/v1", session).is_some());
+        assert_eq!(
+            opencode_session_header("https://opencode.ai.evil.com/v1", session),
+            None
+        );
+        assert_eq!(opencode_session_header("https://api.deepseek.com", session), None);
+        assert_eq!(opencode_session_header("https://opencode.ai/inference/go", None), None);
+        assert_eq!(
+            opencode_session_header("https://opencode.ai/inference/go", Some("  ")),
+            None
+        );
+    }
+
     fn sample_request() -> AiChatRequest {
         AiChatRequest {
             messages: vec![
@@ -819,6 +892,7 @@ mod tests {
             temperature: Some(0.3),
             // 默认不带工具：工具声明由前端按模块能力决定
             tools: Vec::new(),
+            session_id: None,
         }
     }
 
@@ -862,6 +936,7 @@ mod tests {
             model: None,
             temperature: None,
             tools: Vec::new(),
+            session_id: None,
         };
 
         let openai = build_openai_body(&request, "m");
@@ -891,6 +966,7 @@ mod tests {
             model: None,
             temperature: None,
             tools: Vec::new(),
+            session_id: None,
         };
         assert_eq!(build_openai_body(&request, "m")["messages"][0]["content"], "你好");
         assert_eq!(build_anthropic_body(&request, "m")["messages"][0]["content"], "你好");
@@ -996,6 +1072,7 @@ mod tests {
             model: None,
             temperature: None,
             tools: Vec::new(),
+            session_id: None,
         };
         let body = build_openai_body(&request, "test-model");
         let messages = body["messages"].as_array().expect("messages 应是数组");
