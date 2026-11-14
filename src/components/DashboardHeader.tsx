@@ -128,6 +128,12 @@ const DISK_TEXT_CLASS: Record<DiskUsageTone, string> = {
   danger: 'text-[var(--color-danger)]',
 };
 
+/**
+ * 手动刷新后的冷却时长。
+ * 磁盘容量不会在几秒内变两次，放开连点只会堆一叠「已刷新」提示（Toast 会自动消失但仍是刷屏）。
+ */
+const REFRESH_COOLDOWN_MS = 2000;
+
 // ============================================================================
 // 组件实现
 // ============================================================================
@@ -148,15 +154,37 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
   const { drives, loading: drivesLoading, refresh: refreshDrives } = useLocalDrives();
   const [selectedDrive, setSelectedDrive] = useState('');
 
-  /** 手动刷新：读完弹一条轻提示，成功失败都要说，否则用户不知道按钮有没有生效。 */
+  /** 冷却期内按钮保持禁用，让用户看得见「刚刷过」而不是点了没反应。 */
+  const [isRefreshCooling, setIsRefreshCooling] = useState(false);
+  /** state 更新是异步的：同一帧里的连点要靠 ref 锁挡住，不能只靠 disabled。 */
+  const refreshInFlightRef = useRef(false);
+  const cooldownTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (cooldownTimerRef.current !== null) window.clearTimeout(cooldownTimerRef.current);
+  }, []);
+
+  /** 手动刷新：请求中与冷却期内都不重复发起；读完弹一条轻提示，成功失败都要说。 */
   const handleRefreshDrives = useCallback(async () => {
-    const succeeded = await refreshDrives();
-    showToast(
-      succeeded
-        ? { type: 'success', title: t('refreshDiskInfoDone') }
-        : { type: 'error', title: t('refreshDiskInfoFailed') },
-    );
-  }, [refreshDrives, showToast, t]);
+    if (drivesLoading || isRefreshCooling || refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
+    setIsRefreshCooling(true);
+    try {
+      const succeeded = await refreshDrives();
+      showToast(
+        succeeded
+          ? { type: 'success', title: t('refreshDiskInfoDone') }
+          : { type: 'error', title: t('refreshDiskInfoFailed') },
+      );
+    } finally {
+      refreshInFlightRef.current = false;
+      // 冷却从请求结束后开始算：慢请求也不会因为计时提前跑完而提前解禁
+      cooldownTimerRef.current = window.setTimeout(() => {
+        cooldownTimerRef.current = null;
+        setIsRefreshCooling(false);
+      }, REFRESH_COOLDOWN_MS);
+    }
+  }, [drivesLoading, isRefreshCooling, refreshDrives, showToast, t]);
 
   // 首次拿到列表时默认选中系统盘（后端标了 is_system 的那块，找不到就退 C:）。
   useEffect(() => {
@@ -304,7 +332,7 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
               <button
                 type="button"
                 onClick={handleRefreshDrives}
-                disabled={drivesLoading}
+                disabled={drivesLoading || isRefreshCooling}
                 title={t('refreshDiskInfo')}
                 aria-label={t('refreshDiskInfo')}
                 className="shrink-0 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-60"
