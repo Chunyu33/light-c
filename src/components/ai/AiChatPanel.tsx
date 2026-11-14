@@ -409,6 +409,11 @@ export function AiChatPanel({
                     {isUser ? message.content : renderMarkdown(message.content)}
                   </div>
                 </div>
+                {/* 本轮实际使用的模型（后端回传的真值）：常驻显示，不跟着动作条一起等 hover。
+                    切换模型后前后两条回答并排一看就知道有没有生效。 */}
+                {!isUser && message.model ? (
+                  <span className="pl-8 text-xs text-[var(--text-faint)]">{message.model}</span>
+                ) : null}
                 {/* 动作条放在**气泡下方**（悬停出现）：复制每条、重试仅对用户消息。
                     放在上方会和头像挤在一起，也不符合这类界面的习惯。 */}
                 <div

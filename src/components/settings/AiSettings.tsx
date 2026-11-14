@@ -5,7 +5,7 @@
 // 所以这里**永远接触不到明文 API Key** —— 只显示掩码。
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, CheckCircle2, Loader2, Plus, Sparkles } from 'lucide-react';
 import { Select } from '../ui/Select';
@@ -23,7 +23,7 @@ import {
   testAiConnection,
 } from '../../api/ai';
 import { openInFolder, pickFolderDialog } from '../../api/commands';
-import { notifyAiConfigChanged } from '../ai/aiConfigSignal';
+import { notifyAiConfigChanged, subscribeAiConfig } from '../ai/aiConfigSignal';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { AiProviderPreset, AiPublicConfig } from '../../types/ai';
 
@@ -272,6 +272,33 @@ export function AiSettings() {
     },
     [providers],
   );
+
+  /** 编辑态镜像：订阅回调里读它，避免每次展开/收起编辑区都重新订阅。 */
+  const isEditingRef = useRef(isEditing);
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  /**
+   * 外部改了配置时同步过来：助手面板在输入框里就地切模型后，磁盘上的 model 已变，
+   * 这里不更新的话用户随后点「保存」会用旧模型把它写回去。
+   *
+   * ⚠️ 只更新状态、**不再广播** —— persist / applyConfig 都会广播，
+   * 这里再广播就会和设置页自己形成通知循环。
+   */
+  useEffect(() => subscribeAiConfig(() => {
+    void getAiConfig()
+      .then((config) => {
+        setSaved(config);
+        // 编辑中保留用户草稿：只换基准值，别覆盖他正在填的模型名
+        if (isEditingRef.current) return;
+        const active = config.profiles.find((item) => item.id === config.activeProfileId) ?? config.profiles[0];
+        setActiveId(active?.id ?? '');
+        setModel(active?.model ?? '');
+        setModelOptions(active?.models ?? []);
+      })
+      .catch((error) => console.error('同步 AI 配置失败:', error));
+  }), []);
 
   /**
    * 表单里有没有没保存的改动。

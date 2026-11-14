@@ -33,7 +33,7 @@ import { getModuleActions } from './moduleActionRegistry';
 import type { AiDeleteOutcome, AiDeleteTargetSummary, ModuleActions } from './moduleActionRegistry';
 import { formatReadPage } from './useAiModuleBridge';
 import { clearAiAsk, useAiAskRequest } from './aiAsk';
-import { subscribeAiConfig } from './aiConfigSignal';
+import { notifyAiConfigChanged, subscribeAiConfig } from './aiConfigSignal';
 import { useToast } from '../Toast';
 import type { AttachedImage } from './imageAttach';
 
@@ -181,6 +181,9 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           reasoningEffort: activeProfile.reasoningEffort,
         });
         setAiConfig(next);
+        // 设置页可能正开着，它那份配置是挂载时的快照。不广播的话用户随后在设置页
+        // 点「保存」，会用旧模型把刚切好的值写回去 —— 表现就是"模型没切成功"。
+        notifyAiConfigChanged();
       } catch (error) {
         // 写回失败必须让人看见：下拉框看起来已经切过去了，其实没生效
         setErrorMessage(t('switchModelFailed', { message: String(error) }));
@@ -272,6 +275,8 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         reasoningContent?: string;
         localToolOutput?: boolean;
         producedByProfile?: string;
+        /** 后端回传的实际模型名，只在界面显示 */
+        model?: string;
       },
     ) => {
       const message = {
@@ -280,6 +285,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         reasoningContent: extra?.reasoningContent,
         localToolOutput: extra?.localToolOutput,
         producedByProfile: extra?.producedByProfile,
+        model: extra?.model,
       };
       pushMessage(moduleId, message);
       void appendAiSessionMessage(moduleId, localDateKey(), {
@@ -584,6 +590,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
             pushAndPersist(moduleId, reply.content, {
               reasoningContent: reply.reasoningContent,
               producedByProfile: activeProfile?.id,
+              model: reply.model,
             });
             return;
           }
@@ -603,6 +610,7 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
               pushAndPersist(moduleId, reply.content, {
                 reasoningContent: reply.reasoningContent,
                 producedByProfile: activeProfile?.id,
+                model: reply.model,
               });
             } else {
               pushAndPersist(moduleId, t('tool.noConclusion'));

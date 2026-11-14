@@ -98,6 +98,12 @@ export interface AiChatMessage {
    */
   localToolOutput?: boolean;
   /**
+   * 产出这条回复的**实际模型名**（后端回传的真值，只在界面显示）。
+   * 切换模型后逐条对照就能确认是否生效，而不是只能盲信输入框里的下拉值。
+   * 不进请求体：后端构造 messages 时只挑协议字段，界面专用字段会被丢掉。
+   */
+  model?: string;
+  /**
    * Unix 毫秒时间戳（**只在界面用**：跨天加载后靠它插日期分隔线）。
    * 请求构造不会带它 —— `toRequestMessage` 只挑 role/content 这类协议字段。
    */
