@@ -204,23 +204,31 @@ where
 
     // 先在内存里把候选缩到「路径 + 阈值」，再并行 stat：
     // 候选通常只有几十上百个，但分散在整个盘上，串行 stat 实测能占到一秒以上
-    let resolved: Vec<(PathBuf, u64)> = candidate_min_sizes
+    //
+    // 覆盖路径的规范化只做一次：原先每个候选都要对每个覆盖根 canonicalize 一遍
+    // （canonicalize 在 Windows 上要打开文件句柄），候选上千时是几十万次多余的文件系统调用。
+    let covered_keys = covered_root_keys(covered_roots);
+
+    let resolved: Vec<(PathBuf, u64, String)> = candidate_min_sizes
         .into_iter()
         .filter_map(|(mft_id, min_size)| {
             let path = PathBuf::from(paths.get(&mft_id)?);
-            if should_skip_path(&path)
-                || !is_plausible_mft_model_candidate(&path)
-                || is_covered_by_config_layer(&path, covered_roots)
-            {
+            if should_skip_path(&path) || !is_plausible_mft_model_candidate(&path) {
                 return None;
             }
-            Some((path, min_size))
+
+            let path_key = normalize_path_key(&path);
+            if covered_source_for_key(&path_key, &covered_keys).is_some() {
+                return None;
+            }
+
+            Some((path, min_size, path_key))
         })
         .collect();
 
     let models: Vec<(String, ModelItem)> = resolved
         .par_iter()
-        .filter_map(|(path, min_size)| {
+        .filter_map(|(path, min_size, path_key)| {
             // MFT 负责快速定位候选，大小读取回到标准 metadata，
             // 避免少量文件因 NTFS 记录解析差异在进入路径层前被误丢。
             let metadata = path.metadata().ok()?;
@@ -228,7 +236,7 @@ where
                 return None;
             }
 
-            let source_name = infer_source_name(path, covered_roots);
+            let source_name = infer_source_name(path, path_key, &covered_keys);
             let name = path
                 .file_name()
                 .and_then(|value| value.to_str())
@@ -288,11 +296,47 @@ fn finish_mft_phase(
     });
 }
 
-fn is_covered_by_config_layer(path: &Path, covered_roots: &[CoveredRoot]) -> bool {
-    // 配置层是高置信来源，MFT 只负责补漏；这里直接跳过已覆盖路径，避免平台列表和兜底结果重复出现。
+/// 一条覆盖路径的规范化键：来源名 + 小写路径。
+///
+/// 提前算好一次，供本盘所有候选复用；逐个候选重新 canonicalize 是纯浪费。
+struct CoveredRootKey<'a> {
+    source_name: &'a str,
+    key: String,
+}
+
+fn covered_root_keys(covered_roots: &[CoveredRoot]) -> Vec<CoveredRootKey<'_>> {
     covered_roots
         .iter()
-        .any(|root| path_starts_with(path, &root.path))
+        .map(|root| CoveredRootKey {
+            source_name: root.source_name.as_str(),
+            key: normalize_path_key(&root.path),
+        })
+        .collect()
+}
+
+/// 候选落在哪个已覆盖的来源下；`None` 表示配置层没扫过这条路径，MFT 该补进来。
+fn covered_source_for_key<'a>(
+    path_key: &str,
+    covered_keys: &'a [CoveredRootKey<'_>],
+) -> Option<&'a str> {
+    covered_keys
+        .iter()
+        .find(|root| path_key_starts_with(path_key, &root.key))
+        .map(|root| root.source_name)
+}
+
+fn path_key_starts_with(path_key: &str, root_key: &str) -> bool {
+    // 热路径：每个候选都会跟每条覆盖路径比一次，不要为此分配字符串
+    let root_key = root_key.trim_end_matches('\\');
+    if path_key == root_key {
+        return true;
+    }
+    if !path_key.starts_with(root_key) {
+        return false;
+    }
+
+    // 必须停在分隔符上，否则 `d:\models2` 会被当成 `d:\models` 的子孙
+    path_key[root_key.len()..].starts_with('\\')
 }
 
 fn model_extension_threshold(file_name: &str) -> Option<u64> {
@@ -300,12 +344,13 @@ fn model_extension_threshold(file_name: &str) -> Option<u64> {
     mft_model_min_size(file_name)
 }
 
-fn infer_source_name(path: &Path, covered_roots: &[CoveredRoot]) -> String {
-    if let Some(root) = covered_roots
-        .iter()
-        .find(|root| path_starts_with(path, &root.path))
-    {
-        return root.source_name.clone();
+fn infer_source_name(
+    path: &Path,
+    path_key: &str,
+    covered_keys: &[CoveredRootKey<'_>],
+) -> String {
+    if let Some(source_name) = covered_source_for_key(path_key, covered_keys) {
+        return source_name.to_string();
     }
 
     let lower_path = path.to_string_lossy().to_ascii_lowercase();
@@ -336,16 +381,6 @@ fn infer_source_name(path: &Path, covered_roots: &[CoveredRoot]) -> String {
     }
 
     "未归类".to_string()
-}
-
-fn path_starts_with(path: &Path, root: &Path) -> bool {
-    let path_key = normalize_path_key(path);
-    let mut root_key = normalize_path_key(root);
-    if !root_key.ends_with('\\') {
-        root_key.push('\\');
-    }
-
-    path_key == root_key.trim_end_matches('\\') || path_key.starts_with(&root_key)
 }
 
 fn normalize_path_key(path: &Path) -> String {
@@ -494,12 +529,36 @@ mod tests {
 
     #[test]
     fn infers_llama_cpp_for_portable_gguf_models() {
-        let source_name = infer_source_name(
-            Path::new(r"D:\ai\llama\models\Qwythos-9B-Claude-Mythos.gguf"),
-            &[],
-        );
+        let path = Path::new(r"D:\ai\llama\models\Qwythos-9B-Claude-Mythos.gguf");
+        let source_name = infer_source_name(path, &normalize_path_key(path), &[]);
 
         assert_eq!(source_name, "llama.cpp");
+    }
+
+    #[test]
+    fn covered_root_match_requires_a_path_boundary() {
+        // 只看前缀会把 `D:\models2` 误当成 `D:\models` 的子孙，从而整块跳过
+        assert!(path_key_starts_with(r"d:\models\a.gguf", r"d:\models"));
+        assert!(!path_key_starts_with(r"d:\models2\a.gguf", r"d:\models"));
+        assert!(path_key_starts_with(r"d:\models", r"d:\models"));
+    }
+
+    #[test]
+    fn covered_source_wins_over_path_hints() {
+        let covered_keys = vec![CoveredRootKey {
+            source_name: "ComfyUI",
+            key: r"d:\comfyui\models".to_string(),
+        }];
+
+        // 路径里带 `\checkpoints\` 本会推到 ComfyUI，但归属要以覆盖记录为准
+        assert_eq!(
+            covered_source_for_key(r"d:\comfyui\models\checkpoints\a.safetensors", &covered_keys),
+            Some("ComfyUI")
+        );
+        assert_eq!(
+            covered_source_for_key(r"e:\other\checkpoints\a.safetensors", &covered_keys),
+            None
+        );
     }
 
     #[test]

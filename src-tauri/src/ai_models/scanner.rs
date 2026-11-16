@@ -1,3 +1,5 @@
+// 盗取代码妄图搞商业化的sb们，看得明白吗？ 你们永远做不出来比lightc更好的产品
+
 use crate::ai_models::detectors::create_detectors;
 use crate::ai_models::mft_discovery::{discover_models_via_mft, CoveredRoot};
 use crate::ai_models::model_file_rules::is_model_file_path;
@@ -225,7 +227,9 @@ fn dedupe_models_by_path(mut sources: Vec<AssetSource>) -> Vec<AssetSource> {
             .models
             .sort_by(|left, right| right.size.cmp(&left.size));
         source.model_count = source.models.len();
-        source.total_size = source.models.iter().map(|model| model.size).sum();
+        // total_size 保持 Detector 给的值，**不能**用「剩余模型体积之和」重算：
+        // Ollama / HuggingFace 的多个模型共享同一份权重，逐模型累加会让总占用虚高；
+        // 而被去重掉的模型本来就是同一个文件，真实占用并不会因此减少。
         deduped_sources.push(source);
     }
 
@@ -252,8 +256,11 @@ fn merge_sources_by_name(sources: Vec<AssetSource>) -> Vec<AssetSource> {
                 .models
                 .sort_by(|left, right| right.size.cmp(&left.size));
             existing_source.model_count = existing_source.models.len();
-            existing_source.total_size =
-                existing_source.models.iter().map(|model| model.size).sum();
+            // 同名来源可能来自不同根目录（例如 Ollama 装在两块盘），总量按各自真实占用相加。
+            // 同样不能用「合并后模型体积之和」重算，理由见 dedupe_models_by_path。
+            existing_source.total_size = existing_source
+                .total_size
+                .saturating_add(source.total_size);
         } else {
             for model in &source.models {
                 let key = model_identity_key(&source.name, &model.name, &model.path);
@@ -298,4 +305,82 @@ fn canonical_path_key(path: &Path) -> String {
         .unwrap_or_else(|_| path.to_path_buf())
         .to_string_lossy()
         .to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ai_models::types::ModelItem;
+
+    /// 造一个「总量小于逐模型累加」的来源：模拟 Ollama / HuggingFace 的共享权重。
+    fn shared_blob_source(name: &str, root: &str, models: &[(&str, u64)], total_size: u64) -> AssetSource {
+        AssetSource {
+            name: name.to_string(),
+            path: PathBuf::from(root),
+            total_size,
+            model_count: models.len(),
+            models: models
+                .iter()
+                .map(|(model_name, size)| ModelItem {
+                    name: (*model_name).to_string(),
+                    size: *size,
+                    path: PathBuf::from(format!("{}\\{}", root, model_name)),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn dedupe_keeps_shared_blob_total_instead_of_summing_models() {
+        // 两个模型共享 100，各自另有 10：真实占用 120，逐模型累加会得到 220
+        let source = shared_blob_source("Ollama", r"D:\ollama", &[("a", 110), ("b", 110)], 120);
+
+        let deduped = dedupe_models_by_path(vec![source]);
+
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].model_count, 2);
+        assert_eq!(
+            deduped[0].total_size, 120,
+            "去重阶段不能把共享权重的总量改成逐模型累加"
+        );
+    }
+
+    #[test]
+    fn dedupe_dropping_duplicate_keeps_total_unchanged() {
+        // 同一个文件被两个检测器命中：去重后模型少一个，但磁盘占用不变
+        let first = shared_blob_source("ComfyUI", r"D:\comfy", &[("sd.safetensors", 500)], 500);
+        let second = shared_blob_source("LM Studio", r"D:\comfy", &[("sd.safetensors", 500)], 500);
+
+        let deduped = dedupe_models_by_path(vec![first, second]);
+
+        assert_eq!(deduped.len(), 1, "重复模型应只剩一个来源");
+        assert_eq!(deduped[0].name, "ComfyUI", "优先级高的来源应占坑");
+        assert_eq!(deduped[0].total_size, 500);
+    }
+
+    #[test]
+    fn merge_adds_source_totals_instead_of_resumming_models() {
+        // 同名来源来自两个根目录，各自总量都小于模型体积之和
+        let first = shared_blob_source("Ollama", r"D:\ollama", &[("a", 110)], 100);
+        let second = AssetSource {
+            name: "Ollama".to_string(),
+            path: PathBuf::from(r"E:\ollama"),
+            total_size: 90,
+            model_count: 1,
+            models: vec![ModelItem {
+                name: "b".to_string(),
+                size: 110,
+                path: PathBuf::from(r"E:\ollama\b"),
+            }],
+        };
+
+        let merged = merge_sources_by_name(vec![first, second]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].model_count, 2);
+        assert_eq!(
+            merged[0].total_size, 190,
+            "合并同名来源应按各自真实占用相加，而不是按模型体积重算"
+        );
+    }
 }

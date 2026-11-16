@@ -1,8 +1,9 @@
 use super::{
-    directory_size_deduped, linked_file_size, source_from_models, unique_existing_paths,
+    directory_size_deduped, linked_file_size, normalize_existing_path, source_from_models,
     user_home_dir, DetectorOutput, ModelDetector,
 };
 use crate::ai_models::types::ModelItem;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 pub struct HuggingFaceDetector;
@@ -13,34 +14,41 @@ impl HuggingFaceDetector {
     }
 }
 
+/// 一处 HuggingFace 缓存：`hub_dir` 直接包含 `models--*`，`size_root` 是统计总占用时用的根目录。
+///
+/// 两个字段不总是同一个值：`HF_HOME` 指向缓存根（其下才是 `hub`），
+/// 而 `HF_HUB_CACHE` 直接指向 `hub` 本身。
+struct HubCache {
+    hub_dir: PathBuf,
+    size_root: PathBuf,
+}
+
 impl ModelDetector for HuggingFaceDetector {
     fn detect(&self) -> DetectorOutput {
-        let mut candidate_roots = Vec::new();
-
-        if let Ok(hf_home) = std::env::var("HF_HOME") {
-            // HuggingFace 官方允许通过 HF_HOME 改缓存根目录，优先读取它能覆盖大多数迁移到其他盘的用户。
-            candidate_roots.push(PathBuf::from(hf_home));
-        }
-
-        if let Some(home_dir) = user_home_dir() {
-            candidate_roots.push(home_dir.join(".cache").join("huggingface"));
-        }
+        let caches = unique_hub_caches(huggingface_cache_candidates());
 
         let mut models = Vec::new();
+        let mut size_roots: Vec<PathBuf> = Vec::new();
+        let mut seen_size_roots = HashSet::new();
         let mut source_path = None;
 
-        for root in unique_existing_paths(candidate_roots) {
-            source_path.get_or_insert_with(|| root.clone());
-            let mut collected = collect_huggingface_models(&root);
-            models.append(&mut collected);
+        for cache in &caches {
+            // 展示用的来源路径取缓存根目录，和用户自己设的环境变量对得上
+            source_path.get_or_insert_with(|| cache.size_root.clone());
+            models.append(&mut collect_huggingface_models(&cache.hub_dir));
+
+            let key = cache.size_root.to_string_lossy().to_lowercase();
+            if seen_size_roots.insert(key) {
+                size_roots.push(cache.size_root.clone());
+            }
         }
 
         // 各模型体积按"自己引用的数据"累加，共享同一个 blob 时总数会大于磁盘占用，
         // 因此整体占用单独按缓存目录的真实文件统计（符号链接不计入，由 blobs 负责）。
-        let total_size = source_path
-            .as_deref()
-            .map(directory_size_deduped)
-            .unwrap_or(0);
+        let total_size: u64 = size_roots
+            .iter()
+            .map(|root| directory_size_deduped(root))
+            .sum();
 
         DetectorOutput {
             source: source_from_models("HuggingFace", source_path.unwrap_or_default(), models)
@@ -53,15 +61,68 @@ impl ModelDetector for HuggingFaceDetector {
     }
 }
 
+/// 收集所有可能的缓存位置（未校验存在性、未去重）。
+fn huggingface_cache_candidates() -> Vec<HubCache> {
+    let mut candidates = Vec::new();
+
+    // 这两个变量直接指向 hub 目录，其下就是 models--*，不能再拼一层 hub
+    for key in ["HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"] {
+        if let Ok(value) = std::env::var(key) {
+            let hub_dir = PathBuf::from(value);
+            candidates.push(HubCache {
+                size_root: hub_dir.clone(),
+                hub_dir,
+            });
+        }
+    }
+
+    // HF_HOME 指向缓存根，hub 是它的子目录
+    if let Ok(hf_home) = std::env::var("HF_HOME") {
+        let root = PathBuf::from(hf_home);
+        candidates.push(HubCache {
+            hub_dir: root.join("hub"),
+            size_root: root,
+        });
+    }
+
+    if let Some(home_dir) = user_home_dir() {
+        let root = home_dir.join(".cache").join("huggingface");
+        candidates.push(HubCache {
+            hub_dir: root.join("hub"),
+            size_root: root,
+        });
+    }
+
+    candidates
+}
+
+/// 只保留真实存在、且 hub 目录去重后的缓存位置。
+fn unique_hub_caches(candidates: Vec<HubCache>) -> Vec<HubCache> {
+    let mut seen_hubs = HashSet::new();
+    let mut caches = Vec::new();
+
+    for HubCache { hub_dir, size_root } in candidates {
+        // 多个环境变量可能指向同一处（比如 HF_HUB_CACHE 就设成 HF_HOME\hub）
+        let Some(hub_dir) = normalize_existing_path(hub_dir) else {
+            continue;
+        };
+        if !seen_hubs.insert(hub_dir.to_string_lossy().to_lowercase()) {
+            continue;
+        }
+        caches.push(HubCache { hub_dir, size_root });
+    }
+
+    caches
+}
+
 /// 收集 HuggingFace 缓存里的模型。
 ///
 /// 单个模型的体积等于"目录内真实文件"加上"该目录内符号链接指向的目标文件"：
 /// 快照文件全部是指向 blobs 的链接，Windows 上链接自身长度为 0，必须按目标解析，
 /// 否则模型会被算成 0 字节并从列表里丢掉。
-fn collect_huggingface_models(root: &Path) -> Vec<ModelItem> {
+fn collect_huggingface_models(hub_dir: &Path) -> Vec<ModelItem> {
     let mut models = Vec::new();
 
-    let hub_dir = root.join("hub");
     if !hub_dir.is_dir() {
         return models;
     }
@@ -198,7 +259,7 @@ mod tests {
         )
         .unwrap();
 
-        let models = collect_huggingface_models(&root);
+        let models = collect_huggingface_models(&root.join("hub"));
 
         assert_eq!(models.len(), 1, "符号链接指向的模型不应被丢弃");
         assert_eq!(models[0].name, "Systran/faster-whisper-base");
@@ -223,7 +284,7 @@ mod tests {
         )
         .unwrap();
 
-        let models = collect_huggingface_models(&root);
+        let models = collect_huggingface_models(&root.join("hub"));
 
         assert_eq!(models.len(), 1);
         assert_eq!(models[0].size, 4096);
@@ -236,9 +297,41 @@ mod tests {
         let root = fixture("empty");
         std::fs::create_dir_all(root.join("hub").join("models--org--empty")).unwrap();
 
-        let models = collect_huggingface_models(&root);
+        let models = collect_huggingface_models(&root.join("hub"));
 
         assert!(models.is_empty(), "没有任何权重的空壳不应出现在列表里");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// HF_HUB_CACHE 直接指向 hub 目录；同一处缓存被多个环境变量命中时只能算一次。
+    #[test]
+    fn dedupes_hub_dirs_and_skips_missing_ones() {
+        let root = fixture("hub-cache");
+        let hub_dir = root.join("hub");
+        std::fs::create_dir_all(hub_dir.join("models--org--model")).unwrap();
+
+        let caches = unique_hub_caches(vec![
+            HubCache {
+                hub_dir: hub_dir.clone(),
+                size_root: root.clone(),
+            },
+            // HF_HUB_CACHE 常见写法：直接指到 hub
+            HubCache {
+                hub_dir: hub_dir.clone(),
+                size_root: hub_dir.clone(),
+            },
+            // 不存在的路径要丢掉，否则会把不存在的目录算进总占用
+            HubCache {
+                hub_dir: root.join("missing-hub"),
+                size_root: root.clone(),
+            },
+        ]);
+
+        assert_eq!(caches.len(), 1, "同一个 hub 目录只应保留一处");
+        // Windows 的 canonicalize 会带上 `\\?\` 前缀，比字符串要拿规范化后的值
+        assert_eq!(caches[0].hub_dir, hub_dir.canonicalize().unwrap());
+        assert_eq!(caches[0].size_root, root, "先命中的候选决定统计口径");
 
         let _ = std::fs::remove_dir_all(&root);
     }

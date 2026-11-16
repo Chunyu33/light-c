@@ -57,6 +57,13 @@ impl ModelDetector for ComfyUiDetector {
 
         // 遍历真实存在的盘符，而不是写死 C~F：把 ComfyUI 装在 G 盘及之后的用户会整体漏扫
         for drive in available_drive_roots() {
+            // 官方 Windows 便携包解压后是 `ComfyUI_windows_portable\ComfyUI\models`，
+            // 常见整合包的目录名也不统一（Easy-Install 等），因此按盘根浅扫一层找 `ComfyUI*`。
+            for install_root in find_portable_comfyui_roots(&drive) {
+                candidate_roots.push(install_root.join("models"));
+                install_roots.push(install_root);
+            }
+
             let install_root = drive.join("ComfyUI");
             candidate_roots.push(install_root.join("models"));
             install_roots.push(install_root);
@@ -110,6 +117,44 @@ fn available_drive_roots() -> Vec<PathBuf> {
 #[cfg(not(target_os = "windows"))]
 fn available_drive_roots() -> Vec<PathBuf> {
     vec![PathBuf::from("/")]
+}
+
+/// 在盘根浅扫一层，找 ComfyUI 的安装目录。
+///
+/// 官方 Windows 便携包解压后是 `ComfyUI_windows_portable\ComfyUI\models`，
+/// 整合包的目录名更是五花八门（`ComfyUI-Easy-Install`、`ComfyUI-aki-v1.x` 等），
+/// 但只要名字以 `ComfyUI` 开头，就按「目录下有 models」还是「下级 ComfyUI 有 models」来认。
+/// 只读一层目录，开销与盘根无关。
+fn find_portable_comfyui_roots(drive_root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(drive_root) else {
+        return Vec::new();
+    };
+
+    let mut roots = Vec::new();
+    for entry in entries.filter_map(Result::ok) {
+        let is_dir = entry
+            .file_type()
+            .map(|kind| kind.is_dir())
+            .unwrap_or(false);
+        if !is_dir {
+            continue;
+        }
+
+        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+        if !name.starts_with("comfyui") {
+            continue;
+        }
+
+        let install_root = entry.path();
+        let nested_root = install_root.join("ComfyUI");
+        if nested_root.join("models").is_dir() {
+            roots.push(nested_root);
+        } else if install_root.join("models").is_dir() {
+            roots.push(install_root);
+        }
+    }
+
+    roots
 }
 
 fn collect_comfyui_models(models_root: &Path) -> Vec<ModelItem> {
@@ -267,5 +312,68 @@ fn find_json_string_key(value: &Value, target_key: &str) -> Option<String> {
             .iter()
             .find_map(|child_value| find_json_string_key(child_value, target_key)),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+    fn fixture(name: &str) -> PathBuf {
+        let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "lightc-comfyui-{}-{}-{}",
+            name,
+            std::process::id(),
+            sequence
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("创建测试目录失败");
+        dir
+    }
+
+    /// 官方 Windows 便携包的结构：整合包外层目录 + 内层真正的 ComfyUI。
+    #[test]
+    fn finds_portable_and_integrated_install_roots() {
+        let drive = fixture("portable");
+
+        // 官方便携包：ComfyUI_windows_portable\ComfyUI\models
+        let portable = drive.join("ComfyUI_windows_portable");
+        std::fs::create_dir_all(portable.join("ComfyUI").join("models").join("checkpoints"))
+            .unwrap();
+        std::fs::write(
+            portable
+                .join("ComfyUI")
+                .join("models")
+                .join("checkpoints")
+                .join("sd_xl_base.safetensors"),
+            vec![0u8; 4096],
+        )
+        .unwrap();
+
+        // 整合包：根目录下直接就是 models
+        let integrated = drive.join("ComfyUI-aki-v1.6");
+        std::fs::create_dir_all(integrated.join("models").join("loras")).unwrap();
+
+        // 名字像但不是安装目录（没有 models）的要忽略
+        std::fs::create_dir_all(drive.join("ComfyUI_backup").join("python")).unwrap();
+
+        let mut roots: Vec<String> = find_portable_comfyui_roots(&drive)
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        roots.sort();
+
+        assert_eq!(roots, vec!["ComfyUI", "ComfyUI-aki-v1.6"]);
+
+        // 便携包路径下必须能真的扫出模型，否则只是找对了目录却读不到东西
+        let models = collect_comfyui_models(&portable.join("ComfyUI").join("models"));
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].name, "checkpoints / sd_xl_base.safetensors");
+
+        let _ = std::fs::remove_dir_all(&drive);
     }
 }
