@@ -2,10 +2,11 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
-## Unreleased
+## v2.18.4
 
 - The health score now follows the drive you pick, and its details show which drive it is based on.
 - Switching models in the AI assistant is more reliable: you can switch again afterwards, Settings no longer reverts your choice, and each reply shows the model that produced it. Compatibility with some AI services has also improved.
+- AI model storage is measured more accurately: space shared between models is no longer counted twice, and ComfyUI, older LM Studio, and custom HuggingFace cache locations are now detected.
 - Clicking the disk refresh button repeatedly no longer stacks up a pile of notifications.
 
 ## v2.18.3

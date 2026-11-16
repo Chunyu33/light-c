@@ -9,6 +9,7 @@ LightC is a Windows desktop utility for safe junk cleanup, disk analysis, and sy
 - **Junk Cleaner** — Quick and deep scans for temporary files, Delivery Optimization files, thumbnails, DirectX shader caches, and selected rebuildable Microsoft Defender caches.
 - **Large Files** — Find space-consuming files with drive-aware scanning, risk indicators, selection controls, and safe deletion feedback.
 - **Social App Cache** — Review cache categories from WeChat, QQ, DingTalk, Lark, and other supported desktop apps before cleanup.
+- **AI Tool Cleanup** — Review the cache directories left behind by AI clients and coding assistants such as Claude Code, Codex, Cursor, Trae, Windsurf, and Doubao before cleanup.
 - **System Slim** — Review optional Windows system components and space-saving settings with clear safety warnings before applying changes, including rebuilding the Windows Search index when Windows.db grows abnormally large.
 - **Old Drivers** — Identify unused third-party driver packages while protecting drivers currently in use; supports backup and restore workflows.
 - **Uninstall Leftovers** — Detect probable remnants of removed applications across common locations using confidence-based results.
