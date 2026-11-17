@@ -6,8 +6,8 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 - New background wallpaper: pick any image from your computer as the background, with fill, fit, and original-size modes, plus separate clarity for light and dark themes.
 - The app now always uses the sidebar layout, with every feature in the left menu — closer to a classic desktop app. The old layout switcher is gone.
-- The liquid glass sidebar and top bar look more like glass: reflective edges with a clear center.
-- Numbers in the top bar and module descriptions are much easier to read in dark mode.
+- The liquid glass sidebar and top bar look more like glass, and numbers and descriptions in the top bar are much easier to read in dark mode.
+- Local models no longer require an API key: on-device services such as Ollama work as-is, even behind a proxy.
 
 ## v2.18.4
 

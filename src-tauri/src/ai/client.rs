@@ -148,12 +148,35 @@ fn join_url(base_url: &str, path: &str) -> String {
     format!("{}/{}", trimmed, suffix)
 }
 
-fn http_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
+/// 地址是否指向本机。
+///
+/// 只做字符串判断：`base_url` 是用户手填的，值不会带奇怪的结构；
+/// 而引入 URL 解析只为这一处判断不划算。
+fn is_local_endpoint(base_url: &str) -> bool {
+    let lower = base_url.to_ascii_lowercase();
+    lower.contains("127.0.0.1")
+        || lower.contains("localhost")
+        || lower.contains("[::1]")
+        || lower.contains("://0.0.0.0")
+}
+
+fn http_client(timeout_secs: u64, base_url: &str) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         // 用自身客户端名而不是 reqwest 默认 UA：部分网关按 UA 校验客户端身份，
         // 通用 HTTP 库名容易被当成脚本流量（OpenCode Console 的文档也明确要求这一点）。
-        .user_agent(format!("LightC/{}", env!("CARGO_PKG_VERSION")))
+        .user_agent(format!("LightC/{}", env!("CARGO_PKG_VERSION")));
+
+    // ⚠️ 本地推理必须绕过系统代理。
+    // reqwest 默认会读取系统/环境变量代理，若用户开着 Clash 这类代理，
+    // 发往 127.0.0.1:11434 的请求会被转给代理，代理返回 502 ——
+    // 界面上显示"服务商暂时不可用"，但本地模型其实一个请求都没收到。
+    // 云端请求保持原样，国内用户访问外部服务仍走代理。
+    if is_local_endpoint(base_url) {
+        builder = builder.no_proxy();
+    }
+
+    builder
         .build()
         .map_err(|error| format!("创建网络请求客户端失败: {}", error))
 }
@@ -192,10 +215,9 @@ fn resolve_connection() -> Result<(AiProtocol, String, String, String), String> 
         .ok_or_else(|| "还没有添加 AI 服务商，请到「设置 - AI 助手」里添加。".to_string())?;
     let preset = find_preset(&profile.provider_id);
 
+    // 密钥允许为空：本地推理（Ollama / LM Studio / vLLM）本来就不需要鉴权。
+    // 不再在这里拦截，改为"空就不发认证头"—— 云端服务商漏填会在 401 时给出更准确的提示。
     let api_key = profile.api_key.trim().to_string();
-    if api_key.is_empty() {
-        return Err("当前服务商还没有填写 API Key，请到「设置 - AI 助手」里填写。".to_string());
-    }
 
     let base_url = if profile.base_url.trim().is_empty() {
         preset.base_url.to_string()
@@ -343,11 +365,19 @@ fn parse_model_ids(value: &serde_json::Value) -> Vec<String> {
 }
 
 /// 把服务端返回的错误体摘成人话，避免直接把一大坨 JSON 甩给用户。
-fn describe_http_error(status: u16, body: &str) -> String {
+/// `api_key_missing`：本次请求是否没有携带任何密钥。
+/// 用来把"根本没填"和"填错了"分开说 —— 这两种情况用户要做的事完全不同。
+fn describe_http_error(status: u16, body: &str, api_key_missing: bool) -> String {
     // 服务商返回的是一坨 JSON，直接把整段甩给用户等于没说。
     // 先把里面的 message 抠出来 —— 那句话通常才是真正有用的信息。
     let detail = extract_error_message(body);
     match status {
+        // 没填密钥 + 401：多半是把云端服务商当成本地模型用了。
+        // 不能只说"检查 Key 是否正确"，用户会去找一个根本不存在的 Key。
+        401 | 403 if api_key_missing => format!(
+            "这个服务商要求填写 API Key（{}）：本地模型可以留空，云端服务商需要到「设置 - AI 助手」里填写。{}",
+            status, detail
+        ),
         401 | 403 => format!("鉴权失败（{}），请检查 API Key 是否正确、是否已开通该模型。{}", status, detail),
         404 => format!("接口地址不对（404），请检查「接口地址」是否填成了正确的服务商地址。{}", detail),
         429 => format!("请求太频繁或额度不足（429）。{}", detail),
@@ -470,6 +500,25 @@ fn opencode_session_header<'a>(
         .then_some(("x-opencode-session", id))
 }
 
+/// 给请求加上鉴权头；密钥为空时**原样返回，不加任何认证头**。
+///
+/// 本地模型（Ollama、LM Studio、vLLM）不需要密钥，这是它们能跑通的前提。
+/// 抽成函数是为了让两条调用路径（对话、拉模型）共用同一个判断，
+/// 也便于单测直接验证"空密钥不产生 Authorization"。
+fn apply_auth(
+    request: reqwest::RequestBuilder,
+    protocol: AiProtocol,
+    api_key: &str,
+) -> reqwest::RequestBuilder {
+    if api_key.is_empty() {
+        return request;
+    }
+    match protocol {
+        AiProtocol::OpenAi => request.bearer_auth(api_key),
+        AiProtocol::Anthropic => request.header("x-api-key", api_key),
+    }
+}
+
 /// 按协议发对话请求：两种协议只有路径与鉴权头不同。
 async fn send_chat_request(
     client: &reqwest::Client,
@@ -480,14 +529,21 @@ async fn send_chat_request(
     body: &serde_json::Value,
 ) -> Result<reqwest::Response, String> {
     // match 只产 builder：会话头与请求体在两个协议上完全一样，没必要各写一份 .send()
+    // 鉴权头统一走 apply_auth：空密钥不能发 `Authorization: Bearer `（空值），
+    // 部分服务会把空 Bearer 当成错误凭据直接 401，比不发这个头更糟。
     let request = match protocol {
-        AiProtocol::OpenAi => client
-            .post(join_url(base_url, "/chat/completions"))
-            .bearer_auth(api_key),
-        AiProtocol::Anthropic => client
-            .post(join_url(base_url, "/v1/messages"))
-            .header("x-api-key", api_key)
-            .header("anthropic-version", "2023-06-01"),
+        AiProtocol::OpenAi => apply_auth(
+            client.post(join_url(base_url, "/chat/completions")),
+            protocol,
+            api_key,
+        ),
+        AiProtocol::Anthropic => apply_auth(
+            client
+                .post(join_url(base_url, "/v1/messages"))
+                .header("anthropic-version", "2023-06-01"),
+            protocol,
+            api_key,
+        ),
     };
     let request = match opencode_session_header(base_url, session_id) {
         Some((name, value)) => request.header(name, value),
@@ -567,7 +623,7 @@ async fn send_with_reasoning_fallback(
 
     let text = response.text().await.unwrap_or_default();
     if body.get("reasoning_effort").is_none() || !error_blames_reasoning_effort(&text) {
-        return Err(describe_http_error(status, &text));
+        return Err(describe_http_error(status, &text, api_key.is_empty()));
     }
 
     log::info!("服务端不认 reasoning_effort，去掉该参数重试一次");
@@ -584,7 +640,7 @@ async fn send_with_reasoning_fallback(
         return Ok(retry);
     }
     let retry_text = retry.text().await.unwrap_or_default();
-    Err(describe_http_error(retry_status, &retry_text))
+    Err(describe_http_error(retry_status, &retry_text, api_key.is_empty()))
 }
 
 /// 只读工具名：**任何时候都放行**，不需要"本轮声明过"这个前提。
@@ -705,7 +761,7 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
         return Err("还没有选择模型，请在设置里拉取模型列表后选择，或手动填写模型名。".to_string());
     }
 
-    let client = http_client(CHAT_TIMEOUT_SECS)?;
+    let client = http_client(CHAT_TIMEOUT_SECS, &base_url)?;
     let body = build_request_body(&request, protocol, &model, false);
     // 发送与非 2xx 处理都在这里面（含"不认 reasoning_effort 就去掉重试一次"）
     let response =
@@ -759,19 +815,18 @@ pub async fn chat_once(request: AiChatRequest) -> Result<AiChatReply, String> {
 /// 能成功拉到列表，说明地址、密钥、网络三者都没问题。
 pub async fn fetch_models() -> Result<Vec<String>, String> {
     let (protocol, base_url, api_key, _) = resolve_connection()?;
-    let client = http_client(MODELS_TIMEOUT_SECS)?;
+    let client = http_client(MODELS_TIMEOUT_SECS, &base_url)?;
 
     let path = match protocol {
         AiProtocol::OpenAi => "/models",
         AiProtocol::Anthropic => "/v1/models",
     };
+    // Anthropic 的版本头与鉴权无关，任何情况下都要带；鉴权本身交给 apply_auth。
     let mut request = client.get(join_url(&base_url, path));
-    request = match protocol {
-        AiProtocol::OpenAi => request.bearer_auth(&api_key),
-        AiProtocol::Anthropic => request
-            .header("x-api-key", &api_key)
-            .header("anthropic-version", "2023-06-01"),
-    };
+    if protocol == AiProtocol::Anthropic {
+        request = request.header("anthropic-version", "2023-06-01");
+    }
+    request = apply_auth(request, protocol, &api_key);
 
     let response = request.send().await.map_err(describe_request_error)?;
     let status = response.status().as_u16();
@@ -780,7 +835,7 @@ pub async fn fetch_models() -> Result<Vec<String>, String> {
         .await
         .map_err(|error| format!("读取响应内容失败: {}", error))?;
     if !(200..300).contains(&status) {
-        return Err(describe_http_error(status, &text));
+        return Err(describe_http_error(status, &text, api_key.is_empty()));
     }
 
     let value: serde_json::Value =
@@ -807,7 +862,7 @@ where
         return Err("还没有选择模型，请在设置里拉取模型列表后选择，或手动填写模型名。".to_string());
     }
 
-    let client = http_client(STREAM_TIMEOUT_SECS)?;
+    let client = http_client(STREAM_TIMEOUT_SECS, &base_url)?;
     let body = build_request_body(&request, protocol, &model, true);
     // 发送、重试与非 2xx 处理都在这里面（见 send_with_reasoning_fallback）
     let mut response = send_with_reasoning_fallback(
@@ -845,6 +900,85 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 本地地址要被识别出来，否则会走系统代理、拿到代理的 502。
+    #[test]
+    fn local_endpoints_are_detected() {
+        assert!(is_local_endpoint("http://127.0.0.1:11434/v1"));
+        assert!(is_local_endpoint("http://localhost:1234/v1"));
+        assert!(is_local_endpoint("http://[::1]:8000/v1"));
+        assert!(!is_local_endpoint("https://api.deepseek.com/v1"));
+        assert!(!is_local_endpoint("https://api.openai.com/v1"));
+    }
+
+    /// 本地模型没有密钥：必须**完全不发** Authorization。
+    /// 发一个空的 `Bearer ` 更糟 —— 部分服务会把它当成错误凭据直接 401。
+    #[test]
+    fn empty_api_key_sends_no_auth_header() {
+        let client = reqwest::Client::new();
+
+        let openai = apply_auth(
+            client.get("http://127.0.0.1:11434/v1/models"),
+            AiProtocol::OpenAi,
+            "",
+        )
+        .build()
+        .expect("构造请求失败");
+        assert!(
+            openai.headers().get("authorization").is_none(),
+            "空密钥不该带 Authorization"
+        );
+
+        let anthropic = apply_auth(
+            client.get("http://127.0.0.1:8000/v1/models"),
+            AiProtocol::Anthropic,
+            "",
+        )
+        .build()
+        .expect("构造请求失败");
+        assert!(
+            anthropic.headers().get("x-api-key").is_none(),
+            "空密钥不该带 x-api-key"
+        );
+    }
+
+    /// 非空密钥仍按协议正确注入，别把原来能用的路径改坏。
+    #[test]
+    fn non_empty_api_key_is_sent_per_protocol() {
+        let client = reqwest::Client::new();
+
+        let openai = apply_auth(
+            client.get("https://api.deepseek.com/v1/models"),
+            AiProtocol::OpenAi,
+            "sk-test",
+        )
+        .build()
+        .expect("构造请求失败");
+        assert_eq!(
+            openai.headers().get("authorization").map(|v| v.to_str().unwrap()),
+            Some("Bearer sk-test")
+        );
+
+        let anthropic = apply_auth(
+            client.get("https://api.anthropic.com/v1/models"),
+            AiProtocol::Anthropic,
+            "sk-ant",
+        )
+        .build()
+        .expect("构造请求失败");
+        assert_eq!(
+            anthropic.headers().get("x-api-key").map(|v| v.to_str().unwrap()),
+            Some("sk-ant")
+        );
+    }
+
+    /// 没填密钥时收到 401，提示要说清"是没填"而不是"填错了"。
+    #[test]
+    fn missing_key_401_asks_for_a_key() {
+        let text = describe_http_error(401, r#"{"error":{"message":"unauthorized"}}"#, true);
+        assert!(text.contains("要求填写 API Key"), "{}", text);
+        assert!(!text.contains("请检查 API Key 是否正确"), "{}", text);
+    }
 
     /// 会话头只发给 OpenCode Console，不能被形近域名骗过去；
     /// 没带会话 id 或空串时一律不发，其它服务商的请求保持原样。
@@ -977,7 +1111,7 @@ mod tests {
         // 服务商返回一坨 JSON，直接甩给用户等于没说。
         // 实测 503 就是这样：真正有用的只有 message 那一句。
         let body = r#"{"error":{"message":"Service is too busy. We advise users to temporarily switch to alternative LLM API service providers.","type":"service_unavailable_error","code":"service_unavailable_error"}}"#;
-        let text = describe_http_error(503, body);
+        let text = describe_http_error(503, body, false);
         assert!(text.contains("Service is too busy"), "应保留服务商的原文：{}", text);
         assert!(!text.contains("request_id"), "不该把整坨 JSON 带出来：{}", text);
         // 5xx 必须说清"是服务商那边的问题"，否则用户会去反复改设置

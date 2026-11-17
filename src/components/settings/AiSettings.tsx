@@ -95,6 +95,8 @@ export function AiSettings() {
   const [loaded, setLoaded] = useState(false);
 
   // 表单草稿：与已保存配置分开，改动不落盘直到点保存/测试
+  /** 档案显示名。可留空 —— 后端会回落到服务商名，避免列表出现空白项。 */
+  const [profileName, setProfileName] = useState('');
   const [providerId, setProviderId] = useState('deepseek');
   const [baseUrl, setBaseUrl] = useState('');
   const [model, setModel] = useState('');
@@ -127,6 +129,7 @@ export function AiSettings() {
         const active = config.profiles.find((item) => item.id === config.activeProfileId) ?? config.profiles[0];
         const preset = presetList.find((item) => item.id === active?.providerId);
         setActiveId(active?.id ?? '');
+        setProfileName(active?.name ?? '');
         setProviderId(active?.providerId || preset?.id || 'deepseek');
         setBaseUrl(active?.baseUrl || preset?.baseUrl || '');
         setModel(active?.model || '');
@@ -172,25 +175,31 @@ export function AiSettings() {
   /** 切换服务商时，把地址与默认模型一并带过去 —— 用户只需要再填一个密钥。 */
   const handleProviderChange = useCallback(
     (nextId: string) => {
-      setProviderId(nextId);
+      const previousPreset = providers.find((item) => item.id === providerId);
       const preset = providers.find((item) => item.id === nextId);
+      setProviderId(nextId);
       if (preset) {
         setBaseUrl(preset.baseUrl);
         setModel(preset.defaultModel);
+        // 名称跟随服务商**仅在用户没改过名时**：还是空或仍等于旧预设名，说明没自定义过。
+        // 用户手填过就保留，别把他起的名字覆盖掉。
+        setProfileName((current) =>
+          current.trim() === '' || current === previousPreset?.name ? preset.name : current,
+        );
       }
       setModelOptions([]);
       setErrorMessage('');
     },
-    [providers],
+    [providers, providerId],
   );
 
   /** 保存草稿。apiKey 为空时后端会沿用已保存的密钥。 */
   const persist = useCallback(async () => {
     // 密钥留空 = 后端沿用已保存的（前端只拿得到掩码，回传不了明文）
-    // name 原样带回：档案名由用户维护，这里不该覆盖掉
     const next = await saveAiProfile({
       id: activeId,
-      name: activeProfile?.name ?? '',
+      // 用户填的名称；留空交给后端回落到服务商名（避免列表出现空白项）
+      name: profileName.trim(),
       providerId,
       baseUrl,
       model,
@@ -211,7 +220,7 @@ export function AiSettings() {
     // 不广播的话助手那份配置副本还是旧的，"刚配好 Key 就点快捷提问"仍会被误拦（Evan 反馈过）。
     notifyAiConfigChanged();
     return next;
-  }, [activeId, providerId, baseUrl, model, apiKey, reasoningEffort, dataDir, saved]);
+  }, [activeId, profileName, providerId, baseUrl, model, apiKey, reasoningEffort, dataDir, saved]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -259,6 +268,7 @@ export function AiSettings() {
       const preset = providers.find((item) => item.id === active?.providerId);
       setSaved(config);
       setActiveId(active?.id ?? '');
+      setProfileName(active?.name ?? '');
       setProviderId(active?.providerId || preset?.id || 'deepseek');
       setBaseUrl(active?.baseUrl || preset?.baseUrl || '');
       setModel(active?.model || '');
@@ -312,12 +322,13 @@ export function AiSettings() {
     // 新建中的草稿没有对照物，不当作"未保存改动"（用户本来就在编辑）
     if (!current) return false;
     return (
+      profileName.trim() !== current.name ||
       providerId !== current.providerId ||
       baseUrl !== current.baseUrl ||
       model !== current.model ||
       reasoningEffort !== current.reasoningEffort
     );
-  }, [apiKey, saved, activeId, providerId, baseUrl, model, reasoningEffort]);
+  }, [apiKey, saved, activeId, profileName, providerId, baseUrl, model, reasoningEffort]);
 
   /** 待确认的"丢弃改动"动作：有未保存改动时先把动作挂在这里，确认后再执行 */
   const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
@@ -358,6 +369,8 @@ export function AiSettings() {
   const handleAddProfile = useCallback(() => {
     const preset = providers.find((item) => item.id === 'deepseek') ?? providers[0];
     setActiveId('');
+    // 预填服务商名作为初始名，用户可以改成自己好认的；留空则由后端回落到服务商名。
+    setProfileName(preset?.name ?? '');
     setProviderId(preset?.id ?? 'deepseek');
     setBaseUrl(preset?.baseUrl ?? '');
     setModel(preset?.defaultModel ?? '');
@@ -542,6 +555,18 @@ export function AiSettings() {
 
           {isEditing ? (
           <>
+          {/* 名称放在服务商之上：先给这份配置起个名字，再看它接的是哪家。
+              留空会回落到服务商名，列表里不会出现空白项。 */}
+          <SettingRow title={t('aiAssistant.profileName')} description={t('aiAssistant.profileNameDesc')}>
+            <TextField
+              value={profileName}
+              onChange={setProfileName}
+              placeholder={currentPreset?.name}
+              widthClass="w-64"
+            />
+          </SettingRow>
+
+          <div className="border-t border-[var(--border-color)] pt-5">
           <SettingRow title={t('aiAssistant.provider')} description={t('aiAssistant.providerDesc')}>
             <Select<string>
               value={providerId}
@@ -550,6 +575,7 @@ export function AiSettings() {
               widthClass="w-64"
             />
           </SettingRow>
+          </div>
 
           <div className="border-t border-[var(--border-color)] pt-5">
             <SettingRow title={t('aiAssistant.baseUrl')} description={t('aiAssistant.baseUrlDesc')}>
@@ -563,14 +589,24 @@ export function AiSettings() {
               description={
                 activeProfile?.hasApiKey
                   ? t('aiAssistant.apiKeySaved', { masked: activeProfile?.apiKeyMasked ?? '' })
-                  : t('aiAssistant.apiKeyDesc')
+                  : currentPreset?.local
+                    // 本地推理（Ollama / LM Studio / vLLM）不需要鉴权，提示可以直接留空，
+                    // 不然用户会以为必填而卡在这一步。
+                    ? t('aiAssistant.apiKeyOptionalDesc')
+                    : t('aiAssistant.apiKeyDesc')
               }
             >
               <div className="flex items-center gap-2">
                 <TextField
                   value={apiKey}
                   onChange={setApiKey}
-                  placeholder={activeProfile?.hasApiKey ? t('aiAssistant.apiKeyKeep') : 'sk-...'}
+                  placeholder={
+                    activeProfile?.hasApiKey
+                      ? t('aiAssistant.apiKeyKeep')
+                      : currentPreset?.local
+                        ? t('aiAssistant.apiKeyOptionalHint')
+                        : 'sk-...'
+                  }
                   widthClass="w-64"
                   password
                 />

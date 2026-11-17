@@ -176,8 +176,12 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
     [aiConfig],
   );
 
-  /** 能不能对话：**必须有密钥**。没配置时不让人白打一长串字再报错。 */
-  const canChat = Boolean(activeProfile?.hasApiKey);
+  /**
+   * 能不能对话：**配好服务商即可**，不再要求必须有密钥。
+   * 本地模型（Ollama / LM Studio / vLLM）本来就不需要鉴权，用 hasApiKey 判断会把它们
+   * 误拦成"没配置服务商"；云端漏填密钥会在第一次请求时收到明确的 401 提示。
+   */
+  const canChat = Boolean(activeProfile?.providerId);
 
   /** 就地切换模型：写回当前档案，下一句话即生效。 */
   const handleSwitchModel = useCallback(
