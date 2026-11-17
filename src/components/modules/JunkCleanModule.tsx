@@ -43,8 +43,8 @@ import type {
   FileInfo,
   ScanResult,
 } from '../../types';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
+import type { ModuleRenderProps } from './moduleProps';
 
 const DEEP_SCAN_STORAGE_KEY = 'lightc.junkClean.deepScan';
 
@@ -157,14 +157,12 @@ function groupFailuresByReason(
     }));
 }
 
-export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function JunkCleanModule({ isPageActive = true }: ModuleRenderProps) {
   const { t } = useTranslation('junkClean');
   // 深度扫描的递归层数来自设置页，扫描时作为参数传给命令。
   const { settings } = useSettings();
   const {
     moduleState,
-    expandedModule,
-    setExpandedModule,
     updateModuleState,
     triggerHealthRefresh,
     oneClickScanTrigger,
@@ -427,7 +425,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       });
 
       // 自动展开模块
-      setExpandedModule('junk');
     } catch (err) {
       if (cancelRequestedRef.current) {
         updateModuleState('junk', { status: 'idle', error: null });
@@ -438,7 +435,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
     } finally {
       scanningRef.current = false;
     }
-  }, [deepScanEnabled, updateModuleState, setExpandedModule, settings.junkDeepScanDepth]);
+  }, [deepScanEnabled, updateModuleState, settings.junkDeepScanDepth]);
 
   const handleStopScan = useCallback(async () => {
     if (!scanningRef.current || scanMode !== 'deep') return;
@@ -713,10 +710,8 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       setLoadingDeepCategory(null);
     }
   }, [deepScanResult, loadingDeepCategory, scanMode, scanResult, selectedCategoryNames, showToast]);
-
-  const isExpanded = expandedModule === 'junk';
-  // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，避免跨模块共用显示条件。
-  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
+  // 由当前模块控制可见性，避免跨模块共用显示条件。
+  const shouldShowOperationToolbar = isPageActive;
   // 底部操作条只在"有可删结果"时出现；删除中、以及清理完只剩结果卡时都没有它。
   // 正文底部那 80px 留白必须跟着同一个判断走，否则条子不在了还白留一块。
   const showOperations = !isDeleting
@@ -776,7 +771,7 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
   // 扫描失败/降级的盘必须留在页面上，不能被收进浮层
   const driveWarnings = (deepScanResult?.drives ?? []).filter((drive) => Boolean(drive.warning));
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
+  if (!isPageActive && !isDeleting && !showDeleteConfirm) {
     return null;
   }
 
@@ -799,8 +794,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
       />
 
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         id="junk"
         title={t('title')}
         description={t('desc')}
@@ -811,8 +804,6 @@ export function JunkCleanModule({ layoutMode = 'cards', isPageActive = true }: M
         fileCount={isDeleting ? 0 : moduleState.fileCount}
         totalSize={moduleState.totalSize}
         hideDoneBadge={isDeleting}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'junk')}
         onScan={handleScan}
         error={moduleState.error}
         headerExtra={

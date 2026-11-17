@@ -1,12 +1,10 @@
-// 布局切换时的窗口尺寸协调
-// 侧边栏需要稳定的内容宽度，因此在切换前先完成窗口约束和必要的扩展。
+// 启动时的窗口尺寸协调
+// 侧边栏需要稳定的内容宽度，因此在恢复窗口前先完成最小尺寸约束和必要的扩展。
 
 import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window';
-import { DEFAULT_LAYOUT_MODE, type LayoutMode } from '../config/moduleMeta';
 
-export const BASE_WINDOW_MIN_SIZE = { width: 820, height: 610 } as const;
 // 侧边栏包含完整功能菜单和页面内容，720px 高度可减少底部菜单被截断的情况。
-export const SIDEBAR_WINDOW_MIN_SIZE = { width: 1080, height: 720 } as const;
+export const WINDOW_MIN_SIZE = { width: 1080, height: 720 } as const;
 // 预留少量工作区边距，避免窗口贴边时被任务栏或系统缩放误判为超出屏幕。
 export const WINDOW_WORK_AREA_MARGIN = 24;
 
@@ -19,32 +17,11 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-export function getSavedLayoutMode(): LayoutMode {
-  try {
-    const savedSettings = JSON.parse(localStorage.getItem('c-cleanup-settings') ?? '{}') as { layoutMode?: unknown };
-    // 没有缓存（首次启动）时与设置默认值保持一致，否则窗口最小尺寸会按卡片模式准备，
-    // 而界面已经渲染侧边栏，导致菜单被裁切。
-    return savedSettings.layoutMode === 'pages' || savedSettings.layoutMode === 'sidebar'
-      ? savedSettings.layoutMode
-      : savedSettings.layoutMode === 'cards'
-        ? 'cards'
-        : DEFAULT_LAYOUT_MODE;
-  } catch (error) {
-    // 设置损坏时使用默认布局，避免启动阶段因尺寸策略阻断主界面。
-    console.warn('读取窗口布局设置失败:', error);
-    return DEFAULT_LAYOUT_MODE;
-  }
-}
-
 function toLogicalSize(physicalSize: { width: number; height: number }, scaleFactor: number): WindowLayoutSize {
   return {
     width: physicalSize.width / scaleFactor,
     height: physicalSize.height / scaleFactor,
   };
-}
-
-export function getWindowMinimumSize(layoutMode: LayoutMode) {
-  return layoutMode === 'sidebar' ? SIDEBAR_WINDOW_MIN_SIZE : BASE_WINDOW_MIN_SIZE;
 }
 
 export function getMaximumLogicalWindowSize(
@@ -60,17 +37,13 @@ export function getMaximumLogicalWindowSize(
   };
 }
 
-export function getEffectiveWindowMinimumSize(
-  layoutMode: LayoutMode,
-  maximumSize: WindowLayoutSize | null,
-): WindowLayoutSize {
-  const configuredMinimum = getWindowMinimumSize(layoutMode);
-  if (!maximumSize) return configuredMinimum;
+export function getEffectiveWindowMinimumSize(maximumSize: WindowLayoutSize | null): WindowLayoutSize {
+  if (!maximumSize) return WINDOW_MIN_SIZE;
 
   // 小分辨率设备无法达到设计目标时服从工作区，避免最小尺寸大于屏幕可用空间。
   return {
-    width: Math.max(1, Math.min(configuredMinimum.width, maximumSize.width)),
-    height: Math.max(1, Math.min(configuredMinimum.height, maximumSize.height)),
+    width: Math.max(1, Math.min(WINDOW_MIN_SIZE.width, maximumSize.width)),
+    height: Math.max(1, Math.min(WINDOW_MIN_SIZE.height, maximumSize.height)),
   };
 }
 
@@ -105,8 +78,8 @@ async function readWindowBounds(): Promise<WindowBounds> {
   };
 }
 
-async function setWindowMinimumSize(layoutMode: LayoutMode, maximumSize: WindowLayoutSize | null) {
-  const minimumSize = getEffectiveWindowMinimumSize(layoutMode, maximumSize);
+async function setWindowMinimumSize(maximumSize: WindowLayoutSize | null) {
+  const minimumSize = getEffectiveWindowMinimumSize(maximumSize);
   await getCurrentWindow().setMinSize(new LogicalSize(minimumSize.width, minimumSize.height));
 }
 
@@ -121,7 +94,7 @@ async function expandWindowForSidebar(bounds: WindowBounds, minimumSize: WindowL
   const nextHeight = Math.max(bounds.currentSize.height, minimumSize.height);
   if (nextWidth === bounds.currentSize.width && nextHeight === bounds.currentSize.height) return;
 
-  // 当前窗口如果已经大于工作区，不因切换布局而强制缩小，避免覆盖用户主动设置的尺寸。
+  // 当前窗口如果已经大于工作区，不因布局准备而强制缩小，避免覆盖用户主动设置的尺寸。
   const safeWidth = bounds.maximumSize
     ? Math.max(bounds.currentSize.width, Math.min(nextWidth, bounds.maximumSize.width))
     : nextWidth;
@@ -143,7 +116,7 @@ async function expandWindowForSidebar(bounds: WindowBounds, minimumSize: WindowL
   const workAreaTop = monitor.workArea.position.y;
   const workAreaRight = workAreaLeft + monitor.workArea.size.width;
   const workAreaBottom = workAreaTop + monitor.workArea.size.height;
-  // 极端情况下旧窗口可能本来就大于工作区，此时保留原位置，不制造反向跳动。
+  // 极端情况下旧窗口本来就大于工作区，此时保留原位置，不制造反向跳动。
   const nextX = nextOuterWidth <= monitor.workArea.size.width
     ? clamp(centeredX, workAreaLeft, workAreaRight - nextOuterWidth)
     : bounds.outerPosition.x;
@@ -155,19 +128,11 @@ async function expandWindowForSidebar(bounds: WindowBounds, minimumSize: WindowL
   }
 }
 
-export async function prepareWindowForLayout(layoutMode: LayoutMode): Promise<void> {
+export async function prepareWindowForSavedLayout(): Promise<void> {
   const bounds = await readWindowBounds();
-  const minimumSize = getEffectiveWindowMinimumSize(layoutMode, bounds.maximumSize);
+  const minimumSize = getEffectiveWindowMinimumSize(bounds.maximumSize);
 
-  // 先更新最小尺寸，再扩展当前窗口，保证切换完成后用户不能立即拖回不适合的宽度。
-  await setWindowMinimumSize(layoutMode, bounds.maximumSize);
-  if (layoutMode === 'sidebar') {
-    await expandWindowForSidebar(bounds, minimumSize);
-  }
-}
-
-export async function prepareWindowForSavedLayout(): Promise<LayoutMode> {
-  const savedLayoutMode = getSavedLayoutMode();
-  await prepareWindowForLayout(savedLayoutMode);
-  return savedLayoutMode;
+  // 先更新最小尺寸，再扩展当前窗口，保证用户不能立即把窗口拖回不适合的宽度。
+  await setWindowMinimumSize(bounds.maximumSize);
+  await expandWindowForSidebar(bounds, minimumSize);
 }

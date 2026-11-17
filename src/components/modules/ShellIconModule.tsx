@@ -35,7 +35,7 @@ import {
   type ShellIconTarget,
 } from '../../api/commands';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 type PendingAction = { target: ShellIconTarget; mode: 'remove' | 'lock' | 'restore' };
 
@@ -147,11 +147,11 @@ function ShellEntrySection({
   );
 }
 
-export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function ShellIconModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('shellIcons');
+  const { moduleState, updateModuleState, oneClickScanTrigger } = useModuleDashboard('shellIcons');
   const { showToast } = useToast();
   const [entries, setEntries] = useState<ShellIconInfo[] | null>(null);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
@@ -214,11 +214,10 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
       const result = await scanShellIcons();
       setEntries(result);
       updateModuleState('shellIcons', { status: 'done', fileCount: result.length, totalSize: 0 });
-      setExpandedModule('shellIcons');
     } catch (error) {
       updateModuleState('shellIcons', { status: 'error', error: String(error) });
     }
-  }, [setExpandedModule, updateModuleState]);
+  }, [updateModuleState]);
 
   useEffect(() => {
     if (oneClickScanTrigger > 0 && oneClickScanTrigger !== lastScanTrigger.current) {
@@ -250,9 +249,7 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
       setPendingAction(null);
     }
   }, [scan, showToast]);
-
-  const isExpanded = expandedModule === 'shellIcons';
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !pendingAction) return null;
+  if (!isPageActive && !pendingAction) return null;
 
   return (
     <>
@@ -266,14 +263,10 @@ export function ShellIconModule({ layoutMode = 'cards', isPageActive = true }: M
         totalSize={0}
         countLabel={moduleT('shellIcons.nodes')}
         hideTotalSize
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'shellIcons')}
         onScan={() => void scan()}
         scanDisabled={Boolean(busyTarget)}
         scanButtonText={moduleState.status === 'scanning' ? t('scanningShort') : entries ? t('rescan') : moduleT('shellIcons.scan')}
         error={moduleState.error}
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         titleExtra={<span className="rounded-full bg-orange-500/10 px-2 py-1 text-[0.71rem] font-medium text-orange-600 dark:text-orange-400">{moduleT('shellIcons.caution')}</span>}
       >
         <div className="space-y-4 p-5">

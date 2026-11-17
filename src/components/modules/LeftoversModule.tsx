@@ -36,7 +36,7 @@ import {
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
 // 组件实现
@@ -65,11 +65,11 @@ function isSamePath(left: string, right: string): boolean {
   return normalizePathForCompare(left) === normalizePathForCompare(right);
 }
 
-export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function LeftoversModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('leftovers');
+  const { moduleState, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('leftovers');
   const { showToast } = useToast();
 
   const lastScanTriggerRef = useRef(0);
@@ -273,13 +273,11 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         fileCount: result.leftovers.length,
         totalSize: result.total_size,
       });
-
-      setExpandedModule('leftovers');
     } catch (err) {
       console.error('残留&缓存扫描失败:', err);
       updateModuleState('leftovers', { status: 'error', error: String(err) });
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [updateModuleState]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -773,17 +771,15 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         return 'border-[var(--border-default)] bg-[var(--bg-hover)] text-[var(--text-muted)]';
     }
   };
-
-  const isExpanded = expandedModule === 'leftovers';
   /**
    * 底部操作条是否可见。
    *
    * ⚠️ 不能省：`ModuleOperationToolbar` 是 portal 到 body 的 fixed 浮层，
    * 不受模块容器约束 —— 少了这个开关，切到别的模块时它还浮在人家页面上。
    */
-  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
+  const shouldShowOperationToolbar = isPageActive;
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeletingAnimating) {
+  if (!isPageActive && !isDeletingAnimating) {
     return null;
   }
 
@@ -815,8 +811,6 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
       )}
 
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         id="leftovers"
         title={navT('leftovers')}
         description={navT('leftoversDesc')}
@@ -824,8 +818,6 @@ export function LeftoversModule({ layoutMode = 'cards', isPageActive = true }: M
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'leftovers')}
         onScan={handleScan}
         error={moduleState.error}
         headerExtra={

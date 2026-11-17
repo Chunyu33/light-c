@@ -96,12 +96,12 @@ export function useWindowStatePersistence(): void {
 
     const restoreWindowSize = async () => {
       try {
-        const savedLayoutMode = await prepareWindowForSavedLayout();
+        await prepareWindowForSavedLayout();
         const savedSize = readPersistedWindowSize();
         if (!savedSize) return;
 
         const maximumSize = await getMaximumLogicalSize();
-        const minimumSize = getEffectiveWindowMinimumSize(savedLayoutMode, maximumSize);
+        const minimumSize = getEffectiveWindowMinimumSize(maximumSize);
         const restoredSize = clampWindowSize(savedSize, maximumSize, minimumSize);
         await appWindow.setSize(new LogicalSize(restoredSize.width, restoredSize.height));
       } catch (error) {

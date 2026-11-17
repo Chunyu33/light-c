@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 interface BackToTopButtonProps {
-  /** 主内容滚动容器；使用传入 ref 是为了同时兼容卡片模式和页面模式的内部滚动区。 */
+  /** 主内容滚动容器；由调用方传入，组件不自己查 DOM。 */
   scrollContainerRef: React.RefObject<HTMLElement | null>;
   /** 超过该滚动距离后显示按钮，默认避开刚进入页面时的轻微滚动误触。 */
   threshold?: number;

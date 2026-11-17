@@ -29,7 +29,6 @@ import { DonutChart, ColumnChart, CHART_PALETTE, type ChartItem } from '../ui/ch
 import { Select, type SelectOption } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useModuleDashboard } from '../../contexts/DashboardContext';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import {
   deleteAiModel,
   getFailureReasonMessage,
@@ -42,6 +41,7 @@ import {
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
+import type { ModuleRenderProps } from './moduleProps';
 
 const DEEP_DISCOVERY_STORAGE_KEY = 'lightc.aiModels.deepDiscovery';
 const LARGE_MODEL_THRESHOLD = 20 * 1024 * 1024 * 1024;
@@ -76,11 +76,11 @@ interface DisplayModelName {
   typeLabel: string | null;
 }
 
-export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function AiModelsModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('aiModels');
+  const { moduleState, updateModuleState, oneClickScanTrigger } = useModuleDashboard('aiModels');
   const { showToast } = useToast();
 
   const scanningRef = useRef(false);
@@ -206,7 +206,6 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
     scanningRef.current = true;
     setScanProgress(null);
     updateModuleState('aiModels', { status: 'scanning', error: null });
-    setExpandedModule('aiModels');
 
     try {
       const result = await scanAiModelAssets(enableDeepDiscovery);
@@ -234,7 +233,7 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
     } finally {
       scanningRef.current = false;
     }
-  }, [enableDeepDiscovery, setExpandedModule, showToast, updateModuleState]);
+  }, [enableDeepDiscovery, showToast, updateModuleState]);
 
   useEffect(() => {
     if (oneClickScanTrigger > 0 && oneClickScanTrigger !== lastScanTriggerRef.current) {
@@ -312,19 +311,15 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       setDeletingModelPath(null);
     }
   }, [modelPendingDeletion, scanResult, showToast, updateModuleState]);
-
-  const isExpanded = expandedModule === 'aiModels';
   const isScanning = moduleState.status === 'scanning';
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive)) {
+  if (!isPageActive) {
     return null;
   }
 
   return (
     <>
       <ModuleCard
-      variant={layoutMode === 'pages' ? 'page' : 'card'}
-      forceExpanded={layoutMode === 'pages'}
       id="aiModels"
         title={navT('aiModels')}
         description={navT('aiModelsDesc')}
@@ -335,8 +330,6 @@ export function AiModelsModule({ layoutMode = 'cards', isPageActive = true }: Mo
       doneBadgeText={moduleT('aiModels.found')}
       emptyDoneBadgeText={moduleT('aiModels.notFoundBadge')}
       countLabel={moduleT('aiModels.assetCount')}
-      expanded={isExpanded}
-      onToggleExpand={() => setExpandedModule(isExpanded ? null : 'aiModels')}
       onScan={handleScan}
       scanButtonText={isScanning ? moduleT('aiModels.analyzing') : scanResult ? moduleT('aiModels.reanalyze') : moduleT('aiModels.start')}
       error={moduleState.error}

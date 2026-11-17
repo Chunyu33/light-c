@@ -5,7 +5,7 @@
 
 import { ReactNode, useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Loader2, Search, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatSize } from '../utils/format';
 import type { ModuleStatus } from '../contexts/DashboardContext';
 
@@ -40,10 +40,6 @@ export interface ModuleCardProps {
   countLabel?: string;
   /** 仅展示数量，不展示不适用的空间统计。 */
   hideTotalSize?: boolean;
-  /** 是否展开 */
-  expanded: boolean;
-  /** 展开/收起回调 */
-  onToggleExpand: () => void;
   /** 扫描按钮点击回调 */
   onScan: () => void;
   /** 扫描按钮文本 */
@@ -58,10 +54,6 @@ export interface ModuleCardProps {
   headerExtra?: ReactNode;
   /** 错误信息 */
   error?: string | null;
-  /** 展示模式：卡片模式保持手风琴，页面模式用于传统 PC 功能页。 */
-  variant?: 'card' | 'page';
-  /** 页面模式下强制展示内容，避免切换模块后还要再次展开。 */
-  forceExpanded?: boolean;
   /** 允许模块内容中的 sticky 元素跨越卡片内容滚动时保持可见。 */
   allowStickyContent?: boolean;
 }
@@ -86,8 +78,6 @@ export function ModuleCard({
   hideDoneBadge = false,
   countLabel,
   hideTotalSize = false,
-  expanded,
-  onToggleExpand,
   onScan,
   scanButtonText,
   scanDisabled = false,
@@ -95,8 +85,6 @@ export function ModuleCard({
   titleExtra,
   headerExtra,
   error,
-  variant = 'card',
-  forceExpanded = false,
   allowStickyContent = false,
 }: ModuleCardProps) {
   const { t } = useTranslation('common');
@@ -106,8 +94,6 @@ export function ModuleCard({
   const isScanning = status === 'scanning';
   const isDone = status === 'done';
   const hasError = status === 'error' || !!error;
-  const isPageVariant = variant === 'page';
-  const contentExpanded = forceExpanded || expanded;
 
   // 获取状态标签 - 使用微信绿色系
   const getStatusBadge = () => {
@@ -160,47 +146,22 @@ export function ModuleCard({
       className={`
         /* 微信风格卡片：纯白背景 + 极淡阴影 + 大圆角 */
         glass-surface bg-[var(--bg-card)] rounded-2xl ${allowStickyContent ? 'overflow-visible' : 'overflow-hidden'}
-        /* 页面模式用 flex-1 而不是 min-h-full：父级是 flex 列容器时，
-           flex-1 能稳定吃掉剩余高度（min-height: auto 保证内容更长时不被压缩）；
-           min-h-full 依赖父级有确定高度，一旦哪一层忘了传就退化成内容高度，
-           模块之间的底部落点就会不齐。 */
-        ${isPageVariant ? 'module-card--page flex flex-1 flex-col' : ''}
+        /* flex-1 让卡片吃满剩余高度；min-height: auto 保证长结果不被压缩。 */
+        module-card--page flex flex-1 flex-col
+        shadow-sm ring-1 ring-[var(--border-color)]
         transition-all duration-300 ease-out
-        ${isPageVariant
-          ? 'shadow-sm ring-1 ring-[var(--border-color)]'
-          : expanded
-            ? 'shadow-sm ring-1 ring-[var(--brand-green-20)]'
-            : 'shadow-sm hover:shadow-md'
-        }
       `}
     >
       {/* 卡片头部 - 增加内边距提供呼吸空间 */}
       <div className="shrink-0 p-6">
         <div className="flex flex-wrap items-center gap-4">
-          {/* 展开/收起按钮 */}
-          {!isPageVariant && (
-            <button
-              onClick={onToggleExpand}
-              className={`
-                text-[var(--text-muted)] transition-transform duration-200 p-1 -ml-1
-                hover:text-[var(--text-secondary)]
-                ${expanded ? 'rotate-0' : '-rotate-90'}
-              `}
-            >
-              <ChevronDown className="w-5 h-5" />
-            </button>
-          )}
-
           {/* 模块图标 - 微信绿 10% 透明度圆角容器 */}
           <div className={`w-14 h-14 rounded-2xl ${iconBgClass} flex items-center justify-center shrink-0`}>
             {icon}
           </div>
 
           {/* 模块信息 - 清晰的文字层次 */}
-          <div
-            className={`min-w-0 flex-1 basis-[15.71rem] ${isPageVariant ? '' : 'cursor-pointer'}`}
-            onClick={isPageVariant ? undefined : onToggleExpand}
-          >
+          <div className="min-w-0 flex-1 basis-[15.71rem]">
             <div className="flex min-w-0 flex-wrap items-center gap-2.5">
               <h3 className="min-w-0 text-[1.07rem] font-bold text-[var(--text-primary)]">{title}</h3>
               {titleExtra}
@@ -272,16 +233,12 @@ export function ModuleCard({
         )}
       </div>
 
-      {/* 展开内容 - 手风琴动画 */}
-      <AccordionContent
-        expanded={contentExpanded}
-        animated={!isPageVariant && !allowStickyContent}
-        className={isPageVariant ? 'flex flex-1 min-h-0 flex-col' : undefined}
-      >
-        <div className={`border-t border-[var(--border-color)] pb-2 ${isPageVariant ? 'module-card__body flex flex-1 flex-col' : ''}`}>
+      {/* 内容区常驻展示：侧边栏模式下由外层控制当前模块，卡片内不再做手风琴折叠。 */}
+      <div className="flex flex-1 min-h-0 flex-col">
+        <div className="border-t border-[var(--border-color)] pb-2 module-card__body flex flex-1 flex-col">
           {children}
         </div>
-      </AccordionContent>
+      </div>
     </div>
   );
 }

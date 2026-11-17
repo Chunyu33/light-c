@@ -24,11 +24,11 @@ import {
   type DriverPackageInfo,
   type DriverScanResult,
 } from '../../api/commands';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import { openSearchUrl } from '../../utils/searchEngine';
 import { formatSize } from '../../utils/format';
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import { AiAskButton } from '../ai/AiAskButton';
+import type { ModuleRenderProps } from './moduleProps';
 
 function findScrollParent(element: HTMLElement): HTMLElement | null {
   let parent = element.parentElement;
@@ -204,11 +204,11 @@ function getDriverAiQuestion(packageInfo: DriverPackageInfo): string {
   ].join('');
 }
 
-export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function DriverCleanupModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger } = useModuleDashboard('driverCleanup');
+  const { moduleState, updateModuleState, oneClickScanTrigger } = useModuleDashboard('driverCleanup');
   const { showToast } = useToast();
   const lastScanTriggerRef = useRef(0);
   const [scanResult, setScanResult] = useState<DriverScanResult | null>(null);
@@ -359,13 +359,12 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         fileCount: result.total_count,
         totalSize: 0,
       });
-      setExpandedModule('driver-cleanup');
     } catch (error) {
       updateModuleState('driverCleanup', { status: 'error', error: String(error) });
     } finally {
       setLoading(false);
     }
-  }, [setExpandedModule, updateModuleState]);
+  }, [updateModuleState]);
 
   useEffect(() => {
     if (oneClickScanTrigger > 0 && oneClickScanTrigger !== lastScanTriggerRef.current) {
@@ -463,8 +462,6 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
       setRestoring(false);
     }
   }, [loadDrivers, showToast]);
-
-  const isExpanded = expandedModule === 'driver-cleanup';
   const highConfidenceNames = useMemo(
     () => scanResult?.packages
       .filter((packageInfo) => packageInfo.status === 'old_confirmed' && packageInfo.actionable)
@@ -493,7 +490,7 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
   const selectedDriverSizeText = selectedDriverSize > 0
     ? formatSize(selectedDriverSize)
     : moduleT('driverUi.unknownSize');
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !deleting && !restoring) return null;
+  if (!isPageActive && !deleting && !restoring) return null;
 
   return (
     <>
@@ -509,14 +506,10 @@ export function DriverCleanupModule({ layoutMode = 'cards', isPageActive = true 
         hideTotalSize
         hideDoneBadge
         emptyDoneBadgeText={moduleT('driverUi.noActionable')}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'driver-cleanup')}
         onScan={() => void loadDrivers()}
         scanDisabled={deleting || restoring}
         scanButtonText={loading ? moduleT('driverUi.checking') : scanResult ? moduleT('driverUi.rescan') : moduleT('driverUi.scan')}
         error={moduleState.error}
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         allowStickyContent
         titleExtra={scanResult ? (
           <div className="flex items-center gap-2">

@@ -74,10 +74,6 @@ export interface DashboardContextValue {
   isLoadingHealth: boolean;
   /** 所有模块的状态 */
   modules: ModulesState;
-  /** 当前展开的模块ID */
-  expandedModule: string | null;
-  /** 设置展开的模块 */
-  setExpandedModule: (moduleId: string | null) => void;
   /** 更新模块状态 */
   updateModuleState: (moduleId: keyof ModulesState, state: Partial<ModuleState>) => void;
   /** 刷新磁盘信息 */
@@ -101,7 +97,6 @@ export interface DashboardContextValue {
 }
 
 interface DashboardActionsValue {
-  setExpandedModule: (moduleId: string | null) => void;
   updateModuleState: (moduleId: keyof ModulesState, state: Partial<ModuleState>) => void;
   refreshDiskInfo: () => Promise<void>;
   refreshHealthScore: (driveLetter?: string) => Promise<void>;
@@ -111,7 +106,6 @@ interface DashboardActionsValue {
 }
 
 interface DashboardSignalsValue {
-  expandedModule: string | null;
   healthRefreshTrigger: number;
   oneClickScanTrigger: number;
   stopScanTrigger: number;
@@ -194,8 +188,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
   const [isLoadingHealth, setIsLoadingHealth] = useState(true);
   // 模块状态
   const [modules, setModules] = useState<ModulesState>(initialModulesState);
-  // 当前展开的模块
-  const [expandedModule, setExpandedModule] = useState<string | null>(null);
   // 健康评分刷新触发器
   const [healthRefreshTrigger, setHealthRefreshTrigger] = useState(0);
   // 一键扫描触发器
@@ -306,7 +298,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
   }, [healthRefreshTrigger, refreshHealthScore, refreshDiskInfo]);
 
   const actionsValue = useMemo<DashboardActionsValue>(() => ({
-    setExpandedModule,
     updateModuleState,
     refreshDiskInfo,
     refreshHealthScore,
@@ -314,7 +305,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     triggerOneClickScan,
     stopAllScans,
   }), [
-    setExpandedModule,
     updateModuleState,
     refreshDiskInfo,
     refreshHealthScore,
@@ -324,11 +314,10 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
   ]);
 
   const signalsValue = useMemo<DashboardSignalsValue>(() => ({
-    expandedModule,
     healthRefreshTrigger,
     oneClickScanTrigger,
     stopScanTrigger,
-  }), [expandedModule, healthRefreshTrigger, oneClickScanTrigger, stopScanTrigger]);
+  }), [healthRefreshTrigger, oneClickScanTrigger, stopScanTrigger]);
 
   const summaryValue = useMemo<DashboardSummaryValue>(() => ({
     diskInfo,
@@ -342,8 +331,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     healthData,
     isLoadingHealth,
     modules,
-    expandedModule,
-    setExpandedModule,
     updateModuleState,
     refreshDiskInfo,
     refreshHealthScore,
@@ -359,8 +346,6 @@ export function DashboardProvider({ children }: DashboardProviderProps) {
     healthData,
     isLoadingHealth,
     modules,
-    expandedModule,
-    setExpandedModule,
     updateModuleState,
     refreshDiskInfo,
     refreshHealthScore,
@@ -462,10 +447,8 @@ export function useModuleDashboard(moduleId: keyof ModulesState) {
   // 模块只订阅自己的扫描状态；全局触发信号仍单独订阅，保持一键扫描/停止扫描行为不变。
   return {
     moduleState,
-    expandedModule: signals.expandedModule,
     oneClickScanTrigger: signals.oneClickScanTrigger,
     stopScanTrigger: signals.stopScanTrigger,
-    setExpandedModule: actions.setExpandedModule,
     updateModuleState: actions.updateModuleState,
     triggerHealthRefresh: actions.triggerHealthRefresh,
   };

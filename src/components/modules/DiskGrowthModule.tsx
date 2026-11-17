@@ -45,7 +45,6 @@ import {
 import { useModuleDashboard } from '../../contexts/DashboardContext';
 import { useSettings } from '../../contexts';
 import { openSearchUrl } from '../../utils/searchEngine';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
 import {
   cancelDiskGrowthScan,
   getDiskGrowthDirectoryDetails,
@@ -66,6 +65,7 @@ import {
 import { formatSize } from '../../utils/format';
 import { useToast } from '../Toast';
 import { buildDiskGrowthHtml } from '../../utils/diskGrowthHtml';
+import type { ModuleRenderProps } from './moduleProps';
 
 function simplifyPath(path: string): string {
   const normalized = path.replace(/\\/g, '/');
@@ -828,10 +828,10 @@ function DiskGrowthDetailsModal({
   );
 }
 
-export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function DiskGrowthModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('diskGrowth');
+  const { moduleState, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('diskGrowth');
   const { settings } = useSettings();
   const { showToast } = useToast();
   const lastScanTriggerRef = useRef(0);
@@ -895,8 +895,6 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
   const [detailEntry, setDetailEntry] = useState<DiskGrowthEntry | null>(null);
   const { drives, error: drivesError } = useLocalDrives();
   const [selectedDriveLetter, setSelectedDriveLetter] = useState('C:');
-
-  const isExpanded = expandedModule === 'disk-growth';
   const selectedDrive = drives.find((drive) => drive.drive_letter === selectedDriveLetter) ?? null;
   const selectedDriveLabel = driveDisplayName(selectedDriveLetter);
 
@@ -1138,14 +1136,12 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
     </div>
   );
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !detailEntry) {
+  if (!isPageActive && !detailEntry) {
     return null;
   }
 
   return (
     <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
       id="disk-growth"
         title={navT('diskGrowth')}
         description={`${navT('diskGrowthDesc')} (${selectedDriveLabel})`}
@@ -1154,8 +1150,6 @@ export function DiskGrowthModule({ layoutMode = 'cards', isPageActive = true }: 
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}
       countLabel={moduleT('diskGrowth.countLabel')}
-      expanded={isExpanded}
-      onToggleExpand={() => setExpandedModule(isExpanded ? null : 'disk-growth')}
       onScan={handleScan}
       scanButtonText={moduleT('diskGrowth.scan')}
       scanDisabled={isAdmin === false || Boolean(selectedDrive && !selectedDrive.is_ntfs)}

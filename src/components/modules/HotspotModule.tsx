@@ -32,7 +32,7 @@ import { scanHotspot, cancelHotspotScan, openInFolder, cleanupDirectoryContents,
 import { formatSize } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
 import { DrillDownModal } from './DrillDownModal';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
 // 工具函数
@@ -500,11 +500,11 @@ function HotspotItem({ entry, rank, maxSize, isFullScan, onOpenFolder, onCleanup
 // 主组件
 // ============================================================================
 
-export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function HotspotModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('hotspot');
+  const { moduleState, updateModuleState, oneClickScanTrigger, stopScanTrigger } = useModuleDashboard('hotspot');
   const { showToast } = useToast();
   const { settings } = useSettings();
   const { drives } = useLocalDrives();
@@ -578,7 +578,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
   // 是否展开
-  const isExpanded = expandedModule === 'hotspot';
   const selectedDrive = drives.find((drive) => drive.drive_letter === selectedDriveLetter) ?? null;
   const selectedDriveLabel = driveDisplayName(selectedDriveLetter);
 
@@ -843,14 +842,12 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
     ? [{ title: '', rows: stageRows, note: detailNotes.join(' · ') }]
     : [];
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !cleanupTarget && !selectedPath) {
+  if (!isPageActive && !cleanupTarget && !selectedPath) {
     return null;
   }
 
   return (
     <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
       id="hotspot"
         title={navT('hotspot')}
         description={`${navT('hotspotDesc')} (${selectedDriveLabel})`}
@@ -859,8 +856,6 @@ export function HotspotModule({ layoutMode = 'cards', isPageActive = true }: Mod
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}
       countLabel={moduleT('hotspot.folders')}
-      expanded={isExpanded}
-      onToggleExpand={() => setExpandedModule(isExpanded ? null : 'hotspot')}
       onScan={handleScan}
       scanButtonText={moduleState.status === 'scanning' ? t('scanningShort') : t('startScan')}
       scanDisabled={Boolean(fullScanEnabled && selectedDrive && !selectedDrive.is_ntfs)}

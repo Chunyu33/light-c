@@ -2,18 +2,15 @@
 // 应用设置上下文 - 管理各种开关设置
 // ============================================================================
 
-import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import { APP_MODULE_META, DEFAULT_ACTIVE_MODULE_ID, DEFAULT_LAYOUT_MODE, type AppModuleId, type LayoutMode } from '../config/moduleMeta';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { APP_MODULE_META, DEFAULT_ACTIVE_MODULE_ID, type AppModuleId } from '../config/moduleMeta';
 import i18n, { type Language } from '../i18n';
-import { prepareWindowForLayout } from '../utils/windowLayout';
 
 /** 应用设置 */
 interface AppSettings {
   /** 界面语言，手动选择并与其他应用设置一起持久化。 */
   language: Language;
-  /** 首页布局模式：卡片式适合快速总览，页面式适合传统 PC 软件用户。 */
-  layoutMode: LayoutMode;
-  /** 页面式布局下当前激活的功能模块，保存在全局设置里用于切换后保持位置。 */
+  /** 当前激活的功能模块，保存在全局设置里用于切换后保持位置。 */
   activeModuleId: AppModuleId;
   /** 大目录分析深度 (2-4，默认 3) */
   hotspotDepth: number;
@@ -46,10 +43,6 @@ interface SettingsContextValue {
   settings: AppSettings;
   /** 更新设置 */
   updateSettings: (updates: Partial<AppSettings>) => void;
-  /** 切换布局前协调窗口尺寸，避免侧边栏在窄窗口中挤压内容。 */
-  switchLayoutMode: (layoutMode: LayoutMode) => Promise<void>;
-  /** 防止设置弹窗在窗口调整期间重复触发布局切换。 */
-  isLayoutSwitching: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -60,7 +53,6 @@ const moduleIds = APP_MODULE_META.map(module => module.id);
 /** 默认设置 */
 const defaultSettings: AppSettings = {
   language: 'zh',
-  layoutMode: DEFAULT_LAYOUT_MODE, // 布局设置：默认侧边栏模式（可在通用设置里切换为卡片/页面模式）
   activeModuleId: DEFAULT_ACTIVE_MODULE_ID,
   hotspotDepth: 3,     // 默认分析深度 3 层
   hotspotSizeThreshold: 50, // 默认 50MB
@@ -77,11 +69,6 @@ const defaultSettings: AppSettings = {
 function normalizeSettings(settings: AppSettings): AppSettings {
   const language: Language =
     settings.language === 'en' || settings.language === 'ja' || settings.language === 'zh-TW' ? settings.language : 'zh';
-  const layoutMode: LayoutMode = settings.layoutMode === 'pages' || settings.layoutMode === 'sidebar'
-    ? settings.layoutMode
-    : settings.layoutMode === 'cards'
-      ? 'cards'
-      : DEFAULT_LAYOUT_MODE;
   const activeModuleId = moduleIds.includes(settings.activeModuleId)
     ? settings.activeModuleId
     : DEFAULT_ACTIVE_MODULE_ID;
@@ -89,8 +76,6 @@ function normalizeSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
     language,
-    // 布局设置来自本地缓存，读取时收敛到已注册模块，避免旧缓存或手动篡改导致空页面。
-    layoutMode,
     activeModuleId,
     // 这些设置会直接影响扫描结果数量，读取本地缓存时做边界收敛，避免手动篡改导致 UI 或后端压力异常。
     hotspotDepth: Math.min(4, Math.max(2, Number(settings.hotspotDepth) || defaultSettings.hotspotDepth)),
@@ -123,9 +108,6 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }
     return defaultSettings;
   });
-  const [isLayoutSwitching, setIsLayoutSwitching] = useState(false);
-  const layoutSwitchRequestRef = useRef(0);
-  const layoutSwitchInProgressRef = useRef(false);
 
   useEffect(() => {
     // 设置可能来自旧版本缓存，统一在 Provider 生效后切换，避免首屏读取到非法语言。
@@ -141,39 +123,8 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     });
   }, []);
 
-  const switchLayoutMode = useCallback(async (layoutMode: LayoutMode) => {
-    if (layoutMode === settings.layoutMode || layoutSwitchInProgressRef.current) return;
-
-    layoutSwitchInProgressRef.current = true;
-    const requestId = layoutSwitchRequestRef.current + 1;
-    layoutSwitchRequestRef.current = requestId;
-    setIsLayoutSwitching(true);
-
-    try {
-      await prepareWindowForLayout(layoutMode);
-      if (layoutSwitchRequestRef.current !== requestId) return;
-
-      updateSettings({ layoutMode });
-      // 保留至少一帧的切换阶段，让窗口扩展和内容重排在同一轮视觉更新中完成。
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    } catch (error) {
-      try {
-        // 窗口扩展部分失败时恢复原模式的最小尺寸，避免留下与界面状态不一致的约束。
-        await prepareWindowForLayout(settings.layoutMode);
-      } catch (rollbackError) {
-        console.error('回滚布局窗口约束失败:', rollbackError);
-      }
-      throw error;
-    } finally {
-      if (layoutSwitchRequestRef.current === requestId) {
-        setIsLayoutSwitching(false);
-      }
-      layoutSwitchInProgressRef.current = false;
-    }
-  }, [settings.layoutMode, updateSettings]);
-
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, switchLayoutMode, isLayoutSwitching }}>
+    <SettingsContext.Provider value={{ settings, updateSettings }}>
       {children}
     </SettingsContext.Provider>
   );

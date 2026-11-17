@@ -5,8 +5,6 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { 
   SettingsModal, 
   TitleBar, 
@@ -17,7 +15,6 @@ import {
   DashboardHeader,
   SplashScreen,
   // Footer,
-  AnchorNav,
   BackToTopButton,
   AiAssistant,
   SidebarNav,
@@ -54,19 +51,14 @@ function PageTransitionAccent({ active }: { active: boolean }) {
 
 function DashboardContent() {
   const { triggerOneClickScan } = useDashboardActions();
-  const { settings, isLayoutSwitching } = useSettings();
-  const { t: commonT } = useTranslation('common');
+  const { settings } = useSettings();
 
   // 设置弹窗状态
   const [showSettings, setShowSettings] = useState(false);
   // 欢迎弹窗状态
   const [showWelcome, setShowWelcome] = useState(() => shouldShowWelcome());
-  // 三种布局共用同一个内容滚动区，模块实例不会因为模式切换被卸载，扫描结果和展开状态才能保留。
+  // 模块实例常驻挂载，切换菜单只改可见性，扫描结果和本地状态才能保留。
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isSidebarLayout = settings.layoutMode === 'sidebar';
-  const isSinglePageLayout = settings.layoutMode !== 'cards';
-  // 模块内部沿用页面模式语义，侧边栏只改变导航容器，不重复改动每个功能模块。
-  const moduleLayoutMode = isSinglePageLayout ? 'pages' : 'cards';
   const [visibleModuleId, setVisibleModuleId] = useState(settings.activeModuleId);
   const [transitionModuleId, setTransitionModuleId] = useState(settings.activeModuleId);
   const [pageTransitionSequence, setPageTransitionSequence] = useState(0);
@@ -78,17 +70,10 @@ function DashboardContent() {
   }, [triggerOneClickScan]);
 
   useEffect(() => {
-    if (!isSinglePageLayout) {
-      setVisibleModuleId(settings.activeModuleId);
-      setTransitionModuleId(settings.activeModuleId);
-      visibleModuleIdRef.current = settings.activeModuleId;
-      return;
-    }
-
     const previousModuleId = visibleModuleIdRef.current;
     if (settings.activeModuleId === previousModuleId) return;
 
-    // 页面模式下只让新页面做轻量入场动画，旧页面立即隐藏。
+    // 只让新页面做轻量入场动画，旧页面立即隐藏。
     // 大目录/全盘分析这类结果 DOM 很重，如果旧页面也参与离场动画，会触发大面积合成和掉帧。
     // 切换前先回到顶部，防止从长页面切到短页面时继承旧 scrollTop，出现大段空白和多余滚动条。
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
@@ -97,20 +82,12 @@ function DashboardContent() {
     setPageTransitionSequence((current) => current + 1);
     setTransitionModuleId(settings.activeModuleId);
     setVisibleModuleId(settings.activeModuleId);
-  }, [isSinglePageLayout, settings.activeModuleId]);
-
-  useEffect(() => {
-    if (!isSinglePageLayout) return;
-
-    // 从卡片模式进入页面模式时也回到顶部，避免继承卡片总览的滚动位置。
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [isSinglePageLayout]);
+  }, [settings.activeModuleId]);
 
   return (
     <div
-      data-layout-mode={settings.layoutMode}
-      aria-busy={isLayoutSwitching}
-      className={`h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden select-none${isLayoutSwitching ? ' layout-switching' : ''}`}
+      data-layout-mode="sidebar"
+      className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden select-none"
     >
       {/* 自定义标题栏 */}
       <TitleBar onSettingsClick={() => setShowSettings(true)} />
@@ -119,7 +96,7 @@ function DashboardContent() {
       <DashboardHeader 
         onOneClickScan={handleOneClickScan}
         onShowWelcome={() => setShowWelcome(true)}
-        hideOneClickScan={isSinglePageLayout}
+        hideOneClickScan
       />
 
       {/* 设置弹窗 */}
@@ -131,28 +108,26 @@ function DashboardContent() {
       {/* 自动更新检查弹窗 */}
       <UpdateModal autoCheck={true} />
 
-      {/* 侧边导航：卡片模式滚动到锚点，页面模式切换当前模块。 */}
-      {!isSidebarLayout && <AnchorNav scrollContainerRef={scrollContainerRef} />}
       <BackToTopButton scrollContainerRef={scrollContainerRef} />
       {/* AI 助手：横向新增的独立浮层，不参与任何模块逻辑。
           传入当前模块 id，让助手知道用户正停留在哪个模块。
           入口可在「设置 → AI 助手」里关掉，关掉只隐藏界面，服务商与密钥都保留。 */}
       {settings.aiAssistantEnabled && <AiAssistant activeModuleId={visibleModuleId} />}
 
-      {/* 主内容区 - 页面模式下模块实例仍常驻，但 inactive 模块会自行跳过重结果 DOM。 */}
-      <main className={`flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)]${isSidebarLayout ? ' sidebar-layout' : ''}`}>
-        {isSidebarLayout && <SidebarNav />}
+      {/* 主内容区 - 模块实例仍常驻，但 inactive 模块会自行跳过重结果 DOM。 */}
+      <main className="flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)] sidebar-layout">
+        <SidebarNav />
         <div className="h-full min-h-0 min-w-0 flex flex-1 flex-col">
           <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">
-            {/* 页面模式这一层必须自己是 flex 容器：卡片靠 flex-1 铺满可用高度，
+            {/* 单页这一层必须自己是 flex 容器：卡片靠 flex-1 铺满可用高度，
                 父级不是 flex 的话卡片高度只能由内容决定 —— 各模块头部行数不同，
                 底部落点就会各不相同（Evan 反馈"有的太高有的又太低"）。
                 min-h-full 保证短内容时至少占满滚动区，长内容仍由外层滚动承载。 */}
-            <div className={`${isSinglePageLayout ? 'min-h-full box-border flex flex-col' : 'space-y-5'} relative p-6 dashboard-container module-stage`}>
+            <div className="min-h-full box-border flex flex-col relative p-6 dashboard-container module-stage">
               {APP_MODULES.map((moduleConfig) => {
                 const ModuleComponent = moduleConfig.component;
                 const isActivePage = visibleModuleId === moduleConfig.id;
-                const shouldPlayPageEnter = isSinglePageLayout && isActivePage && transitionModuleId === moduleConfig.id;
+                const shouldPlayPageEnter = isActivePage && transitionModuleId === moduleConfig.id;
                 const pageEnterClass = shouldPlayPageEnter
                   ? pageTransitionSequence % 2 === 0
                     ? 'page-content-enter-even'
@@ -163,24 +138,19 @@ function DashboardContent() {
                     key={moduleConfig.id}
                     data-module-id={moduleConfig.id}
                     className={
-                      isSinglePageLayout
-                        ? isActivePage
-                          // flex-1 + flex-col：把"铺满剩下的高度"继续往下传，
-                          // 卡片才能吃满；min-height: auto 保证长结果不被压缩。
-                          ? `relative z-10 overflow-visible flex flex-1 flex-col ${pageEnterClass}`
-                          : 'hidden'
-                        : 'relative'
+                      isActivePage
+                        // flex-1 + flex-col：把"铺满剩下的高度"继续往下传，
+                        // 卡片才能吃满；min-height: auto 保证长结果不被压缩。
+                        ? `relative z-10 overflow-visible flex flex-1 flex-col ${pageEnterClass}`
+                        : 'hidden'
                     }
-                    style={isActivePage && isSinglePageLayout ? { contentVisibility: 'auto' } : undefined}
+                    style={isActivePage ? { contentVisibility: 'auto' } : undefined}
                   >
-                    <PageTransitionAccent active={isSinglePageLayout && isActivePage && transitionModuleId === moduleConfig.id} />
-                    <ModuleComponent layoutMode={moduleLayoutMode} isPageActive={isActivePage} />
+                    <PageTransitionAccent active={isActivePage && transitionModuleId === moduleConfig.id} />
+                    <ModuleComponent isPageActive={isActivePage} />
                   </div>
                 );
               })}
-
-              {/* 底部留白只给卡片总览使用，页面模式由固定 Footer 承接底部空间。 */}
-              {!isSinglePageLayout && <div className="h-4" />}
             </div>
           </div>
 
@@ -189,14 +159,6 @@ function DashboardContent() {
         </div>
       </main>
 
-      {isLayoutSwitching && (
-        <div className="layout-switching-overlay" role="status" aria-live="polite">
-          <div className="layout-switching-overlay__content">
-            <Loader2 className="layout-switching-overlay__icon" aria-hidden="true" />
-            <span>{commonT('layoutSwitching')}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

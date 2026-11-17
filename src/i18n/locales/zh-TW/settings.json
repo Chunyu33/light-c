@@ -126,17 +126,6 @@
     "customRange": "範圍 {{min}}-{{max}}px",
     "customTitle": "自定義字號，範圍 {{min}}-{{max}}px"
   },
-  "layout": {
-    "label": "佈局設定",
-    "desc": "調整頁面佈局模式",
-    "cards": "卡片模式",
-    "cardsDesc": "所有功能集中在同一頁，適合快速總覽",
-    "pages": "頁面模式",
-    "pagesDesc": "左側選單切換單功能頁，更接近傳統 PC 軟體",
-    "sidebar": "側邊欄模式",
-    "sidebarDesc": "固定側邊欄顯示功能選單，右側顯示目前功能頁面",
-    "switchFailed": "佈局切換失敗"
-  },
   "searchEngine": {
     "label": "搜尋引擎",
     "desc": "設定各模組搜尋按鈕開啟的預設搜尋引擎"

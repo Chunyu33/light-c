@@ -53,7 +53,7 @@ import { formatSize } from '../../utils/format';
 import i18n from '../../i18n';
 import { getSourceKey, getSourceLabel } from '../../utils/socialSource';
 import { applyDeletedPaths, resolveDeletedPaths } from '../../utils/socialScanResult';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
 // 分类配置
@@ -140,11 +140,11 @@ function getLastPathSegment(path: string): string {
 // 组件实现
 // ============================================================================
 
-export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function SocialCleanModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('social');
+  const { moduleState, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('social');
   const { showToast } = useToast();
 
   // 用于跟踪是否已处理过当前的一键扫描触发
@@ -286,13 +286,11 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         fileCount: result.total_files,
         totalSize: result.total_size,
       });
-
-      setExpandedModule('social');
     } catch (err) {
       console.error('扫描社交软件缓存失败:', err);
       updateModuleState('social', { status: 'error', error: String(err) });
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [updateModuleState]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -517,12 +515,10 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
     }
     return scanResult.categories.find(category => category.id === fileModalData.categoryId)?.files ?? [];
   }, [fileModalData, scanResult]);
+  // 由当前模块控制可见性，避免误判为共用操作区。
+  const shouldShowOperationToolbar = isPageActive;
 
-  const isExpanded = expandedModule === 'social';
-  // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，避免误判为共用操作区。
-  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
-
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm && !fileModalData) {
+  if (!isPageActive && !isDeleting && !showDeleteConfirm && !fileModalData) {
     return null;
   }
 
@@ -543,8 +539,6 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
       />
 
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         id="social"
         title={navT('socialClean')}
         description={navT('socialCleanDesc')}
@@ -552,8 +546,6 @@ export function SocialCleanModule({ layoutMode = 'cards', isPageActive = true }:
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'social')}
         onScan={handleScan}
         error={moduleState.error}
         allowStickyContent

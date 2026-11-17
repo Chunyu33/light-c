@@ -23,17 +23,15 @@ import { openInFolder } from '../../api/commands';
 import type { AiToolScanResult } from '../../types/aiToolCleanup';
 import { formatSize } from '../../utils/format';
 import { useToast } from '../Toast';
-import { useDashboard } from '../../contexts/DashboardContext';
 import { useAiModuleBridge } from '../ai/useAiModuleBridge';
 import type { ModuleRenderProps } from './moduleProps';
 
-export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function AiToolCleanupModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t: moduleT } = useTranslation('modules');
   const { showToast } = useToast();
   // 展开状态放在全局上下文里：和社交专清共用同一个 "当前展开的模块"，
   // 否则各自维护一份就会同时出现两条操作条。
-  const { expandedModule, setExpandedModule } = useDashboard();
 
   const [scanning, setScanning] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -272,15 +270,12 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
    *
    * ⚠️ 这一段不能省：`ModuleOperationToolbar` 用 portal 渲染成 `position: fixed` 的悬浮层，
    * **不受模块容器约束** —— 不加这个开关，切到别的模块时它还会浮在人家页面上。
-   * 卡片模式看模块是否展开，页面模式看本模块是否是当前页。
+   * 只在当前模块显示，避免跨模块共用显示条件。
    */
-  const isExpanded = expandedModule === 'ai-tools';
-  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
+  const shouldShowOperationToolbar = isPageActive;
 
   return (
     <ModuleCard
-      variant={layoutMode === 'pages' ? 'page' : 'card'}
-      forceExpanded={layoutMode === 'pages'}
       id="ai-tools"
       title={navT('aiToolCleanup')}
       description={navT('aiToolCleanupDesc')}
@@ -290,8 +285,6 @@ export function AiToolCleanupModule({ layoutMode = 'cards', isPageActive = true 
       totalSize={result?.totalSize ?? 0}
       onScan={handleScan}
       error={error}
-      expanded={isExpanded}
-      onToggleExpand={() => setExpandedModule(isExpanded ? null : 'ai-tools')}
     >
       <div className="p-4">
         {scanning ? (

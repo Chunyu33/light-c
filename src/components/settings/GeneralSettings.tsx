@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, ClipboardList, ChevronRight, FolderOpen, HardDrive, History, Info, LayoutGrid, MonitorCog, RefreshCw, Rocket, Search, Trash2, Type } from 'lucide-react';
+import { CheckCircle2, ClipboardList, ChevronRight, FolderOpen, HardDrive, History, Info, MonitorCog, RefreshCw, Rocket, Search, Trash2, Type } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { Switch } from '../ui/Switch';
 import { useFontSize, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, useSettings, useTheme, type Language, type ThemeMode } from '../../contexts';
@@ -14,7 +14,7 @@ import { clearSelectedLocalData, getStorageLocationInfo, getStorageWriteDiagnost
 import { formatSize } from '../../utils/format';
 import { getStoredSearchEngine, SEARCH_ENGINE_CHANGED_EVENT, SEARCH_ENGINE_OPTIONS, setStoredSearchEngine, type SearchEngine } from '../../utils/searchEngine';
 import { ClearLocalDataDialog } from './ClearLocalDataDialog';
-import { FONT_SIZE_CONFIGS, FONT_SIZE_OPTIONS, LAYOUT_MODE_OPTIONS, THEME_OPTIONS } from './constants';
+import { FONT_SIZE_CONFIGS, FONT_SIZE_OPTIONS, THEME_OPTIONS } from './constants';
 
 const LANGUAGE_OPTIONS: { value: Language; labelKey: string }[] = [
   { value: 'zh', labelKey: 'language.zh' },
@@ -29,7 +29,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const { glass, setGlass } = useTheme();
   const { t: commonT } = useTranslation('common');
   const { level: fontSizeLevel, setLevel: setFontSizeLevel, customFontSize, setCustomFontSize } = useFontSize();
-  const { settings, updateSettings, switchLayoutMode, isLayoutSwitching } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const { showToast } = useToast();
   const [dataDir, setDataDir] = useState('');
   const [storageInfo, setStorageInfo] = useState<StorageLocationInfo | null>(null);
@@ -41,17 +41,6 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const [clearableItems, setClearableItems] = useState<ClearableDataItem[]>([]);
   const [selectedClearItemIds, setSelectedClearItemIds] = useState<string[]>([]);
   const [customFontSizeDraft, setCustomFontSizeDraft] = useState(String(customFontSize));
-
-  const handleLayoutModeChange = async (layoutMode: typeof settings.layoutMode) => {
-    if (layoutMode === settings.layoutMode || isLayoutSwitching) return;
-
-    try {
-      await switchLayoutMode(layoutMode);
-    } catch (error) {
-      // 窗口调整失败时保留原布局，提示用户而不是让设置状态与实际窗口脱节。
-      showToast({ type: 'error', title: t('layout.switchFailed'), description: String(error) });
-    }
-  };
 
   useEffect(() => {
     setCustomFontSizeDraft(String(customFontSize));
@@ -363,36 +352,6 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-
-          {/* 布局设置 */}
-          <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
-            <div>
-              <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-                <LayoutGrid className="w-4 h-4 text-[var(--text-muted)]" />
-                {t('layout.label')}
-              </p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">
-                {t('layout.desc')}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 p-1 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
-              {LAYOUT_MODE_OPTIONS.map(({ mode, label, icon: Icon, description }) => (
-                <button
-                  key={mode}
-                  onClick={() => void handleLayoutModeChange(mode)}
-                  disabled={isLayoutSwitching}
-                  title={`${t(label)}: ${t(description)}`}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200 ${
-                    settings.layoutMode === mode
-                      ? 'bg-[var(--brand-green)] text-white shadow-sm'
-                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-              ))}
-            </div>
           </div>
 
           <SearchEngineSettings />

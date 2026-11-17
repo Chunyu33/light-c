@@ -126,17 +126,6 @@
     "customRange": "范围 {{min}}-{{max}}px",
     "customTitle": "自定义字号，范围 {{min}}-{{max}}px"
   },
-  "layout": {
-    "label": "布局设置",
-    "desc": "调整页面布局模式",
-    "cards": "卡片模式",
-    "cardsDesc": "所有功能集中在同一页，适合快速总览",
-    "pages": "页面模式",
-    "pagesDesc": "左侧菜单切换单功能页，更接近传统 PC 软件",
-    "sidebar": "侧边栏模式",
-    "sidebarDesc": "固定侧边栏显示功能菜单，右侧展示当前功能页面",
-    "switchFailed": "布局切换失败"
-  },
   "searchEngine": {
     "label": "搜索引擎",
     "desc": "设置各模块搜索按钮打开的默认搜索引擎"

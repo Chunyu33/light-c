@@ -36,7 +36,7 @@ import {
   type ContextMenuDeleteRequest,
   type CleanupLogEntryInput,
 } from '../../api/commands';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
 // 工具函数
@@ -297,14 +297,12 @@ function EntryRow({ entry, isSelected, onToggle }: EntryRowProps) {
 // 主组件
 // ============================================================================
 
-export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function ContextMenuModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
   const {
     moduleState,
-    expandedModule,
-    setExpandedModule,
     updateModuleState,
     oneClickScanTrigger,
   } = useModuleDashboard('contextMenu');
@@ -448,13 +446,11 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         fileCount: result.invalid_count,
         totalSize: 0, // 注册表项没有文件大小概念
       });
-
-      setExpandedModule('contextMenu');
     } catch (err) {
       console.error('右键菜单扫描失败:', err);
       updateModuleState('contextMenu', { status: 'error', error: String(err) });
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [updateModuleState]);
 
   /** 监听一键扫描触发器 */
   useEffect(() => {
@@ -606,8 +602,6 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
   }, [selectedIds, scanResult, updateModuleState]);
 
   // ── 渲染 ─────────────────────────────────────────────────────────────────
-
-  const isExpanded = expandedModule === 'contextMenu';
   /** 可选中条目（排除系统保护） */
   const selectableEntries = useMemo(
     () => filteredEntries.filter((e) => !e.is_system_protected),
@@ -617,15 +611,13 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
     selectableEntries.length > 0 &&
     selectableEntries.every((e) => selectedIds.has(e.id));
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
+  if (!isPageActive && !isDeleting && !showDeleteConfirm) {
     return null;
   }
 
   return (
     <>
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         id="contextMenu"
         title={navT('contextMenu')}
         description={navT('contextMenuDesc')}
@@ -633,8 +625,6 @@ export function ContextMenuModule({ layoutMode = 'cards', isPageActive = true }:
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={0}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'contextMenu')}
         onScan={handleScan}
         error={moduleState.error}
         headerExtra={

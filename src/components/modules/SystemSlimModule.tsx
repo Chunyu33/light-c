@@ -39,7 +39,7 @@ import {
   SystemSlimStatus
 } from '../../api/commands';
 import { formatSize } from '../../utils/format';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
 // 配置
@@ -113,11 +113,11 @@ function formatElapsed(elapsedMs: number): string {
 // 组件实现
 // ============================================================================
 
-export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function SystemSlimModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('system');
+  const { moduleState, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('system');
   const { showToast } = useToast();
 
   // 用于跟踪是否已处理过当前的一键扫描触发
@@ -419,15 +419,13 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
         fileCount: result.items.filter(i => i.actionable).length,
         totalSize: result.total_reclaimable,
       });
-
-      setExpandedModule('system');
     } catch (error) {
       console.error('加载系统瘦身状态失败:', error);
       updateModuleState('system', { status: 'error', error: String(error) });
     } finally {
       setLoading(false);
     }
-  }, [actionLoading, moduleT, showToast, updateModuleState, setExpandedModule]);
+  }, [actionLoading, moduleT, showToast, updateModuleState]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -530,14 +528,12 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
     }
     void runAction(item);
   }, [runAction]);
-
-  const isExpanded = expandedModule === 'system';
   // 任一系统操作执行中即视为忙碌：所有操作入口（按钮、重新检测）统一用它拦截。
   const isActionBusy = actionLoading !== null;
   // 分析刚开始 -> 禁用；分析已经拖过兜底时间 -> 放开，避免按钮和僵死进程互相等死。
   const isAnalyzingLocked = isAnalyzingWinsxs && !analyzeTimedOut;
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !actionLoading) {
+  if (!isPageActive && !actionLoading) {
     return null;
   }
 
@@ -561,8 +557,6 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
       />
 
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
       id="system"
         title={navT('systemSlim')}
         description={navT('systemSlimDesc')}
@@ -570,8 +564,6 @@ export function SystemSlimModule({ layoutMode = 'cards', isPageActive = true }: 
       status={moduleState.status}
       fileCount={moduleState.fileCount}
       totalSize={moduleState.totalSize}
-      expanded={isExpanded}
-      onToggleExpand={() => setExpandedModule(isExpanded ? null : 'system')}
       onScan={() => loadStatus(true)}
       scanButtonText={loading ? moduleT('systemSlim.checking') : status ? moduleT('systemSlim.rescan') : moduleT('systemSlim.check')}
       // 检测中 / 后台分析中 / 系统操作执行中都不允许重新检测：

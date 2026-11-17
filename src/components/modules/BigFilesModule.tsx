@@ -32,7 +32,7 @@ import { scanLargeFiles, cancelLargeFileScan, deleteFiles, openInFolder, recordC
 import { formatSize, formatDate, getRiskLevelColor, getRiskLevelBgColor, getRiskLevelKey } from '../../utils/format';
 import { openSearchUrl } from '../../utils/searchEngine';
 import type { LargeFileEntry, LargeFileScanProgress } from '../../types';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // 后端当前返回固定来源标签；只映射已知枚举，未知值不展示，避免误译真实文件信息。
 function getLocalizedSourceLabel(sourceLabel: string, translate: (key: string) => string): string {
@@ -65,10 +65,10 @@ function getLocalizedSourceLabel(sourceLabel: string, translate: (key: string) =
 // 组件实现
 // ============================================================================
 
-export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function BigFilesModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('bigFiles');
+  const { moduleState, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('bigFiles');
   const { showToast } = useToast();
   const { settings } = useSettings();
   const { drives } = useLocalDrives();
@@ -238,15 +238,13 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
         fileCount: results.length,
         totalSize,
       });
-
-      setExpandedModule('bigFiles');
     } catch (err) {
       console.error('扫描大文件失败:', err);
       updateModuleState('bigFiles', { status: 'error', error: String(err) });
     } finally {
       scanningRef.current = false;
     }
-  }, [updateModuleState, setExpandedModule, settings.bigFilesScanLimit, selectedDriveLetter]);
+  }, [updateModuleState, settings.bigFilesScanLimit, selectedDriveLetter]);
 
   // 监听一键扫描触发器
   useEffect(() => {
@@ -394,10 +392,8 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
 
   // 可选中文件数量（risk_level >= 4 被锁定，不可选）
   const selectableCount = files.filter((f) => f.risk_level <= 3).length;
-
-  const isExpanded = expandedModule === 'bigFiles';
-  // 页面模式由当前模块控制可见性，卡片模式则沿用手风琴展开状态，确保操作区跟随各自结果。
-  const shouldShowOperationToolbar = layoutMode === 'pages' ? isPageActive : isExpanded;
+  // 由当前模块控制可见性，确保操作区跟随对应结果。
+  const shouldShowOperationToolbar = isPageActive;
   const isScanning = moduleState.status === 'scanning';
   const displayElapsedSeconds = isScanning
     ? scanElapsed
@@ -418,7 +414,7 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
     </div>
   );
 
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
+  if (!isPageActive && !isDeleting && !showDeleteConfirm) {
     return null;
   }
 
@@ -441,8 +437,6 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
       />
 
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         id="bigFiles"
         title={navT('bigFiles')}
         description={`${navT('bigFilesDesc')} (${selectedDriveLabel})`}
@@ -450,8 +444,6 @@ export function BigFilesModule({ layoutMode = 'cards', isPageActive = true }: Mo
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={moduleState.totalSize}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'bigFiles')}
         onScan={handleScan}
         error={moduleState.error}
         titleExtra={driveSelector}

@@ -25,17 +25,17 @@ import {
   type RegistryEntry,
   type CleanupLogEntryInput,
 } from '../../api/commands';
-import { shouldSkipInactivePageRender, type ModuleRenderProps } from './moduleProps';
+import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
 // 主组件
 // ============================================================================
 
-export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: ModuleRenderProps) {
+export function RegistryModule({ isPageActive = true }: ModuleRenderProps) {
   const { t: navT } = useTranslation('nav');
   const { t } = useTranslation('common');
   const { t: moduleT } = useTranslation('modules');
-  const { moduleState, expandedModule, setExpandedModule, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('registry');
+  const { moduleState, updateModuleState, triggerHealthRefresh, oneClickScanTrigger } = useModuleDashboard('registry');
 
   const lastScanTriggerRef = useRef(0);
 
@@ -108,13 +108,11 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         fileCount: result.total_count,
         totalSize: 0,
       });
-
-      setExpandedModule('registry');
     } catch (err) {
       console.error('注册表扫描失败:', err);
       updateModuleState('registry', { status: 'error', error: String(err) });
     }
-  }, [updateModuleState, setExpandedModule]);
+  }, [updateModuleState]);
 
   // 一键扫描触发
   useEffect(() => {
@@ -210,17 +208,13 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
     }
   }, [scanResult, selectedEntries]);
 
-  const isExpanded = expandedModule === 'registry';
-
-  if (shouldSkipInactivePageRender(layoutMode, isPageActive) && !isDeleting && !showDeleteConfirm) {
+  if (!isPageActive && !isDeleting && !showDeleteConfirm) {
     return null;
   }
 
   return (
     <>
       <ModuleCard
-        variant={layoutMode === 'pages' ? 'page' : 'card'}
-        forceExpanded={layoutMode === 'pages'}
         id="registry"
         title={navT('registry')}
         description={navT('registryDesc')}
@@ -228,8 +222,6 @@ export function RegistryModule({ layoutMode = 'cards', isPageActive = true }: Mo
         status={moduleState.status}
         fileCount={moduleState.fileCount}
         totalSize={0}
-        expanded={isExpanded}
-        onToggleExpand={() => setExpandedModule(isExpanded ? null : 'registry')}
         onScan={handleScan}
         error={moduleState.error}
       >
