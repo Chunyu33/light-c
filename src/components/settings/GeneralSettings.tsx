@@ -35,6 +35,8 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const [dataDir, setDataDir] = useState('');
   const [storageInfo, setStorageInfo] = useState<StorageLocationInfo | null>(null);
   const [writeDiagnostic, setWriteDiagnostic] = useState<StorageWriteDiagnostic | null>(null);
+  /** 界面数据目录：只有便携版有值；提前取成字符串，避免可选链在回调里丢掉窄化。 */
+  const webviewDataDir = storageInfo?.webview_data_directory ?? '';
   const [isChangingDir, setIsChangingDir] = useState(false);
   const [isMigratingLegacyData, setIsMigratingLegacyData] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -507,12 +509,25 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
                 </button>
               </div>
             </div>
-            {storageInfo?.webview_data_directory && (
+            {webviewDataDir && (
               <div className="flex items-center justify-between gap-3">
                 <span className="shrink-0 text-xs text-[var(--text-muted)]">{t('dataDir.webviewData')}</span>
-                <span className="max-w-[20.0rem] truncate text-right text-[0.71rem] text-[var(--text-faint)]" title={storageInfo.webview_data_directory}>
-                  {storageInfo.webview_data_directory}
-                </span>
+                {/* 与「配置位置」「数据位置」保持一致：可截断的路径 + 前往按钮。
+                    这行只有便携版会出现（安装版用系统默认目录），但能打开就该能点。 */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="max-w-[16.43rem] truncate text-right text-[0.71rem] text-[var(--text-faint)]"
+                    title={webviewDataDir}
+                  >
+                    {shortenPathMiddle(webviewDataDir)}
+                  </span>
+                  <button
+                    onClick={() => handleOpenStoragePath(webviewDataDir, t('dataDir.webviewData'))}
+                    className="shrink-0 text-[0.71rem] text-[var(--brand-green)] transition hover:opacity-80"
+                  >
+                    {commonT('go')}
+                  </button>
+                </div>
               </div>
             )}
             <div className="flex items-center justify-between gap-3">

@@ -75,10 +75,13 @@ export function AboutSettings() {
               </span>
             </a>
           </div>
-          {/* 检查更新按钮 */}
+          {/* 检查更新按钮。
+              与「安全与校验」里的「校验文件完整性」保持一致：整宽单行动作按钮用实心品牌绿。
+              原来是淡绿底 + 绿字，同一个设置页里两个同级别操作长得不一样，
+              看起来像一个是主操作、一个是未启用的次要操作。 */}
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('lightc:check-update'))}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--brand-green)] bg-[var(--brand-green)]/10 rounded-xl hover:bg-[var(--brand-green)]/20 transition-colors"
+            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-[var(--brand-green)] rounded-xl hover:opacity-90 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             {/* 两个发行版共用同一个入口文案：点下去都是"看有没有新版本"，只是便携版走手动替换引导。 */}
