@@ -2,7 +2,7 @@ import React from "react";
 import { hydrateRoot } from "react-dom/client";
 import "./i18n";
 import App from "./App";
-import { ThemeProvider } from "./contexts";
+import { ThemeProvider, WallpaperProvider } from "./contexts";
 import "./App.css";
 
 /**
@@ -41,7 +41,9 @@ if (import.meta.env.PROD) {
 hydrateRoot(document.getElementById("root") as HTMLElement,
   <React.StrictMode>
     <ThemeProvider>
-      <App />
+      <WallpaperProvider>
+        <App />
+      </WallpaperProvider>
     </ThemeProvider>
   </React.StrictMode>
 );

@@ -25,3 +25,5 @@ export {
 export type { FontSizeLevel } from './FontSizeContext';
 export { SettingsProvider, useSettings } from './SettingsContext';
 export type { Language } from '../i18n';
+export { WallpaperProvider, useWallpaper } from './WallpaperContext';
+export type { WallpaperFit } from './WallpaperContext';

@@ -122,6 +122,25 @@ html.glass:not(.dark) {
      （Evan 之前反馈过"DashboardHeader 顶部非常明显的白色"）。0.5 是"
      看得出有一道反光，但不抢注意力"的量级。 */
   --glass-header-highlight: rgba(255, 255, 255, 0.5);
+  /* 表面高光渐变：半透明色块 + 1px 描边只会读成"染了壁纸的膜"，
+     叠一层方向性高光才有玻璃的折射感。
+     · 顶栏用**横向**渐变：TitleBar / DashboardHeader 是两个 DOM 拼的，
+       斜向或纵向渐变会在接缝处颜色错位，横向则左右一致、看不出缝。
+     · 侧栏是独立面板，可以用斜向渐变模拟"光从左上打来"。 */
+  --glass-chrome-sheen: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.02) 30%,
+    rgba(15, 23, 42, 0.055) 62%,
+    rgba(255, 255, 255, 0.32) 100%);
+  /* 侧栏高光只留在边缘：整面渐变会把 0.5 的底色刷成一块实心板，
+     等于给侧栏多加了一层底色（Evan 反馈过）。中间必须完全透明，
+     让面板的透明度由 --glass-sidebar-bg 单独决定。 */
+  --glass-sidebar-sheen: linear-gradient(142deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.1) 4%,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 255, 255, 0) 88%,
+    rgba(255, 255, 255, 0.2) 100%);
   /* AI 面板是**悬浮在内容之上**的，比顶栏/侧栏需要更多遮蔽、比吸顶操作栏可以更透。
      用 --glass-toolbar-bg（0.78）会白得像一块板子，用 --glass-chrome-bg（0.4）
      又太透 —— 所以单独给一档，配合 blur 才是"液态玻璃"该有的样子。 */
@@ -151,6 +170,14 @@ html.dark.glass {
   /* 暗色同样提高模糊与饱和，但 saturation 收一档：
      深底上饱和度放大更明显，2.1 会让青色块变成一块"绿玻璃"（Evan 明确讨厌绿）。 */
   --glass-blur: blur(30px) saturate(175%);
+
+  /* 深色玻璃下必须单独提亮次级文字。
+     深色基础值 #888 / #666 是按**不透明深底**选的，压在上半屏那片白色主光晕
+     （左上 26% 白）上时对比度掉到 2~3:1，顶栏统计数字和模块描述基本看不清
+     （用户反馈"深色模式部分字体看不清"）。
+     浅色玻璃是往下加深（#424b58），深色这侧对称地往上提亮。 */
+  --text-muted: #a8a8a8;
+  --text-faint: #9a9a9a;
 
   --bg-main: transparent;
   /* 深色沿用与浅色相同的做法：表面是「在背景上叠一层白」，
@@ -192,11 +219,28 @@ html.dark.glass {
      0.07 → 0.055 → 0.075 → 0.085：卡片越透，背景色相越容易透上来把卡片染色，
      深色里 1% 的差别都很明显。宁可让卡片实一点，通透感交给 blur 和背景明度。 */
   --glass-surface-bg: rgba(255, 255, 255, 0.12);
-  --glass-chrome-bg: rgba(255, 255, 255, 0.1);
+  /* 顶栏在深色下用**半透明黑**，不再叠白。
+     原来 0.1 白会让顶栏比背景还亮，再叠上左上的白色主光，
+     统计数字（40/40、10/30）就彻底没底了 —— 深色玻璃的顶栏本来就该是暗的。
+     0.32 黑压在光晕上约 #343434，配合上面提亮的次级文字刚好够 AA。 */
+  --glass-chrome-bg: rgba(0, 0, 0, 0.32);
   /* 深色侧栏比顶栏略实：深底上 0.07 的侧栏会和背景糊成一片，导航项就没有依托了 */
   --glass-sidebar-bg: rgba(255, 255, 255, 0.09);
   /* 深色下顶栏的顶部高光只能给 0.1：深底上白色反光非常显眼 */
   --glass-header-highlight: rgba(255, 255, 255, 0.1);
+  /* 深色高光必须比浅色收敛得多：深底上 0.2 的白已经是一条亮带。
+     方向、接缝理由与浅色那份相同。 */
+  --glass-chrome-sheen: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.02) 32%,
+    rgba(0, 0, 0, 0.14) 64%,
+    rgba(255, 255, 255, 0.14) 100%);
+  --glass-sidebar-sheen: linear-gradient(142deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.04) 4%,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 255, 255, 0) 88%,
+    rgba(255, 255, 255, 0.1) 100%);
   /* 深色浮层用实色深底（与 --glass-overlay-bg 同一思路），叠白会变成白板。
      色值从 rgba(30,36,34) 改成中性偏冷的 rgba(32,37,42)：原来那组 G > B，
      压在背景上会让弹窗透出一层极淡的墨绿，和整体色调不搭。
@@ -262,7 +306,10 @@ html.glass body::before {
    底色 #262a2b → #0c0f10：冷中性深灰（B 只比 G 高 1），不偏青也不偏蓝。 */
 html.dark.glass body::before {
   background:
-    radial-gradient(ellipse 70vw 60vh at 34% 12%, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0) 70%),
+    /* 主光从 0.26 降到 0.18：它正好压在顶栏和每个模块的头部，太亮时
+       那些位置变成一片浅灰，次级文字（统计数字、模块描述）直接糊掉。
+       仍然保留这道光——完全没有明暗的深色背景会读成"一块死黑"。 */
+    radial-gradient(ellipse 62vw 52vh at 34% 12%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 70%),
     radial-gradient(ellipse 65vw 60vh at 62% 46%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 70%),
     radial-gradient(ellipse 80vw 80vh at 104% 104%, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0) 64%),
     linear-gradient(150deg, #262626 0%, #0d0d0d 100%);
@@ -372,6 +419,8 @@ html.glass .glass-surface {
 
 html.glass .glass-chrome {
   background-color: var(--glass-chrome-bg);
+  /* 高光叠在底色上（不是替换）：横向渐变左右一致，两个顶栏 DOM 拼接处不会错位。 */
+  background-image: var(--glass-chrome-sheen);
 }
 
 html.glass .glass-surface {
@@ -848,6 +897,10 @@ html.glass .sidebar-nav {
 
   padding: var(--sidebar-panel-inset-y) var(--sidebar-panel-inset-x);
   background-color: transparent;
+  /* ⚠️ 必须同时清掉 background-image：侧栏也带 .glass-chrome，
+     顶栏那条横向高光会铺在**整个外框矩形**上，在圆角面板背后形成一层浅色底
+     （Evan 反馈"侧边栏背后这一层还是有"）。面板自己的高光在 ::before 上。 */
+  background-image: none;
   border-right-color: transparent;
   /* 抵消 .glass-chrome 加在外框上的效果 —— 这两条是关键：
      · box-shadow 会沿外框画一圈投影轮廓；
@@ -883,6 +936,8 @@ html.glass .sidebar-nav::before {
      iOS 的侧栏是"悬浮在内容旁边的独立导航层"，它要比主内容区更透，
      这样背景的光影能从它下面透上来；用和卡片一样的厚度会读成"另一张卡片"。 */
   background-color: var(--glass-sidebar-bg);
+  /* 斜向高光叠在底色上：面板是独立的圆角块，不需要担心跨 DOM 接缝。 */
+  background-image: var(--glass-sidebar-sheen);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   /* 投影收紧：留白带只有 10.5px 宽，--glass-shadow 的 30px 模糊会整条盖住它，

@@ -5,10 +5,10 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, ClipboardList, ChevronRight, FolderOpen, HardDrive, History, Info, MonitorCog, RefreshCw, Rocket, Search, Trash2, Type } from 'lucide-react';
+import { CheckCircle2, ClipboardList, ChevronRight, FolderOpen, HardDrive, History, Image as ImageIcon, Info, MonitorCog, RefreshCw, Rocket, Search, Trash2, Type } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { Switch } from '../ui/Switch';
-import { useFontSize, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, useSettings, useTheme, type Language, type ThemeMode } from '../../contexts';
+import { useFontSize, CUSTOM_FONT_SIZE_MIN, CUSTOM_FONT_SIZE_MAX, useSettings, useTheme, useWallpaper, type Language, type ThemeMode, type WallpaperFit } from '../../contexts';
 import { useToast } from '../Toast';
 import { clearSelectedLocalData, getStorageLocationInfo, getStorageWriteDiagnostic, listClearableDataItems, migrateLegacyPortableData, openInFolder, openLogsFolder, openStartupManager, openStorageSettings, pickFolderDialog, setDataDirectory, type ClearableDataItem, type StorageLocationInfo, type StorageWriteDiagnostic } from '../../api/commands';
 import { formatSize } from '../../utils/format';
@@ -26,7 +26,8 @@ const LANGUAGE_OPTIONS: { value: Language; labelKey: string }[] = [
 export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (mode: ThemeMode) => void }) {
   const { t } = useTranslation('settings');
   // 玻璃开关直接从上下文取，避免再往 SettingsModal 传一层 props
-  const { glass, setGlass } = useTheme();
+  const { glass, setGlass, theme: appliedTheme } = useTheme();
+  const wallpaper = useWallpaper();
   const { t: commonT } = useTranslation('common');
   const { level: fontSizeLevel, setLevel: setFontSizeLevel, customFontSize, setCustomFontSize } = useFontSize();
   const { settings, updateSettings } = useSettings();
@@ -41,6 +42,36 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
   const [clearableItems, setClearableItems] = useState<ClearableDataItem[]>([]);
   const [selectedClearItemIds, setSelectedClearItemIds] = useState<string[]>([]);
   const [customFontSizeDraft, setCustomFontSizeDraft] = useState(String(customFontSize));
+
+  /** 壁纸操作统一在这里给反馈：选图、安装、清除都会失败（取消选图除外）。 */
+  const handleChooseWallpaper = async () => {
+    try {
+      await wallpaper.choose();
+    } catch (error) {
+      showToast({ type: 'error', title: t('wallpaper.pickFailed'), description: String(error) });
+    }
+  };
+
+  const handleRemoveWallpaper = async () => {
+    try {
+      await wallpaper.remove();
+    } catch (error) {
+      showToast({ type: 'error', title: t('wallpaper.removeFailed'), description: String(error) });
+    }
+  };
+
+  /**
+   * 界面上暴露「壁纸透明度」：数值越大图片越清晰，符合直觉。
+   * 内部存的是遮罩浓度（越大越糊），两者互补，所以读写时都要 100 - x 换算。
+   * 存储格式不动，老配置照常兼容。
+   */
+  const activeDim = appliedTheme === 'dark' ? wallpaper.dimDark : wallpaper.dimLight;
+  const wallpaperOpacity = 100 - activeDim;
+  const setWallpaperOpacity = (opacity: number) => {
+    const dim = 100 - opacity;
+    if (appliedTheme === 'dark') wallpaper.setDimDark(dim);
+    else wallpaper.setDimLight(dim);
+  };
 
   useEffect(() => {
     setCustomFontSizeDraft(String(customFontSize));
@@ -263,6 +294,73 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
               onChange={setGlass}
               aria-label={t('theme.glassLabel')}
             />
+          </div>
+
+          {/* 背景壁纸：图片存数据目录，这里只放开关和适配选项。 */}
+          <div className="border-t border-[var(--border-color)] pt-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-[var(--text-muted)]" />
+                  {t('wallpaper.label')}
+                </p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{t('wallpaper.desc')}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => void handleChooseWallpaper()}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-[var(--brand-green)] bg-[var(--brand-green)] text-white hover:bg-[var(--brand-green-hover)] transition-colors"
+                >
+                  {t(wallpaper.active ? 'wallpaper.replace' : 'wallpaper.choose')}
+                </button>
+                {wallpaper.active && (
+                  <button
+                    onClick={() => void handleRemoveWallpaper()}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    {t('wallpaper.remove')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 没有壁纸时隐藏细项，避免一屏出现一堆用不上的控件。 */}
+            {wallpaper.active && (
+              <div className="space-y-3 pl-5 border-l-2 border-[var(--border-muted)]">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-[var(--text-secondary)]">{t('wallpaper.fitLabel')}</p>
+                  <Select<WallpaperFit>
+                    value={wallpaper.fit}
+                    options={[
+                      { value: 'cover', label: t('wallpaper.fitCover') },
+                      { value: 'contain', label: t('wallpaper.fitContain') },
+                      { value: 'center', label: t('wallpaper.fitCenter') },
+                    ]}
+                    onChange={wallpaper.setFit}
+                    widthClass="w-32"
+                  />
+                </div>
+
+                {/* 透明度只显示当前主题那一档，深浅各存各的，切换主题不用重调。 */}
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs text-[var(--text-secondary)]">{t('wallpaper.opacityLabel')}</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={wallpaperOpacity}
+                      onChange={(event) => setWallpaperOpacity(Number(event.target.value))}
+                      className="w-28 accent-[var(--brand-green)]"
+                      aria-label={t('wallpaper.opacityLabel')}
+                    />
+                    <span className="w-8 text-xs tabular-nums text-[var(--text-muted)]">{wallpaperOpacity}</span>
+                  </div>
+                </div>
+
+              </div>
+            )}
           </div>
 
           {/* 使用通用下拉选择器，语言名称长度变化时不会撑开设置页布局。 */}

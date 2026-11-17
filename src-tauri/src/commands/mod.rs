@@ -9,7 +9,7 @@
 mod ai;
 mod ai_models;
 mod app;
-mod data;
+pub mod data;
 mod delete;
 mod disk;
 mod disk_growth;

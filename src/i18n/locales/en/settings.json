@@ -107,6 +107,20 @@
     "glassDesc": "Gives the title bar, sidebar and cards a translucent glass finish",
     "glassWarning": "Keeps the GPU busy, so scrolling may stutter on slower machines. Turn it on only if your device can handle it."
   },
+  "wallpaper": {
+    "label": "Background wallpaper",
+    "desc": "Pick an image from your computer. It is stored with the app's data.",
+    "choose": "Choose image",
+    "replace": "Replace image",
+    "remove": "Remove",
+    "pickFailed": "Could not set the wallpaper",
+    "removeFailed": "Could not remove the wallpaper",
+    "fitLabel": "Image fit",
+    "fitCover": "Fill (crop edges)",
+    "fitContain": "Fit (with margins)",
+    "fitCenter": "Original size, centered",
+    "opacityLabel": "Wallpaper clarity (higher is clearer)"
+  },
   "language": {
     "label": "Language",
     "desc": "Choose the interface display language",

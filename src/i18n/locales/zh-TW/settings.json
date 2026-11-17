@@ -107,6 +107,20 @@
     "glassDesc": "讓頂欄、側邊欄和卡片呈現半透明玻璃質感",
     "glassWarning": "會持續佔用顯卡資源，低階裝置上捲動可能變卡；確認裝置效能足夠再開啟"
   },
+  "wallpaper": {
+    "label": "背景桌布",
+    "desc": "選擇電腦中的圖片作為背景，圖片會儲存在應用程式資料中",
+    "choose": "選擇圖片",
+    "replace": "更換圖片",
+    "remove": "移除",
+    "pickFailed": "設定桌布失敗",
+    "removeFailed": "移除桌布失敗",
+    "fitLabel": "圖片顯示方式",
+    "fitCover": "填滿（裁切邊緣）",
+    "fitContain": "完整顯示（留白）",
+    "fitCenter": "原始大小置中",
+    "opacityLabel": "桌布透明度（越大越清晰）"
+  },
   "language": {
     "label": "語言",
     "desc": "選擇介面顯示語言",

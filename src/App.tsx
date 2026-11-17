@@ -87,6 +87,7 @@ function DashboardContent() {
   return (
     <div
       data-layout-mode="sidebar"
+      data-wallpaper-surface
       className="h-screen flex flex-col bg-[var(--bg-base)] overflow-hidden select-none"
     >
       {/* 自定义标题栏 */}
@@ -115,7 +116,7 @@ function DashboardContent() {
       {settings.aiAssistantEnabled && <AiAssistant activeModuleId={visibleModuleId} />}
 
       {/* 主内容区 - 模块实例仍常驻，但 inactive 模块会自行跳过重结果 DOM。 */}
-      <main className="flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)] sidebar-layout">
+      <main data-wallpaper-surface className="flex-1 min-h-0 overflow-hidden bg-[var(--bg-base)] sidebar-layout">
         <SidebarNav />
         <div className="h-full min-h-0 min-w-0 flex flex-1 flex-col">
           <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto">

@@ -107,6 +107,20 @@
     "glassDesc": "让顶栏、侧边栏和卡片呈现半透明玻璃质感",
     "glassWarning": "会持续占用显卡资源，低配设备上滚动可能变卡；确认设备性能足够再开启"
   },
+  "wallpaper": {
+    "label": "背景壁纸",
+    "desc": "选择电脑里的图片作为背景，图片会保存在应用数据中",
+    "choose": "选择图片",
+    "replace": "更换图片",
+    "remove": "移除",
+    "pickFailed": "设置壁纸失败",
+    "removeFailed": "移除壁纸失败",
+    "fitLabel": "图片适配",
+    "fitCover": "填充（裁切边缘）",
+    "fitContain": "完整显示（留白）",
+    "fitCenter": "原始大小居中",
+    "opacityLabel": "壁纸透明度（越大越清晰）"
+  },
   "language": {
     "label": "语言",
     "desc": "选择界面显示语言",

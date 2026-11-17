@@ -1848,3 +1848,27 @@ export async function clearSelectedLocalData(itemIds: string[]): Promise<ClearLo
 export async function pickFolderDialog(): Promise<string | null> {
   return invoke<string | null>('pick_folder_dialog');
 }
+
+// ============================================================================
+// 背景壁纸
+// ============================================================================
+
+/** 打开系统图片选择框；取消时返回 null。 */
+export async function pickWallpaperDialog(): Promise<string | null> {
+  return invoke<string | null>('pick_wallpaper_dialog');
+}
+
+/** 把选中的图片装进数据目录，返回文件名（配合数据目录拼 asset URL）。 */
+export async function installWallpaper(source: string): Promise<string> {
+  return invoke<string>('install_wallpaper', { source });
+}
+
+/** 清除已安装的壁纸。 */
+export async function clearWallpaper(): Promise<void> {
+  return invoke<void>('clear_wallpaper');
+}
+
+/** 读取当前壁纸的绝对路径；没有安装时返回空字符串。 */
+export async function getWallpaperPath(): Promise<string> {
+  return invoke<string>('get_wallpaper_path');
+}

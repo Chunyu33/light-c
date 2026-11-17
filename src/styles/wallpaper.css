@@ -1,0 +1,48 @@
+/* ============================================================================
+   背景壁纸
+   壁纸铺在 body::before（z-index:-1），遮罩与图片叠成两层背景：
+   第一层是主题遮罩（保文字对比度），第二层才是图片。
+   ⚠️ 必须排在 glass.css 之后：玻璃态也用 body::before 铺渐变，
+   这里靠同名选择器的级联顺序覆盖它，而不是靠 !important。
+   ============================================================================ */
+
+/* 有壁纸时主体容器透明，否则非玻璃态的纯色底色会把壁纸整块盖住。
+   只作用于 app 根和 main，模块内部自己的局部底色不动。 */
+html.has-wallpaper [data-wallpaper-surface] {
+  background-color: transparent;
+}
+
+/* contain 模式露出的留白要跟主题走。index.html 的启动屏给 body 写了内联背景色，
+   只在壁纸激活时用 !important 覆盖——这是唯一能盖过内联样式的办法。 */
+html.has-wallpaper body {
+  background-color: var(--bg-base) !important;
+}
+
+/* 遮罩：深浅各读自己的强度。注入的是完整 linear-gradient（image 类型），
+   ⚠️ 不能注入裸 rgba()：实测 background-image 用 var() 展开 rgba 会让整条声明失效，
+   遮罩和图片一起消失、只剩纯色背景。2026-11-17 踩过，别改回去。 */
+:root {
+  --wallpaper-scrim: var(--wallpaper-scrim-light, linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.55)));
+}
+.dark {
+  --wallpaper-scrim: var(--wallpaper-scrim-dark, linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)));
+}
+
+/* 壁纸层：遮罩在上、图片在下。contain 模式下露出的空白由 body 底色兜住。
+   ⚠️ glass.css 里 `html.dark.glass body::before` 特异性更高，必须再写一条带 .glass 的
+   版本压过去，否则深色玻璃态下仍显示原来的灰渐变、看不到壁纸。 */
+html.has-wallpaper body::before,
+html.glass.has-wallpaper body::before,
+html.dark.glass.has-wallpaper body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--wallpaper-scrim), var(--wallpaper-image);
+  background-size: cover, var(--wallpaper-size, cover);
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed;
+}
+

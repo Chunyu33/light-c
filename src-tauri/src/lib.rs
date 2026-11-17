@@ -58,6 +58,8 @@ pub fn run() {
                         .build()?;
                 }
             }
+            // 壁纸存到数据目录后靠 asset 协议加载，scope 不跨进程保留，启动时重新授权。
+            commands::data::authorize_wallpaper(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -157,6 +159,10 @@ pub fn run() {
             list_clearable_data_items,
             clear_selected_local_data,
             pick_folder_dialog,
+            pick_wallpaper_dialog,
+            install_wallpaper,
+            clear_wallpaper,
+            get_wallpaper_path,
             // AI 资产分析
             scan_ai_model_assets,
             delete_ai_model,
