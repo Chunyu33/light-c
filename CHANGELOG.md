@@ -2,6 +2,13 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.19.0
+
+- New background wallpaper: pick any image from your computer as the background, with fill, fit, and original-size modes, plus separate clarity for light and dark themes.
+- The app now always uses the sidebar layout, with every feature in the left menu — closer to a classic desktop app. The old layout switcher is gone.
+- The liquid glass sidebar and top bar look more like glass: reflective edges with a clear center.
+- Numbers in the top bar and module descriptions are much easier to read in dark mode.
+
 ## v2.18.4
 
 - The health score now follows the drive you pick, and its details show which drive it is based on.
