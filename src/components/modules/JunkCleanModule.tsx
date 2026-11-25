@@ -238,13 +238,27 @@ export function JunkCleanModule({ isPageActive = true }: ModuleRenderProps) {
     // 由模型自己决定要不要继续读。
     readItems: (targetId, offset, limit) => {
       const result = deepScanResult ?? scanResult;
-      const category = result?.categories.find((item) => item.category === targetId);
+      // 模型手上的是摘要里的分类 id，但它也可能照抄分类名称，两种都认
+      const wanted = targetId.trim();
+      const category = result?.categories.find(
+        (item) => item.category === wanted || item.display_name === wanted,
+      );
       if (!category) return null;
+      // ⚠️ 深度扫描的分类只加载了首屏，file_count 才是全量：总数必须按**已加载的**算。
+      // 否则模型照着「还有更多」往后翻，翻出已加载范围只会得到一句「没有读到内容」。
+      // 首屏那条说明占一行，所以这一页少放一个文件，条数才对得上。
+      const unloadedCount = Math.max(0, category.file_count - category.files.length);
+      const notes = unloadedCount > 0 && offset === 0
+        ? [`（这个分类共 ${category.file_count} 个文件，这里只能读到已加载的前 ${category.files.length} 个）`]
+        : [];
       return {
-        total: category.file_count,
-        lines: category.files
-          .slice(offset, offset + limit)
-          .map((file) => `${file.path}  ${formatSize(file.size)}`),
+        total: category.files.length,
+        lines: [
+          ...notes,
+          ...category.files
+            .slice(offset, offset + limit - notes.length)
+            .map((file) => `${file.path}  ${formatSize(file.size)}`),
+        ],
       };
     },
     // 只读：单条详情。itemId 就是 read_items 里行首那个完整路径 ——

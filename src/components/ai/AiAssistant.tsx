@@ -27,7 +27,7 @@ import type { AiSessionMessage } from '../../api/ai';
 import type { AiChatMessage, AiChatReply, AiPublicConfig, AiToolCall } from '../../types/ai';
 import { AiChatPanel } from './AiChatPanel';
 import { AiMarkIcon } from './AiMarkIcon';
-import { buildRequestMessages, getModuleDisplayName } from './aiContext';
+import { buildRequestMessages, getModuleDisplayName, looksLikeActionRequest } from './aiContext';
 import { getModuleDataSummary } from './moduleDataRegistry';
 import { getModuleActions } from './moduleActionRegistry';
 import type { AiDeleteOutcome, AiDeleteTargetSummary, ModuleActions } from './moduleActionRegistry';
@@ -413,12 +413,19 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
           }
           const args = call.arguments as { target_id?: unknown; offset?: unknown; limit?: unknown };
           const targetId = typeof args.target_id === 'string' ? args.target_id : '';
-          const offset = Math.max(0, Number(args.offset) || 0);
+          // 取整：模型偶尔会给出小数，不取整的话分页边界会重复或漏条
+          const offset = Math.max(0, Math.trunc(Number(args.offset)) || 0);
           // 上限 100：再大就把上下文吃光了，而"看得多"并不等于"答得准"
           const limit = Math.min(100, Math.max(1, Number(args.limit) || 30));
           const page = actions.readItems(targetId, offset, limit);
           if (!page || page.lines.length === 0) {
-            report(t(emptyReadMessageKey(moduleId), { module: moduleId }));
+            // 翻过末尾 ≠ 没有内容：工具说明让模型"加大 offset 再要"，它照做而出界时，
+            // 回一句"可能已经不存在"会把它带偏（转而去猜别的条目），这里如实说"到头了"。
+            if (page && page.total > 0 && offset >= page.total) {
+              report(t('tool.readEnd', { total: page.total }));
+            } else {
+              report(t(emptyReadMessageKey(moduleId), { module: moduleId }));
+            }
             continue;
           }
           report(formatReadPage(page, offset));
@@ -545,7 +552,9 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
         skipLookup,
       );
       // 工具声明、请求、看门狗、收尾各自成函数（见文件末的"发送流程里的几个步骤"）
-      const tools = buildAllowedTools(getModuleActions(moduleId), request, skipLookup);
+      // ⚠️ 这里必须传**转换前**的历史：request 里的工具查询结果已被转成用户侧消息（见 toRequestMessage），
+      // 拿它判断"是不是在要求动手"，查出来的数据就会被当成用户说的话（详见 looksLikeActionRequest）。
+      const tools = buildAllowedTools(getModuleActions(moduleId), history, text, skipLookup);
 
       try {
         // 一轮 = 一次请求。模型要求调只读工具时，把结果带上**再问一轮**，它才能据此作答。
@@ -804,6 +813,14 @@ export function AiAssistant({ activeModuleId }: AiAssistantProps) {
 
     lastAskIdRef.current = askRequest.id;
 
+    // 上一条还在回答：handleSend 为了防并发会直接返回，这次提问就被悄悄吞掉了 ——
+    // 面板照样打开、请求照样清掉，用户以为已经问出去了。必须明确告知。
+    if (sendingRef.current) {
+      showToast({ type: 'warning', title: t('askBusy'), description: t('askBusyHint') });
+      clearAiAsk();
+      return;
+    }
+
     // ⚠️ 没配好服务商时**什么都不做**：不弹面板、不入库、不发请求。
     // 快捷提问是从模块里点的，弹出一个空面板再报错，用户会以为问题已经发出去了；
     // 更糟的是那句话会被写进会话历史（面板一开就已经落盘）。
@@ -995,10 +1012,13 @@ function executableTools(declared: string[]): string[] {
  * 只读工具：模块登记了就给 —— 它们不改任何东西，用户问「这里有什么」正该直接读。
  * 会改数据的工具：**只在这次看起来是在要求动手时**才给。这是请求层的硬约束，
  * 比在提示词里反复叮嘱可靠得多：提示词只能"劝"，不给工具是"不能"。
+ *
+ * `history` 必须是**转换前**的历史（见 `looksLikeActionRequest` 的说明）。
  */
 function buildAllowedTools(
   actions: ModuleActions | null,
-  messages: AiChatMessage[],
+  history: AiChatMessage[],
+  userText: string,
   skipLookup = false,
 ): string[] {
   // 用户是**展开某一层之后**点的那一行（数据就在问句里、且不在模块的读取能力内）：
@@ -1008,7 +1028,7 @@ function buildAllowedTools(
   const tools: string[] = [];
   if (actions?.readItems) tools.push('read_items');
   if (actions?.readItemDetail) tools.push('read_item_detail');
-  if (looksLikeActionRequest(messages)) {
+  if (looksLikeActionRequest(history, userText)) {
     if (actions?.selectItems) tools.push('select_items');
     if (actions?.deleteItems) tools.push('propose_delete');
   }
@@ -1096,45 +1116,6 @@ async function requestStreamReply(options: {
     // 必须取消监听：否则一次对话留下一个永久监听器，下次的增量会被累加两遍
     unlisten?.();
   }
-}
-
-/**
- * 看起来像"在要求动手"的表达。
- *
- * 命中才把**会改数据**的工具声明给模型 —— 这是请求层的硬约束，
- * 比在提示词里反复叮嘱可靠得多：提示词只能"劝"，不给工具是"不能"。
- *
- * ⚠️ 刻意做得**保守**：宁可漏判（该动时没动，助手会反问一句），
- * 也不要误判（不该动时动了，弹出一张删除卡片）。
- * ⚠️ 只收"动手"的词，**不要收「对」「好」「确认」这类应答词** ——
- * 它们在任何一句闲聊里都可能出现，那样等于这道闸常开。
- */
-const ACTION_HINTS = [
-  // 简体（"清理""清除"两种字形通用，只列一次）
-  '删', '清理', '清掉', '清空', '清除', '勾选', '勾上', '选中', '移除',
-  // 繁体
-  '刪', '勾選', '選取',
-  // 日文
-  '削除', '消去', '選択', '選んで',
-  // 英文
-  'delete', 'remove', 'clean up', 'clear out', 'erase', 'wipe', 'uninstall',
-];
-
-/**
- * 用户最近两条消息里出现"动手"类词，就算"在要求操作"。
- *
- * ⚠️ 只扫**用户**消息：早先连助手自己的回复一起扫，于是"这些文件不建议删除"
- * 这种正文也会把删除工具重新声明出来 —— 模型的措辞反过来把闸打开了。
- * 看两条是为了兼容"助手问一句、用户接着回一句"。
- * 已知取舍：纯应答（只回一个「对」「好」，不含动词）不会命中，那种情况下
- * 助手会再问一句，功能不会静默失效。
- */
-function looksLikeActionRequest(messages: AiChatMessage[]): boolean {
-  const recent = messages
-    .filter((message) => message.role === 'user')
-    .slice(-2)
-    .map((message) => message.content.toLowerCase());
-  return recent.some((text) => ACTION_HINTS.some((hint) => text.includes(hint)));
 }
 
 /**

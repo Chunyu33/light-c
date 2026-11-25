@@ -287,7 +287,7 @@ export function GeneralSettings({ mode, setMode }: { mode: ThemeMode; setMode: (
             <div className="min-w-0">
               {/* Beta 标记用 ASCII 括号：这是唯一一处硬编码后缀，
                   用全角「（）」在西文界面里会显得是中文标点混入 */}
-              <p className="text-sm font-medium text-[var(--text-primary)]">{t('theme.glassLabel')} (Beta)</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t('theme.glassLabel')}</p>
               <p className="mt-1 text-xs text-[var(--text-muted)]">{t('theme.glassDesc')}</p>
               <p className="mt-1 text-xs text-[var(--color-warning)]">{t('theme.glassWarning')}</p>
             </div>

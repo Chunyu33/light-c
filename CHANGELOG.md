@@ -2,6 +2,13 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.19.1
+
+- Fixes old-style QQ accounts being missed when their data sits next to new-style QQ data.
+- Social app cleanup no longer pre-ticks transfer files marked "clean with care", so documents kept only inside a chat app can't be deleted by accident.
+- AI assistant: several read-lookup fixes and a searchable model dropdown; the Settings entry loses its Beta tag and "Test connection" becomes "Fetch models".
+- Liquid glass and wallpaper polish: a richer glass material that looks better over wallpapers in both themes, full-window wallpaper support without liquid glass, and the app logo as the chat avatar.
+
 ## v2.19.0
 
 - New background wallpaper: pick any image from your computer as the background, with fill, fit, and original-size modes, plus separate clarity for light and dark themes.

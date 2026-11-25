@@ -52,7 +52,7 @@ import {
 import { formatSize } from '../../utils/format';
 import i18n from '../../i18n';
 import { getSourceKey, getSourceLabel } from '../../utils/socialSource';
-import { applyDeletedPaths, resolveDeletedPaths } from '../../utils/socialScanResult';
+import { applyDeletedPaths, isSelectedByDefault, resolveDeletedPaths } from '../../utils/socialScanResult';
 import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
@@ -136,6 +136,49 @@ function getLastPathSegment(path: string): string {
   return segments[segments.length - 1] ?? path;
 }
 
+/** 按模型给回的标识找分类：它既可能照抄分类名，也可能用分类 id，两种都认。 */
+function findCategoryByIdentifier(
+  categories: SocialCategoryStats[],
+  identifier: string,
+): SocialCategoryStats | undefined {
+  const wanted = identifier.trim();
+  if (!wanted) return undefined;
+  return (
+    categories.find((entry) => entry.name.trim() === wanted)
+    ?? categories.find((entry) => entry.id.trim() === wanted)
+  );
+}
+
+/**
+ * 单个文件的详情；路径对不上任何文件时返回 null（公共层会统一说明"没有读到内容"）。
+ *
+ * 风险标签的文案由调用方给：这里不碰 i18n，保持纯函数。
+ */
+function describeFileDetail(
+  categories: SocialCategoryStats[],
+  path: string,
+  riskLabel: (level: RiskLevel) => string,
+): string | null {
+  for (const category of categories) {
+    // startsWith 兜一下：模型偶尔会把行尾的风险说明一起抄回来
+    const file = category.files.find((entry) => entry.path === path || path.startsWith(entry.path));
+    if (!file) continue;
+    return [
+      `路径：${file.path}`,
+      `大小：${formatSize(file.size)}`,
+      `所属分类：${category.name}（${category.description}）`,
+      `风险等级：${riskLabel(file.risk_level)}`,
+      // 默认勾不勾选必须说清，否则模型会顺着「可清理」说成"扫描后已经帮你选上了"
+      !file.deletable
+        ? '聊天记录数据库，不能在这里删除。'
+        : isSelectedByDefault(file)
+          ? '可以清理，扫描后默认已勾选。'
+          : '可以清理，但可能是唯一副本 —— 扫描后默认不勾选，需要用户自己勾。',
+    ].join('\n');
+  }
+  return null;
+}
+
 // ============================================================================
 // 组件实现
 // ============================================================================
@@ -203,27 +246,37 @@ export function SocialCleanModule({ isPageActive = true }: ModuleRenderProps) {
   }, [scanResult]);
   // 接入 AI 助手（只读）：只给摘要，不提供操作动作。
   useAiModuleBridge('social-clean', {
-    // 只读读取：分类列表（截图里也是"有哪些聊天软件"这种问法）
-    readItems: (_targetId, offset, limit) => {
-      const list = scanResult?.categories ?? [];
-      if (list.length === 0) return null;
+    // 只读读取。不给 targetId = 分类列表（界面上那一列）；
+    // 给了 = 那个分类下的文件 —— 模型问「传输文件里有哪些文件」时要能往下看一层。
+    // ⚠️ 不能无视 targetId 一律回分类列表：那和摘要是同一份数据，模型拿不到新东西，
+    //    只会反复要同一份、直到轮次用尽也答不出来（大目录分析那边踩过同样的坑）。
+    readItems: (targetId, offset, limit) => {
+      const categories = scanResult?.categories ?? [];
+      if (categories.length === 0) return null;
+      const category = findCategoryByIdentifier(categories, targetId);
+      if (!category) {
+        return {
+          total: categories.length,
+          lines: categories.slice(offset, offset + limit).map(
+            (item) => `${item.name}  ${formatSize(item.total_size)}  （${item.file_count} 个文件，其中可清理 ${item.deletable_count} 个）`,
+          ),
+        };
+      }
       return {
-        total: list.length,
-        lines: list.slice(offset, offset + limit).map(
-          (item) => `${item.name}  ${formatSize(item.total_size)}  （${item.file_count} 个文件，其中可清理 ${item.deletable_count} 个）`,
+        total: category.files.length,
+        lines: category.files.slice(offset, offset + limit).map(
+          (file) => `${file.path}  ${formatSize(file.size)}  ${getSocialRiskLabel(moduleT, file.risk_level)}`,
         ),
       };
     },
-    // 只读：单条详情。itemId 用 read_items 行首那个分类名 —— 该模块每行开头就是它，
-    // 名字对不上再用分类 id 兜一次。
+    // 只读：单条详情。itemId 先按分类找（分类名或分类 id）—— 该模块每行开头就是它；
+    // 对不上再按文件路径找（read_items 带了 targetId 之后，行首就是文件路径）。
     readItemDetail: (itemId) => {
       const wanted = itemId.trim();
       if (!wanted) return null;
       const list = scanResult?.categories ?? [];
-      const item =
-        list.find((entry) => entry.name.trim() === wanted) ??
-        list.find((entry) => entry.id.trim() === wanted);
-      if (!item) return null;
+      const item = findCategoryByIdentifier(list, wanted);
+      if (!item) return describeFileDetail(list, wanted, (level) => getSocialRiskLabel(moduleT, level));
       // 「能删不能删」是这里最容易说错的地方：可清理数与总数是两件事，
       // 所以两个数都给出来，别让模型只看到总量就说"都能删"。
       const keepCount = Math.max(0, item.file_count - item.deletable_count);
@@ -274,12 +327,13 @@ export function SocialCleanModule({ isPageActive = true }: ModuleRenderProps) {
       const result = await scanSocialCache();
       setScanResult(result);
       
-      // 默认只选中可删除的文件（排除 Critical 级别）
-      const deletablePaths = result.categories
+      // 默认只勾选「建议清理 / 安全清理」两档。聊天记录不可勾；
+      // 「谨慎清理」的传输文件可能是唯一副本，要用户自己勾（Issue #108）。
+      const defaultSelectedPaths = result.categories
         .flatMap(c => c.files)
-        .filter(f => f.deletable)
+        .filter(isSelectedByDefault)
         .map(f => f.path);
-      setSelectedPaths(new Set(deletablePaths));
+      setSelectedPaths(new Set(defaultSelectedPaths));
 
       updateModuleState('social', {
         status: 'done',
@@ -430,7 +484,7 @@ export function SocialCleanModule({ isPageActive = true }: ModuleRenderProps) {
       }
 
       // 删除成功后本地更新结果集，不再重跑一次全量扫描：
-      // 重扫既昂贵（要重新遍历所有软件的数据目录），又会把用户的勾选整块重置成「默认全选」。
+      // 重扫既昂贵（要重新遍历所有软件的数据目录），又会把用户的勾选整块重置成「默认勾选」。
       // resolveDeletedPaths 返回 null 表示有文件无法确认是否真的被删掉（例如被标记为重启后删除），
       // 这时退回重新扫描 —— 宁可慢一点，也不能把还在磁盘上的文件显示成已删除。
       const removedPaths = resolveDeletedPaths(paths, result);
@@ -1001,7 +1055,7 @@ interface FileListModalProps {
   /** 批量设置选中状态：筛选内全选一次性提交，避免逐条更新触发大量重渲染 */
   onSetSelectionForPaths: (paths: string[], select: boolean) => void;
   /** 请求打开删除确认框。作用范围由弹窗给定（当前筛选内已选中的文件），
-   *  避免因为「扫描后默认全选」而误删其它分类的文件。 */
+   *  避免因为「扫描后默认勾选」而误删其它分类的文件。 */
   onRequestDelete: (paths: string[]) => void;
   isOpen: boolean;
   onClose: () => void;

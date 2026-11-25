@@ -63,37 +63,7 @@ impl SocialScanner {
 
         for base_path in found_base_paths {
             info!("发现QQ目录: {}", base_path.display());
-
-            if Self::looks_like_qq_account(&base_path) {
-                self.scan_qq_account_directory(&base_path, is_custom, &mut paths);
-            } else if let Ok(entries) = std::fs::read_dir(&base_path) {
-                for entry in entries.filter_map(|e| e.ok()) {
-                    if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                        continue;
-                    }
-
-                    let user_dir = entry.path();
-                    let user_name = user_dir
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-
-                    // QQ号通常是纯数字，跳过非用户目录
-                    if Self::is_qq_non_account_name(&user_name) {
-                        continue;
-                    }
-
-                    // 账号目录特征是"存在 Msg/Image/FileRecv 之类子目录"，
-                    // 不满足就跳过，避免把 All Users 之外的杂项目录也扫一遍。
-                    if !Self::looks_like_qq_account(&user_dir) {
-                        continue;
-                    }
-
-                    info!("  QQ用户: {}", user_name);
-                    self.scan_qq_account_directory(&user_dir, is_custom, &mut paths);
-                }
-            }
+            self.scan_qq_base_directory(&base_path, is_custom, &mut paths);
         }
 
         self.add_named_subdirectories(
@@ -109,6 +79,67 @@ impl SocialScanner {
             None
         } else {
             Some(paths)
+        }
+    }
+
+    /// 扫描一个 QQ 数据目录候选。候选有两种形态，必须分开处理：
+    ///
+    /// - **账号目录本身**（注册表 PersonalFolder 直接指到 `<数据根>\<QQ号>`）：只解析这一个账号；
+    /// - **数据根**（`Documents\Tencent Files` 等）：下面挂着多个账号目录，
+    ///   以及与账号**同级**的 `nt_qq`（新版 QQ 的数据根，其下才是账号目录和 global）。
+    ///
+    /// ⚠️ 两种形态的特征会重叠：账号目录的标记里有 `nt_qq`（新版数据写进老账号目录），
+    /// 而 Issue #109 的数据根下也直接有 `nt_qq`。只看"有没有 nt_qq"会把数据根误判成
+    /// 一个账号，于是跳过子目录枚举，同级的旧版账号（Msg / FileRecv）整个漏扫。
+    /// 区分办法见 `is_qq_account_directory_itself`。
+    fn scan_qq_base_directory(
+        &self,
+        base_path: &Path,
+        is_custom: bool,
+        paths: &mut Vec<SocialAppPath>,
+    ) {
+        if Self::is_qq_account_directory_itself(base_path) {
+            self.scan_qq_account_directory(base_path, is_custom, paths);
+            return;
+        }
+
+        let Ok(entries) = std::fs::read_dir(base_path) else {
+            return;
+        };
+
+        for entry in entries.filter_map(|e| e.ok()) {
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+
+            let user_dir = entry.path();
+            let user_name = user_dir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            // QQ号通常是纯数字，跳过非用户目录
+            if Self::is_qq_non_account_name(&user_name) {
+                continue;
+            }
+
+            // 与账号同级的 nt_qq 不是旧版账号（它没有 Msg / Image 这些标记），
+            // 而是新版 QQ 的数据根，交给 NTQQ 适配器解析，否则这一整棵子树没人认领。
+            if user_name.eq_ignore_ascii_case("nt_qq") {
+                info!("  QQ数据根下的 NTQQ 数据: {}", user_dir.display());
+                self.collect_ntqq_paths(&user_dir, paths);
+                continue;
+            }
+
+            // 账号目录特征是"存在 Msg/Image/FileRecv 之类子目录"，
+            // 不满足就跳过，避免把 All Users 之外的杂项目录也扫一遍。
+            if !Self::looks_like_qq_account(&user_dir) {
+                continue;
+            }
+
+            info!("  QQ用户: {}", user_name);
+            self.scan_qq_account_directory(&user_dir, is_custom, paths);
         }
     }
 
@@ -322,14 +353,43 @@ impl SocialScanner {
         }
     }
 
+    /// 旧版 QQ 账号目录的标记子目录。
+    ///
+    /// 判定"是不是账号"和判定"是不是账号目录本身"都要用这一份，
+    /// 各写一遍的话两边迟早不一致。
+    const QQ_LEGACY_ACCOUNT_MARKERS: [&str; 5] = ["Msg", "Msg2", "FileRecv", "Image", "Database"];
+
+    /// 候选目录是不是**账号目录本身**（而不是装着多个账号的数据根）。
+    ///
+    /// `nt_qq` 单独不足以判定，必须再看一层（Issue #109）：
+    ///   - `nt_qq` 下面**直接是 nt_data / nt_db / nt_msg** → 它是本账号的新版数据，
+    ///     外层是账号目录（`<数据根>\<QQ号>\nt_qq\nt_data\Pic`）；
+    ///   - `nt_qq` 下面是账号目录或 global → 外层是数据根
+    ///     （`<数据根>\nt_qq\<QQ号>\nt_data`），旧账号是它的同级目录。
+    fn is_qq_account_directory_itself(path: &Path) -> bool {
+        if Self::QQ_LEGACY_ACCOUNT_MARKERS
+            .iter()
+            .any(|name| path.join(name).is_dir())
+        {
+            return true;
+        }
+
+        let nested_ntqq = path.join("nt_qq");
+        nested_ntqq.is_dir() && Self::looks_like_ntqq_account(&nested_ntqq)
+    }
+
     fn looks_like_qq_account(path: &Path) -> bool {
         // 🚨 必须带上 nt_qq：装在默认路径（Documents\Tencent Files）或自定义 data 目录的
         // 新版 QQ，账号目录下只有 `nt_qq`，没有 Msg / Image / FileRecv 这些老标记。
         // 少了这一项，整棵 `<账号>\nt_qq\nt_data\Pic` 连"是不是账号目录"这一关都过不了，
         // 后面的嵌套解析根本不会被执行 —— 用户反馈"默认路径扫不到任何内容"就是这里。
-        ["Msg", "Msg2", "FileRecv", "Image", "Database", "nt_qq"]
+        //
+        // 注意这里只回答"像不像账号"，不区分账号目录与数据根：
+        // 两者的分辨在 `is_qq_account_directory_itself`，那里要多看一层。
+        Self::QQ_LEGACY_ACCOUNT_MARKERS
             .iter()
             .any(|name| path.join(name).is_dir())
+            || path.join("nt_qq").is_dir()
     }
 
     /// 从注册表读取 QQ 自定义路径
@@ -486,6 +546,70 @@ mod tests {
             SocialScanner::looks_like_qq_account(&account),
             "只有 nt_qq 的账号目录也必须被认出来"
         );
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Issue #109：数据根下同时挂着旧版账号和**同级**的 nt_qq（新版数据根）。
+    ///
+    /// 旧实现把"有 nt_qq 子目录"当成账号特征，整个数据根被当成一个账号处理、
+    /// 跳过了子目录枚举，于是新版数据扫得到，同级的旧账号（Msg / FileRecv）全漏。
+    /// 同时守住"同一文件只列一次"：两个适配器都能到达的路径不能重复登记。
+    #[test]
+    fn scans_legacy_accounts_next_to_nt_qq_data_root() {
+        let root = fixture("mixed-data-root");
+        let legacy = root.join("123450001");
+        std::fs::create_dir_all(legacy.join("Msg")).unwrap();
+        std::fs::create_dir_all(legacy.join("FileRecv")).unwrap();
+        let ntqq = root.join("nt_qq/123450003");
+        std::fs::create_dir_all(ntqq.join("nt_msg")).unwrap();
+        std::fs::create_dir_all(ntqq.join("nt_data/Pic")).unwrap();
+        std::fs::create_dir_all(root.join("nt_qq/global/nt_data/Emoji")).unwrap();
+
+        let scanner = SocialScanner::new();
+        let mut paths = Vec::new();
+        scanner.scan_qq_base_directory(&root, false, &mut paths);
+
+        let found = |suffix: &str, category: FileCategory| {
+            paths
+                .iter()
+                .filter(|p| p.path.ends_with(suffix) && p.category == category)
+                .count()
+        };
+
+        // 旧版 QQ 的两个类别
+        assert_eq!(found("Msg", FileCategory::ChatDatabase), 1, "旧账号的 Msg 应被收录且只列一次");
+        assert_eq!(found("FileRecv", FileCategory::FileTransfer), 1, "旧账号的 FileRecv 应被收录且只列一次");
+        // NTQQ 的两个类别
+        assert_eq!(found("nt_msg", FileCategory::ChatDatabase), 1, "nt_msg 应被收录且只列一次");
+        assert_eq!(found("Pic", FileCategory::ImageVideo), 1, "nt_data/Pic 应被收录且只列一次");
+        assert_eq!(found("Emoji", FileCategory::TempCache), 1, "nt_qq/global 应被收录且只列一次");
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// 已支持的形态不能被 #109 的修复带坏：账号目录自己带着 nt_qq（新版数据写在老账号里）。
+    /// 这里的 `nt_qq` 下面**直接是 nt_data**，外层仍是账号目录，旧版的 Image 也要一起扫到。
+    #[test]
+    fn keeps_scanning_legacy_part_of_account_holding_nt_qq() {
+        let root = fixture("account-with-ntqq");
+        let account = root.join("123450001");
+        std::fs::create_dir_all(account.join("Image")).unwrap();
+        std::fs::create_dir_all(account.join("nt_qq/nt_data/Pic")).unwrap();
+
+        let scanner = SocialScanner::new();
+        let mut paths = Vec::new();
+        scanner.scan_qq_base_directory(&account, false, &mut paths);
+
+        let found = |suffix: &str, category: FileCategory| {
+            paths
+                .iter()
+                .filter(|p| p.path.ends_with(suffix) && p.category == category)
+                .count()
+        };
+
+        assert_eq!(found("Image", FileCategory::ImageVideo), 1, "账号内的旧版图片应被收录");
+        assert_eq!(found("Pic", FileCategory::ImageVideo), 1, "账号内 nt_qq 的图片应被收录且只列一次");
 
         let _ = std::fs::remove_dir_all(&root);
     }

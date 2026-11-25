@@ -1,7 +1,7 @@
 {
   "name": "light-c",
   "private": true,
-  "version": "2.19.0",
+  "version": "2.19.1",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": {
@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri",
     "check:i18n": "node scripts/check-i18n-keys.mjs",
@@ -44,6 +45,7 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^5.1.1"
   }
 }

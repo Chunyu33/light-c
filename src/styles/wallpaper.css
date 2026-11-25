@@ -46,3 +46,63 @@ html.dark.glass.has-wallpaper body::before {
   background-attachment: fixed;
 }
 
+/* ===== 非玻璃态：壁纸也要铺满整个窗口 =====
+   壁纸层（body::before）本来就是全屏的，但非玻璃态下侧栏和顶栏画着自己的实底
+   （都是 --bg-card），把壁纸挡住了 —— 结果壁纸只在主内容区的留白里可见
+   （用户 2026-11-25 反馈"应用范围也是全屏，不应该只是主要内容"）。
+
+   框架表面（侧栏 / 顶栏）和主内容面板换成带透明度的衬底，壁纸透出来。
+   ⚠️ 卡片透出来之后，卡内的次级文字直接压在壁纸上 —— 沿用玻璃态的
+   加深色（--text-muted / --text-faint），否则在深色壁纸区域看不清。
+   ⚠️ 卡内的悬浮/吸顶元素（--bg-elevated）保持实色，内容从下面滚过去时不能叠字。 */
+html.has-wallpaper:not(.glass) .module-card--page {
+  background-color: rgba(255, 255, 255, 0.6);
+  --text-muted: #424b58;
+  --text-faint: #48515f;
+  /* 模块卡的 ring（#EDEDED）压在照片上读作一圈白框 —— 半透明 + 投影已经足够
+     表达边界，描边直接去掉（只在壁纸模式下） */
+  --tw-ring-color: transparent;
+}
+
+/* 卡内空状态的虚线框：在壁纸上同样是一道白痕；玻璃态已有同款处理 */
+html.has-wallpaper:not(.glass) .module-card--page .empty-state {
+  border-color: transparent;
+}
+
+/* 顶栏与健康评分栏的下沿分隔线：壁纸上读作横贯全屏的白线，去掉 ——
+   上下两块都是半透明表面，靠壁纸的连续性自然衔接 */
+html.has-wallpaper:not(.glass) .glass-chrome {
+  background-color: rgba(255, 255, 255, 0.55);
+  border-color: transparent;
+}
+
+html.has-wallpaper:not(.glass) .sidebar-nav {
+  background-color: rgba(255, 255, 255, 0.55);
+  --text-muted: #424b58;
+  --text-faint: #48515f;
+}
+
+html.has-wallpaper:not(.glass) .module-card--page {
+  background-color: rgba(255, 255, 255, 0.6);
+  --text-muted: #424b58;
+  --text-faint: #48515f;
+}
+
+html.dark.has-wallpaper:not(.glass) .glass-chrome {
+  background-color: rgba(25, 25, 25, 0.72);
+}
+
+html.dark.has-wallpaper:not(.glass) .sidebar-nav {
+  background-color: rgba(25, 25, 25, 0.72);
+  /* 半透明表面上次级文字要提亮（同玻璃态深色的做法） */
+  --text-muted: #a8a8a8;
+  --text-faint: #9a9a9a;
+}
+
+html.dark.has-wallpaper:not(.glass) .module-card--page {
+  /* 没有模糊层可用，深色卡片透得太多时壁纸亮带会直接顶到文字，收一档 */
+  background-color: rgba(20, 20, 20, 0.72);
+  --text-muted: #a8a8a8;
+  --text-faint: #9a9a9a;
+}
+
