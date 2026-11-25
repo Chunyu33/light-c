@@ -6,6 +6,9 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
 - Fixes old-style QQ accounts being missed when they sit next to new-style QQ data in the same folder: their chat records and received files now show up in the scan.
 - Social app cleanup no longer pre-ticks transfer files marked "clean with care" after a scan; you can still tick them yourself. This prevents deleting documents that only exist inside the chat app.
+- AI assistant: clicking "Ask AI Assistant" while an answer is still streaming now tells you to try again, instead of silently dropping the question.
+- AI assistant: in Social app cleanup, asking what a category contains now returns the actual files, and reaching the end of a list no longer reports "nothing to read".
+- The AI assistant is more cautious: words like "clean" appearing in fetched data are no longer treated as a request to delete.
 
 ## v2.19.0
 

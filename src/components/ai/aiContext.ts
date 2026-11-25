@@ -217,6 +217,56 @@ export function buildRequestMessages(
   ];
 }
 
+/**
+ * 看起来像"在要求动手"的表达。
+ *
+ * 命中才把**会改数据**的工具声明给模型 —— 这是请求层的硬约束，
+ * 比在提示词里反复叮嘱可靠得多：提示词只能"劝"，不给工具是"不能"。
+ *
+ * ⚠️ 刻意做得**保守**：宁可漏判（该动时没动，助手会反问一句），
+ * 也不要误判（不该动时动了，弹出一张删除卡片）。
+ * ⚠️ 只收"动手"的词，**不要收「对」「好」「确认」这类应答词** ——
+ * 它们在任何一句闲聊里都可能出现，那样等于这道闸常开。
+ */
+const ACTION_HINTS = [
+  // 简体（"清理""清除"两种字形通用，只列一次）
+  '删', '清理', '清掉', '清空', '清除', '勾选', '勾上', '选中', '移除',
+  // 繁体
+  '刪', '勾選', '選取',
+  // 日文
+  '削除', '消去', '選択', '選んで',
+  // 英文
+  'delete', 'remove', 'clean up', 'clear out', 'erase', 'wipe', 'uninstall',
+];
+
+/**
+ * 用户最近两条消息里出现"动手"类词，就算"在要求操作"。
+ *
+ * ⚠️ 只看**用户亲手打的字**（`history` 里的 user 消息 + 这一句 `currentUserText`）：
+ * 早先连助手自己的回复一起扫，于是"这些文件不建议删除"这种正文也会把删除工具
+ * 重新声明出来 —— 模型的措辞反过来把闸打开了。
+ *
+ * ⚠️ 同样不能拿**发出去的请求消息**来判断：工具查询结果在历史里是 assistant，
+ * 但发请求时会被转成**用户侧消息**（见 `toRequestMessage`）。拿转换后的消息扫，
+ * 「所属分类：Windows 更新清理」这种查出来的数据就成了"用户说了清理"，
+ * 下一句纯提问（"那缓存呢？"）也会把勾选/删除工具声明出去。
+ *
+ * 看两条是为了兼容"助手问一句、用户接着回一句"。
+ * 已知取舍：纯应答（只回一个「对」「好」，不含动词）不会命中，那种情况下
+ * 助手会再问一句，功能不会静默失效。
+ */
+export function looksLikeActionRequest(history: AiChatMessage[], currentUserText: string): boolean {
+  const askedByUser = history
+    .filter((message) => message.role === 'user')
+    .map((message) => message.content);
+  askedByUser.push(currentUserText);
+
+  return askedByUser
+    .slice(-2)
+    .map((text) => text.toLowerCase())
+    .some((text) => ACTION_HINTS.some((hint) => text.includes(hint)));
+}
+
 /** 取模块显示名。未知模块返回空串，界面据此不显示"· xxx"尾巴。 */
 export function getModuleDisplayName(moduleId: string | null): string {
   if (!moduleId) return '';
