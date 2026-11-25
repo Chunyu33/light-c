@@ -55,8 +55,25 @@ html.dark.glass.has-wallpaper body::before {
    ⚠️ 卡片透出来之后，卡内的次级文字直接压在壁纸上 —— 沿用玻璃态的
    加深色（--text-muted / --text-faint），否则在深色壁纸区域看不清。
    ⚠️ 卡内的悬浮/吸顶元素（--bg-elevated）保持实色，内容从下面滚过去时不能叠字。 */
+html.has-wallpaper:not(.glass) .module-card--page {
+  background-color: rgba(255, 255, 255, 0.6);
+  --text-muted: #424b58;
+  --text-faint: #48515f;
+  /* 模块卡的 ring（#EDEDED）压在照片上读作一圈白框 —— 半透明 + 投影已经足够
+     表达边界，描边直接去掉（只在壁纸模式下） */
+  --tw-ring-color: transparent;
+}
+
+/* 卡内空状态的虚线框：在壁纸上同样是一道白痕；玻璃态已有同款处理 */
+html.has-wallpaper:not(.glass) .module-card--page .empty-state {
+  border-color: transparent;
+}
+
+/* 顶栏与健康评分栏的下沿分隔线：壁纸上读作横贯全屏的白线，去掉 ——
+   上下两块都是半透明表面，靠壁纸的连续性自然衔接 */
 html.has-wallpaper:not(.glass) .glass-chrome {
   background-color: rgba(255, 255, 255, 0.55);
+  border-color: transparent;
 }
 
 html.has-wallpaper:not(.glass) .sidebar-nav {

@@ -301,9 +301,6 @@ export function DashboardHeader({ onOneClickScan, onShowWelcome, hideOneClickSca
           </div>
         </div>
 
-        {/* 分隔线 */}
-        <div className="w-px h-9 bg-[var(--border-color)]" />
-
         {/* 磁盘使用情况：左侧是当前盘标签，右侧是切换 + 刷新图标和容量。
             切换分区走弹窗而不是下拉 —— 顶栏只有几十像素高，下拉的字号/宽度/选项截断
             反复对不齐；弹窗里每个盘能完整显示卷标、可用量和占用率。 */}
