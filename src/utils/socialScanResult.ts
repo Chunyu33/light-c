@@ -2,7 +2,7 @@
 // 社交扫描结果的本地增量更新
 //
 // 删除成功后如果重跑一次全量扫描，代价是重新遍历所有软件的数据目录，
-// 而且会把用户的勾选状态整块重置（handleScan 会默认全选所有可删除文件）。
+// 而且会把用户的勾选状态整块重置（handleScan 会按 `isSelectedByDefault` 重新勾选）。
 // 这里在本地把已删除的文件从结果里摘掉并重算统计，让界面立即反映变化。
 //
 // 顶层总计按「各分类之和」重算 —— 后端 core.rs 就是这么汇总的
@@ -10,7 +10,22 @@
 // 所以本地重算与重新扫描的结果一致，不会引入语义差异。
 // ============================================================================
 
-import type { SocialCategoryStats, SocialScanResult } from '../api/commands';
+import type { SocialCategoryStats, SocialFileEntry, SocialScanResult } from '../api/commands';
+
+/**
+ * 扫描结束后是否**默认勾选**某个文件。
+ *
+ * 「能不能勾」和「默认勾不勾」是两件事（Issue #108），不能用同一个判断：
+ *   - 能不能勾：只有聊天记录不可勾，见 `deletable`；
+ *   - 默认勾不勾：传输文件（谨慎清理）可能是某份文档的唯一副本 —— 微信 4.x 只留在
+ *     temp/RWTemp 里的文件就是这种情况，默认勾上后用户一路点确认会把它删掉。
+ *
+ * 所以默认只勾「建议清理 / 安全清理」两档；谨慎清理的文件保留手动勾选的能力。
+ * 这里按白名单判断而不是排除某一档：以后新增风险等级时，默认不勾比默认勾更安全。
+ */
+export function isSelectedByDefault(file: SocialFileEntry): boolean {
+  return file.deletable && (file.risk_level === 'low' || file.risk_level === 'none');
+}
 
 /** 单个分类被移除的文件带来的统计变化 */
 interface CategoryRemoval {

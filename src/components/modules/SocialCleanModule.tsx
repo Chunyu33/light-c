@@ -52,7 +52,7 @@ import {
 import { formatSize } from '../../utils/format';
 import i18n from '../../i18n';
 import { getSourceKey, getSourceLabel } from '../../utils/socialSource';
-import { applyDeletedPaths, resolveDeletedPaths } from '../../utils/socialScanResult';
+import { applyDeletedPaths, isSelectedByDefault, resolveDeletedPaths } from '../../utils/socialScanResult';
 import type { ModuleRenderProps } from './moduleProps';
 
 // ============================================================================
@@ -274,12 +274,13 @@ export function SocialCleanModule({ isPageActive = true }: ModuleRenderProps) {
       const result = await scanSocialCache();
       setScanResult(result);
       
-      // 默认只选中可删除的文件（排除 Critical 级别）
-      const deletablePaths = result.categories
+      // 默认只勾选「建议清理 / 安全清理」两档。聊天记录不可勾；
+      // 「谨慎清理」的传输文件可能是唯一副本，要用户自己勾（Issue #108）。
+      const defaultSelectedPaths = result.categories
         .flatMap(c => c.files)
-        .filter(f => f.deletable)
+        .filter(isSelectedByDefault)
         .map(f => f.path);
-      setSelectedPaths(new Set(deletablePaths));
+      setSelectedPaths(new Set(defaultSelectedPaths));
 
       updateModuleState('social', {
         status: 'done',
@@ -430,7 +431,7 @@ export function SocialCleanModule({ isPageActive = true }: ModuleRenderProps) {
       }
 
       // 删除成功后本地更新结果集，不再重跑一次全量扫描：
-      // 重扫既昂贵（要重新遍历所有软件的数据目录），又会把用户的勾选整块重置成「默认全选」。
+      // 重扫既昂贵（要重新遍历所有软件的数据目录），又会把用户的勾选整块重置成「默认勾选」。
       // resolveDeletedPaths 返回 null 表示有文件无法确认是否真的被删掉（例如被标记为重启后删除），
       // 这时退回重新扫描 —— 宁可慢一点，也不能把还在磁盘上的文件显示成已删除。
       const removedPaths = resolveDeletedPaths(paths, result);
@@ -1001,7 +1002,7 @@ interface FileListModalProps {
   /** 批量设置选中状态：筛选内全选一次性提交，避免逐条更新触发大量重渲染 */
   onSetSelectionForPaths: (paths: string[], select: boolean) => void;
   /** 请求打开删除确认框。作用范围由弹窗给定（当前筛选内已选中的文件），
-   *  避免因为「扫描后默认全选」而误删其它分类的文件。 */
+   *  避免因为「扫描后默认勾选」而误删其它分类的文件。 */
   onRequestDelete: (paths: string[]) => void;
   isOpen: boolean;
   onClose: () => void;

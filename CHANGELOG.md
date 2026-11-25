@@ -5,6 +5,7 @@ English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 ## v2.19.1
 
 - Fixes old-style QQ accounts being missed when they sit next to new-style QQ data in the same folder: their chat records and received files now show up in the scan.
+- Social app cleanup no longer pre-ticks transfer files marked "clean with care" after a scan; you can still tick them yourself. This prevents deleting documents that only exist inside the chat app.
 
 ## v2.19.0
 
