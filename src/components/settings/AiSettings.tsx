@@ -701,7 +701,7 @@ export function AiSettings() {
                 type="button"
                 onClick={() => void handleTest()}
                 disabled={isTesting || isSaving}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--brand-green-20)] px-3 py-1.5 text-xs font-medium text-[var(--brand-green)] transition-colors hover:bg-[var(--brand-green-10)] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-green)] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--brand-green-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 {isTesting ? t('aiAssistant.testing') : t('aiAssistant.test')}

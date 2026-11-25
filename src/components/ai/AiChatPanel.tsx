@@ -22,7 +22,6 @@ import type { AiDeleteOutcome } from './moduleActionRegistry';
 import { collectImageFiles, compressImage, type AttachedImage } from './imageAttach';
 import { renderMarkdown } from './renderMarkdown';
 import { usePanelSize } from './usePanelSize';
-import { BetaBadge } from '../BetaBadge';
 import { formatSize } from '../../utils/format';
 
 /**
@@ -308,7 +307,6 @@ export function AiChatPanel({
           {t('panelTitle')}
           {moduleName ? <span className="text-[var(--text-muted)]"> · {moduleName}</span> : null}
         </span>
-        <BetaBadge />
         <button
           type="button"
           onClick={onClear}
@@ -370,13 +368,16 @@ export function AiChatPanel({
                 ) : null}
                 <div style={{ userSelect: 'all' }} className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                   <div
-                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                      isUser
-                        ? 'bg-[var(--bg-hover)] text-[var(--text-muted)]'
-                        : 'bg-[var(--brand-green-10)] text-[var(--brand-green)]'
+                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full ${
+                      isUser ? 'bg-[var(--bg-hover)] text-[var(--text-muted)]' : ''
                     }`}
                   >
-                    {isUser ? <User className="h-3.5 w-3.5" /> : <AiMarkIcon className="h-3.5 w-3.5" />}
+                    {isUser ? (
+                      <User className="h-3.5 w-3.5" />
+                    ) : (
+                      /* AI 侧头像用应用 Logo：对话里的身份标识和窗口品牌统一 */
+                      <img src="/logo.svg" alt="" className="h-full w-full" draggable={false} />
+                    )}
                   </div>
                   <div
                     className={`max-w-[80%] select-text whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed ${
@@ -451,8 +452,8 @@ export function AiChatPanel({
         {/* 正在生成的回答：边收边显示，让人看到"它在写字"而不是干等 */}
         {streamingText ? (
           <div className="flex items-start gap-2">
-            <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--brand-green-10)] text-[var(--brand-green)]">
-              <AiMarkIcon className="h-3.5 w-3.5" />
+            <div className="mt-0.5 h-6 w-6 shrink-0 overflow-hidden rounded-full">
+              <img src="/logo.svg" alt="" className="h-full w-full" draggable={false} />
             </div>
             {/* 流式过程中的气泡必须与落定后的**同一个底色**：
                 否则回答结束的一瞬间气泡会变一次色，很跳。 */}

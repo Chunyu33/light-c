@@ -52,11 +52,11 @@
     "apiKeyOptionalHint": "Optional",
     "apiKeyKeep": "Leave empty to keep the saved key",
     "model": "Model",
-    "modelDesc": "Use \"Test connection\" to fetch the models available to this key",
+    "modelDesc": "Use \"Fetch models\" to list the models available to this key",
     "localHint": "Local inference: conversations never leave this machine",
     "remoteHint": "Conversation content is sent to the chosen provider; avoid sensitive details",
-    "test": "Test connection",
-    "testing": "Testing...",
+    "test": "Fetch models",
+    "testing": "Fetching...",
     "testOk": "Connected",
     "testOkDesc": "Found {{count}} models",
     "save": "Save",
@@ -108,7 +108,7 @@
     "dark": "Dark",
     "system": "System",
     "glassLabel": "Liquid glass look",
-    "glassDesc": "Gives the title bar, sidebar and cards a translucent glass finish",
+    "glassDesc": "Gives the title bar, sidebar and cards a translucent glass finish — pair it with the background wallpaper below for the best look",
     "glassWarning": "Keeps the GPU busy, so scrolling may stutter on slower machines. Turn it on only if your device can handle it."
   },
   "wallpaper": {
