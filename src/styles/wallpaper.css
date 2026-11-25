@@ -51,15 +51,24 @@ html.dark.glass.has-wallpaper body::before {
    （都是 --bg-card），把壁纸挡住了 —— 结果壁纸只在主内容区的留白里可见
    （用户 2026-11-25 反馈"应用范围也是全屏，不应该只是主要内容"）。
 
-   给这两类**框架表面**换成带透明度的同色衬底：壁纸隐约透出，文字对比度基本不损失。
-   ⚠️ 模块卡保持实底，不动：它是内容载体，半透明卡片是玻璃态才有的表达；
-      卡片四周的留白本来就看得见壁纸。 */
+   框架表面（侧栏 / 顶栏）和主内容面板换成带透明度的衬底，壁纸透出来。
+   ⚠️ 卡片透出来之后，卡内的次级文字直接压在壁纸上 —— 沿用玻璃态的
+   加深色（--text-muted / --text-faint），否则在深色壁纸区域看不清。
+   ⚠️ 卡内的悬浮/吸顶元素（--bg-elevated）保持实色，内容从下面滚过去时不能叠字。 */
 html.has-wallpaper:not(.glass) .glass-chrome {
-  background-color: rgba(255, 255, 255, 0.72);
+  background-color: rgba(255, 255, 255, 0.55);
 }
 
 html.has-wallpaper:not(.glass) .sidebar-nav {
-  background-color: rgba(255, 255, 255, 0.72);
+  background-color: rgba(255, 255, 255, 0.55);
+  --text-muted: #424b58;
+  --text-faint: #48515f;
+}
+
+html.has-wallpaper:not(.glass) .module-card--page {
+  background-color: rgba(255, 255, 255, 0.6);
+  --text-muted: #424b58;
+  --text-faint: #48515f;
 }
 
 html.dark.has-wallpaper:not(.glass) .glass-chrome {
@@ -68,5 +77,15 @@ html.dark.has-wallpaper:not(.glass) .glass-chrome {
 
 html.dark.has-wallpaper:not(.glass) .sidebar-nav {
   background-color: rgba(25, 25, 25, 0.72);
+  /* 半透明表面上次级文字要提亮（同玻璃态深色的做法） */
+  --text-muted: #a8a8a8;
+  --text-faint: #9a9a9a;
+}
+
+html.dark.has-wallpaper:not(.glass) .module-card--page {
+  /* 没有模糊层可用，深色卡片透得太多时壁纸亮带会直接顶到文字，收一档 */
+  background-color: rgba(20, 20, 20, 0.72);
+  --text-muted: #a8a8a8;
+  --text-faint: #9a9a9a;
 }
 
