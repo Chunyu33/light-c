@@ -82,11 +82,24 @@ html.glass:not(.dark) {
   /* 表面配方：顶部内高光 + 大扩散柔和投影。
      只做半透明、不做这两样，面板只会像"发白的盒子"，不像玻璃。 */
   --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  /* 左右内高光 + 底部内暗边：iOS 液态玻璃的"厚度"就靠这三条边。
-     只有顶部一条高光时，面板读作"贴在背景上的一层膜"；
-     补上左右渐弱的高光和底部一道暗边，才有"一块有釉面的玻璃板"的立体感。
-     ⚠️ 暗边必须比高光淡得多 —— 两边等强会变成一圈描边，像套了个边框。 */
-  --glass-inner-side: rgba(255, 255, 255, 0.45);
+  /* 棱边（rim）与斜面（bevel）：液态玻璃的"材质感"主要来自边缘，而不是底色。
+     真玻璃的边缘是一条有宽度的斜面 —— 顶部受光、底部背光，最外沿再有一圈细反光。
+     只画 1px 细线时边缘读作"描边"，补上渐隐的受光带/暗带之后才读作"有厚度的板"。
+     ⚠️ 四条边**不能等强**：等强是一圈描边；受光面（上、左）亮、背光面（右、下）暗，
+     光源方向才成立。下沿单独留一道细亮线 —— 那是玻璃底边的反光，暗带在它内侧。 */
+  --glass-rim:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 1px 0 0 rgba(255, 255, 255, 0.55),
+    inset -1px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  --glass-bevel:
+    inset 0 16px 20px -16px rgba(255, 255, 255, 0.7),
+    inset 14px 0 18px -16px rgba(255, 255, 255, 0.3),
+    inset -14px 0 18px -16px rgba(15, 23, 42, 0.04),
+    inset 0 -14px 18px -14px rgba(15, 23, 42, 0.08);
+  /* 镜面反光的强度：深浅各一档。深底上白色反光非常显眼，必须收敛。 */
+  --glass-specular-strength: 0.14;
+  /* 浮层（下拉 / 气泡 / 弹窗栏）的下沿暗边：浮层不画整套斜面，只留这一条。 */
   --glass-inner-bottom: rgba(15, 23, 42, 0.06);
   /* 卡片轮廓外侧的一圈柔光：模拟光在玻璃棱边上的散射。
      iOS 那层玻璃最抓眼的就是"边缘在发光"，而 1px 白描边在浅底上几乎看不见 ——
@@ -206,9 +219,20 @@ html.dark.glass {
   --glass-overlay-bg: rgba(38, 38, 38, 0.93);
 
   --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  /* 暗色下"厚度"的价值比浅色更大：面板本身只有 7% 白，全靠这几条边才看得出是一块板。
-     底部暗边可以给到 0.45 —— 深底上这道暗边读作"玻璃的下沿"，不会像描边。 */
-  --glass-inner-side: rgba(255, 255, 255, 0.08);
+  /* 深色棱边与斜面（含义见浅色处的说明）。深底上要反过来收敛白、放大黑：
+     受光带只给一点点白，背光面用黑带压出厚度。 */
+  --glass-rim:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset -1px 0 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16);
+  --glass-bevel:
+    inset 0 16px 20px -16px rgba(255, 255, 255, 0.09),
+    inset 14px 0 18px -16px rgba(255, 255, 255, 0.04),
+    inset -14px 0 18px -16px rgba(0, 0, 0, 0.22),
+    inset 0 -16px 20px -16px rgba(0, 0, 0, 0.34);
+  --glass-specular-strength: 0.09;
+  /* 浮层的下沿暗边（同浅色处的说明）：深底上可以给到 0.45，读作"玻璃的下沿"。 */
   --glass-inner-bottom: rgba(0, 0, 0, 0.45);
   /* 深色下这道外发光只能给到 0.06：深底上白色光晕非常显眼，
      0.1 就已经像"卡片后面放了个灯"。 */
@@ -258,6 +282,30 @@ html.dark.glass {
       深底上那圈白会在面板边缘形成明显的亮边，看着像一圈浅色阴影。
       取与 --glass-edge 同量级的值。 */
   --glass-panel-border: rgba(255, 255, 255, 0.14);
+}
+
+/* ===== 深色玻璃 + 壁纸：表面换成中性深色，不再"叠白" =====
+   上面那套深色表面是按**中性灰渐变背景**调的：在背景上叠 7%~12% 的白。
+   换成壁纸之后这条路不成立 —— 壁纸自带色相，叠白 + saturate(175%) 等于把整块面板
+   染成壁纸的颜色（紫色壁纸上卡片、侧栏、行全是紫的），彩色数字和风险标签
+   （橙、绿、红）落在同色相的底上，对比度掉到 3:1 以下，基本读不出来。
+
+   液态玻璃在深色下的做法是**中性深色的烟色玻璃**：颜色透上来，但明度被压住。
+   所以这里把表面改成带透明度的中性深色，而不是继续叠白；饱和度放大也收一档。
+   ⚠️ 只在「深色 + 玻璃 + 有壁纸」时生效：无壁纸的深色观感是单独调过的，不动。 */
+html.dark.glass.has-wallpaper {
+  --glass-blur: blur(26px) saturate(140%);
+  --glass-surface-bg: rgba(21, 23, 26, 0.46);
+  --glass-sidebar-bg: rgba(21, 23, 26, 0.34);
+  --glass-chrome-bg: rgba(0, 0, 0, 0.42);
+  /* 行与次级表面：在深色玻璃上继续用"叠白"是对的，它们要比母体亮一档 */
+  --bg-card: rgba(255, 255, 255, 0.055);
+  --bg-elevated: rgba(255, 255, 255, 0.085);
+  --bg-input: rgba(255, 255, 255, 0.07);
+  --bg-hover: rgba(255, 255, 255, 0.1);
+  --bg-active: rgba(255, 255, 255, 0.14);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --glass-edge: rgba(255, 255, 255, 0.16);
 }
 
 /* ===== 背景层：纯明度分层（不带任何彩色） =====
@@ -413,8 +461,42 @@ html.dark.glass .glass-header-bottom {
    浅色为什么要压到 0.4：暗色卡片是 rgba(255,255,255,0.07)，93% 的背景透出来，
    所以通透；浅色原来 0.58 只有 42% 可见，在浅底上就"看不出玻璃"。
    两侧对齐到同一量级才有同样的观感。 */
+/* 镜面反光强度注册成**数值**：只有注册过，鼠标进出时的淡入淡出才能过渡，
+   否则会直接跳变，读作"闪了一下"。 */
+@property --glass-specular {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
+
 html.glass .glass-surface {
   background-color: var(--glass-surface-bg);
+  /* 镜面反光：一块柔和的光斑叠在底色上（在内容之下）。
+     · 静止时停在左上方 —— 光源方向和棱边一致（上、左受光）；
+     · 鼠标划过时跟着指针走（useGlassSpecular 写入 --glass-lx / --glass-ly），
+       这就是液态玻璃"光会动"的那一下；
+     · 反光画在 background-image 上而不用伪元素：模块卡不能随便改成定位元素，
+       否则内部绝对定位的遮罩层的包含块会变。
+     ⚠️ 写在底色规则里而不是单独一条：Tailwind 的 bg-* 只管 background-color，
+     两处分开写容易改了一处忘另一处。 */
+  --glass-lx: 30%;
+  --glass-ly: -20%;
+  background-image: radial-gradient(
+    62% 58% at var(--glass-lx) var(--glass-ly),
+    rgba(255, 255, 255, calc(var(--glass-specular) * var(--glass-specular-strength))),
+    rgba(255, 255, 255, 0) 72%
+  );
+  background-repeat: no-repeat;
+  /* 保留卡片原有的过渡（等价于 Tailwind 的 transition-all duration-300 ease-out），
+     再单独给反光强度一条更慢的过渡 */
+  transition:
+    all 300ms ease-out,
+    --glass-specular 420ms ease;
+}
+
+/* 悬停时反光加强：像玻璃转向光源。只调强度，位置由指针决定。 */
+html.glass .glass-surface:hover {
+  --glass-specular: 1.7;
 }
 
 html.glass .glass-chrome {
@@ -434,10 +516,8 @@ html.glass .glass-surface {
     0 0 0 1px var(--glass-edge),
     0 0 22px var(--glass-glow),
     var(--glass-shadow),
-    var(--glass-inner),
-    inset 1px 0 0 var(--glass-inner-side),
-    inset -1px 0 0 var(--glass-inner-side),
-    inset 0 -1px 0 var(--glass-inner-bottom);
+    var(--glass-bevel),
+    var(--glass-rim);
 }
 
 /* ===== 模块内部的玻璃化重排 =====
@@ -951,10 +1031,8 @@ html.glass .sidebar-nav::before {
   box-shadow:
     0 1px 3px rgba(30, 41, 59, 0.06),
     0 8px 16px rgba(30, 41, 59, 0.08),
-    var(--glass-inner),
-    inset 1px 0 0 var(--glass-inner-side),
-    inset -1px 0 0 var(--glass-inner-side),
-    inset 0 -1px 0 var(--glass-inner-bottom);
+    var(--glass-bevel),
+    var(--glass-rim);
 }
 
 /* 深色侧栏：投影必须换成黑色系。
@@ -964,10 +1042,8 @@ html.dark.glass .sidebar-nav::before {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.45),
     0 8px 16px rgba(0, 0, 0, 0.5),
-    var(--glass-inner),
-    inset 1px 0 0 var(--glass-inner-side),
-    inset -1px 0 0 var(--glass-inner-side),
-    inset 0 -1px 0 var(--glass-inner-bottom);
+    var(--glass-bevel),
+    var(--glass-rim);
 }
 
 /* 收缩态只有 4.25em 宽，内缩必须收小，否则面板装不下图标 */

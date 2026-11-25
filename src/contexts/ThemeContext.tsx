@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useGlassSpecular } from '../hooks/useGlassSpecular';
 
 /** 主题类型 */
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -116,6 +117,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     document.documentElement.classList.toggle('glass', glass);
   }, [glass]);
+
+  // 玻璃态下让模块卡的镜面反光跟着指针走；关闭时这个钩子不挂任何监听。
+  useGlassSpecular(glass);
 
   return (
     <ThemeContext.Provider value={{ mode, theme, setMode, glass, setGlass }}>
