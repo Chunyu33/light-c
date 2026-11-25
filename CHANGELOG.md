@@ -2,6 +2,10 @@
 
 English is the default changelog. See [简体中文](CHANGELOG-zh.md).
 
+## v2.19.1
+
+- Fixes old-style QQ accounts being missed when they sit next to new-style QQ data in the same folder: their chat records and received files now show up in the scan.
+
 ## v2.19.0
 
 - New background wallpaper: pick any image from your computer as the background, with fill, fit, and original-size modes, plus separate clarity for light and dark themes.
