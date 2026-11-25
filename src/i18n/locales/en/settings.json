@@ -59,6 +59,8 @@
     "testing": "Fetching...",
     "testOk": "Connected",
     "testOkDesc": "Found {{count}} models",
+    "modelSearch": "Search models…",
+    "modelNoMatch": "No matching models",
     "save": "Save",
     "saved": "AI settings saved",
     "loading": "Loading settings...",

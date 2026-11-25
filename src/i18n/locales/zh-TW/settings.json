@@ -59,6 +59,8 @@
     "testing": "取得中...",
     "testOk": "連線成功",
     "testOkDesc": "已取得 {{count}} 個可用模型",
+    "modelSearch": "搜尋模型…",
+    "modelNoMatch": "沒有符合的模型",
     "save": "儲存",
     "saved": "AI 設定已儲存",
     "loading": "正在讀取設定...",

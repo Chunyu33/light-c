@@ -60,6 +60,8 @@
   "askBusy": "アシスタントは前の質問に回答中です",
   "askBusyHint": "回答が終わってから、もう一度「AI アシスタントに聞く」を押してください。この質問は送信されていません。",
   "noModel": "モデル未選択",
+  "modelSearch": "モデルを検索…",
+  "modelNoMatch": "一致するモデルはありません",
   "attachImage": "画像を追加（スクリーンショットの貼り付けも可）",
   "attachRemove": "この画像を外す",
   "attachTooMany": "一度に最大 {{count}} 枚まで",

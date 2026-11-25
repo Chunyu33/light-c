@@ -619,7 +619,10 @@ export function AiChatPanel({
                 options={modelOptions.map((id) => ({ value: id, label: id }))}
                 onChange={onSwitchModel}
                 size="sm"
-                widthClass="w-44"
+                widthClass="w-56"
+                searchable
+                searchPlaceholder={t('modelSearch')}
+                emptyText={t('modelNoMatch')}
               />
             ) : (
               <span className="truncate text-[0.79rem] text-[var(--text-muted)]">

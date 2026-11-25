@@ -636,6 +636,9 @@ export function AiSettings() {
                   options={modelSelectOptions}
                   onChange={setModel}
                   widthClass="w-64"
+                  searchable
+                  searchPlaceholder={t('aiAssistant.modelSearch')}
+                  emptyText={t('aiAssistant.modelNoMatch')}
                 />
               ) : (
                 /* 连当前值都没有（没配过、也没拉到列表）：退化成文本输入，

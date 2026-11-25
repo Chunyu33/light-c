@@ -60,6 +60,8 @@
   "askBusy": "助手还在回答上一个问题",
   "askBusyHint": "等它回答完，再点一次「咨询 AI 助手」。这次提问没有发出去。",
   "noModel": "未选择模型",
+  "modelSearch": "搜索模型…",
+  "modelNoMatch": "没有匹配的模型",
   "attachImage": "添加图片（也可直接粘贴截图）",
   "attachRemove": "移除这张图",
   "attachTooMany": "最多一次带 {{count}} 张图片",

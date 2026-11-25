@@ -60,6 +60,8 @@
   "askBusy": "The assistant is still answering your previous question",
   "askBusyHint": "Wait for it to finish, then click “Ask AI Assistant” again. This question was not sent.",
   "noModel": "No model selected",
+  "modelSearch": "Search models…",
+  "modelNoMatch": "No matching models",
   "attachImage": "Add an image (or paste a screenshot)",
   "attachRemove": "Remove this image",
   "attachTooMany": "Up to {{count}} images at a time",
