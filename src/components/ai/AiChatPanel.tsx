@@ -327,7 +327,7 @@ export function AiChatPanel({
         </button>
       </header>
 
-      <div ref={listRef} onScroll={handleListScroll} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3">
+      <div ref={listRef} onScroll={handleListScroll} className="min-h-0 flex-1 space-y-2.5 overflow-x-hidden overflow-y-auto px-3 py-3">
         {/* 加载更早：历史是跨天读取的，到底或到内存上限时按钮就消失 */}
         {hasEarlier && visibleMessages.length > 0 ? (
           <button
@@ -380,7 +380,7 @@ export function AiChatPanel({
                     )}
                   </div>
                   <div
-                    className={`max-w-[80%] select-text whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed ${
+                    className={`min-w-0 max-w-[80%] select-text whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed ${
                       isUser ? 'bg-[var(--brand-green)] text-white' : 'bg-[var(--ai-bubble-bg)] text-[var(--text-primary)]'
                     }`}
                   >
@@ -457,7 +457,7 @@ export function AiChatPanel({
             </div>
             {/* 流式过程中的气泡必须与落定后的**同一个底色**：
                 否则回答结束的一瞬间气泡会变一次色，很跳。 */}
-            <div className="max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--ai-bubble-bg)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--text-primary)]">
+            <div className="min-w-0 max-w-[80%] whitespace-pre-wrap break-words rounded-xl bg-[var(--ai-bubble-bg)] px-2.5 py-1.5 text-sm leading-relaxed text-[var(--text-primary)]">
               {renderMarkdown(streamingText)}
               {/* 光标：暗示还在继续输出 */}
               <span className="ml-0.5 inline-block h-3 w-1 translate-y-0.5 animate-pulse bg-[var(--brand-green)]" />
